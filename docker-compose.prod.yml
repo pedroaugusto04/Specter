@@ -60,7 +60,7 @@ services:
       - "${PORT:-3001}:3001"
     volumes:
       - /home/ubuntu/.local/bin/agy:/usr/local/bin/agy:ro
-      - /home/ubuntu/.gemini:/root/.gemini:ro
+      - /home/ubuntu/.gemini:/root/.gemini
       - /home/ubuntu/.codex:/root/.codex:ro
       - /tmp/scraper_jobs:/tmp/scraper_jobs
     depends_on:
