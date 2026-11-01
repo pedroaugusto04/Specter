@@ -34,7 +34,6 @@ permissions:
 env:
   APP_NAME: ${{ vars.APP_NAME || 'Dynamic Scrapper' }}
   APP_DIR_NAME: ${{ vars.APP_DIR_NAME || 'dynamic-scrapper' }}
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/dynamic-scrapper-backend:latest', secrets.DOCKERHUB_USERNAME) || format('ghcr.io/{0}/dynamic-scrapper-backend:latest', github.repository) }}
   FRONTEND_DEPLOY_PATH: ${{ vars.FRONTEND_DEPLOY_PATH || '/var/www/dynamic-scrapper' }}
   RELOAD_NGINX: ${{ vars.RELOAD_NGINX || 'true' }}
   DOCKER_PLATFORMS: ${{ vars.DOCKER_PLATFORMS || 'linux/arm64' }}
@@ -133,6 +132,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_USERNAME || github.actor }}
           password: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
+      - name: Compute lowercase image names
+        id: image_meta
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            RAW_REPO="${{ secrets.DOCKERHUB_USERNAME }}/dynamic-scrapper-backend"
+          else
+            RAW_REPO="ghcr.io/${{ github.repository_owner }}/dynamic-scrapper-backend"
+          fi
+          LOWER_REPO=$(echo "$RAW_REPO" | tr '[:upper:]' '[:lower:]')
+          echo "image_repo=$LOWER_REPO" >> "$GITHUB_OUTPUT"
+          echo "image_latest=$LOWER_REPO:latest" >> "$GITHUB_OUTPUT"
+          echo "image_sha=$LOWER_REPO:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         if: ${{ contains(env.DOCKER_PLATFORMS, 'arm64') }}
         uses: docker/setup-qemu-action@v3
@@ -148,8 +160,8 @@ jobs:
           push: true
           platforms: ${{ env.DOCKER_PLATFORMS }}
           tags: |
-            ${{ env.BACKEND_IMAGE }}
-            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/dynamic-scrapper-backend:{1}', secrets.DOCKERHUB_USERNAME, github.sha) || format('ghcr.io/{0}/dynamic-scrapper-backend:{1}', github.repository, github.sha) }}
+            ${{ steps.image_meta.outputs.image_latest }}
+            ${{ steps.image_meta.outputs.image_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -218,7 +230,7 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          BACKEND_IMAGE: ${{ steps.image_meta.outputs.image_sha }}
           APP_DIR_NAME: ${{ env.APP_DIR_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
