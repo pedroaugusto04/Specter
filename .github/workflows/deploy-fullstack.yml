@@ -1,0 +1,328 @@
+name: Deploy Fullstack
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'scripts/deploy/**'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy-fullstack.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Component to deploy / Componente para deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+
+concurrency:
+  group: deploy-fullstack-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  APP_NAME: ${{ vars.APP_NAME || 'Dynamic Scrapper' }}
+  APP_DIR_NAME: ${{ vars.APP_DIR_NAME || 'dynamic-scrapper' }}
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/dynamic-scrapper-backend:latest', secrets.DOCKERHUB_USERNAME) || format('ghcr.io/{0}/dynamic-scrapper-backend:latest', github.repository) }}
+  FRONTEND_DEPLOY_PATH: ${{ vars.FRONTEND_DEPLOY_PATH || '/var/www/dynamic-scrapper' }}
+  RELOAD_NGINX: ${{ vars.RELOAD_NGINX || 'true' }}
+  DOCKER_PLATFORMS: ${{ vars.DOCKER_PLATFORMS || 'linux/arm64' }}
+  APP_PORT: ${{ vars.PORT || '3001' }}
+  CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
+  NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '/scrapper' }}
+  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/scrapper/api' }}
+  COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'agy' }}
+  SCRAPER_ENGINE: ${{ vars.SCRAPER_ENGINE || 'playwright' }}
+  SCRAPER_CONCURRENCY: ${{ vars.SCRAPER_CONCURRENCY || '3' }}
+  PLAYWRIGHT_TIMEOUT_MS: ${{ vars.PLAYWRIGHT_TIMEOUT_MS || '30000' }}
+  COMPILER_TIMEOUT_MS: ${{ vars.COMPILER_TIMEOUT_MS || '90000' }}
+  NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || 'console' }}
+  NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || 'alerts@scraper.local' }}
+  MIN_CRON_INTERVAL_MINUTES: ${{ vars.MIN_CRON_INTERVAL_MINUTES || '15' }}
+  DOCKER_LOG_MAX_SIZE: ${{ vars.DOCKER_LOG_MAX_SIZE || '10m' }}
+  DOCKER_LOG_MAX_FILE: ${{ vars.DOCKER_LOG_MAX_FILE || '5' }}
+
+jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.set-outputs.outputs.backend }}
+      frontend: ${{ steps.set-outputs.outputs.frontend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'scripts/deploy/**'
+              - 'docker-compose.prod.yml'
+              - '.github/workflows/deploy-fullstack.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/deploy-fullstack.yml'
+
+      - name: Determine target components
+        id: set-outputs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ inputs.target }}"
+            if [ "$TARGET" = "all" ]; then
+              echo "backend=true" >> "$GITHUB_OUTPUT"
+              echo "frontend=true" >> "$GITHUB_OUTPUT"
+            elif [ "$TARGET" = "backend" ]; then
+              echo "backend=true" >> "$GITHUB_OUTPUT"
+              echo "frontend=false" >> "$GITHUB_OUTPUT"
+            elif [ "$TARGET" = "frontend" ]; then
+              echo "backend=false" >> "$GITHUB_OUTPUT"
+              echo "frontend=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "backend=${{ steps.filter.outputs.backend }}" >> "$GITHUB_OUTPUT"
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-backend:
+    name: Build Docker & Deploy Backend to VPS
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          npm ci --no-audit --no-fund
+
+      - name: Run backend tests
+        working-directory: backend
+        run: |
+          npm run test
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKERHUB_USERNAME != '' && 'docker.io' || 'ghcr.io' }}
+          username: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_USERNAME || github.actor }}
+          password: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        if: ${{ contains(env.DOCKER_PLATFORMS, 'arm64') }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          platforms: ${{ env.DOCKER_PLATFORMS }}
+          tags: |
+            ${{ env.BACKEND_IMAGE }}
+            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/dynamic-scrapper-backend:{1}', secrets.DOCKERHUB_USERNAME, github.sha) || format('ghcr.io/{0}/dynamic-scrapper-backend:{1}', github.repository, github.sha) }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Ensure rsync is available on GitHub runner
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Generate backend env file
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER || vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || vars.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB || vars.POSTGRES_DB }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CORS_ORIGIN: ${{ env.CORS_ORIGIN }}
+          COMPILER_PROVIDER: ${{ env.COMPILER_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NOTIFICATION_PROVIDER: ${{ env.NOTIFICATION_PROVIDER }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFICATION_FROM_EMAIL: ${{ env.NOTIFICATION_FROM_EMAIL }}
+          SCRAPER_ENGINE: ${{ env.SCRAPER_ENGINE }}
+          SCRAPER_CONCURRENCY: ${{ env.SCRAPER_CONCURRENCY }}
+          PLAYWRIGHT_TIMEOUT_MS: ${{ env.PLAYWRIGHT_TIMEOUT_MS }}
+          COMPILER_TIMEOUT_MS: ${{ env.COMPILER_TIMEOUT_MS }}
+          MIN_CRON_INTERVAL_MINUTES: ${{ env.MIN_CRON_INTERVAL_MINUTES }}
+          DOCKER_LOG_MAX_SIZE: ${{ env.DOCKER_LOG_MAX_SIZE }}
+          DOCKER_LOG_MAX_FILE: ${{ env.DOCKER_LOG_MAX_FILE }}
+        run: |
+          bash scripts/deploy/generate-backend-env.sh .deploy/backend.env 3001
+
+      - name: Prepare SSH for VPS sync
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          APP_DIR_NAME: ${{ env.APP_DIR_NAME }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 22 -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" \
+            "command -v rsync >/dev/null 2>&1 || { echo 'rsync nao encontrado no servidor remoto'; exit 1; }; mkdir -p ~/$APP_DIR_NAME /tmp/scraper_jobs"
+
+      - name: Sync backend deploy assets to VPS
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          APP_DIR_NAME: ${{ env.APP_DIR_NAME }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes" \
+            .deploy/backend.env "$SERVER_USER@$SERVER_HOST:~/$APP_DIR_NAME/backend.env"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes" \
+            docker-compose.prod.yml "$SERVER_USER@$SERVER_HOST:~/$APP_DIR_NAME/docker-compose.prod.yml"
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.4
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          APP_DIR_NAME: ${{ env.APP_DIR_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,GHCR_TOKEN,GH_ACTOR,BACKEND_IMAGE,APP_DIR_NAME
+          script: |
+            set -euo pipefail
+            COMPOSE_FILE="docker-compose.prod.yml"
+
+            mkdir -p ~/${APP_DIR_NAME}
+            cd ~/${APP_DIR_NAME} || exit 1
+            chmod 600 backend.env
+            cp backend.env .env.prod
+            echo "DOCKER_IMAGE=$BACKEND_IMAGE" >> .env.prod
+
+            if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+              echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            elif [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "${GH_ACTOR:-}" --password-stdin
+            fi
+
+            sudo docker pull "$BACKEND_IMAGE"
+            sudo env DOCKER_IMAGE="$BACKEND_IMAGE" docker compose --env-file .env.prod -f "$COMPOSE_FILE" up -d --remove-orphans
+
+            # Limpa imagens antigas (mais de 7 dias)
+            sudo docker image prune -a -f --filter "until=168h"
+
+  deploy-frontend:
+    name: Build & Deploy Frontend to VPS
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+
+      - name: Build frontend static export
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ env.NEXT_PUBLIC_BASE_PATH }}
+          NEXT_PUBLIC_API_URL: ${{ env.NEXT_PUBLIC_API_URL }}
+        run: |
+          npm run build
+
+      - name: Ensure rsync is available on GitHub runner
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Prepare SSH for VPS sync
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          APP_DIR_NAME: ${{ env.APP_DIR_NAME }}
+          FRONTEND_DEPLOY_PATH: ${{ env.FRONTEND_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 22 -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" \
+            "command -v rsync >/dev/null 2>&1 || { echo 'rsync nao encontrado no servidor remoto'; exit 1; }; sudo mkdir -p \"$FRONTEND_DEPLOY_PATH\" && sudo chown -R $SERVER_USER:$SERVER_USER \"$FRONTEND_DEPLOY_PATH\""
+
+      - name: Sync frontend export to VPS
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          FRONTEND_DEPLOY_PATH: ${{ env.FRONTEND_DEPLOY_PATH }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes" \
+            frontend/out/ "$SERVER_USER@$SERVER_HOST:$FRONTEND_DEPLOY_PATH/"
+
+      - name: Reload Nginx on App VPS
+        if: ${{ vars.RELOAD_NGINX != 'false' }}
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            if command -v nginx >/dev/null 2>&1 && systemctl list-unit-files | grep -q '^nginx.service'; then
+              sudo nginx -t
+              sudo systemctl reload nginx
+            else
+              echo "Nginx nao instalado; pulando reload."
+            fi

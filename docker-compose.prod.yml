@@ -1,0 +1,81 @@
+x-default-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+    max-file: "${DOCKER_LOG_MAX_FILE:-5}"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dynamic-scrapper-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dynamic_scrapper}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dynamic_scrapper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - dynamic-scrapper-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dynamic-scrapper-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - dynamic-scrapper-net
+
+  backend:
+    image: ${DOCKER_IMAGE}
+    container_name: dynamic-scrapper-backend
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-dynamic_scrapper}
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AGY_CLI_PATH: /usr/local/bin/agy
+      CODEX_CLI_PATH: /usr/local/bin/codex
+    ports:
+      - "${PORT:-3001}:3001"
+    volumes:
+      - /home/ubuntu/.local/bin/agy:/usr/local/bin/agy:ro
+      - /home/ubuntu/.gemini:/root/.gemini:ro
+      - /home/ubuntu/.codex:/root/.codex:ro
+      - /tmp/scraper_jobs:/tmp/scraper_jobs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - dynamic-scrapper-net
+
+networks:
+  dynamic-scrapper-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

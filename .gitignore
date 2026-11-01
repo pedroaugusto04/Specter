@@ -1,0 +1,15 @@
+AGENTS.md
+.agents
+docs/*
+node_modules/
+dist/
+.next/
+out/
+coverage/
+.env
+.env.local
+.env.*.local
+.deploy/
+*.log
+.DS_Store
+tsconfig.tsbuildinfo

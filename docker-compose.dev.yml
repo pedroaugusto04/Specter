@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dynamic-scrapper-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dynamic_scrapper}
+    ports:
+      - "${POSTGRES_PORT:-5445}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./backend/drizzle/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dynamic_scrapper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dynamic-scrapper-redis-dev
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: dynamic-scrapper-backend-dev
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      HOST: 0.0.0.0
+      CORS_ORIGIN: "http://localhost:3000,http://localhost:3005"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-dynamic_scrapper}
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-agy}
+      AGY_CLI_PATH: agy
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-console}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /home/pedroduarte/.local/bin/agy:/usr/local/bin/agy:ro
+      - agy_profile:/root/.gemini
+      - /tmp/scraper_jobs:/tmp/scraper_jobs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: dynamic-scrapper-frontend-dev
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+    environment:
+      NODE_ENV: development
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3005:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  agy_profile:

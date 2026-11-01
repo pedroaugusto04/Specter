@@ -1,0 +1,228 @@
+import crypto from 'crypto';
+import type {
+  CompilerInput,
+  ExtractorSchema,
+  ICompilerProvider,
+} from '../../src/providers/compilers/compiler.interface.js';
+import type {
+  AlertPayload,
+  INotificationProvider,
+} from '../../src/providers/notifications/notification.interface.js';
+import type {
+  IScraperEngine,
+  ScrapeOptions,
+  ScrapeResult,
+} from '../../src/providers/scraping/scraper.interface.js';
+import type { IJobScheduler } from '../../src/queues/scheduler.interface.js';
+import type {
+  CreateJobInput,
+  CreateJobRunInput,
+  DashboardStats,
+  IJobRepository,
+  UpdateJobPatch,
+} from '../../src/repositories/jobRepository.js';
+import type { JobRunEntity, JobStatus, ScrapingJobEntity } from '../../src/types/domain.js';
+
+export class InMemoryJobRepository implements IJobRepository {
+  public jobs = new Map<string, ScrapingJobEntity>();
+  public runs: JobRunEntity[] = [];
+
+  async createJob(input: CreateJobInput): Promise<ScrapingJobEntity> {
+    const now = new Date();
+    const entity: ScrapingJobEntity = {
+      id: crypto.randomUUID(),
+      userId: input.userId ?? 'default-user',
+      url: input.url,
+      userPrompt: input.userPrompt,
+      notificationEmail: input.notificationEmail,
+      cronExpression: input.cronExpression,
+      bullmqRepeatableKey: null,
+      extractorConfig: null,
+      status: 'PENDING_COMPILATION',
+      lastError: null,
+      failureCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.jobs.set(entity.id, entity);
+    return { ...entity };
+  }
+
+  async findById(id: string): Promise<ScrapingJobEntity | null> {
+    const job = this.jobs.get(id);
+    return job ? { ...job } : null;
+  }
+
+  async findAll(statusFilter?: JobStatus): Promise<ScrapingJobEntity[]> {
+    const all = Array.from(this.jobs.values());
+    const filtered = statusFilter ? all.filter((j) => j.status === statusFilter) : all;
+    return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async findActiveJobs(): Promise<ScrapingJobEntity[]> {
+    return Array.from(this.jobs.values()).filter((j) => j.status === 'ACTIVE');
+  }
+
+  async updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null> {
+    const existing = this.jobs.get(id);
+    if (!existing) return null;
+
+    const updated: ScrapingJobEntity = {
+      ...existing,
+      ...patch,
+      updatedAt: new Date(),
+    };
+    this.jobs.set(id, updated);
+    return { ...updated };
+  }
+
+  async deleteJob(id: string): Promise<boolean> {
+    const existed = this.jobs.delete(id);
+    if (existed) {
+      this.runs = this.runs.filter((r) => r.jobId !== id);
+    }
+    return existed;
+  }
+
+  async createRun(input: CreateJobRunInput): Promise<JobRunEntity> {
+    const entity: JobRunEntity = {
+      id: crypto.randomUUID(),
+      jobId: input.jobId,
+      extractedData: input.extractedData ?? null,
+      normalizedHash: input.normalizedHash ?? null,
+      hasChanges: input.hasChanges,
+      status: input.status,
+      errorMessage: input.errorMessage ?? null,
+      httpStatus: input.httpStatus ?? null,
+      durationMs: input.durationMs ?? null,
+      executedAt: input.executedAt ?? new Date(),
+    };
+    this.runs.push(entity);
+    return { ...entity };
+  }
+
+  async findRunsByJobId(jobId: string, limit = 50): Promise<JobRunEntity[]> {
+    return this.runs
+      .filter((r) => r.jobId === jobId)
+      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime())
+      .slice(0, limit);
+  }
+
+  async findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null> {
+    const matches = this.runs
+      .filter((r) => r.jobId === jobId && r.status === 'SUCCESS')
+      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
+    return matches[0] ? { ...matches[0] } : null;
+  }
+
+  async deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number> {
+    const beforeCount = this.runs.length;
+    this.runs = this.runs.filter(
+      (r) => !(r.hasChanges === 'NO' && r.executedAt.getTime() < cutoffDate.getTime())
+    );
+    return beforeCount - this.runs.length;
+  }
+
+  async getStats(): Promise<DashboardStats> {
+    const allJobs = Array.from(this.jobs.values());
+    return {
+      totalJobs: allJobs.length,
+      activeJobs: allJobs.filter((j) => j.status === 'ACTIVE').length,
+      healingOrCompilingJobs: allJobs.filter(
+        (j) => j.status === 'HEALING' || j.status === 'PENDING_COMPILATION'
+      ).length,
+      failedOrPausedJobs: allJobs.filter((j) => j.status === 'FAILED' || j.status === 'PAUSED')
+        .length,
+      totalRuns: this.runs.length,
+      DetectedChangesCount: this.runs.filter((r) => r.hasChanges === 'YES').length,
+    };
+  }
+}
+
+export class MockCompilerProvider implements ICompilerProvider {
+  public readonly name = 'mock-compiler';
+  public calls: CompilerInput[] = [];
+  private handler: (input: CompilerInput) => Promise<ExtractorSchema>;
+
+  constructor(handler?: (input: CompilerInput) => Promise<ExtractorSchema>) {
+    this.handler =
+      handler ??
+      (async () => ({
+        fields: {
+          title: { selector: '[data-testid="product-title"]', attribute: 'text' },
+          price: { selector: '[data-testid="product-price"]', attribute: 'text' },
+        },
+      }));
+  }
+
+  setHandler(handler: (input: CompilerInput) => Promise<ExtractorSchema>): void {
+    this.handler = handler;
+  }
+
+  async compile(input: CompilerInput): Promise<ExtractorSchema> {
+    this.calls.push(input);
+    return this.handler(input);
+  }
+}
+
+export class MockScraperEngine implements IScraperEngine {
+  public readonly name = 'mock-scraper';
+  public calls: Array<{ url: string; options?: ScrapeOptions }> = [];
+  private handler: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>;
+
+  constructor(handler?: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>) {
+    this.handler =
+      handler ??
+      (async (url) => ({
+        rawHtml: `<html><body><h1 data-testid="product-title">Notebook Pro</h1><span data-testid="product-price">$ 1,200.00</span></body></html>`,
+        httpStatus: 200,
+        url,
+        durationMs: 42,
+      }));
+  }
+
+  setHandler(handler: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>): void {
+    this.handler = handler;
+  }
+
+  async fetchHtml(url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
+    this.calls.push({ url, options });
+    return this.handler(url, options);
+  }
+}
+
+export class MockNotificationProvider implements INotificationProvider {
+  public readonly name = 'mock-notification';
+  public sentAlerts: AlertPayload[] = [];
+
+  async sendAlert(payload: AlertPayload): Promise<void> {
+    this.sentAlerts.push(payload);
+  }
+}
+
+export class MockJobScheduler implements IJobScheduler {
+  public compilationQueue: Array<{ jobId: string; reason: 'initial' | 'healing' | 'manual' }> = [];
+  public immediateScrapeQueue: string[] = [];
+  public scheduledRepeatables = new Map<string, string>();
+
+  async enqueueCompilation(
+    jobId: string,
+    reason: 'initial' | 'healing' | 'manual'
+  ): Promise<void> {
+    this.compilationQueue.push({ jobId, reason });
+  }
+
+  async enqueueImmediateScrape(jobId: string): Promise<void> {
+    this.immediateScrapeQueue.push(jobId);
+  }
+
+  async scheduleRepeatableJob(jobId: string, cronExpression: string): Promise<string | null> {
+    const key = `repeat:${jobId}:${cronExpression}`;
+    this.scheduledRepeatables.set(jobId, key);
+    return key;
+  }
+
+  async removeRepeatableJob(jobId: string): Promise<void> {
+    this.scheduledRepeatables.delete(jobId);
+  }
+}

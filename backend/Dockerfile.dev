@@ -1,0 +1,22 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+# Install system dependencies required for Playwright Chromium
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+# Install Playwright browser binaries with system dependencies
+RUN npx playwright install --with-deps chromium
+
+COPY . .
+
+EXPOSE 3001
+
+CMD ["npm", "run", "dev"]

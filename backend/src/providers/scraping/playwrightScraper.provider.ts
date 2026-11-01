@@ -1,0 +1,123 @@
+import { chromium, type Browser, type BrowserContext } from 'playwright';
+import { env } from '../../config/env.js';
+import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
+import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
+
+const DEFAULT_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+const BLOCKED_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
+
+export class PlaywrightScraperEngine implements IScraperEngine {
+  public readonly name = 'playwright';
+  private readonly defaultTimeoutMs: number;
+
+  constructor(options: { timeoutMs?: number } = {}) {
+    this.defaultTimeoutMs = options.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
+  }
+
+  async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
+    const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
+    const startTime = Date.now();
+
+    let browser: Browser | null = null;
+    let context: BrowserContext | null = null;
+
+    try {
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-blink-features=AutomationControlled',
+        ],
+      });
+
+      context = await browser.newContext({
+        userAgent: DEFAULT_USER_AGENT,
+        viewport: { width: 1920, height: 1080 },
+        locale: 'pt-BR',
+        extraHTTPHeaders: {
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Upgrade-Insecure-Requests': '1',
+        },
+      });
+
+      // Mask automation fingerprint (stealth)
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      });
+
+      const page = await context.newPage();
+      page.setDefaultNavigationTimeout(timeoutMs);
+      page.setDefaultTimeout(timeoutMs);
+
+      // Abort heavy media downloads to preserve VPS RAM and bandwidth
+      await page.route('**/*', (route) => {
+        const resourceType = route.request().resourceType();
+        if (BLOCKED_RESOURCE_TYPES.has(resourceType)) {
+          return route.abort();
+        }
+        return route.continue();
+      });
+
+      let response;
+      try {
+        response = await page.goto(targetUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: timeoutMs,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.toLowerCase().includes('timeout')) {
+          throw new NavigationTimeoutError(
+            `Navigation timeout after ${timeoutMs}ms for URL: ${targetUrl}`,
+            err
+          );
+        }
+        throw err;
+      }
+
+      const httpStatus = response?.status() ?? 200;
+
+      // Detect WAF / Cloudflare / Rate-Limit blocks without triggering layout self-healing
+      if (httpStatus === 403 || httpStatus === 429) {
+        throw new AntiBotBlockedError(
+          `Bloqueio anti-bot detectado com HTTP status ${httpStatus} em ${targetUrl}`,
+          httpStatus
+        );
+      }
+
+      if (options?.waitForSelector) {
+        await page
+          .waitForSelector(options.waitForSelector, { timeout: Math.min(5000, timeoutMs) })
+          .catch(() => {});
+      }
+
+      // Brief network stabilization wait for SPA hydration
+      await page
+        .waitForLoadState('networkidle', { timeout: Math.min(5000, timeoutMs) })
+        .catch(() => {});
+
+      const rawHtml = await page.content();
+      const durationMs = Date.now() - startTime;
+
+      return {
+        rawHtml,
+        httpStatus,
+        url: page.url() || targetUrl,
+        durationMs,
+      };
+    } finally {
+      if (context) {
+        await context.close().catch(() => {});
+      }
+      if (browser) {
+        await browser.close().catch(() => {});
+      }
+    }
+  }
+}
