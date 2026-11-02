@@ -17,7 +17,7 @@ export interface CreateScrapingJobRequest {
   userId?: string;
   url: string;
   userPrompt: string;
-  notificationEmail: string;
+  notificationEmail?: string;
   cronExpression?: string;
 }
 
@@ -103,7 +103,7 @@ export class JobService {
       userId: request.userId ?? 'default-user',
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
-      notificationEmail: request.notificationEmail.trim(),
+      notificationEmail: (request.notificationEmail ?? '').trim(),
       cronExpression,
     });
 

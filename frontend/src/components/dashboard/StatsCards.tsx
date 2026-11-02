@@ -7,32 +7,32 @@ import type { DashboardStats } from '@/lib/api';
 export function StatsCards({ stats }: { stats: DashboardStats | null }) {
   const items = [
     {
-      label: 'Total Monitors',
+      label: 'Monitors',
       value: stats?.totalJobs ?? 0,
-      sub: `${stats?.totalRuns ?? 0} runs recorded`,
+      sub: `${stats?.totalRuns ?? 0} runs executed`,
       icon: Activity,
       color: 'text-slate-700 bg-slate-100',
     },
     {
-      label: 'Active Monitors',
+      label: 'Active',
       value: stats?.activeJobs ?? 0,
-      sub: 'Deterministic execution (0 LLM tokens)',
+      sub: 'Continuous schedule',
       icon: CheckCircle2,
       color: 'text-emerald-700 bg-emerald-50',
     },
     {
-      label: 'Compiling / Self-Healing',
+      label: 'Healing',
       value: stats?.healingOrCompilingJobs ?? 0,
-      sub: 'AI agent generating selectors',
+      sub: 'Selector updates',
       icon: Sparkles,
       color: 'text-amber-700 bg-amber-50',
     },
     {
-      label: 'Failed / Paused',
-      value: stats?.failedOrPausedJobs ?? 0,
-      sub: `${stats?.DetectedChangesCount ?? 0} diff alerts sent`,
+      label: 'Diff Alerts',
+      value: stats?.DetectedChangesCount ?? 0,
+      sub: `${stats?.failedOrPausedJobs ?? 0} paused / failed`,
       icon: AlertTriangle,
-      color: 'text-red-700 bg-red-50',
+      color: 'text-indigo-700 bg-indigo-50',
     },
   ];
 

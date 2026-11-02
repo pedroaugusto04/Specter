@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bot, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { CreateJobForm } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
 import { EditJobModal } from '@/components/dashboard/EditJobModal';
@@ -29,7 +29,7 @@ export default function DashboardPage() {
       setConnectionWarning(null);
     } catch {
       setConnectionWarning(
-        'Unable to connect to Fastify API. Please verify the backend service is running.'
+        'Unable to connect to the backend service. Please verify that the API is running.'
       );
     } finally {
       setIsRefreshing(false);
@@ -46,18 +46,57 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      <header className="border-b border-slate-200/80 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
-              <Bot className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm ring-1 ring-slate-800">
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="url(#specter-grad)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="#818CF8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="#06B6D4"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <defs>
+                  <linearGradient id="specter-grad" x1="2" y1="2" x2="22" y2="12" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#6366F1" />
+                    <stop offset="1" stopColor="#06B6D4" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900">
-                Dynamic Scrapper & Autonomous Monitor
-              </h1>
+            <div className="flex items-center gap-2.5">
+              <span className="text-base font-semibold tracking-tight text-slate-950">
+                Specter
+              </span>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-600 border border-slate-200">
+                v1.0
+              </span>
+              <div className="hidden sm:flex items-center gap-1.5 pl-2 text-xs text-slate-500">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                </span>
+                <span>Live</span>
+              </div>
             </div>
           </div>
+
           <Button
             onClick={() => setIsCreateModalOpen(true)}
             size="sm"

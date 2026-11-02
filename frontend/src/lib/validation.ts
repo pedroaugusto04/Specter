@@ -44,10 +44,14 @@ export function validateUserPrompt(prompt: string): string | null {
   return null;
 }
 
-export function validateNotificationEmail(email: string): string | null {
+export function validateNotificationEmail(email?: string | null): string | null {
+  if (!email) {
+    return null;
+  }
+
   const trimmed = email.trim();
   if (!trimmed) {
-    return 'Alert email is required.';
+    return null;
   }
 
   // Standard RFC-5322 compatible email pattern

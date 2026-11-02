@@ -45,10 +45,12 @@ export const jobInputSchema = z.object({
     .min(1, 'Extraction instructions are required')
     .min(5, 'Extraction instructions must contain at least 5 characters'),
   notificationEmail: z
-    .string({ required_error: 'Alert email is required' })
+    .string()
     .trim()
-    .min(1, 'Alert email is required')
-    .email('Please enter a valid alert email address (e.g. alerts@company.com)'),
+    .email('Please enter a valid alert email address (e.g. alerts@company.com)')
+    .optional()
+    .or(z.literal(''))
+    .default(''),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
 });
 
@@ -71,9 +73,9 @@ export const jobUpdateSchema = z.object({
   notificationEmail: z
     .string()
     .trim()
-    .min(1, 'Alert email is required')
     .email('Please enter a valid alert email address (e.g. alerts@company.com)')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   cronExpression: cronExpressionSchema.optional(),
 });
 

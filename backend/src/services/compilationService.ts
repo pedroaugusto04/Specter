@@ -93,11 +93,11 @@ export class CompilationService {
         durationMs,
       });
 
-      if (hasChanges === 'YES' && previousRun) {
+      if (hasChanges === 'YES' && previousRun && job.notificationEmail && job.notificationEmail.trim()) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
         await this.notificationProvider
           .sendAlert({
-            to: job.notificationEmail,
+            to: job.notificationEmail.trim(),
             subject: `[Update] ${job.url}`,
             jobId: job.id,
             targetUrl: job.url,

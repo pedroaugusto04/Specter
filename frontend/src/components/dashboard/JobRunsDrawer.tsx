@@ -48,7 +48,7 @@ export function JobRunsDrawer({
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
             <Code2 className="h-4 w-4" />
-            AI Agent Compiled Specification
+            Extraction Schema
           </div>
           {job.extractorConfig ? (
             <pre className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3 text-xs text-slate-100">
@@ -56,7 +56,7 @@ export function JobRunsDrawer({
             </pre>
           ) : (
             <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-              Selectors have not been compiled yet or are pending in the compilation queue.
+              Extraction schema has not been generated yet.
             </p>
           )}
         </section>
@@ -66,7 +66,7 @@ export function JobRunsDrawer({
           <section className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
               <GitCompare className="h-4 w-4" />
-              Latest Structured Diff ({latestDiff.totalChanges} changes)
+              Latest Diff ({latestDiff.totalChanges} changes)
             </div>
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-left text-xs">

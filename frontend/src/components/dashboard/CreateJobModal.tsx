@@ -13,7 +13,6 @@ export interface CreateJobModalProps {
 export function CreateJobModal({ isOpen, onClose, onCreated }: CreateJobModalProps) {
   const [isDirty, setIsDirty] = React.useState(false);
 
-  // Reset dirty flag whenever modal closes
   React.useEffect(() => {
     if (!isOpen) {
       setIsDirty(false);
@@ -25,10 +24,10 @@ export function CreateJobModal({ isOpen, onClose, onCreated }: CreateJobModalPro
       isOpen={isOpen}
       onClose={onClose}
       isDirty={isDirty}
-      title="New Autonomous Monitor"
-      description="Configure target website URL, AI extraction instructions, and monitoring interval."
+      title="New Monitor"
+      description="Configure target website URL, extraction instructions, and check interval."
       confirmTitle="Discard Unsaved Changes?"
-      confirmMessage="You have filled in parts of this new monitor form. Closing now will discard your input. Are you sure you want to close?"
+      confirmMessage="You have unsaved changes. Closing now will discard your input. Are you sure you want to close?"
     >
       <CreateJobForm
         isModal

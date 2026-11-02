@@ -3,9 +3,8 @@ import { ModalProvider } from '@/components/ui/modal-dialog';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Dynamic Scrapper — Autonomous AI Web Monitor',
-  description:
-    'Web scraping and monitoring platform combining single-turn AI compilation with continuous deterministic execution.',
+  title: 'Specter — Autonomous Web Monitor',
+  description: 'Minimalist autonomous web monitoring and change detection platform.',
 };
 
 export default function RootLayout({
@@ -15,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900">
+      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         <ModalProvider>{children}</ModalProvider>
       </body>
     </html>

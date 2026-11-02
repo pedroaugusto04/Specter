@@ -81,7 +81,7 @@ export function JobsTable({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Configured Monitors ({jobs.length})</CardTitle>
+        <CardTitle className="text-base">Monitors ({jobs.length})</CardTitle>
         <Button variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing}>
           <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
           {isRefreshing ? 'Refreshing...' : 'Refresh'}
@@ -91,10 +91,10 @@ export function JobsTable({
         {jobs.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
             <p className="text-sm font-medium text-slate-600">
-              No monitoring jobs configured yet.
+              No monitors configured yet.
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              Use the form above to compile your first autonomous extractor.
+              Create your first target monitor above.
             </p>
           </div>
         ) : (

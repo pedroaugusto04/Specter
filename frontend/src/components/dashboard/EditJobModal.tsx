@@ -192,16 +192,15 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
           </FormField>
 
           <FormField
-            label="Alert Email (Resend)"
+            label="Alert Email"
             htmlFor="edit-notify-email"
-            required
             error={fieldErrors.notificationEmail}
-            hint="Destination email for detected change reports."
+            hint="Optional. Destination email for detected change reports."
           >
             <Input
               id="edit-notify-email"
               type="email"
-              placeholder="alerts@company.com"
+              placeholder="alerts@company.com (optional)"
               value={notificationEmail}
               hasError={Boolean(fieldErrors.notificationEmail)}
               aria-describedby={fieldErrors.notificationEmail ? 'edit-notify-email-error' : undefined}

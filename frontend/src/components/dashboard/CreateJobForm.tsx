@@ -229,16 +229,15 @@ export function CreateJobForm({
         </FormField>
 
         <FormField
-          label="Alert Email (Resend)"
+          label="Alert Email"
           htmlFor="notify-email"
-          required
           error={fieldErrors.notificationEmail}
-          hint="Destination email for detected change reports."
+          hint="Optional. Destination email for detected change reports."
         >
           <Input
             id="notify-email"
             type="email"
-            placeholder="alerts@company.com"
+            placeholder="alerts@company.com (optional)"
             value={notificationEmail}
             hasError={Boolean(fieldErrors.notificationEmail)}
             aria-describedby={fieldErrors.notificationEmail ? 'notify-email-error' : undefined}
@@ -277,7 +276,6 @@ export function CreateJobForm({
           htmlFor="cron-preset"
           required
           error={!useCustomCron ? fieldErrors.cronExpression : undefined}
-          hint={!useCustomCron ? 'Minimum allowed interval floor is 15 minutes.' : undefined}
         >
           <select
             id="cron-preset"
@@ -351,7 +349,7 @@ export function CreateJobForm({
         )}
         <Button type="submit" disabled={loading}>
           <Plus className="h-4 w-4" />
-          {loading ? 'Compiling & Scheduling...' : 'Create Monitor'}
+          {loading ? 'Creating...' : 'Create Monitor'}
         </Button>
       </div>
     </form>
@@ -364,10 +362,7 @@ export function CreateJobForm({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-slate-900" />
-          <CardTitle className="text-base">New Autonomous Monitor</CardTitle>
-        </div>
+        <CardTitle className="text-base">New Monitor</CardTitle>
       </CardHeader>
       <CardContent>{formContent}</CardContent>
     </Card>
