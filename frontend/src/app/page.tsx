@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Plus, Radio } from 'lucide-react';
 import { ProfileModal } from '@/components/auth/ProfileModal';
 import { UserAvatarMenu } from '@/components/auth/UserAvatarMenu';
@@ -190,8 +191,17 @@ export default function DashboardPage() {
 
       {/* Minimal Footer */}
       <footer className="border-t border-border bg-card/40">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 text-xs font-mono text-muted-foreground">
-          <span>Specter Web Monitor</span>
+        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8 text-xs text-muted-foreground">
+          <span className="font-mono">Specter Web Monitor &copy; 2026</span>
+          <div className="flex items-center gap-4 text-xs font-normal">
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms of Service
+            </Link>
+            <span>&bull;</span>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
 

@@ -98,7 +98,7 @@ export default function PrivacyPage() {
               <li>Provide diagnostic visibility into job executions and session expiration statuses.</li>
             </ul>
             <p className="text-emerald-400 font-medium pt-1">
-              ✓ We never sell, rent, monetize, or transfer user data or session cookies to third parties or advertising networks.
+              We never sell, rent, monetize, or transfer user data or session cookies to third parties or advertising networks.
             </p>
           </section>
 

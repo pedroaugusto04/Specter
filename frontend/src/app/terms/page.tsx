@@ -35,7 +35,7 @@ export default function TermsPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-2">
-          Terms of Service (Termos de Uso e Compromisso)
+          Terms of Service
         </h1>
         <p className="text-sm text-slate-400 mb-8">
           Last updated: November 2, 2026 • Effective immediately
