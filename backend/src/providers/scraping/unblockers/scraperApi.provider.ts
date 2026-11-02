@@ -36,6 +36,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('api_key', this.apiKey.trim());
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('render', 'true');
+      endpoint.searchParams.set('premium', 'true');
 
       if (targetUrl.includes('.com.br')) {
         endpoint.searchParams.set('country_code', 'br');

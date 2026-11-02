@@ -106,15 +106,11 @@ export function CreateJobForm({
       if (probe.accessible) {
         setProbeState({ status: 'accessible', urlChecked: trimmedUrl });
       } else {
-        const errorMsg =
-          probe.reason ||
-          'Target website is protected against automated requests. Monitoring cannot be created for this URL.';
         setProbeState({
           status: 'blocked',
           urlChecked: trimmedUrl,
-          reason: errorMsg,
+          reason: probe.reason,
         });
-        setFieldErrors((prev) => ({ ...prev, url: errorMsg }));
       }
     } catch {
       setProbeState({ status: 'idle' });
@@ -192,6 +188,10 @@ export function CreateJobForm({
               <span className="flex items-center gap-1.5 font-medium text-foreground">
                 <CheckCircle2 className="h-3 w-3 text-foreground" />
                 Website verified and accessible for automated monitoring.
+              </span>
+            ) : probeState.status === 'blocked' ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Protected by anti-bot checks. Background residential unblockers will handle extraction.
               </span>
             ) : (
               'Website URL to monitor for dynamic updates.'

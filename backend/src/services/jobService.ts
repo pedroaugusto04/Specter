@@ -53,7 +53,7 @@ export class JobService {
 
     try {
       // 30s allows remote residential proxies with JS rendering enough time to solve challenges
-      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 30000 });
+      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000 });
       return { accessible: true };
     } catch (err) {
       // Log the full internal error and unblocker breakdown for developer debugging
@@ -94,17 +94,6 @@ export class JobService {
         cronCheck.error ??
         'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
       throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
-    }
-
-    // Pre-flight check: verify URL accessibility and detect active anti-bot protections early
-    if (this.scraperEngine) {
-      const probe = await this.probeUrl(normalizedUrl);
-      if (!probe.accessible) {
-        throw new ValidationError(
-          probe.reason || 'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).',
-          [{ field: 'url', message: probe.reason || 'Anti-bot or access protection detected on target URL.' }]
-        );
-      }
     }
 
     const createdEntity = await this.jobRepository.createJob({

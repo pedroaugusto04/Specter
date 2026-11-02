@@ -260,8 +260,8 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(blockedData.accessible).toBe(false);
     expect(blockedData.reason).toContain('Anti-Bot / CAPTCHA');
 
-    // 3. Attempting to create a job on an anti-bot protected URL fails early at validation
-    const createBlockedRes = await app.inject({
+    // 3. Creating a job delegates anti-bot resolution to the background compilation queue without blocking the form
+    const createJobRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',
       payload: {
@@ -270,12 +270,10 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         notificationEmail: 'user@example.com',
       },
     });
-    expect(createBlockedRes.statusCode).toBe(400);
-    const createBlockedJson = createBlockedRes.json();
-    expect(createBlockedJson.error).toBe('VALIDATION_ERROR');
-    expect(createBlockedJson.fields.url).toContain('Anti-Bot / CAPTCHA');
-    // Ensure no job was enqueued or persisted
-    expect(repository.jobs.size).toBe(0);
-    expect(scheduler.compilationQueue).toHaveLength(0);
+    expect(createJobRes.statusCode).toBe(201);
+    const createdData = createJobRes.json().data;
+    expect(createdData.status).toBe('PENDING_COMPILATION');
+    expect(repository.jobs.size).toBe(1);
+    expect(scheduler.compilationQueue).toHaveLength(1);
   });
 });

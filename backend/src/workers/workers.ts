@@ -39,6 +39,7 @@ export class WorkerManager {
       {
         concurrency: env.COMPILER_CONCURRENCY,
         connection,
+        lockDuration: env.COMPILER_TIMEOUT_MS,
       }
     );
 
@@ -51,6 +52,7 @@ export class WorkerManager {
       {
         concurrency: env.SCRAPER_CONCURRENCY,
         connection,
+        lockDuration: env.COMPILER_TIMEOUT_MS,
       }
     );
 

@@ -24,13 +24,13 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
-  COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(90000),
+  COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(600000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),
 
   // Scraping Engine & Concurrency
   SCRAPER_ENGINE: z.enum(['playwright', 'cheerio']).default('playwright'),
   SCRAPER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(3),
-  PLAYWRIGHT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
+  PLAYWRIGHT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120000),
 
   // Proxy & Anti-Bot Unblocker Providers (Optional Fallback Cascade)
   HTTP_PROXY: z.string().optional().default(''),
