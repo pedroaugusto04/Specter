@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -25,8 +26,9 @@ export function AuthForm({
   const [mode, setMode] = React.useState<'login' | 'register'>(defaultMode);
   const [email, setEmail] = React.useState(initialEmail);
   const [password, setPassword] = React.useState('');
+  const [termsAccepted, setTermsAccepted] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [fieldErrors, setFieldErrors] = React.useState<{ email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = React.useState<{ email?: string; password?: string; terms?: string }>({});
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -36,6 +38,13 @@ export function AuthForm({
   }, [initialEmail, email]);
 
   const handleGoogleLogin = () => {
+    if (mode === 'register' && !termsAccepted) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        terms: 'You must agree to the Terms of Service and Privacy Policy to create an account.',
+      }));
+      return;
+    }
     onGoogleBeforeRedirect?.();
     window.location.href = api.getGoogleAuthUrl();
   };
@@ -46,7 +55,7 @@ export function AuthForm({
     setFieldErrors({});
 
     const trimmedEmail = email.trim();
-    const errors: { email?: string; password?: string } = {};
+    const errors: { email?: string; password?: string; terms?: string } = {};
 
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = 'Enter a valid email address.';
@@ -55,6 +64,10 @@ export function AuthForm({
       errors.password = 'Password must be at least 8 characters.';
     } else if (!password) {
       errors.password = 'Enter your password.';
+    }
+
+    if (mode === 'register' && !termsAccepted) {
+      errors.terms = 'You must agree to the Terms of Service and Privacy Policy.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -72,7 +85,7 @@ export function AuthForm({
     } catch (err) {
       if (err instanceof ApiError) {
         if (Object.keys(err.fieldErrors).length > 0) {
-          setFieldErrors(err.fieldErrors);
+          setFieldErrors((prev) => ({ ...prev, ...err.fieldErrors }));
           return;
         }
         setGlobalError(err.message);
@@ -128,7 +141,7 @@ export function AuthForm({
         variant="outline"
         className="w-full h-10 text-sm font-medium gap-2.5"
         onClick={handleGoogleLogin}
-        disabled={loading}
+        disabled={loading || (mode === 'register' && !termsAccepted)}
       >
         <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -150,6 +163,12 @@ export function AuthForm({
         </svg>
         <span>Continue with Google</span>
       </Button>
+
+      {mode === 'register' && !termsAccepted && (
+        <p className="text-[11px] text-muted-foreground text-center">
+          Please accept the terms and privacy policy below before continuing with Google.
+        </p>
+      )}
 
       <div className="relative flex items-center py-1">
         <div className="grow border-t border-border" />
@@ -191,6 +210,51 @@ export function AuthForm({
           />
         </FormField>
 
+        {mode === 'register' && (
+          <div className="space-y-1.5 pt-1">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="terms-checkbox"
+                checked={termsAccepted}
+                onChange={(e) => {
+                  setTermsAccepted(e.target.checked);
+                  if (fieldErrors.terms) {
+                    setFieldErrors((prev) => ({ ...prev, terms: undefined }));
+                  }
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+              />
+              <span className="text-xs text-muted-foreground leading-snug">
+                I agree to the{' '}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-foreground underline hover:text-primary transition-colors"
+                >
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-foreground underline hover:text-primary transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+            {fieldErrors.terms && (
+              <p className="text-[11px] text-red-600 dark:text-red-400 pl-6.5">
+                {fieldErrors.terms}
+              </p>
+            )}
+          </div>
+        )}
+
         {globalError && (
           <div
             role="alert"
@@ -216,7 +280,11 @@ export function AuthForm({
             <div />
           )}
 
-          <Button type="submit" className="h-10 px-5 text-sm ml-auto" disabled={loading}>
+          <Button
+            type="submit"
+            className="h-10 px-5 text-sm ml-auto"
+            disabled={loading || (mode === 'register' && !termsAccepted)}
+          >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{mode === 'register' ? 'Create Account' : 'Sign In'}</span>
           </Button>

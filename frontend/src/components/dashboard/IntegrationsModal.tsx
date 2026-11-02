@@ -633,7 +633,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-sm font-semibold text-foreground">
-                        Authenticated Web Sessions (Specter Companion)
+                        Authenticated Web Sessions
                       </h4>
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         Allows Specter to access websites requiring login, 2FA, or password protection.
