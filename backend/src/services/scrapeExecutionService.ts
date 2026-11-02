@@ -17,7 +17,8 @@ import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js'
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
-import { evaluateTriggerRules } from '../utils/triggerEvaluator.js';
+import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
+import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 
 export interface ScrapeExecutionServiceDeps {
   jobRepository: IJobRepository;
@@ -74,22 +75,15 @@ export class ScrapeExecutionService {
     let httpStatus: number | null = null;
 
     try {
-      let storageState;
-      if (this.sessionRepository && job.userId) {
-        try {
-          const urlObj = new URL(job.url);
-          const savedSession = await this.sessionRepository.findByUserAndDomain(job.userId, urlObj.hostname);
-          if (savedSession) {
-            storageState = savedSession.storageState;
-            logger.debug('Injecting authenticated web session into Playwright scraper', {
-              jobId: job.id,
-              domain: savedSession.domain,
-            });
-          }
-        } catch {
-          // ignore url parse error
+      const storageState = await resolveSessionStorageState(
+        this.sessionRepository,
+        job.userId,
+        job.url,
+        {
+          jobId: job.id,
+          logAction: 'Injecting authenticated web session into Playwright scraper',
         }
-      }
+      );
 
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
         waitForSelector: job.extractorConfig.containerSelector,
@@ -157,41 +151,15 @@ export class ScrapeExecutionService {
 
       // Send notification only when actual changes occur compared to a prior snapshot
       if (hasChanges === 'YES' && previousRun) {
-        const diffSummary = buildDiffSummary(previousRun.extractedData, extractedData);
-        if (diffSummary.hasChanges) {
-          const triggerResult = evaluateTriggerRules(
-            extractedData,
-            job.extractorConfig?.triggerRules,
-            job.extractorConfig?.triggerMatchMode,
-            previousRun.extractedData
-          );
-
-          if (!triggerResult.triggered) {
-            logger.info('Change detected but notification suppressed because trigger conditions were not met', {
-              jobId: job.id,
-              reasons: triggerResult.reasons,
-            });
-          } else {
-            const changeNoun =
-              diffSummary.totalChanges === 1
-                ? '1 change detected'
-                : `${diffSummary.totalChanges} changes detected`;
-            await this.notificationProvider.sendAlert({
-              to: job.notificationEmail?.trim() || undefined,
-              subject: `[Specter] ${changeNoun}: ${job.url}`,
-              jobId: job.id,
-              userId: job.userId,
-              targetUrl: job.url,
-              userPrompt: job.userPrompt,
-              webhookUrl: job.webhookUrl ?? undefined,
-              detectedAt: new Date(),
-              diffSummary,
-              data: extractedData,
-              triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
-              screenshotUrl: screenshotUrl ?? undefined,
-            });
-          }
-        }
+        await evaluateAndDispatchChangeAlert({
+          job,
+          currentData: extractedData,
+          previousData: previousRun.extractedData,
+          triggerRules: job.extractorConfig?.triggerRules,
+          triggerMatchMode: job.extractorConfig?.triggerMatchMode,
+          notificationProvider: this.notificationProvider,
+          screenshotUrl,
+        });
       }
 
       logger.info('Deterministic scrape execution completed', {

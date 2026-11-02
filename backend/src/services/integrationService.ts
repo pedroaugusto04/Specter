@@ -30,11 +30,14 @@ export class IntegrationService {
 
   async getIntegrations(userId: string): Promise<UserIntegrationsDto> {
     const existing = await this.integrationRepository.findByUserId(userId);
+    const botUsername = await this.getBotUsername();
+
     if (existing) {
-      return IntegrationMapper.entityToDto(existing);
+      const dto = IntegrationMapper.entityToDto(existing);
+      return { ...dto, botUsername };
     }
 
-    return IntegrationMapper.entityToDto({
+    const defaultDto = IntegrationMapper.entityToDto({
       id: '',
       userId,
       telegramEnabled: false,
@@ -46,6 +49,8 @@ export class IntegrationService {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    return { ...defaultDto, botUsername };
   }
 
   async updateIntegrations(
@@ -53,7 +58,9 @@ export class IntegrationService {
     input: UpsertIntegrationInput
   ): Promise<UserIntegrationsDto> {
     const updated = await this.integrationRepository.upsert(userId, input);
-    return IntegrationMapper.entityToDto(updated);
+    const botUsername = await this.getBotUsername();
+    const dto = IntegrationMapper.entityToDto(updated);
+    return { ...dto, botUsername };
   }
 
   async testTelegram(input: {

@@ -15,6 +15,7 @@ import type { DiffSummary, JobStatus } from '../types/domain.js';
 import type { TriggerRule } from '../types/extractor.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
+import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { normalizeUrl } from '../utils/urlNormalizer.js';
 
 export interface CreateScrapingJobRequest {
@@ -62,20 +63,12 @@ export class JobService {
       return { accessible: true };
     }
 
-    let storageState;
-    let hasSavedSession = false;
-    if (this.sessionRepository && userId) {
-      try {
-        const urlObj = new URL(normalizedUrl);
-        const savedSession = await this.sessionRepository.findByUserAndDomain(userId, urlObj.hostname);
-        if (savedSession) {
-          storageState = savedSession.storageState;
-          hasSavedSession = true;
-        }
-      } catch {
-        // ignore url parse error
-      }
-    }
+    const storageState = await resolveSessionStorageState(
+      this.sessionRepository,
+      userId,
+      normalizedUrl
+    );
+    const hasSavedSession = Boolean(storageState);
 
     try {
       await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000, storageState });

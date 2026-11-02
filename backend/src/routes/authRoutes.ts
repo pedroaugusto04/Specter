@@ -1,15 +1,21 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UnauthorizedError } from '../errors/domainErrors.js';
-import type { UserDto } from '../mappers/userMapper.js';
+import {
+  optionalAuth,
+  requireAuth,
+  requireUser,
+  resolveAuthenticatedUser,
+} from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import {
-  ACCESS_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
   parseCookies,
   REFRESH_COOKIE_NAME,
   serializeCookie,
 } from '../utils/cookies.js';
 import { authLoginSchema, authRegisterSchema } from './schemas.js';
+
+export { resolveAuthenticatedUser };
 
 function resolveDynamicCallbackUrl(request: FastifyRequest): string {
   const proto =
@@ -23,50 +29,23 @@ function resolveDynamicCallbackUrl(request: FastifyRequest): string {
   return `${proto}://${host}/api/auth/google/callback`;
 }
 
-export async function resolveAuthenticatedUser(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authService: AuthService,
-  requireAuth = false
-): Promise<UserDto | null> {
-  const cookies = parseCookies(request.headers.cookie);
-  const authHeader = request.headers.authorization;
-  const bearerToken =
-    authHeader && authHeader.toLowerCase().startsWith('bearer ')
-      ? authHeader.slice(7).trim()
-      : undefined;
-
-  const session = await authService.resolveSession(
-    bearerToken || cookies[ACCESS_COOKIE_NAME],
-    cookies[REFRESH_COOKIE_NAME]
-  );
-
-  if (session?.refreshedTokens) {
-    reply.header('Set-Cookie', authService.buildAuthCookies(session.refreshedTokens));
-  }
-
-  if (!session?.user && requireAuth) {
-    throw new UnauthorizedError('Please sign in to continue.');
-  }
-
-  return session?.user ?? null;
-}
-
 export function registerAuthRoutes(app: FastifyInstance, authService: AuthService): void {
-  app.get('/api/auth/me', async (request, reply) => {
-    const user = await resolveAuthenticatedUser(request, reply, authService, false);
+  const withAuth = requireAuth(authService);
+  const withOptionalAuth = optionalAuth(authService);
+
+  app.get('/api/auth/me', { preHandler: [withOptionalAuth] }, async (request) => {
     return {
-      data: user,
+      data: request.user,
       meta: {
         googleEnabled: authService.isGoogleConfigured(),
       },
     };
   });
 
-  app.patch('/api/auth/profile', async (request, reply) => {
-    const user = await resolveAuthenticatedUser(request, reply, authService, true);
+  app.patch('/api/auth/profile', { preHandler: [withAuth] }, async (request, reply) => {
+    const user = requireUser(request);
     const body = (request.body as { name?: string | null }) ?? {};
-    const updated = await authService.updateProfile(user!.id, {
+    const updated = await authService.updateProfile(user.id, {
       name: typeof body.name === 'string' ? body.name : body.name === null ? null : undefined,
     });
     return reply.status(200).send({ data: updated });

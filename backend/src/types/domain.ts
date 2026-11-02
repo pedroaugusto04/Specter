@@ -1,4 +1,5 @@
 import type { ExtractedPayload, ExtractorConfig } from './extractor.js';
+import type { PlaywrightStorageState } from '../db/schema.js';
 
 export type JobStatus =
   | 'PENDING_COMPILATION'
@@ -30,6 +31,17 @@ export interface UserIntegrationEntity {
   webhookEnabled: boolean;
   webhookUrl: string | null;
   webhookSecret: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserWebSessionEntity {
+  id: string;
+  userId: string;
+  domain: string;
+  name: string;
+  storageState: PlaywrightStorageState;
+  cookieCount: number;
   createdAt: Date;
   updatedAt: Date;
 }

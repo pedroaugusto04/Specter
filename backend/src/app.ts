@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
+import { centralErrorHandler } from './middlewares/errorHandler.js';
 import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
 import { registerIntegrationRoutes } from './routes/integrationRoutes.js';
@@ -23,6 +24,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const app = Fastify({
     logger: options.enableLogger ?? env.NODE_ENV !== 'test',
   });
+
+  app.decorateRequest('user', null);
+  app.setErrorHandler(centralErrorHandler);
 
   const sessionService =
     options.sessionService ?? new SessionService(new DrizzleSessionRepository());

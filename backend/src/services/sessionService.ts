@@ -3,9 +3,13 @@ import type {
   PlaywrightStorageCookie,
   PlaywrightStorageOrigin,
   PlaywrightStorageState,
-  UserWebSessionRow,
 } from '../db/schema.js';
+import { SessionMapper, type SessionDto } from '../mappers/sessionMapper.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
+import type { UserWebSessionEntity } from '../types/domain.js';
+import { normalizeDomain } from '../utils/urlNormalizer.js';
+
+export type { SessionDto };
 
 export interface SyncSessionInput {
   domain: string;
@@ -23,30 +27,8 @@ export interface SyncSessionInput {
   origins?: PlaywrightStorageOrigin[];
 }
 
-export interface SessionDto {
-  id: string;
-  domain: string;
-  name: string;
-  cookieCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export class SessionService {
   constructor(private readonly sessionRepository: ISessionRepository) {}
-
-  private normalizeDomain(input: string): string {
-    const trimmed = input.trim().toLowerCase();
-    const withoutProtocol = trimmed.replace(/^https?:\/\//, '');
-    const firstPart = withoutProtocol.split('/')[0] ?? '';
-    const hostOnly = firstPart.split(':')[0] ?? '';
-    if (!hostOnly || hostOnly.includes(' ')) {
-      throw new ValidationError('Invalid domain format.', [
-        { field: 'domain', message: 'Domain must be a valid host or URL.' },
-      ]);
-    }
-    return hostOnly;
-  }
 
   private normalizeSameSite(val?: string): 'Strict' | 'Lax' | 'None' {
     if (!val) return 'Lax';
@@ -56,36 +38,29 @@ export class SessionService {
     return 'Lax';
   }
 
-  public toDto(row: UserWebSessionRow): SessionDto {
-    return {
-      id: row.id,
-      domain: row.domain,
-      name: row.name,
-      cookieCount: row.cookieCount,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    };
+  public toDto(entity: UserWebSessionEntity): SessionDto {
+    return SessionMapper.entityToDto(entity);
   }
 
   async listSessions(userId: string): Promise<SessionDto[]> {
-    const rows = await this.sessionRepository.listByUserId(userId);
-    return rows.map((r) => this.toDto(r));
+    const entities = await this.sessionRepository.listByUserId(userId);
+    return entities.map((e) => SessionMapper.entityToDto(e));
   }
 
   async checkSession(userId: string, hostOrUrl: string): Promise<SessionDto | null> {
-    const domain = this.normalizeDomain(hostOrUrl);
-    const row = await this.sessionRepository.findByUserAndDomain(userId, domain);
-    return row ? this.toDto(row) : null;
+    const domain = normalizeDomain(hostOrUrl);
+    const entity = await this.sessionRepository.findByUserAndDomain(userId, domain);
+    return entity ? SessionMapper.entityToDto(entity) : null;
   }
 
   async getSessionStorageState(userId: string, hostOrUrl: string): Promise<PlaywrightStorageState | null> {
-    const domain = this.normalizeDomain(hostOrUrl);
-    const row = await this.sessionRepository.findByUserAndDomain(userId, domain);
-    return row ? row.storageState : null;
+    const domain = normalizeDomain(hostOrUrl);
+    const entity = await this.sessionRepository.findByUserAndDomain(userId, domain);
+    return entity ? entity.storageState : null;
   }
 
   async syncSession(userId: string, input: SyncSessionInput): Promise<SessionDto> {
-    const domain = this.normalizeDomain(input.domain);
+    const domain = normalizeDomain(input.domain);
 
     if (!Array.isArray(input.cookies) || input.cookies.length === 0) {
       throw new ValidationError('At least one cookie is required to sync a session.', [
@@ -109,13 +84,13 @@ export class SessionService {
       origins: Array.isArray(input.origins) ? input.origins : [],
     };
 
-    const row = await this.sessionRepository.upsert(userId, {
+    const entity = await this.sessionRepository.upsert(userId, {
       domain,
       name: input.name?.trim() || domain,
       storageState,
     });
 
-    return this.toDto(row);
+    return SessionMapper.entityToDto(entity);
   }
 
   async deleteSession(userId: string, id: string): Promise<boolean> {

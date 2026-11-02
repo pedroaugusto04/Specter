@@ -11,7 +11,8 @@ import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { validateExtractionSmokeTest } from '../utils/extractorEngine.js';
 import { sanitizeHtml } from '../utils/htmlSanitizer.js';
 import { logger } from '../utils/logger.js';
-import { evaluateTriggerRules } from '../utils/triggerEvaluator.js';
+import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
+import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
@@ -55,23 +56,15 @@ export class CompilationService {
         provider: this.compilerProvider.name,
       });
 
-      let storageState;
-      if (this.sessionRepository && job.userId) {
-        try {
-          const urlObj = new URL(job.url);
-          const savedSession = await this.sessionRepository.findByUserAndDomain(job.userId, urlObj.hostname);
-          if (savedSession) {
-            storageState = savedSession.storageState;
-            logger.info('Using authenticated web session for AI compilation', {
-              jobId: job.id,
-              domain: savedSession.domain,
-              cookieCount: savedSession.cookieCount,
-            });
-          }
-        } catch {
-          // ignore url parse error
+      const storageState = await resolveSessionStorageState(
+        this.sessionRepository,
+        job.userId,
+        job.url,
+        {
+          jobId: job.id,
+          logAction: 'Using authenticated web session for AI compilation',
         }
-      }
+      );
 
       // 1. Fetch raw HTML from target URL
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, { storageState });
@@ -117,47 +110,15 @@ export class CompilationService {
       });
 
       if (hasChanges === 'YES' && previousRun) {
-        const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
-        if (diffSummary.hasChanges) {
-          const triggerResult = evaluateTriggerRules(
-            smokeTest.extractedData,
-            compiledSchema.triggerRules,
-            compiledSchema.triggerMatchMode,
-            previousRun.extractedData
-          );
-
-          if (!triggerResult.triggered) {
-            logger.info('Change detected on healing but notification suppressed because trigger conditions were not met', {
-              jobId: job.id,
-              reasons: triggerResult.reasons,
-            });
-          } else {
-            const changeNoun =
-              diffSummary.totalChanges === 1
-                ? '1 change detected'
-                : `${diffSummary.totalChanges} changes detected`;
-            await this.notificationProvider
-              .sendAlert({
-                to: job.notificationEmail?.trim() || undefined,
-                subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
-                jobId: job.id,
-                userId: job.userId,
-                targetUrl: job.url,
-                userPrompt: job.userPrompt,
-                webhookUrl: job.webhookUrl ?? undefined,
-                detectedAt: new Date(),
-                diffSummary,
-                data: smokeTest.extractedData,
-                triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
-              })
-              .catch((notifyErr) => {
-                logger.warn('Failed to send notification after self-healing compilation', {
-                  jobId: job.id,
-                  errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
-                });
-              });
-          }
-        }
+        await evaluateAndDispatchChangeAlert({
+          job,
+          currentData: smokeTest.extractedData,
+          previousData: previousRun.extractedData,
+          triggerRules: compiledSchema.triggerRules,
+          triggerMatchMode: compiledSchema.triggerMatchMode,
+          notificationProvider: this.notificationProvider,
+          subjectSuffix: ' (Self-healing)',
+        });
       }
 
       // 6. Schedule repeatable job in BullMQ and activate job

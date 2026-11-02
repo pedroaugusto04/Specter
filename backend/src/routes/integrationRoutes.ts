@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { optionalAuth } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { IntegrationService } from '../services/integrationService.js';
-import { resolveAuthenticatedUser } from './authRoutes.js';
 import {
   testTelegramSchema,
   testWebhookSchema,
@@ -13,18 +13,16 @@ export function registerIntegrationRoutes(
   integrationService: IntegrationService,
   authService: AuthService
 ): void {
-  app.get('/api/integrations', async (request, reply) => {
-    const user = await resolveAuthenticatedUser(request, reply, authService, false);
-    const userId = user?.id ?? 'default-user';
+  const withOptionalAuth = optionalAuth(authService);
+
+  app.get('/api/integrations', { preHandler: [withOptionalAuth] }, async (request) => {
+    const userId = request.user?.id ?? 'default-user';
     const data = await integrationService.getIntegrations(userId);
-    const botUsername = await integrationService.getBotUsername();
-    return { data: { ...data, botUsername } };
+    return { data };
   });
 
-  app.put('/api/integrations', async (request, reply) => {
-    const user = await resolveAuthenticatedUser(request, reply, authService, false);
-    const userId = user?.id ?? 'default-user';
-
+  app.put('/api/integrations', { preHandler: [withOptionalAuth] }, async (request) => {
+    const userId = request.user?.id ?? 'default-user';
     const input = updateIntegrationsSchema.parse(request.body);
     const updated = await integrationService.updateIntegrations(userId, {
       telegramEnabled: input.telegramEnabled,
@@ -33,9 +31,8 @@ export function registerIntegrationRoutes(
       webhookUrl: input.webhookUrl || null,
       webhookSecret: input.webhookSecret || null,
     });
-    const botUsername = await integrationService.getBotUsername();
 
-    return { data: { ...updated, botUsername } };
+    return { data: updated };
   });
 
   app.post('/api/integrations/telegram/test', async (request, reply) => {

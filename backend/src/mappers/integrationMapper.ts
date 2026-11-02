@@ -9,6 +9,7 @@ export interface UserIntegrationsDto {
   webhookEnabled: boolean;
   webhookUrl: string | null;
   webhookSecret: string | null;
+  botUsername?: string | null;
   createdAt: string;
   updatedAt: string;
 }
