@@ -41,7 +41,7 @@ const SUSPICIOUS_HTML_PATTERNS = [
 export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: number): void {
   if (httpStatus === 403 || httpStatus === 429) {
     throw new AntiBotBlockedError(
-      `Bloqueio anti-bot detectado com HTTP status ${httpStatus} em ${url}`,
+      `Bloqueio anti-bot detectado com HTTP status ${httpStatus}`,
       httpStatus
     );
   }
@@ -49,7 +49,7 @@ export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: num
   for (const pattern of SUSPICIOUS_URL_PATTERNS) {
     if (pattern.test(url)) {
       throw new AntiBotBlockedError(
-        `Bloqueio anti-bot detectado via redirecionamento para tela de verificação: ${url}`,
+        `Bloqueio anti-bot detectado via redirecionamento para tela de verificação (CAPTCHA / checkpoint)`,
         403
       );
     }
@@ -58,7 +58,7 @@ export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: num
   for (const pattern of SUSPICIOUS_HTML_PATTERNS) {
     if (pattern.test(rawHtml)) {
       throw new AntiBotBlockedError(
-        `Bloqueio anti-bot / checkpoint de segurança detectado no conteúdo da página em ${url}`,
+        `Bloqueio anti-bot / checkpoint de segurança detectado no conteúdo da página`,
         403
       );
     }

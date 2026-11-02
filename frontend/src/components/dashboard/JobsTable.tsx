@@ -9,6 +9,7 @@ import {
   Pencil,
   Play,
   RefreshCw,
+  ShieldAlert,
   Trash2,
   Zap,
 } from 'lucide-react';
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useModal } from '@/components/ui/modal-dialog';
 import { api, type JobStatus, type ScrapingJobDto } from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 function renderStatusBadge(status: JobStatus) {
   switch (status) {
@@ -100,6 +101,8 @@ export function JobsTable({
                 {jobs.map((job) => {
                   const isBusy = busyJobId === job.id;
                   const isPaused = job.status === 'PAUSED';
+                  const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
+
                   return (
                     <tr key={job.id} className="hover:bg-slate-50/70">
                       <td className="max-w-md py-3.5 pr-4">
@@ -117,10 +120,16 @@ export function JobsTable({
                         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
                           {job.userPrompt}
                         </p>
-                        {job.lastError && (
-                          <p className="mt-1 line-clamp-1 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-600">
-                            Error: {job.lastError}
-                          </p>
+                        {parsedError && (
+                          <div
+                            className="mt-1 flex items-center gap-1.5 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-700"
+                            title={parsedError.description}
+                          >
+                            <ShieldAlert className="h-3 w-3 shrink-0 text-red-500" />
+                            <span className="truncate">
+                              {parsedError.title}: {parsedError.description}
+                            </span>
+                          </div>
                         )}
                       </td>
 

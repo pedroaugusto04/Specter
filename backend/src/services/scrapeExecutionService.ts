@@ -12,6 +12,7 @@ import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ChangeStatus, JobRunEntity } from '../types/domain.js';
 import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
 
@@ -144,7 +145,10 @@ export class ScrapeExecutionService {
         durationMs,
         errorCode,
         httpStatus: httpStatus ?? undefined,
+        errorStack,
       });
+
+      const userMessage = formatUserErrorMessage(error);
 
       await this.jobRepository.createRun({
         jobId: job.id,
@@ -152,7 +156,7 @@ export class ScrapeExecutionService {
         normalizedHash: null,
         hasChanges: 'NO',
         status: 'FAILED',
-        errorMessage: errorStack,
+        errorMessage: userMessage,
         httpStatus,
         durationMs,
       });
@@ -160,7 +164,7 @@ export class ScrapeExecutionService {
       // 1. Anti-bot / WAF block (HTTP 403/429): DO NOT trigger layout self-healing
       if (error instanceof AntiBotBlockedError) {
         await this.jobRepository.updateJob(job.id, {
-          lastError: errorMessage,
+          lastError: userMessage,
         });
         return null;
       }
@@ -168,7 +172,7 @@ export class ScrapeExecutionService {
       // 2. Navigation / Network Timeout: DO NOT recompile; rethrow for BullMQ exponential backoff
       if (error instanceof NavigationTimeoutError) {
         await this.jobRepository.updateJob(job.id, {
-          lastError: errorMessage,
+          lastError: userMessage,
         });
         throw error;
       }
@@ -182,7 +186,7 @@ export class ScrapeExecutionService {
           await this.jobRepository.updateJob(job.id, {
             status: 'FAILED',
             failureCount: newFailureCount,
-            lastError: `Max self-healing attempts exceeded (${this.maxHealingRetries}): ${errorMessage}`,
+            lastError: `Limite de auto-recuperação excedido (${this.maxHealingRetries}): ${userMessage}`,
           });
           logger.warn('Job exceeded max self-healing retries and transitioned to FAILED', {
             jobId: job.id,
@@ -195,7 +199,7 @@ export class ScrapeExecutionService {
           await this.jobRepository.updateJob(job.id, {
             status: 'HEALING',
             failureCount: newFailureCount,
-            lastError: errorMessage,
+            lastError: userMessage,
           });
           logger.info('Consecutive selector mismatches reached threshold; transitioning to HEALING', {
             jobId: job.id,
@@ -209,14 +213,14 @@ export class ScrapeExecutionService {
         await this.jobRepository.updateJob(job.id, {
           status: 'ACTIVE',
           failureCount: newFailureCount,
-          lastError: errorMessage,
+          lastError: userMessage,
         });
         return null;
       }
 
       // Unexpected errors: record lastError
       await this.jobRepository.updateJob(job.id, {
-        lastError: errorMessage,
+        lastError: userMessage,
       });
       throw error;
     }

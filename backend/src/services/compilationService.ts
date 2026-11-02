@@ -6,6 +6,7 @@ import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ChangeStatus, ScrapingJobEntity } from '../types/domain.js';
 import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { validateExtractionSmokeTest } from '../utils/extractorEngine.js';
 import { sanitizeHtml } from '../utils/htmlSanitizer.js';
 import { logger } from '../utils/logger.js';
@@ -144,7 +145,10 @@ export class CompilationService {
         durationMs,
         errorCode,
         httpStatus: httpStatus ?? undefined,
+        errorStack,
       });
+
+      const userMessage = formatUserErrorMessage(error);
 
       await this.jobRepository.createRun({
         jobId: job.id,
@@ -152,14 +156,14 @@ export class CompilationService {
         normalizedHash: null,
         hasChanges: 'NO',
         status: 'FAILED',
-        errorMessage: errorStack,
+        errorMessage: userMessage,
         httpStatus,
         durationMs,
       });
 
       await this.jobRepository.updateJob(job.id, {
         status: 'FAILED',
-        lastError: errorMessage,
+        lastError: userMessage,
       });
 
       throw error;

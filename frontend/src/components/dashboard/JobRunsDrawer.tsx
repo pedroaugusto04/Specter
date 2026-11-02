@@ -1,11 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Code2, GitCompare } from 'lucide-react';
+import { AlertCircle, Code2, GitCompare, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { api, type DiffSummary, type JobRunDto, type ScrapingJobDto } from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 export function JobRunsDrawer({
   job,
@@ -44,88 +44,91 @@ export function JobRunsDrawer({
       description={job.userPrompt}
     >
       <div className="space-y-6">
-          {/* Compiled Extractor Schema */}
+        {/* Compiled Extractor Schema */}
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <Code2 className="h-4 w-4" />
+            AI Agent Compiled Specification
+          </div>
+          {job.extractorConfig ? (
+            <pre className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3 text-xs text-slate-100">
+              {JSON.stringify(job.extractorConfig, null, 2)}
+            </pre>
+          ) : (
+            <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+              Selectors have not been compiled yet or are pending in the compilation queue.
+            </p>
+          )}
+        </section>
+
+        {/* Latest Diff Summary */}
+        {latestDiff && latestDiff.hasChanges && (
           <section className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-              <Code2 className="h-4 w-4" />
-              AI Agent Compiled Specification
+              <GitCompare className="h-4 w-4" />
+              Latest Structured Diff ({latestDiff.totalChanges} changes)
             </div>
-            {job.extractorConfig ? (
-              <pre className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3 text-xs text-slate-100">
-                {JSON.stringify(job.extractorConfig, null, 2)}
-              </pre>
-            ) : (
-              <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-                Selectors have not been compiled yet or are pending in the compilation queue.
-              </p>
-            )}
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2">Field</th>
+                    <th className="px-3 py-2">Type</th>
+                    <th className="px-3 py-2">Previous</th>
+                    <th className="px-3 py-2">Current</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[...latestDiff.modified, ...latestDiff.added, ...latestDiff.removed].map(
+                    (item) => (
+                      <tr key={item.field}>
+                        <td className="px-3 py-2 font-mono font-medium">{item.field}</td>
+                        <td className="px-3 py-2">
+                          <Badge
+                            variant={
+                              item.changeType === 'MODIFIED'
+                                ? 'warning'
+                                : item.changeType === 'ADDED'
+                                  ? 'success'
+                                  : 'destructive'
+                            }
+                          >
+                            {item.changeType}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {item.previousValue === null ? '—' : String(item.previousValue)}
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-slate-900">
+                          {item.currentValue === null ? '—' : String(item.currentValue)}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
+        )}
 
-          {/* Latest Diff Summary */}
-          {latestDiff && latestDiff.hasChanges && (
-            <section className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                <GitCompare className="h-4 w-4" />
-                Latest Structured Diff ({latestDiff.totalChanges} changes)
-              </div>
-              <div className="overflow-hidden rounded-lg border border-slate-200">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="px-3 py-2">Field</th>
-                      <th className="px-3 py-2">Type</th>
-                      <th className="px-3 py-2">Previous</th>
-                      <th className="px-3 py-2">Current</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[...latestDiff.modified, ...latestDiff.added, ...latestDiff.removed].map(
-                      (item) => (
-                        <tr key={item.field}>
-                          <td className="px-3 py-2 font-mono font-medium">{item.field}</td>
-                          <td className="px-3 py-2">
-                            <Badge
-                              variant={
-                                item.changeType === 'MODIFIED'
-                                  ? 'warning'
-                                  : item.changeType === 'ADDED'
-                                    ? 'success'
-                                    : 'destructive'
-                              }
-                            >
-                              {item.changeType}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2 text-slate-500">
-                            {item.previousValue === null ? '—' : String(item.previousValue)}
-                          </td>
-                          <td className="px-3 py-2 font-semibold text-slate-900">
-                            {item.currentValue === null ? '—' : String(item.currentValue)}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
+        {/* Execution History */}
+        <section className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+            Run History ({runs.length})
+          </h3>
 
-          {/* Execution History */}
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-              Run History ({runs.length})
-            </h3>
+          {loading ? (
+            <p className="text-xs text-slate-500">Loading snapshot history...</p>
+          ) : runs.length === 0 ? (
+            <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+              No runs recorded for this monitor yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {runs.map((run) => {
+                const parsedError = run.errorMessage ? parseErrorMessage(run.errorMessage) : null;
 
-            {loading ? (
-              <p className="text-xs text-slate-500">Loading snapshot history...</p>
-            ) : runs.length === 0 ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                No runs recorded for this monitor yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {runs.map((run) => (
+                return (
                   <div
                     key={run.id}
                     className="rounded-lg border border-slate-200 bg-white p-4 shadow-2xs"
@@ -164,10 +167,34 @@ export function JobRunsDrawer({
                       </p>
                     )}
 
-                    {run.errorMessage && (
-                      <pre className="mt-2 max-h-32 overflow-auto rounded bg-red-50 p-2 text-[11px] text-red-700">
-                        {run.errorMessage}
-                      </pre>
+                    {parsedError && (
+                      <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50/80 p-3 text-xs text-red-900">
+                        <div className="flex items-start gap-2">
+                          {parsedError.category === 'anti-bot' ? (
+                            <ShieldAlert className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-red-950">
+                              {parsedError.title}
+                            </p>
+                            <p className="mt-0.5 text-red-800 leading-relaxed">
+                              {parsedError.description}
+                            </p>
+                            {parsedError.technicalDetails && (
+                              <details className="mt-2 text-[11px] text-red-700">
+                                <summary className="cursor-pointer font-medium hover:underline select-none">
+                                  Ver detalhes técnicos
+                                </summary>
+                                <pre className="mt-1 max-h-36 overflow-auto rounded border border-red-200 bg-white/80 p-2 font-mono text-[10px] text-red-900 whitespace-pre-wrap">
+                                  {parsedError.technicalDetails}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     )}
 
                     {run.extractedData && (
@@ -176,10 +203,11 @@ export function JobRunsDrawer({
                       </pre>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </Drawer>
   );
