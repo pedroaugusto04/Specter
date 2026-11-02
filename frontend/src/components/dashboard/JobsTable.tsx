@@ -248,12 +248,12 @@ export function JobsTable({
           <table className="w-full border-collapse text-left text-sm table-fixed">
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
-                <th className="w-[38%] min-w-[200px] max-w-[320px] py-3.5 px-4 sm:px-5">Target</th>
-                <th className="w-28 px-4 py-3.5">Status</th>
-                <th className="w-36 px-4 py-3.5">Schedule</th>
-                <th className="w-24 px-4 py-3.5">Failures</th>
-                <th className="w-36 px-4 py-3.5">Last Checked</th>
-                <th className="w-48 py-3.5 pr-4 pl-3 sm:pr-5 text-right">Actions</th>
+                <th className="py-3 px-3 sm:px-4">Target</th>
+                <th className="w-24 sm:w-28 px-2.5 sm:px-3 py-3">Status</th>
+                <th className="w-28 sm:w-32 px-2.5 sm:px-3 py-3">Schedule</th>
+                <th className="w-16 sm:w-20 px-2.5 sm:px-3 py-3">Failures</th>
+                <th className="w-28 sm:w-32 px-2.5 sm:px-3 py-3">Last Checked</th>
+                <th className="w-36 sm:w-44 py-3 pr-3 pl-2 sm:pr-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -277,53 +277,53 @@ export function JobsTable({
                     className="group hover:bg-muted/30 transition-colors"
                   >
                     {/* Target & Prompt */}
-                    <td className="w-[38%] min-w-[200px] max-w-[320px] py-4 px-4 sm:px-5">
+                    <td className="py-3 px-3 sm:px-4 max-w-0">
                       <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
                         <a
                           href={job.url}
                           target="_blank"
                           rel="noreferrer"
                           title={job.url}
-                          className="truncate hover:underline underline-offset-4 text-sm"
+                          className="truncate hover:underline underline-offset-4 text-xs sm:text-sm font-medium block max-w-full"
                         >
                           {job.url}
                         </a>
                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                       </div>
                       <p
-                        className="mt-1 truncate text-xs text-muted-foreground"
+                        className="mt-0.5 truncate text-xs text-muted-foreground block max-w-full"
                         title={job.userPrompt}
                       >
                         {job.userPrompt}
                       </p>
                       {parsedError && (
                         <div
-                          className="mt-2 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 min-w-0"
-                          title={parsedError.description}
+                          className="mt-1.5 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 min-w-0"
+                          title={`${parsedError.title}: ${parsedError.description}`}
                         >
                           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">
-                            {parsedError.title}: {parsedError.description}
+                          <span className="truncate block">
+                            {parsedError.title}
                           </span>
                         </div>
                       )}
                     </td>
 
                     {/* Status Pill */}
-                    <td className="whitespace-nowrap px-4 py-4">
+                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3">
                       {renderStatusPill(job.status)}
                     </td>
 
                     {/* Cron */}
-                    <td className="whitespace-nowrap px-4 py-4 font-mono text-xs sm:text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        {job.cronExpression}
+                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 font-mono text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-muted-foreground/70" />
+                        <span className="truncate">{job.cronExpression}</span>
                       </span>
                     </td>
 
                     {/* Failures */}
-                    <td className="whitespace-nowrap px-4 py-4 text-xs sm:text-sm">
+                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 text-xs">
                       <span
                         className={
                           job.failureCount > 0
@@ -336,13 +336,13 @@ export function JobsTable({
                     </td>
 
                     {/* Updated At */}
-                    <td className="whitespace-nowrap px-4 py-4 text-xs sm:text-sm text-muted-foreground font-mono">
+                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 text-xs text-muted-foreground font-mono">
                       {formatDateTime(job.updatedAt)}
                     </td>
 
                     {/* Action Buttons */}
-                    <td className="whitespace-nowrap py-4 pr-4 pl-3 sm:pr-5 text-right">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="whitespace-nowrap py-3 pr-3 pl-2 sm:pr-4 text-right">
+                      <div className="inline-flex items-center gap-0.5">
                         {/* Edit */}
                         <Button
                           variant="ghost"
