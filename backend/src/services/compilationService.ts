@@ -95,12 +95,18 @@ export class CompilationService {
 
       if (hasChanges === 'YES' && previousRun && job.notificationEmail && job.notificationEmail.trim()) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
+        const changeNoun =
+          diffSummary.totalChanges === 1
+            ? '1 alteração detectada'
+            : `${diffSummary.totalChanges} alterações detectadas`;
         await this.notificationProvider
           .sendAlert({
             to: job.notificationEmail.trim(),
-            subject: `[Update] ${job.url}`,
+            subject: `[Specter] ${changeNoun} (Auto-recuperação): ${job.url}`,
             jobId: job.id,
             targetUrl: job.url,
+            userPrompt: job.userPrompt,
+            detectedAt: new Date(),
             diffSummary,
             data: smokeTest.extractedData,
           })

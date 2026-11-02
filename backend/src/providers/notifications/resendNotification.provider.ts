@@ -1,7 +1,9 @@
 import { Resend } from 'resend';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
+import { buildSpecterAlertEmail } from './emailTemplate.js';
 import type { AlertPayload, INotificationProvider } from './notification.interface.js';
+import { SPECTER_LOGO_PNG_BUFFER } from './specterLogo.js';
 
 export class ResendNotificationProvider implements INotificationProvider {
   public readonly name = 'resend';
@@ -15,29 +17,27 @@ export class ResendNotificationProvider implements INotificationProvider {
   }
 
   async sendAlert(payload: AlertPayload): Promise<void> {
-    const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 680px; margin: 0 auto; padding: 24px; color: #111827;">
-        <h2 style="margin-top: 0; color: #111827;">Change Detected in Monitored Target</h2>
-        <p style="color: #4b5563; font-size: 14px;">
-          Monitored URL: <a href="${payload.targetUrl}" style="color: #2563eb;">${payload.targetUrl}</a>
-        </p>
-        <div style="margin: 20px 0;">
-          <h3 style="font-size: 15px; margin-bottom: 10px;">Summary of Changes (${payload.diffSummary.totalChanges})</h3>
-          ${payload.diffSummary.summaryHtml}
-        </div>
-        <details style="margin-top: 20px; background: #f9fafb; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;">
-          <summary style="cursor: pointer; font-weight: 600; font-size: 13px; color: #374151;">Full Snapshot (JSON)</summary>
-          <pre style="font-size: 12px; overflow-x: auto; margin-top: 10px; color: #1f2937;">${JSON.stringify(payload.data, null, 2)}</pre>
-        </details>
-      </div>
-    `;
+    const { html, text } = buildSpecterAlertEmail(payload);
+
+    // Format sender name nicely as "Specter <sender@domain.com>" if not already formatted
+    const formattedFrom = this.fromEmail.includes('<')
+      ? this.fromEmail
+      : `Specter <${this.fromEmail}>`;
 
     const response = await this.client.emails.send({
-      from: this.fromEmail,
+      from: formattedFrom,
       to: payload.to,
       subject: payload.subject,
-      html: htmlBody,
-      text: `${payload.subject}\nURL: ${payload.targetUrl}\n\n${payload.diffSummary.summaryText}`,
+      html,
+      text,
+      attachments: [
+        {
+          filename: 'specter-logo.png',
+          content: SPECTER_LOGO_PNG_BUFFER,
+          contentType: 'image/png',
+          inlineContentId: 'specter-logo',
+        },
+      ],
     });
 
     if (response.error) {
@@ -53,6 +53,9 @@ export class ResendNotificationProvider implements INotificationProvider {
     logger.info('Transactional alert email sent via Resend', {
       jobId: payload.jobId,
       provider: this.name,
+      to: payload.to,
+      subject: payload.subject,
+      emailId: response.data?.id,
     });
   }
 }

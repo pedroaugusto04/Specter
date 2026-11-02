@@ -26,6 +26,14 @@ if [ -d ".git" ]; then
 fi
 
 echo "2. Configurando arquivo de ambiente (.env.prod)..."
+if [ -f ".env" ]; then
+  echo "✔ Carregando variáveis locais de .env..."
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 if [ -f "backend.env" ]; then
   cp backend.env .env.prod
 elif [ -f ".env.prod" ]; then

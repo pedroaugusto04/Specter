@@ -47,7 +47,7 @@ env:
   PLAYWRIGHT_TIMEOUT_MS: ${{ vars.PLAYWRIGHT_TIMEOUT_MS || '120000' }}
   COMPILER_TIMEOUT_MS: ${{ vars.COMPILER_TIMEOUT_MS || '600000' }}
   NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || 'console' }}
-  NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || 'alerts@scraper.local' }}
+  NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || 'onboarding@resend.dev' }}
   MIN_CRON_INTERVAL_MINUTES: ${{ vars.MIN_CRON_INTERVAL_MINUTES || '15' }}
   DOCKER_LOG_MAX_SIZE: ${{ vars.DOCKER_LOG_MAX_SIZE || '10m' }}
   DOCKER_LOG_MAX_FILE: ${{ vars.DOCKER_LOG_MAX_FILE || '5' }}
@@ -122,6 +122,11 @@ jobs:
 
       - name: Run backend tests
         working-directory: backend
+        env:
+          NODE_ENV: test
+          NOTIFICATION_PROVIDER: console
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY || 're_test_dummy_key' }}
+          NOTIFICATION_FROM_EMAIL: ${{ env.NOTIFICATION_FROM_EMAIL }}
         run: |
           npm run test
 
@@ -182,9 +187,9 @@ jobs:
           CORS_ORIGIN: ${{ env.CORS_ORIGIN }}
           COMPILER_PROVIDER: ${{ env.COMPILER_PROVIDER }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          NOTIFICATION_PROVIDER: ${{ env.NOTIFICATION_PROVIDER }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          NOTIFICATION_FROM_EMAIL: ${{ env.NOTIFICATION_FROM_EMAIL }}
+          NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || env.NOTIFICATION_PROVIDER }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}
+          NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || env.NOTIFICATION_FROM_EMAIL }}
           SCRAPER_ENGINE: ${{ env.SCRAPER_ENGINE }}
           SCRAPER_CONCURRENCY: ${{ env.SCRAPER_CONCURRENCY }}
           PLAYWRIGHT_TIMEOUT_MS: ${{ env.PLAYWRIGHT_TIMEOUT_MS }}

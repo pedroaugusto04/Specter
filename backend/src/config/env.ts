@@ -48,7 +48,7 @@ export const envSchema = z.object({
   // Notifications
   NOTIFICATION_PROVIDER: z.enum(['resend', 'console']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),
-  NOTIFICATION_FROM_EMAIL: z.string().email().default('alerts@scraper.local'),
+  NOTIFICATION_FROM_EMAIL: z.string().min(1).default('onboarding@resend.dev'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -65,7 +65,11 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 
   const parsed = result.data;
 
-  if (parsed.NOTIFICATION_PROVIDER === 'resend' && !parsed.RESEND_API_KEY) {
+  if (
+    parsed.NOTIFICATION_PROVIDER === 'resend' &&
+    !parsed.RESEND_API_KEY &&
+    parsed.NODE_ENV !== 'test'
+  ) {
     throw new Error(
       'Invalid environment configuration:\n  - RESEND_API_KEY: Required when NOTIFICATION_PROVIDER is set to "resend"'
     );

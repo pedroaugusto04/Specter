@@ -28,8 +28,18 @@ REDIS_PORT="${REDIS_PORT:-6379}"
 CORS_ORIGIN="${CORS_ORIGIN:-https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com}"
 COMPILER_PROVIDER="${COMPILER_PROVIDER:-agy}"
 NOTIFICATION_PROVIDER="${NOTIFICATION_PROVIDER:-console}"
+NOTIFICATION_FROM_EMAIL="${NOTIFICATION_FROM_EMAIL:-onboarding@resend.dev}"
+RESEND_API_KEY="${RESEND_API_KEY:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 SCRAPER_ENGINE="${SCRAPER_ENGINE:-playwright}"
+
+# Guardrail: If NOTIFICATION_PROVIDER is resend but RESEND_API_KEY is not provided,
+# warn and safely fall back to console to prevent container boot crash loops.
+if [ "$NOTIFICATION_PROVIDER" = "resend" ] && [ -z "${RESEND_API_KEY:-}" ]; then
+  echo "⚠️ AVISO: NOTIFICATION_PROVIDER está definido como 'resend', mas RESEND_API_KEY não foi configurada."
+  echo "   Revertendo NOTIFICATION_PROVIDER para 'console' para garantir inicialização segura do backend."
+  NOTIFICATION_PROVIDER="console"
+fi
 
 keys=(
   POSTGRES_USER
