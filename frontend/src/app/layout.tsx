@@ -8,10 +8,12 @@ export const metadata: Metadata = {
   description: 'Minimalist web monitoring and structured change detection.',
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
       { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png' },
     ],
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    shortcut: '/favicon.ico',
+    apple: '/icon.png',
   },
 };
 
