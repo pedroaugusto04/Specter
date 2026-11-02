@@ -192,6 +192,11 @@ jobs:
           MIN_CRON_INTERVAL_MINUTES: ${{ env.MIN_CRON_INTERVAL_MINUTES }}
           DOCKER_LOG_MAX_SIZE: ${{ env.DOCKER_LOG_MAX_SIZE }}
           DOCKER_LOG_MAX_FILE: ${{ env.DOCKER_LOG_MAX_FILE }}
+          ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
+          SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
+          SCRAPINGBEE_API_KEY: ${{ secrets.SCRAPINGBEE_API_KEY }}
+          CRAWLBASE_TOKEN: ${{ secrets.CRAWLBASE_TOKEN }}
+          HTTP_PROXY: ${{ secrets.HTTP_PROXY || vars.HTTP_PROXY }}
         run: |
           bash scripts/deploy/generate-backend-env.sh .deploy/backend.env 3001
 
