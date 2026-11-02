@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Bot, Plus, ShieldCheck } from 'lucide-react';
+import { Bot, Plus } from 'lucide-react';
 import { CreateJobForm } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
+import { EditJobModal } from '@/components/dashboard/EditJobModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
 import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = React.useState<ScrapingJobDto[]>([]);
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [selectedJob, setSelectedJob] = React.useState<ScrapingJobDto | null>(null);
+  const [editingJob, setEditingJob] = React.useState<ScrapingJobDto | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
 
@@ -78,6 +80,7 @@ export default function DashboardPage() {
           jobs={jobs}
           onRefresh={loadDashboard}
           onSelectJobForHistory={(job) => setSelectedJob(job)}
+          onEditJob={(job) => setEditingJob(job)}
         />
       </main>
 
@@ -85,6 +88,13 @@ export default function DashboardPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={loadDashboard}
+      />
+
+      <EditJobModal
+        job={editingJob}
+        isOpen={Boolean(editingJob)}
+        onClose={() => setEditingJob(null)}
+        onUpdated={loadDashboard}
       />
 
       <JobRunsDrawer job={selectedJob} onClose={() => setSelectedJob(null)} />

@@ -131,4 +131,84 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(getRes.statusCode).toBe(404);
   });
+
+  it('updates an existing monitor configuration and handles recompilation triggers appropriately', async () => {
+    // 1. Create monitor
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      payload: {
+        url: 'https://shop.example.com/shoes',
+        userPrompt: 'Extract shoe name and discounted price',
+        notificationEmail: 'alerts@shoeshop.com',
+        cronExpression: '0 */6 * * *',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const job = createRes.json().data;
+
+    // Simulate job was compiled and activated
+    await repository.updateJob(job.id, {
+      status: 'ACTIVE',
+      bullmqRepeatableKey: `repeat:${job.id}:0 */6 * * *`,
+    });
+    scheduler.scheduledRepeatables.set(job.id, `repeat:${job.id}:0 */6 * * *`);
+
+    // 2. Update notification email and cron expression only (no recompile needed)
+    const updateCronRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${job.id}`,
+      payload: {
+        notificationEmail: 'newemail@shoeshop.com',
+        cronExpression: '*/30 * * * *',
+      },
+    });
+    expect(updateCronRes.statusCode).toBe(200);
+    const updatedData1 = updateCronRes.json().data;
+    expect(updatedData1.notificationEmail).toBe('newemail@shoeshop.com');
+    expect(updatedData1.cronExpression).toBe('*/30 * * * *');
+    expect(updatedData1.status).toBe('ACTIVE');
+    expect(scheduler.scheduledRepeatables.get(job.id)).toBe(`repeat:${job.id}:*/30 * * * *`);
+    // No new compilation should have been enqueued
+    expect(scheduler.compilationQueue).toHaveLength(1); // Only the initial one from creation
+
+    // 3. Update extraction prompt (triggers recompilation)
+    const updatePromptRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${job.id}`,
+      payload: {
+        userPrompt: 'Extract shoe name, stock quantity, and current price in USD',
+      },
+    });
+    expect(updatePromptRes.statusCode).toBe(200);
+    const updatedData2 = updatePromptRes.json().data;
+    expect(updatedData2.userPrompt).toBe(
+      'Extract shoe name, stock quantity, and current price in USD'
+    );
+    expect(updatedData2.status).toBe('PENDING_COMPILATION');
+    expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
+    expect(scheduler.compilationQueue).toHaveLength(2);
+    expect(scheduler.compilationQueue[1]).toEqual({ jobId: job.id, reason: 'manual' });
+
+    // 4. Validation error on invalid update payload
+    const invalidRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${job.id}`,
+      payload: {
+        cronExpression: '*/2 * * * *', // violates 15m floor
+      },
+    });
+    expect(invalidRes.statusCode).toBe(400);
+    expect(invalidRes.json().error).toBe('VALIDATION_ERROR');
+
+    // 5. 404 on non-existent job
+    const notFoundRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/jobs/00000000-0000-0000-0000-000000000000',
+      payload: {
+        notificationEmail: 'valid@example.com',
+      },
+    });
+    expect(notFoundRes.statusCode).toBe(404);
+  });
 });

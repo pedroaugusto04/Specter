@@ -102,14 +102,23 @@ export class JobService {
         throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
       }
       patch.cronExpression = trimmedCron;
+    }
 
-      if (existing.status === 'ACTIVE') {
+    const needsRecompile =
+      (patch.url !== undefined && patch.url !== existing.url) ||
+      (patch.userPrompt !== undefined && patch.userPrompt !== existing.userPrompt);
+
+    if (needsRecompile) {
+      if (existing.bullmqRepeatableKey) {
         await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-        patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
-          existing.id,
-          trimmedCron
-        );
       }
+      patch.bullmqRepeatableKey = null;
+    } else if (patch.cronExpression !== undefined && existing.status === 'ACTIVE') {
+      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
+        existing.id,
+        patch.cronExpression
+      );
     }
 
     const updated = await this.jobRepository.updateJob(id, patch);
@@ -118,10 +127,7 @@ export class JobService {
     }
 
     // If URL or prompt changed, trigger recompilation
-    if (
-      (patch.url && patch.url !== existing.url) ||
-      (patch.userPrompt && patch.userPrompt !== existing.userPrompt)
-    ) {
+    if (needsRecompile) {
       await this.jobRepository.updateJob(id, {
         status: 'PENDING_COMPILATION',
         failureCount: 0,

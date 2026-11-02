@@ -6,6 +6,7 @@ import {
   ExternalLink,
   History,
   Pause,
+  Pencil,
   Play,
   RefreshCw,
   Trash2,
@@ -38,10 +39,12 @@ export function JobsTable({
   jobs,
   onRefresh,
   onSelectJobForHistory,
+  onEditJob,
 }: {
   jobs: ScrapingJobDto[];
   onRefresh: () => void;
   onSelectJobForHistory: (job: ScrapingJobDto) => void;
+  onEditJob: (job: ScrapingJobDto) => void;
 }) {
   const [busyJobId, setBusyJobId] = React.useState<string | null>(null);
   const modal = useModal();
@@ -150,6 +153,17 @@ export function JobsTable({
 
                       <td className="whitespace-nowrap py-3.5 pl-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isBusy}
+                            title="Edit monitor configuration"
+                            onClick={() => onEditJob(job)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+
                           <Button
                             variant="outline"
                             size="sm"

@@ -177,6 +177,21 @@ export const api = {
     });
   },
 
+  updateJob(
+    id: string,
+    input: {
+      url?: string;
+      userPrompt?: string;
+      notificationEmail?: string;
+      cronExpression?: string;
+    }
+  ): Promise<ScrapingJobDto> {
+    return request<ScrapingJobDto>(`/api/jobs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
   togglePause(id: string, paused: boolean): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>(`/api/jobs/${id}/pause`, {
       method: 'PATCH',
