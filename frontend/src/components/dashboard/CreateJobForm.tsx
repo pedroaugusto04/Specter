@@ -498,23 +498,17 @@ export function CreateJobForm({
       </div>
 
       <div className="space-y-3 pt-1">
-        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-border/80 bg-muted/20 p-3 hover:bg-muted/40 transition-colors">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
             id="capture-screenshot"
             checked={captureScreenshotOnChange}
             onChange={(e) => setCaptureScreenshotOnChange(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
           />
-          <div className="flex-1">
-            <span className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5">
-              <Camera className="h-3.5 w-3.5 text-muted-foreground" />
-              Capture screenshot on change
-            </span>
-            <span className="block text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              Saves a visual snapshot of the page whenever a change is detected.
-            </span>
-          </div>
+          <span className="text-sm font-medium text-foreground">
+            Capture screenshot on change
+          </span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer select-none">
