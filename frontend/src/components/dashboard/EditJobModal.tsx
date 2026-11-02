@@ -21,7 +21,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
+  const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
+  const [captureScreenshotOnChange, setCaptureScreenshotOnChange] = React.useState(false);
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
@@ -38,7 +40,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       setUrl(job.url);
       setUserPrompt(job.userPrompt);
       setNotificationEmail(job.notificationEmail);
+      setShowCustomWebhook(Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0));
       setWebhookUrl(job.webhookUrl || '');
+      setCaptureScreenshotOnChange(Boolean(job.captureScreenshotOnChange));
 
       const isPreset = CRON_PRESETS.some((p) => p.value === job.cronExpression);
       if (isPreset) {
@@ -80,7 +84,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       (url.trim() !== job.url ||
         userPrompt.trim() !== job.userPrompt ||
         notificationEmail.trim() !== job.notificationEmail ||
-        webhookUrl.trim() !== (job.webhookUrl || '') ||
+        (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
+        captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
         effectiveCron.trim() !== job.cronExpression ||
         rulesChanged)
   );
@@ -137,8 +142,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         url: url.trim(),
         userPrompt: userPrompt.trim(),
         notificationEmail: notificationEmail.trim() || undefined,
-        webhookUrl: webhookUrl.trim() || null,
+        webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
         cronExpression: effectiveCron.trim(),
+        captureScreenshotOnChange,
         triggerRules,
         triggerMatchMode,
       });
@@ -232,19 +238,53 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
           </FormField>
         </div>
 
-        <FormField
-          label="Custom Webhook URL"
-          htmlFor="edit-job-webhook"
-          hint="Optional. Custom endpoint URL for this specific monitor."
-        >
-          <Input
-            id="edit-job-webhook"
-            type="url"
-            placeholder="https://your-domain.com/webhook (optional)"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-          />
-        </FormField>
+        <div className="space-y-3 pt-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              id="edit-capture-screenshot"
+              checked={captureScreenshotOnChange}
+              onChange={(e) => setCaptureScreenshotOnChange(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+            />
+            <span className="text-sm font-medium text-foreground">
+              Capture screenshot on change
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showCustomWebhook}
+              onChange={(e) => {
+                setShowCustomWebhook(e.target.checked);
+                if (!e.target.checked) {
+                  setWebhookUrl('');
+                }
+              }}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+            />
+            <span className="text-sm font-medium text-foreground">
+              Send notifications to a custom webhook URL
+            </span>
+          </label>
+
+          {showCustomWebhook && (
+            <FormField
+              label="Custom Webhook URL"
+              htmlFor="edit-job-webhook"
+              hint="Optional. Custom endpoint URL for this specific monitor."
+            >
+              <Input
+                id="edit-job-webhook"
+                type="url"
+                placeholder="https://your-domain.com/webhook (optional)"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+              />
+            </FormField>
+          )}
+        </div>
 
         <FormField
           label="Extraction Instructions"
