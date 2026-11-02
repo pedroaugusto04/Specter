@@ -134,3 +134,25 @@ export class NotFoundError extends DomainError {
     });
   }
 }
+
+export class UnauthorizedError extends DomainError {
+  constructor(message = 'Authentication required.', cause?: unknown) {
+    super(message, {
+      code: 'UNAUTHORIZED',
+      statusCode: 401,
+      isRetryable: false,
+      cause,
+    });
+  }
+}
+
+export class ConflictError extends DomainError {
+  constructor(message: string, cause?: unknown) {
+    super(message, {
+      code: 'CONFLICT',
+      statusCode: 409,
+      isRetryable: false,
+      cause,
+    });
+  }
+}

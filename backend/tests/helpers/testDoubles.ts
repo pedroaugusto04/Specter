@@ -21,7 +21,73 @@ import type {
   IJobRepository,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
-import type { JobRunEntity, JobStatus, ScrapingJobEntity } from '../../src/types/domain.js';
+import type {
+  CreateUserInput,
+  IUserRepository,
+  UpdateUserPatch,
+} from '../../src/repositories/userRepository.js';
+import type {
+  JobRunEntity,
+  JobStatus,
+  ScrapingJobEntity,
+  UserEntity,
+} from '../../src/types/domain.js';
+
+export class InMemoryUserRepository implements IUserRepository {
+  public users = new Map<string, UserEntity>();
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = this.users.get(id);
+    return user ? { ...user } : null;
+  }
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    const normalized = email.trim().toLowerCase();
+    for (const user of this.users.values()) {
+      if (user.email === normalized) {
+        return { ...user };
+      }
+    }
+    return null;
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserEntity | null> {
+    for (const user of this.users.values()) {
+      if (user.googleId === googleId) {
+        return { ...user };
+      }
+    }
+    return null;
+  }
+
+  async createUser(input: CreateUserInput): Promise<UserEntity> {
+    const now = new Date();
+    const entity: UserEntity = {
+      id: crypto.randomUUID(),
+      email: input.email.trim().toLowerCase(),
+      name: input.name ?? null,
+      passwordHash: input.passwordHash ?? null,
+      googleId: input.googleId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.users.set(entity.id, entity);
+    return { ...entity };
+  }
+
+  async updateUser(id: string, patch: UpdateUserPatch): Promise<UserEntity | null> {
+    const existing = this.users.get(id);
+    if (!existing) return null;
+
+    const updated: UserEntity = {
+      ...existing,
+      ...patch,
+      updatedAt: new Date(),
+    };
+    this.users.set(id, updated);
+    return { ...updated };
+  }
+}
 
 export class InMemoryJobRepository implements IJobRepository {
   public jobs = new Map<string, ScrapingJobEntity>();
@@ -53,9 +119,13 @@ export class InMemoryJobRepository implements IJobRepository {
     return job ? { ...job } : null;
   }
 
-  async findAll(statusFilter?: JobStatus): Promise<ScrapingJobEntity[]> {
+  async findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]> {
     const all = Array.from(this.jobs.values());
-    const filtered = statusFilter ? all.filter((j) => j.status === statusFilter) : all;
+    const filtered = all.filter((j) => {
+      if (statusFilter && j.status !== statusFilter) return false;
+      if (userId && j.userId !== userId) return false;
+      return true;
+    });
     return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
@@ -123,8 +193,13 @@ export class InMemoryJobRepository implements IJobRepository {
     return beforeCount - this.runs.length;
   }
 
-  async getStats(): Promise<DashboardStats> {
-    const allJobs = Array.from(this.jobs.values());
+  async getStats(userId?: string): Promise<DashboardStats> {
+    const allJobs = Array.from(this.jobs.values()).filter((j) =>
+      userId ? j.userId === userId : true
+    );
+    const jobIds = new Set(allJobs.map((j) => j.id));
+    const userRuns = userId ? this.runs.filter((r) => jobIds.has(r.jobId)) : this.runs;
+
     return {
       totalJobs: allJobs.length,
       activeJobs: allJobs.filter((j) => j.status === 'ACTIVE').length,
@@ -133,8 +208,8 @@ export class InMemoryJobRepository implements IJobRepository {
       ).length,
       failedOrPausedJobs: allJobs.filter((j) => j.status === 'FAILED' || j.status === 'PAUSED')
         .length,
-      totalRuns: this.runs.length,
-      DetectedChangesCount: this.runs.filter((r) => r.hasChanges === 'YES').length,
+      totalRuns: userRuns.length,
+      DetectedChangesCount: userRuns.filter((r) => r.hasChanges === 'YES').length,
     };
   }
 }

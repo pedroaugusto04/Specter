@@ -202,6 +202,12 @@ jobs:
           SCRAPINGBEE_API_KEY: ${{ secrets.SCRAPINGBEE_API_KEY }}
           CRAWLBASE_TOKEN: ${{ secrets.CRAWLBASE_TOKEN }}
           HTTP_PROXY: ${{ secrets.HTTP_PROXY || vars.HTTP_PROXY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://specterdev.online' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: ${{ vars.GOOGLE_CALLBACK_URL }}
         run: |
           bash scripts/deploy/generate-backend-env.sh .deploy/backend.env 3001
 

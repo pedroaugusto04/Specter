@@ -1,6 +1,20 @@
 import { pgTable, uuid, text, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core';
 import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
 
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: text('email').notNull().unique(),
+    name: text('name'),
+    passwordHash: text('password_hash'),
+    googleId: text('google_id').unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_users_email').on(table.email)]
+);
+
 export const scrapingJobs = pgTable(
   'scraping_jobs',
   {
@@ -60,6 +74,8 @@ export const jobRuns = pgTable(
   ]
 );
 
+export type UserRow = typeof users.$inferSelect;
+export type NewUserRow = typeof users.$inferInsert;
 export type ScrapingJobRow = typeof scrapingJobs.$inferSelect;
 export type NewScrapingJobRow = typeof scrapingJobs.$inferInsert;
 export type JobRunRow = typeof jobRuns.$inferSelect;

@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Plus } from 'lucide-react';
+import { LogOut, Plus } from 'lucide-react';
+import { AuthModal } from '@/components/auth/AuthModal';
 import { SpecterLogo } from '@/components/brand/SpecterLogo';
+import { PENDING_JOB_STORAGE_KEY } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
 import { EditJobModal } from '@/components/dashboard/EditJobModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
@@ -10,24 +12,60 @@ import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
-import { api, type DashboardStats, type ScrapingJobDto } from '@/lib/api';
+import { api, type DashboardStats, type ScrapingJobDto, type UserDto } from '@/lib/api';
 
 export default function DashboardPage() {
+  const [user, setUser] = React.useState<UserDto | null>(null);
   const [jobs, setJobs] = React.useState<ScrapingJobDto[]>([]);
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [selectedJob, setSelectedJob] = React.useState<ScrapingJobDto | null>(null);
   const [editingJob, setEditingJob] = React.useState<ScrapingJobDto | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const loadDashboard = React.useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [jobsData, statsData] = await Promise.all([api.listJobs(), api.getStats()]);
+      const [meData, jobsData, statsData] = await Promise.all([
+        api.getMe(),
+        api.listJobs(),
+        api.getStats(),
+      ]);
+      setUser(meData);
       setJobs(jobsData);
       setStats(statsData);
       setConnectionWarning(null);
+
+      if (meData && typeof window !== 'undefined') {
+        const rawPending = sessionStorage.getItem(PENDING_JOB_STORAGE_KEY);
+        if (rawPending) {
+          sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
+          try {
+            const draft = JSON.parse(rawPending) as {
+              url: string;
+              userPrompt: string;
+              notificationEmail?: string;
+              cronExpression: string;
+            };
+            await api.createJob({
+              url: draft.url,
+              userPrompt: draft.userPrompt,
+              notificationEmail: draft.notificationEmail || meData.email,
+              cronExpression: draft.cronExpression,
+            });
+            const [updatedJobs, updatedStats] = await Promise.all([
+              api.listJobs(),
+              api.getStats(),
+            ]);
+            setJobs(updatedJobs);
+            setStats(updatedStats);
+          } catch {
+            // ignore malformed pending draft
+          }
+        }
+      }
     } catch {
       setConnectionWarning(
         'Unable to connect to the backend service. Please verify that the API is running.'
@@ -44,6 +82,18 @@ export default function DashboardPage() {
     }, 10000);
     return () => clearInterval(timer);
   }, [loadDashboard]);
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+      setUser(null);
+      setSelectedJob(null);
+      setEditingJob(null);
+      await loadDashboard();
+    } catch {
+      // ignore logout error
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -63,6 +113,31 @@ export default function DashboardPage() {
               <Plus className="h-4 w-4" />
               <span>New Monitor</span>
             </Button>
+            {user ? (
+              <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 pl-2.5 pr-1 h-9 text-xs font-mono text-foreground">
+                <span className="truncate max-w-[120px] sm:max-w-[160px]" title={user.email}>
+                  {user.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void handleLogout()}
+                  title="Sign out"
+                  aria-label="Sign out"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="h-9 px-3.5 text-xs sm:text-sm font-medium"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -117,8 +192,20 @@ export default function DashboardPage() {
       {/* Creation Modal */}
       <CreateJobModal
         isOpen={isCreateModalOpen}
+        user={user}
+        onAuthenticated={(loggedUser) => setUser(loggedUser)}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={loadDashboard}
+      />
+
+      {/* Standalone Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthenticated={(loggedUser) => {
+          setUser(loggedUser);
+          void loadDashboard();
+        }}
       />
 
       {/* Edit Modal */}

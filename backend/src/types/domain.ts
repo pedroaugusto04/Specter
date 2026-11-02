@@ -11,6 +11,16 @@ export type RunStatus = 'SUCCESS' | 'FAILED';
 
 export type ChangeStatus = 'YES' | 'NO' | 'INITIAL';
 
+export interface UserEntity {
+  id: string;
+  email: string;
+  name: string | null;
+  passwordHash: string | null;
+  googleId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ScrapingJobEntity {
   id: string;
   userId: string;

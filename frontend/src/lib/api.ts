@@ -20,6 +20,13 @@ export interface ExtractorConfig {
   paginationSelector?: string;
 }
 
+export interface UserDto {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+}
+
 export interface ScrapingJobDto {
   id: string;
   userId: string;
@@ -111,7 +118,7 @@ export class ApiError extends Error {
   }
 }
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     // Dynamically detect context: if loaded on /scrapper (dev/staging), route API calls to /scrapper
     if (window.location.pathname.startsWith('/scrapper')) {
@@ -131,11 +138,11 @@ function getApiBaseUrl(): string {
   return 'http://localhost:3001';
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const hasBody = init?.body !== undefined && init?.body !== null;
   const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string> ?? {}),
+    ...((init?.headers as Record<string, string>) ?? {}),
   };
 
   if (hasBody && !headers['Content-Type']) {
@@ -145,8 +152,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
     cache: 'no-store',
   });
+
+  if (response.status === 401 && !isRetry && !path.startsWith('/api/auth/')) {
+    const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+    }).catch(() => null);
+
+    if (refreshRes?.ok) {
+      return request<T>(path, init, true);
+    }
+  }
 
   if (response.status === 204) {
     return undefined as T;
@@ -165,6 +185,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getMe(): Promise<UserDto | null> {
+    return request<UserDto | null>('/api/auth/me');
+  },
+
+  login(input: { email: string; password: string }): Promise<UserDto> {
+    return request<UserDto>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  register(input: { email: string; password: string; name?: string }): Promise<UserDto> {
+    return request<UserDto>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  logout(): Promise<void> {
+    return request<void>('/api/auth/logout', {
+      method: 'POST',
+    });
+  },
+
+  getGoogleAuthUrl(): string {
+    return `${getApiBaseUrl()}/api/auth/google`;
+  },
+
   getStats(): Promise<DashboardStats> {
     return request<DashboardStats>('/api/stats');
   },

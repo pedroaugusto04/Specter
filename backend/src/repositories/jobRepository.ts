@@ -55,7 +55,7 @@ export interface DashboardStats {
 export interface IJobRepository {
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
   findById(id: string): Promise<ScrapingJobEntity | null>;
-  findAll(statusFilter?: JobStatus): Promise<ScrapingJobEntity[]>;
+  findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]>;
   findActiveJobs(): Promise<ScrapingJobEntity[]>;
   updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null>;
   deleteJob(id: string): Promise<boolean>;
@@ -63,7 +63,7 @@ export interface IJobRepository {
   findRunsByJobId(jobId: string, limit?: number): Promise<JobRunEntity[]>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
-  getStats(): Promise<DashboardStats>;
+  getStats(userId?: string): Promise<DashboardStats>;
 }
 
 export class DrizzleJobRepository implements IJobRepository {
@@ -104,14 +104,23 @@ export class DrizzleJobRepository implements IJobRepository {
     return row ? JobMapper.rowToEntity(row) : null;
   }
 
-  async findAll(statusFilter?: JobStatus): Promise<ScrapingJobEntity[]> {
-    const rows = statusFilter
-      ? await this.db
-          .select()
-          .from(scrapingJobs)
-          .where(eq(scrapingJobs.status, statusFilter))
-          .orderBy(desc(scrapingJobs.createdAt))
-      : await this.db.select().from(scrapingJobs).orderBy(desc(scrapingJobs.createdAt));
+  async findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]> {
+    const conditions = [];
+    if (statusFilter) {
+      conditions.push(eq(scrapingJobs.status, statusFilter));
+    }
+    if (userId) {
+      conditions.push(eq(scrapingJobs.userId, userId));
+    }
+
+    const rows =
+      conditions.length > 0
+        ? await this.db
+            .select()
+            .from(scrapingJobs)
+            .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+            .orderBy(desc(scrapingJobs.createdAt))
+        : await this.db.select().from(scrapingJobs).orderBy(desc(scrapingJobs.createdAt));
 
     return rows.map(JobMapper.rowToEntity);
   }
@@ -201,14 +210,29 @@ export class DrizzleJobRepository implements IJobRepository {
     return deleted.length;
   }
 
-  async getStats(): Promise<DashboardStats> {
-    const allJobs = await this.db.select({ status: scrapingJobs.status }).from(scrapingJobs);
-    const [runCounts] = await this.db
-      .select({
-        totalRuns: sql<number>`count(*)::int`,
-        changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = 'YES')::int`,
-      })
-      .from(jobRuns);
+  async getStats(userId?: string): Promise<DashboardStats> {
+    const allJobs = userId
+      ? await this.db
+          .select({ status: scrapingJobs.status })
+          .from(scrapingJobs)
+          .where(eq(scrapingJobs.userId, userId))
+      : await this.db.select({ status: scrapingJobs.status }).from(scrapingJobs);
+
+    const [runCounts] = userId
+      ? await this.db
+          .select({
+            totalRuns: sql<number>`count(*)::int`,
+            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = 'YES')::int`,
+          })
+          .from(jobRuns)
+          .innerJoin(scrapingJobs, eq(jobRuns.jobId, scrapingJobs.id))
+          .where(eq(scrapingJobs.userId, userId))
+      : await this.db
+          .select({
+            totalRuns: sql<number>`count(*)::int`,
+            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = 'YES')::int`,
+          })
+          .from(jobRuns);
 
     let activeJobs = 0;
     let healingOrCompilingJobs = 0;
