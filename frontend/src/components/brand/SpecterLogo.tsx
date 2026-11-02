@@ -13,19 +13,19 @@ export function SpecterLogo({
   className,
 }: SpecterLogoProps) {
   const sizeMap = {
-    sm: { icon: 'h-6 w-6 rounded-md', text: 'text-sm', badge: 'text-[10px]' },
-    md: { icon: 'h-7 w-7 rounded-md', text: 'text-[15px]', badge: 'text-[10px]' },
-    lg: { icon: 'h-9 w-9 rounded-lg', text: 'text-lg', badge: 'text-xs' },
+    sm: { icon: 'h-6 w-6 rounded-md', text: 'text-sm' },
+    md: { icon: 'h-7 w-7 rounded-md', text: 'text-[15px]' },
+    lg: { icon: 'h-9 w-9 rounded-lg', text: 'text-lg' },
   };
 
   const currentSize = sizeMap[size];
 
   return (
     <div className={cn('flex items-center gap-2.5 select-none', className)}>
-      {/* Minimalist Monochrome Brandmark */}
+      {/* Minimalist Viewfinder / Target Brandmark */}
       <div
         className={cn(
-          'relative flex items-center justify-center bg-zinc-950 text-zinc-50 dark:bg-zinc-900 dark:border dark:border-zinc-800 shrink-0',
+          'relative flex items-center justify-center bg-zinc-950 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 shrink-0 shadow-xs',
           currentSize.icon
         )}
       >
@@ -33,40 +33,50 @@ export function SpecterLogo({
           viewBox="0 0 32 32"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="h-full w-full p-0.5"
+          className="h-full w-full p-1"
         >
           <path
-            d="M21.5 9.5H12.5C10.567 9.5 9 11.067 9 13C9 14.933 10.567 16.5 12.5 16.5H19.5C21.433 16.5 23 18.067 23 20C23 21.933 21.433 23.5 19.5 23.5H10.5"
+            d="M8 13V8.5C8 8.22386 8.22386 8 8.5 8H13"
             stroke="currentColor"
-            strokeWidth="2.75"
-            strokeLinecap="square"
-            strokeLinejoin="miter"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-          <rect x="20" y="8" width="3" height="3" fill="currentColor" />
-          <rect x="9" y="22" width="3" height="3" fill="currentColor" />
+          <path
+            d="M19 8H23.5C23.7761 8 24 8.22386 24 8.5V13"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 19V23.5C8 23.7761 8.22386 24 8.5 24H13"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M19 24H23.5C23.7761 24 24 23.7761 24 23.5V19"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="16" cy="16" r="2.5" fill="currentColor" />
         </svg>
       </div>
 
-      {/* Brand Name & Version */}
+      {/* Brand Name */}
       {showWordmark && (
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'font-semibold tracking-tight text-foreground',
-              currentSize.text
-            )}
-          >
-            Specter
-          </span>
-          <span
-            className={cn(
-              'rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono font-medium text-muted-foreground leading-none',
-              currentSize.badge
-            )}
-          >
-            1.0
-          </span>
-        </div>
+        <span
+          className={cn(
+            'font-semibold tracking-tight text-foreground',
+            currentSize.text
+          )}
+        >
+          Specter
+        </span>
       )}
     </div>
   );

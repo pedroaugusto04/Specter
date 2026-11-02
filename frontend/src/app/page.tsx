@@ -52,12 +52,6 @@ export default function DashboardPage() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <SpecterLogo size="md" />
-            <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-border">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-foreground" />
-              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                System Online
-              </span>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -118,7 +112,6 @@ export default function DashboardPage() {
       <footer className="border-t border-border bg-card/40">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 text-[11px] font-mono text-muted-foreground">
           <span>Specter Web Monitor</span>
-          <span>v1.0</span>
         </div>
       </footer>
 
