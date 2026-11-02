@@ -46,16 +46,16 @@ export function JobRunsDrawer({
       <div className="space-y-6">
         {/* Compiled Extractor Schema */}
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Code2 className="h-4 w-4" />
             Extraction Schema
           </div>
           {job.extractorConfig ? (
-            <pre className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3 text-xs text-slate-100">
+            <pre className="max-h-48 overflow-auto rounded-lg border border-border bg-zinc-950 p-3 text-xs text-zinc-200">
               {JSON.stringify(job.extractorConfig, null, 2)}
             </pre>
           ) : (
-            <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+            <p className="rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
               Extraction schema has not been generated yet.
             </p>
           )}
@@ -64,13 +64,13 @@ export function JobRunsDrawer({
         {/* Latest Diff Summary */}
         {latestDiff && latestDiff.hasChanges && (
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <GitCompare className="h-4 w-4" />
               Latest Diff ({latestDiff.totalChanges} changes)
             </div>
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="overflow-hidden rounded-lg border border-border">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600">
+                <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2">Field</th>
                     <th className="px-3 py-2">Type</th>
@@ -78,11 +78,11 @@ export function JobRunsDrawer({
                     <th className="px-3 py-2">Current</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {[...latestDiff.modified, ...latestDiff.added, ...latestDiff.removed].map(
                     (item) => (
                       <tr key={item.field}>
-                        <td className="px-3 py-2 font-mono font-medium">{item.field}</td>
+                        <td className="px-3 py-2 font-mono font-medium text-foreground">{item.field}</td>
                         <td className="px-3 py-2">
                           <Badge
                             variant={
@@ -96,10 +96,10 @@ export function JobRunsDrawer({
                             {item.changeType}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2 text-slate-500">
+                        <td className="px-3 py-2 text-muted-foreground">
                           {item.previousValue === null ? '—' : String(item.previousValue)}
                         </td>
-                        <td className="px-3 py-2 font-semibold text-slate-900">
+                        <td className="px-3 py-2 font-semibold text-foreground">
                           {item.currentValue === null ? '—' : String(item.currentValue)}
                         </td>
                       </tr>
@@ -113,14 +113,14 @@ export function JobRunsDrawer({
 
         {/* Execution History */}
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Run History ({runs.length})
           </h3>
 
           {loading ? (
-            <p className="text-xs text-slate-500">Loading snapshot history...</p>
+            <p className="text-xs text-muted-foreground">Loading snapshot history...</p>
           ) : runs.length === 0 ? (
-            <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+            <p className="rounded-md border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
               No runs recorded for this monitor yet.
             </p>
           ) : (
@@ -131,7 +131,7 @@ export function JobRunsDrawer({
                 return (
                   <div
                     key={run.id}
-                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-2xs"
+                    className="rounded-lg border border-border bg-card p-4 shadow-2xs"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -150,36 +150,36 @@ export function JobRunsDrawer({
                           Change: {run.hasChanges}
                         </Badge>
                         {run.httpStatus && (
-                          <span className="text-xs text-slate-500">HTTP {run.httpStatus}</span>
+                          <span className="text-xs text-muted-foreground">HTTP {run.httpStatus}</span>
                         )}
                         {run.durationMs !== null && (
-                          <span className="text-xs text-slate-400">{run.durationMs}ms</span>
+                          <span className="text-xs text-muted-foreground">{run.durationMs}ms</span>
                         )}
                       </div>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-muted-foreground">
                         {formatDateTime(run.executedAt)}
                       </span>
                     </div>
 
                     {run.normalizedHash && (
-                      <p className="mt-1.5 font-mono text-[11px] text-slate-400">
+                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
                         SHA-256: {run.normalizedHash}
                       </p>
                     )}
 
                     {parsedError && (
-                      <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50/80 p-3 text-xs text-red-900">
+                      <div className="mt-2.5 rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300">
                         <div className="flex items-start gap-2">
                           {parsedError.category === 'anti-bot' ? (
-                            <ShieldAlert className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                            <ShieldAlert className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                            <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-red-950">
+                            <p className="font-semibold text-red-200">
                               {parsedError.title}
                             </p>
-                            <p className="mt-0.5 text-red-800 leading-relaxed">
+                            <p className="mt-0.5 text-red-300 leading-relaxed">
                               {parsedError.description}
                             </p>
                           </div>
@@ -188,7 +188,7 @@ export function JobRunsDrawer({
                     )}
 
                     {run.extractedData && (
-                      <pre className="mt-2 max-h-48 overflow-auto rounded bg-slate-50 p-2.5 text-xs text-slate-800">
+                      <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-zinc-950 p-2.5 text-xs text-zinc-200">
                         {JSON.stringify(run.extractedData, null, 2)}
                       </pre>
                     )}

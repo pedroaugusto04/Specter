@@ -45,11 +45,11 @@ export default function DashboardPage() {
   }, [loadDashboard]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200/80 bg-white">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-border/80 bg-card/60 backdrop-blur-md sticky top-0 z-40">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm ring-1 ring-slate-800">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-900 text-white shadow-xs ring-1 ring-border">
               <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                 <path
                   d="M12 2L2 7L12 12L22 7L12 2Z"
@@ -81,13 +81,13 @@ export default function DashboardPage() {
               </svg>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="text-base font-semibold tracking-tight text-slate-950">
+              <span className="text-base font-semibold tracking-tight text-foreground">
                 Specter
               </span>
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-600 border border-slate-200">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground border border-border">
                 v1.0
               </span>
-              <div className="hidden sm:flex items-center gap-1.5 pl-2 text-xs text-slate-500">
+              <div className="hidden sm:flex items-center gap-1.5 pl-2 text-xs text-muted-foreground">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
           <Button
             onClick={() => setIsCreateModalOpen(true)}
             size="sm"
-            className="flex items-center gap-1.5 shadow-sm"
+            className="flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="h-4 w-4" />
             <span>New Monitor</span>
@@ -110,7 +110,7 @@ export default function DashboardPage() {
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {connectionWarning && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          <div className="rounded-lg border border-amber-900/60 bg-amber-950/40 px-4 py-3 text-xs text-amber-300">
             {connectionWarning}
           </div>
         )}

@@ -112,58 +112,54 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       return;
     }
 
-    setFieldErrors({});
     setLoading(true);
-
     try {
       await api.updateJob(job.id, {
         url: url.trim(),
         userPrompt: userPrompt.trim(),
-        notificationEmail: notificationEmail.trim(),
+        notificationEmail: notificationEmail.trim() || undefined,
         cronExpression: effectiveCron.trim(),
       });
-      onClose();
+
       onUpdated();
+      onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
-          const apiFieldErrors = err.fieldErrors as Partial<Record<JobFormField, string>>;
-          setFieldErrors(apiFieldErrors);
-          focusFirstInvalidField(apiFieldErrors);
-          if (err.fieldErrors.root) {
-            setGlobalError(err.fieldErrors.root);
-          }
-        } else {
-          setGlobalError(err.message || 'Validation failed on server.');
+        if (Object.keys(err.fieldErrors).length > 0) {
+          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          return;
         }
+        setGlobalError(err.message);
+      } else if (err instanceof Error) {
+        setGlobalError(err.message);
       } else {
-        setGlobalError(err instanceof Error ? err.message : 'Failed to update monitor configuration.');
+        setGlobalError('An unexpected error occurred while updating the monitor.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  if (!job) return null;
-
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
       isDirty={isDirty}
-      title="Edit Monitor Configuration"
-      description="Update target URL, AI extraction prompt, notification recipient, or monitoring interval."
-      confirmTitle="Discard Changes?"
-      confirmMessage="You have unsaved changes in this monitor configuration. Closing now will discard them. Are you sure you want to close?"
+      title="Edit Monitor"
+      description="Update target URL, extraction prompts, or check schedule."
+      confirmTitle="Discard Unsaved Changes?"
+      confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {willRecompile && (
-          <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-xs text-amber-300">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
             <div>
-              <p className="font-semibold">Notice: AI Recompilation will be scheduled</p>
-              <p className="mt-0.5 text-amber-800">
-                Modifying the target URL or extraction instructions resets compiled selectors and queues a fresh AI compiler run before resuming autonomous checks.
+              <p className="font-semibold text-amber-200">Re-compilation Trigger</p>
+              <p className="mt-0.5 text-amber-300/90 leading-relaxed">
+                Modifying the Target URL or Extraction Instructions will invalidate the currently
+                compiled extraction schema. Specter will re-analyze the target web page.
               </p>
             </div>
           </div>
@@ -171,11 +167,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
-            label="Target URL"
+            label="Target Website URL"
             htmlFor="edit-target-url"
             required
             error={fieldErrors.url}
-            hint="Website URL to monitor for dynamic updates."
+            hint="URL of the page to monitor."
           >
             <Input
               id="edit-target-url"
@@ -195,7 +191,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
             label="Alert Email"
             htmlFor="edit-notify-email"
             error={fieldErrors.notificationEmail}
-            hint="Optional. Destination email for detected change reports."
+            hint="Optional. Recipient for diff alert notifications."
           >
             <Input
               id="edit-notify-email"
@@ -244,10 +240,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
               aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined}
               className={cn(
-                'flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
                 !useCustomCron && fieldErrors.cronExpression
-                  ? 'border-red-400 text-red-950 focus-visible:border-red-500 focus-visible:ring-red-500/30 bg-red-50/20'
-                  : 'border-slate-200 focus-visible:ring-slate-900'
+                  ? 'border-red-500/50 text-red-300 focus-visible:ring-red-500/30 bg-red-950/20'
+                  : 'border-input focus-visible:ring-ring'
               )}
               value={useCustomCron ? 'custom' : cronPreset}
               onChange={(e) => {
@@ -262,11 +258,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               }}
             >
               {CRON_PRESETS.map((preset) => (
-                <option key={preset.value} value={preset.value}>
+                <option key={preset.value} value={preset.value} className="bg-background text-foreground">
                   {preset.label} ({preset.value})
                 </option>
               ))}
-              <option value="custom">Custom Cron Expression...</option>
+              <option value="custom" className="bg-background text-foreground">Custom Cron Expression...</option>
             </select>
           </FormField>
 
@@ -296,7 +292,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         {globalError && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 animate-in fade-in-50 duration-200"
+            className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-300 animate-in fade-in-50 duration-200"
           >
             {globalError}
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -102,19 +102,22 @@ export function CreateJobForm({
 
     setProbeState({ status: 'probing', urlChecked: trimmedUrl });
     try {
-      const res = await api.probeUrl(trimmedUrl);
-      if (res.accessible) {
+      const probe = await api.probeUrl(trimmedUrl);
+      if (probe.accessible) {
         setProbeState({ status: 'accessible', urlChecked: trimmedUrl });
-        clearFieldError('url');
       } else {
         const errorMsg =
-          res.reason ||
-          'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).';
-        setProbeState({ status: 'blocked', urlChecked: trimmedUrl, reason: errorMsg });
+          probe.reason ||
+          'Target website is protected against automated requests. Monitoring cannot be created for this URL.';
+        setProbeState({
+          status: 'blocked',
+          urlChecked: trimmedUrl,
+          reason: errorMsg,
+        });
         setFieldErrors((prev) => ({ ...prev, url: errorMsg }));
       }
     } catch {
-      setProbeState({ status: 'idle', urlChecked: trimmedUrl });
+      setProbeState({ status: 'idle' });
     }
   };
 
@@ -122,7 +125,6 @@ export function CreateJobForm({
     e.preventDefault();
     setGlobalError(null);
 
-    // Standardized client-side validation
     const validation = validateJobForm({
       url,
       userPrompt,
@@ -136,18 +138,7 @@ export function CreateJobForm({
       return;
     }
 
-    if (probeState.status === 'blocked' && probeState.urlChecked === url.trim()) {
-      const errorMsg =
-        probeState.reason ||
-        'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).';
-      setFieldErrors((prev) => ({ ...prev, url: errorMsg }));
-      focusFirstInvalidField({ url: errorMsg });
-      return;
-    }
-
-    setFieldErrors({});
     setLoading(true);
-
     try {
       await api.createJob({
         url: url.trim(),
@@ -155,31 +146,28 @@ export function CreateJobForm({
         notificationEmail: notificationEmail.trim(),
         cronExpression: effectiveCron.trim(),
       });
+
       setUrl('');
       setUserPrompt('');
+      setNotificationEmail('');
       setCronPreset('0 */6 * * *');
       setCustomCron('0 */6 * * *');
       setUseCustomCron(false);
       setFieldErrors({});
-      setGlobalError(null);
       setProbeState({ status: 'idle' });
       onCreated();
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
-          const apiFieldErrors = err.fieldErrors as Partial<Record<JobFormField, string>>;
-          setFieldErrors(apiFieldErrors);
-          focusFirstInvalidField(apiFieldErrors);
-
-          // If there is a root or general error distinct from standard fields
-          if (err.fieldErrors.root) {
-            setGlobalError(err.fieldErrors.root);
-          }
-        } else {
-          setGlobalError(err.message || 'Validation failed on server.');
+        if (Object.keys(err.fieldErrors).length > 0) {
+          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          return;
         }
+        setGlobalError(err.message);
+      } else if (err instanceof Error) {
+        setGlobalError(err.message);
       } else {
-        setGlobalError(err instanceof Error ? err.message : 'Failed to create monitoring job.');
+        setGlobalError('An unexpected error occurred while creating the monitor.');
       }
     } finally {
       setLoading(false);
@@ -190,19 +178,19 @@ export function CreateJobForm({
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <FormField
-          label="Target URL"
+          label="Target Website URL"
           htmlFor="target-url"
           required
           error={fieldErrors.url}
           hint={
             probeState.status === 'probing' ? (
-              <span className="flex items-center gap-1.5 text-slate-500">
-                <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                 Checking website accessibility...
               </span>
             ) : probeState.status === 'accessible' && !fieldErrors.url ? (
-              <span className="flex items-center gap-1.5 font-medium text-emerald-600">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+              <span className="flex items-center gap-1.5 font-medium text-emerald-400">
+                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
                 Website verified and accessible for automated monitoring.
               </span>
             ) : (
@@ -282,10 +270,10 @@ export function CreateJobForm({
             aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
             aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
             className={cn(
-              'flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+              'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
               !useCustomCron && fieldErrors.cronExpression
-                ? 'border-red-400 text-red-950 focus-visible:border-red-500 focus-visible:ring-red-500/30 bg-red-50/20'
-                : 'border-slate-200 focus-visible:ring-slate-900'
+                ? 'border-red-500/50 text-red-300 focus-visible:ring-red-500/30 bg-red-950/20'
+                : 'border-input focus-visible:ring-ring'
             )}
             value={useCustomCron ? 'custom' : cronPreset}
             onChange={(e) => {
@@ -300,11 +288,11 @@ export function CreateJobForm({
             }}
           >
             {CRON_PRESETS.map((preset) => (
-              <option key={preset.value} value={preset.value}>
+              <option key={preset.value} value={preset.value} className="bg-background text-foreground">
                 {preset.label} ({preset.value})
               </option>
             ))}
-            <option value="custom">Custom Cron Expression...</option>
+            <option value="custom" className="bg-background text-foreground">Custom Cron Expression...</option>
           </select>
         </FormField>
 
@@ -335,7 +323,7 @@ export function CreateJobForm({
       {globalError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+          className="rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300"
         >
           {globalError}
         </div>

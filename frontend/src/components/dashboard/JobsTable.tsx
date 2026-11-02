@@ -89,11 +89,11 @@ export function JobsTable({
       </CardHeader>
       <CardContent>
         {jobs.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
-            <p className="text-sm font-medium text-slate-600">
+          <div className="rounded-lg border border-dashed border-border py-12 text-center">
+            <p className="text-sm font-medium text-foreground">
               No monitors configured yet.
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               Create your first target monitor above.
             </p>
           </div>
@@ -101,7 +101,7 @@ export function JobsTable({
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-border text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <th className="w-48 max-w-[200px] py-3 pr-4">Target</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Cron</th>
@@ -110,7 +110,7 @@ export function JobsTable({
                   <th className="py-3 pl-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {jobs.map((job) => {
                   const currentAction = activeActions[job.id];
                   const isJobBusy = Boolean(currentAction);
@@ -126,9 +126,9 @@ export function JobsTable({
                   const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
 
                   return (
-                    <tr key={job.id} className="hover:bg-slate-50/70">
+                    <tr key={job.id} className="hover:bg-muted/40 transition-colors">
                       <td className="w-48 max-w-[200px] py-3.5 pr-4">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-900 min-w-0">
+                        <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
                           <a
                             href={job.url}
                             target="_blank"
@@ -138,20 +138,20 @@ export function JobsTable({
                           >
                             {job.url}
                           </a>
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         </div>
                         <p
-                          className="mt-0.5 truncate text-xs text-slate-500"
+                          className="mt-0.5 truncate text-xs text-muted-foreground"
                           title={job.userPrompt}
                         >
                           {job.userPrompt}
                         </p>
                         {parsedError && (
                           <div
-                            className="mt-1 flex items-center gap-1.5 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-700 min-w-0"
+                            className="mt-1 flex items-center gap-1.5 rounded border border-red-900/60 bg-red-950/40 px-2 py-0.5 text-[11px] text-red-400 min-w-0"
                             title={parsedError.description}
                           >
-                            <ShieldAlert className="h-3 w-3 shrink-0 text-red-500" />
+                            <ShieldAlert className="h-3 w-3 shrink-0 text-red-400" />
                             <span className="truncate">
                               {parsedError.title}: {parsedError.description}
                             </span>
@@ -163,9 +163,9 @@ export function JobsTable({
                         {renderStatusBadge(job.status)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 font-mono text-xs text-slate-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 font-mono text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-slate-400" />
+                          <Clock className="h-3 w-3 text-muted-foreground" />
                           {job.cronExpression}
                         </span>
                       </td>
@@ -174,15 +174,15 @@ export function JobsTable({
                         <span
                           className={
                             job.failureCount > 0
-                              ? 'font-semibold text-amber-600'
-                              : 'text-slate-500'
+                              ? 'font-semibold text-amber-400'
+                              : 'text-muted-foreground'
                           }
                         >
                           {job.failureCount}
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-xs text-slate-500">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-xs text-muted-foreground">
                         {formatDateTime(job.updatedAt)}
                       </td>
 
@@ -226,7 +226,7 @@ export function JobsTable({
                             }
                           >
                             {isRunning ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
                             ) : (
                               <Zap className="h-3.5 w-3.5" />
                             )}
@@ -264,7 +264,7 @@ export function JobsTable({
                             }
                           >
                             {isCompiling ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
                             ) : (
                               <RefreshCw className="h-3.5 w-3.5" />
                             )}
@@ -292,11 +292,11 @@ export function JobsTable({
                             }
                           >
                             {isPausing ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                             ) : isPaused ? (
-                              <Play className="h-3.5 w-3.5 text-emerald-600" />
+                              <Play className="h-3.5 w-3.5 text-emerald-400" />
                             ) : (
-                              <Pause className="h-3.5 w-3.5 text-slate-600" />
+                              <Pause className="h-3.5 w-3.5 text-muted-foreground" />
                             )}
                           </Button>
 
@@ -327,9 +327,9 @@ export function JobsTable({
                             }}
                           >
                             {isDeleting ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-red-600" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
                             ) : (
-                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <Trash2 className="h-3.5 w-3.5 text-red-400" />
                             )}
                           </Button>
                         </div>

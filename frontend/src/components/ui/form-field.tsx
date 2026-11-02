@@ -26,11 +26,11 @@ export function FormField({
       {label && (
         <label
           htmlFor={htmlFor}
-          className="flex items-center gap-1 text-xs font-medium text-slate-700"
+          className="flex items-center gap-1 text-xs font-medium text-foreground"
         >
           <span>{label}</span>
           {required && (
-            <span className="text-red-500 font-semibold" title="Required field" aria-hidden="true">
+            <span className="text-red-400 font-semibold" title="Required field" aria-hidden="true">
               *
             </span>
           )}
@@ -44,15 +44,15 @@ export function FormField({
           id={htmlFor ? `${htmlFor}-error` : undefined}
           role="alert"
           aria-live="polite"
-          className="flex items-start gap-1.5 pt-0.5 text-xs font-medium text-red-600 animate-in fade-in-50 duration-200"
+          className="flex items-start gap-1.5 pt-0.5 text-xs font-medium text-red-400 animate-in fade-in-50 duration-200"
         >
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-500" aria-hidden="true" />
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
           <span>{error}</span>
         </p>
       ) : hint ? (
         <div
           id={htmlFor ? `${htmlFor}-hint` : undefined}
-          className="text-[11px] text-slate-500"
+          className="text-[11px] text-muted-foreground"
         >
           {hint}
         </div>

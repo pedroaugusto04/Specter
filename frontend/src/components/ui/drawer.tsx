@@ -51,29 +51,29 @@ export function Drawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onBackdropClick}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className={`flex h-full w-full ${widthClass} flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200`}
+        className={`flex h-full w-full ${widthClass} flex-col border-l border-border bg-card text-card-foreground shadow-2xl animate-in slide-in-from-right duration-200`}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || description) && (
-          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+          <div className="flex items-start justify-between border-b border-border px-6 py-4">
             <div className="min-w-0 pr-4">
               {title && (
-                <div className="text-base font-semibold text-slate-900">{title}</div>
+                <div className="text-base font-semibold text-foreground">{title}</div>
               )}
               {description && (
-                <div className="mt-0.5 text-xs text-slate-500">{description}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
               )}
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 text-slate-400 hover:text-slate-600"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
               onClick={() => void requestClose()}
               aria-label="Close panel"
             >
@@ -85,7 +85,7 @@ export function Drawer({
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
 
         {footer && (
-          <div className="border-t border-slate-200 bg-slate-50 px-6 py-3">{footer}</div>
+          <div className="border-t border-border bg-muted/30 px-6 py-3">{footer}</div>
         )}
       </div>
     </div>
