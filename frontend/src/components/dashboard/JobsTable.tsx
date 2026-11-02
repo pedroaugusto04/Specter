@@ -271,14 +271,14 @@ export function JobsTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm table-fixed">
+          <table className="w-full min-w-[760px] border-collapse text-left text-sm table-fixed">
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
-                <th className="w-[200px] sm:w-[240px] md:w-[280px] py-3 px-3 sm:px-4">Target</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="w-[120px] px-3 py-3">Schedule</th>
-                <th className="w-[85px] px-3 py-3">Failures</th>
-                <th className="w-[140px] px-3 py-3">Last Checked</th>
+                <th className="py-3 px-3 sm:px-4">Target</th>
+                <th className="w-[125px] px-2.5 py-3">Status</th>
+                <th className="w-[110px] px-2.5 py-3">Schedule</th>
+                <th className="w-[80px] px-2.5 py-3">Failures</th>
+                <th className="w-[130px] px-2.5 py-3">Last Checked</th>
                 <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -303,28 +303,28 @@ export function JobsTable({
                     className="group hover:bg-muted/30 transition-colors"
                   >
                     {/* Target & Prompt */}
-                    <td className="py-3 px-3 sm:px-4 max-w-0">
+                    <td className="py-3 px-3 sm:px-4 min-w-0">
                       <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
                         <a
                           href={job.url}
                           target="_blank"
                           rel="noreferrer"
                           title={job.url}
-                          className="truncate max-w-[180px] sm:max-w-[220px] hover:underline underline-offset-4 text-xs sm:text-sm font-medium inline-block"
+                          className="truncate hover:underline underline-offset-4 text-xs sm:text-sm font-medium inline-block max-w-[200px] sm:max-w-[280px] md:max-w-md"
                         >
                           {formatDisplayUrl(job.url)}
                         </a>
                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                       </div>
                       <p
-                        className="mt-0.5 truncate max-w-[180px] sm:max-w-[220px] text-xs text-muted-foreground block"
+                        className="mt-0.5 truncate text-xs text-muted-foreground block max-w-[200px] sm:max-w-[280px] md:max-w-md"
                         title={job.userPrompt}
                       >
                         {job.userPrompt}
                       </p>
                       {parsedError && (
                         <div
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 max-w-[200px]"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 max-w-[220px]"
                           title={`${parsedError.title}: ${parsedError.description}`}
                         >
                           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
@@ -336,12 +336,12 @@ export function JobsTable({
                     </td>
 
                     {/* Status Pill */}
-                    <td className="whitespace-nowrap px-3 py-3">
+                    <td className="whitespace-nowrap px-2.5 py-3">
                       {renderStatusPill(job.status)}
                     </td>
 
                     {/* Cron */}
-                    <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="whitespace-nowrap px-2.5 py-3 font-mono text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3 text-muted-foreground/70" />
                         <span className="truncate">{job.cronExpression}</span>
@@ -349,7 +349,7 @@ export function JobsTable({
                     </td>
 
                     {/* Failures */}
-                    <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    <td className="whitespace-nowrap px-2.5 py-3 text-xs">
                       <span
                         className={
                           job.failureCount > 0
@@ -363,7 +363,7 @@ export function JobsTable({
 
                     {/* Updated At */}
                     <td
-                      className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground font-mono"
+                      className="whitespace-nowrap px-2.5 py-3 text-xs text-muted-foreground font-mono"
                       title={formatDateTime(job.updatedAt)}
                     >
                       {formatCompactDate(job.updatedAt)}
