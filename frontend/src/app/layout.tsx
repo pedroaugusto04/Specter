@@ -3,17 +3,19 @@ import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ModalProvider } from '@/components/ui/modal-dialog';
 import './globals.css';
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export const metadata: Metadata = {
   title: 'Specter — Web Change Monitor',
   description: 'Minimalist web monitoring and structured change detection.',
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: '32x32' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/icon.png', type: 'image/png' },
+      { url: `${basePath}/favicon.ico`, sizes: '32x32' },
+      { url: `${basePath}/icon.svg`, type: 'image/svg+xml' },
+      { url: `${basePath}/icon.png`, type: 'image/png' },
     ],
-    shortcut: '/favicon.ico',
-    apple: '/icon.png',
+    shortcut: `${basePath}/favicon.ico`,
+    apple: `${basePath}/icon.png`,
   },
 };
 
