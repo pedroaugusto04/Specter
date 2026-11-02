@@ -198,3 +198,35 @@ export const testWebhookSchema = z.object({
     }),
   secret: z.string().trim().optional().nullable(),
 });
+
+export const syncSessionSchema = z.object({
+  domain: z.string().trim().min(1, 'Domain is required'),
+  name: z.string().trim().optional(),
+  cookies: z
+    .array(
+      z.object({
+        name: z.string().min(1, 'Cookie name is required'),
+        value: z.string(),
+        domain: z.string().optional(),
+        path: z.string().optional(),
+        expires: z.number().optional(),
+        httpOnly: z.boolean().optional(),
+        secure: z.boolean().optional(),
+        sameSite: z.string().optional(),
+      })
+    )
+    .min(1, 'At least one cookie is required to sync a session'),
+  origins: z
+    .array(
+      z.object({
+        origin: z.string(),
+        localStorage: z.array(
+          z.object({
+            name: z.string(),
+            value: z.string(),
+          })
+        ),
+      })
+    )
+    .optional(),
+});

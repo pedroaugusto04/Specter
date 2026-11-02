@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ExternalLink,
+  Globe,
   HelpCircle,
   Key,
   Layers,
@@ -13,13 +14,15 @@ import {
   MessageSquare,
   Radio,
   Send,
+  ShieldCheck,
+  Trash2,
   Webhook,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { api, type UserIntegrationsDto } from '@/lib/api';
+import { api, type SessionDto, type UserIntegrationsDto } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export interface IntegrationsModalProps {
@@ -29,11 +32,16 @@ export interface IntegrationsModalProps {
 }
 
 export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModalProps) {
-  const [activeTab, setActiveTab] = React.useState<'telegram' | 'webhook'>('telegram');
+  const [activeTab, setActiveTab] = React.useState<'telegram' | 'webhook' | 'sessions'>('telegram');
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [globalError, setGlobalError] = React.useState<string | null>(null);
+
+  // Sessions state (from companion browser extension)
+  const [sessions, setSessions] = React.useState<SessionDto[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = React.useState(false);
+  const [deletingSessionId, setDeletingSessionId] = React.useState<string | null>(null);
 
   // Telegram state
   const [telegramEnabled, setTelegramEnabled] = React.useState(false);
@@ -83,11 +91,36 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
     }
   }, []);
 
+  const fetchSessions = React.useCallback(async () => {
+    setIsLoadingSessions(true);
+    try {
+      const data = await api.getSessions();
+      setSessions(data || []);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }, []);
+
+  const handleDeleteSession = async (id: string) => {
+    setDeletingSessionId(id);
+    try {
+      await api.deleteSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Falha ao revogar sessão.');
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
+
   React.useEffect(() => {
     if (isOpen) {
       void fetchIntegrations();
+      void fetchSessions();
     }
-  }, [isOpen, fetchIntegrations]);
+  }, [isOpen, fetchIntegrations, fetchSessions]);
 
   const isDirty = React.useMemo(() => {
     if (!initialData) return false;
@@ -205,19 +238,19 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
     >
       <div className="space-y-6 pt-2">
         {/* Navigation Tabs */}
-        <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-1 border border-border">
+        <div className="grid grid-cols-3 gap-1.5 rounded-lg bg-muted/60 p-1 border border-border">
           <button
             type="button"
             onClick={() => setActiveTab('telegram')}
             className={cn(
-              'flex items-center justify-center gap-2 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
+              'flex items-center justify-center gap-1.5 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
               activeTab === 'telegram'
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <Send className="h-4 w-4 text-sky-500" />
-            <span>Telegram Bot</span>
+            <span className="truncate">Telegram</span>
             {telegramEnabled && (
               <span className="h-2 w-2 rounded-full bg-emerald-500" title="Active" />
             )}
@@ -226,16 +259,37 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
             type="button"
             onClick={() => setActiveTab('webhook')}
             className={cn(
-              'flex items-center justify-center gap-2 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
+              'flex items-center justify-center gap-1.5 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
               activeTab === 'webhook'
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <Webhook className="h-4 w-4 text-violet-500" />
-            <span>Generic Webhook</span>
+            <span className="truncate">Webhook</span>
             {webhookEnabled && (
               <span className="h-2 w-2 rounded-full bg-emerald-500" title="Active" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('sessions');
+              void fetchSessions();
+            }}
+            className={cn(
+              'flex items-center justify-center gap-1.5 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
+              activeTab === 'sessions'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            <span className="truncate">Sessões Web</span>
+            {sessions.length > 0 && (
+              <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                {sessions.length}
+              </span>
             )}
           </button>
         </div>
@@ -569,25 +623,123 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
               </div>
             )}
 
+            {activeTab === 'sessions' && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-semibold text-foreground">
+                        Sessões Autenticadas (Extensão Specter)
+                      </h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Permite que o Specter acesse sites que exigem login, 2FA ou proteção por senha.
+                        A extensão captura a sua sessão já autenticada no navegador com 1 clique, sem precisar informar senhas.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1.5 border border-border/50">
+                    <div className="font-medium text-foreground flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-primary" />
+                      Como usar a extensão Companion:
+                    </div>
+                    <ol className="list-decimal list-inside text-muted-foreground space-y-1 pl-1">
+                      <li>Carregue a pasta <code className="text-foreground bg-muted px-1 py-0.5 rounded">extension/</code> no seu Chrome (<code className="text-foreground">chrome://extensions</code> em Modo Desenvolvedor).</li>
+                      <li>Entre no site desejado pelo seu navegador normal onde você já está logado.</li>
+                      <li>Clique no ícone da extensão Specter e aperte <strong>"Sincronizar com o Specter"</strong>.</li>
+                    </ol>
+                  </div>
+
+                  <div className="rounded-md bg-emerald-500/10 p-3 text-xs border border-emerald-500/20 text-muted-foreground leading-relaxed">
+                    <span className="font-semibold text-emerald-400">🔒 Privacidade & Segurança de Dados:</span>{' '}
+                    A extensão coleta estritamente os cookies de sessão do domínio ativo na aba para permitir que os robôs monitorem páginas logadas em seu nome.
+                    Nenhuma senha, dados de formulários, cartão de crédito ou histórico de outros sites são coletados ou transmitidos. Você pode revogar qualquer sessão a qualquer momento com 1 clique no botão abaixo.
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                    <span>Sessões Salvas ({sessions.length})</span>
+                    <button
+                      type="button"
+                      onClick={() => void fetchSessions()}
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      Atualizar lista
+                    </button>
+                  </div>
+
+                  {isLoadingSessions ? (
+                    <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span>Carregando sessões sincronizadas...</span>
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
+                      Nenhuma sessão web sincronizada ainda. Instale a extensão Specter e sincronize seus sites logados com 1 clique.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
+                      {sessions.map((sess) => (
+                        <div key={sess.id} className="flex items-center justify-between p-3 text-xs hover:bg-muted/30 transition-colors">
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-foreground flex items-center gap-1.5">
+                              <span>{sess.domain}</span>
+                              {sess.name && sess.name !== sess.domain && (
+                                <span className="text-[11px] font-normal text-muted-foreground">({sess.name})</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {sess.cookieCount} cookies • Sincronizado em {new Date(sess.updatedAt).toLocaleDateString('pt-BR')} às {new Date(sess.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={deletingSessionId === sess.id}
+                            onClick={() => void handleDeleteSession(sess.id)}
+                            className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-border"
+                            title="Revogar esta sessão"
+                          >
+                            {deletingSessionId === sess.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
               <Button type="button" variant="outline" onClick={onClose} className="h-9 text-xs">
-                Close
+                {activeTab === 'sessions' ? 'Fechar' : 'Close'}
               </Button>
-              <Button
-                type="submit"
-                disabled={isSaving || !isDirty}
-                className="h-9 px-4 text-xs font-medium"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <span>Save Changes</span>
-                )}
-              </Button>
+              {activeTab !== 'sessions' && (
+                <Button
+                  type="submit"
+                  disabled={isSaving || !isDirty}
+                  className="h-9 px-4 text-xs font-medium"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         )}

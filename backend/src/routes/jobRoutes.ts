@@ -101,8 +101,9 @@ export function registerJobRoutes(
   });
 
   app.post('/api/jobs/probe', async (request, reply) => {
+    const user = await resolveAuthenticatedUser(request, reply, authService, false);
     const { url } = jobProbeSchema.parse(request.body);
-    const result = await jobService.probeUrl(url);
+    const result = await jobService.probeUrl(url, user?.id);
     return reply.status(200).send({ data: result });
   });
 

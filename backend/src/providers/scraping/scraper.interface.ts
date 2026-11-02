@@ -1,6 +1,9 @@
+import type { PlaywrightStorageState } from '../../db/schema.js';
+
 export interface ScrapeOptions {
   timeoutMs?: number;
   waitForSelector?: string;
+  storageState?: PlaywrightStorageState;
 }
 
 export interface ScrapeResult {

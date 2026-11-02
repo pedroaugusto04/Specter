@@ -116,6 +116,15 @@ export interface UserIntegrationsDto {
   botUsername?: string | null;
 }
 
+export interface SessionDto {
+  id: string;
+  domain: string;
+  name: string;
+  cookieCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ApiValidationErrorDetail {
   field: string;
   message: string;
@@ -367,5 +376,21 @@ export const api = {
 
   getJobRuns(id: string): Promise<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }> {
     return request<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }>(`/api/jobs/${id}/runs`);
+  },
+
+  getSessions(): Promise<SessionDto[]> {
+    return request<SessionDto[]>('/api/sessions');
+  },
+
+  checkSession(domainOrUrl: string): Promise<{ hasSession: boolean; session: SessionDto | null }> {
+    return request<{ hasSession: boolean; session: SessionDto | null }>(
+      `/api/sessions/check?url=${encodeURIComponent(domainOrUrl)}`
+    );
+  },
+
+  deleteSession(id: string): Promise<void> {
+    return request<void>(`/api/sessions/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

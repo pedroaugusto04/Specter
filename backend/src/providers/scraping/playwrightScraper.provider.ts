@@ -42,6 +42,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         userAgent: DEFAULT_USER_AGENT,
         viewport: { width: 1920, height: 1080 },
         locale: 'pt-BR',
+        ...(options?.storageState ? { storageState: options.storageState } : {}),
         extraHTTPHeaders: {
           'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
           Accept:

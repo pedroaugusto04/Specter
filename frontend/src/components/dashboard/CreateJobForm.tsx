@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, HelpCircle, Loader2, Plus } from 'lucide-react';
+import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
-import { ApiError, api, type UserDto } from '@/lib/api';
+import { ApiError, api, type SessionDto, type UserDto } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 
@@ -57,6 +57,7 @@ export function CreateJobForm({
     urlChecked?: string;
     reason?: string;
   }>({ status: 'idle' });
+  const [detectedSession, setDetectedSession] = React.useState<SessionDto | null>(null);
 
   const effectiveCron = useCustomCron ? customCron : cronPreset;
 
@@ -116,7 +117,13 @@ export function CreateJobForm({
 
     setProbeState({ status: 'probing', urlChecked: trimmedUrl });
     try {
-      const probe = await api.probeUrl(trimmedUrl);
+      const [probe, sessionCheck] = await Promise.all([
+        api.probeUrl(trimmedUrl),
+        api.checkSession(trimmedUrl).catch(() => ({ hasSession: false, session: null })),
+      ]);
+
+      setDetectedSession(sessionCheck.hasSession ? sessionCheck.session : null);
+
       if (probe.accessible) {
         setProbeState({ status: 'accessible', urlChecked: trimmedUrl });
       } else {
@@ -301,12 +308,19 @@ export function CreateJobForm({
             onChange={(e) => {
               setUrl(e.target.value);
               clearFieldError('url');
+              setDetectedSession(null);
               if (probeState.status !== 'idle') {
                 setProbeState({ status: 'idle' });
               }
             }}
             onBlur={handleUrlBlur}
           />
+          {detectedSession && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-md">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Sessão autenticada ativa detectada ({detectedSession.domain}) via Extensão Specter. O robô navegará logado!</span>
+            </div>
+          )}
         </FormField>
 
         <FormField

@@ -30,8 +30,14 @@ export async function resolveAuthenticatedUser(
   requireAuth = false
 ): Promise<UserDto | null> {
   const cookies = parseCookies(request.headers.cookie);
+  const authHeader = request.headers.authorization;
+  const bearerToken =
+    authHeader && authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : undefined;
+
   const session = await authService.resolveSession(
-    cookies[ACCESS_COOKIE_NAME],
+    bearerToken || cookies[ACCESS_COOKIE_NAME],
     cookies[REFRESH_COOKIE_NAME]
   );
 
@@ -77,7 +83,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
     const input = authLoginSchema.parse(request.body);
     const { user, tokens } = await authService.login(input);
     reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
-    return reply.status(200).send({ data: user });
+    return reply.status(200).send({ data: user, token: tokens.accessToken });
   });
 
   app.post('/api/auth/refresh', async (request, reply) => {

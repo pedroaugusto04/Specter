@@ -11,6 +11,7 @@ import { BullMqJobScheduler } from './queues/queues.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
+import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
 import { DrizzleUserRepository } from './repositories/userRepository.js';
 import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
@@ -18,6 +19,7 @@ import { IntegrationService } from './services/integrationService.js';
 import { JobService } from './services/jobService.js';
 import { RetentionService } from './services/retentionService.js';
 import { ScrapeExecutionService } from './services/scrapeExecutionService.js';
+import { SessionService } from './services/sessionService.js';
 import { logger } from './utils/logger.js';
 import { WorkerManager } from './workers/workers.js';
 
@@ -25,6 +27,7 @@ async function bootstrap(): Promise<void> {
   const jobRepository = new DrizzleJobRepository();
   const userRepository = new DrizzleUserRepository();
   const integrationRepository = new DrizzleIntegrationRepository();
+  const sessionRepository = new DrizzleSessionRepository();
   const jobScheduler = new BullMqJobScheduler();
   const compilerProvider = createCompilerProvider();
   const scraperEngine = createScraperEngine();
@@ -46,6 +49,7 @@ async function bootstrap(): Promise<void> {
     compilerProvider,
     notificationProvider: notificationDispatcher,
     jobScheduler,
+    sessionRepository,
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
@@ -53,16 +57,18 @@ async function bootstrap(): Promise<void> {
     scraperEngine,
     notificationProvider: notificationDispatcher,
     jobScheduler,
+    sessionRepository,
   });
 
   const retentionService = new RetentionService(jobRepository);
-  const jobService = new JobService(jobRepository, jobScheduler, scraperEngine);
+  const jobService = new JobService(jobRepository, jobScheduler, scraperEngine, sessionRepository);
   const authService = new AuthService(userRepository);
   const integrationService = new IntegrationService(
     integrationRepository,
     telegramProvider,
     webhookProvider
   );
+  const sessionService = new SessionService(sessionRepository);
 
   // Run migrations automatically on startup
   try {
@@ -97,7 +103,7 @@ async function bootstrap(): Promise<void> {
   });
   workerManager.start();
 
-  const app = await buildApp({ jobService, authService, integrationService });
+  const app = await buildApp({ jobService, authService, integrationService, sessionService });
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);

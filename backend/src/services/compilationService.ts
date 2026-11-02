@@ -4,6 +4,7 @@ import type { INotificationProvider } from '../providers/notifications/notificat
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
+import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ChangeStatus, ScrapingJobEntity } from '../types/domain.js';
 import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
@@ -18,6 +19,7 @@ export interface CompilationServiceDeps {
   compilerProvider: ICompilerProvider;
   notificationProvider: INotificationProvider;
   jobScheduler: IJobScheduler;
+  sessionRepository?: ISessionRepository;
 }
 
 export class CompilationService {
@@ -26,6 +28,7 @@ export class CompilationService {
   private readonly compilerProvider: ICompilerProvider;
   private readonly notificationProvider: INotificationProvider;
   private readonly jobScheduler: IJobScheduler;
+  private readonly sessionRepository?: ISessionRepository;
 
   constructor(deps: CompilationServiceDeps) {
     this.jobRepository = deps.jobRepository;
@@ -33,6 +36,7 @@ export class CompilationService {
     this.compilerProvider = deps.compilerProvider;
     this.notificationProvider = deps.notificationProvider;
     this.jobScheduler = deps.jobScheduler;
+    this.sessionRepository = deps.sessionRepository;
   }
 
   async compileJob(jobId: string): Promise<ScrapingJobEntity> {
@@ -51,8 +55,26 @@ export class CompilationService {
         provider: this.compilerProvider.name,
       });
 
+      let storageState;
+      if (this.sessionRepository && job.userId) {
+        try {
+          const urlObj = new URL(job.url);
+          const savedSession = await this.sessionRepository.findByUserAndDomain(job.userId, urlObj.hostname);
+          if (savedSession) {
+            storageState = savedSession.storageState;
+            logger.info('Using authenticated web session for AI compilation', {
+              jobId: job.id,
+              domain: savedSession.domain,
+              cookieCount: savedSession.cookieCount,
+            });
+          }
+        } catch {
+          // ignore url parse error
+        }
+      }
+
       // 1. Fetch raw HTML from target URL
-      const scrapeResult = await this.scraperEngine.fetchHtml(job.url);
+      const scrapeResult = await this.scraperEngine.fetchHtml(job.url, { storageState });
       httpStatus = scrapeResult.httpStatus;
 
       // 2. Sanitize DOM and prune repeated sibling nodes before forwarding to AI

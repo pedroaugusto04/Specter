@@ -23,6 +23,10 @@ export class CheerioScraperEngine implements IScraperEngine {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      const cookieHeader = options?.storageState?.cookies?.length
+        ? options.storageState.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+        : undefined;
+
       const response = await this.fetchFn(targetUrl, {
         method: 'GET',
         headers: {
@@ -33,6 +37,7 @@ export class CheerioScraperEngine implements IScraperEngine {
           'sec-ch-ua-mobile': '?0',
           'sec-ch-ua-platform': '"Windows"',
           'Upgrade-Insecure-Requests': '1',
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
         },
         signal: controller.signal,
       });

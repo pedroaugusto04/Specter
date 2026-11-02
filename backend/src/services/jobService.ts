@@ -9,6 +9,7 @@ import {
 import { JobMapper, type JobRunDto, type ScrapingJobDto } from '../mappers/jobMapper.js';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
+import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { DashboardStats, IJobRepository, UpdateJobPatch } from '../repositories/jobRepository.js';
 import type { DiffSummary, JobStatus } from '../types/domain.js';
 import type { TriggerRule } from '../types/extractor.js';
@@ -39,26 +40,44 @@ export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
   private readonly scraperEngine?: IScraperEngine;
+  private readonly sessionRepository?: ISessionRepository;
 
   constructor(
     jobRepository: IJobRepository,
     jobScheduler: IJobScheduler,
-    scraperEngine?: IScraperEngine
+    scraperEngine?: IScraperEngine,
+    sessionRepository?: ISessionRepository
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
     this.scraperEngine = scraperEngine;
+    this.sessionRepository = sessionRepository;
   }
 
-  async probeUrl(targetUrl: string): Promise<{ accessible: boolean; reason?: string }> {
+  async probeUrl(targetUrl: string, userId?: string): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
     const normalizedUrl = normalizeUrl(targetUrl);
     if (!this.scraperEngine) {
       return { accessible: true };
     }
 
+    let storageState;
+    let hasSavedSession = false;
+    if (this.sessionRepository && userId) {
+      try {
+        const urlObj = new URL(normalizedUrl);
+        const savedSession = await this.sessionRepository.findByUserAndDomain(userId, urlObj.hostname);
+        if (savedSession) {
+          storageState = savedSession.storageState;
+          hasSavedSession = true;
+        }
+      } catch {
+        // ignore url parse error
+      }
+    }
+
     try {
-      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000 });
-      return { accessible: true };
+      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000, storageState });
+      return { accessible: true, ...(hasSavedSession ? { hasSavedSession: true } : {}) };
     } catch (err) {
       logger.warn('URL accessibility verification failed during probe', {
         url: normalizedUrl,

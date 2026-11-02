@@ -10,6 +10,7 @@ import type { INotificationProvider } from '../providers/notifications/notificat
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
+import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ChangeStatus, JobRunEntity } from '../types/domain.js';
 import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
@@ -22,6 +23,7 @@ export interface ScrapeExecutionServiceDeps {
   scraperEngine: IScraperEngine;
   notificationProvider: INotificationProvider;
   jobScheduler: IJobScheduler;
+  sessionRepository?: ISessionRepository;
   consecutiveFailuresForHealing?: number;
   maxHealingRetries?: number;
 }
@@ -31,6 +33,7 @@ export class ScrapeExecutionService {
   private readonly scraperEngine: IScraperEngine;
   private readonly notificationProvider: INotificationProvider;
   private readonly jobScheduler: IJobScheduler;
+  private readonly sessionRepository?: ISessionRepository;
   private readonly consecutiveFailuresForHealing: number;
   private readonly maxHealingRetries: number;
 
@@ -39,6 +42,7 @@ export class ScrapeExecutionService {
     this.scraperEngine = deps.scraperEngine;
     this.notificationProvider = deps.notificationProvider;
     this.jobScheduler = deps.jobScheduler;
+    this.sessionRepository = deps.sessionRepository;
     this.consecutiveFailuresForHealing =
       deps.consecutiveFailuresForHealing ?? env.CONSECUTIVE_FAILURES_FOR_HEALING;
     this.maxHealingRetries = deps.maxHealingRetries ?? env.MAX_HEALING_RETRIES;
@@ -66,8 +70,26 @@ export class ScrapeExecutionService {
     let httpStatus: number | null = null;
 
     try {
+      let storageState;
+      if (this.sessionRepository && job.userId) {
+        try {
+          const urlObj = new URL(job.url);
+          const savedSession = await this.sessionRepository.findByUserAndDomain(job.userId, urlObj.hostname);
+          if (savedSession) {
+            storageState = savedSession.storageState;
+            logger.debug('Injecting authenticated web session into Playwright scraper', {
+              jobId: job.id,
+              domain: savedSession.domain,
+            });
+          }
+        } catch {
+          // ignore url parse error
+        }
+      }
+
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
         waitForSelector: job.extractorConfig.containerSelector,
+        storageState,
       });
       httpStatus = scrapeResult.httpStatus;
 

@@ -305,6 +305,7 @@ function isRuleSatisfiedInPayload(
 
     for (let i = 0; i < payload.items.length; i++) {
       const record = payload.items[i];
+      if (!record) continue;
       const actual = record[rule.field];
       const prev = prevItems[i]?.[rule.field];
       const result = evaluateSingleRule(actual, rule, prev);

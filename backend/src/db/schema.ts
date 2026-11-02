@@ -97,6 +97,45 @@ export const jobRuns = pgTable(
   ]
 );
 
+export interface PlaywrightStorageCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'Strict' | 'Lax' | 'None';
+}
+
+export interface PlaywrightStorageOrigin {
+  origin: string;
+  localStorage: Array<{ name: string; value: string }>;
+}
+
+export interface PlaywrightStorageState {
+  cookies: PlaywrightStorageCookie[];
+  origins: PlaywrightStorageOrigin[];
+}
+
+export const userWebSessions = pgTable(
+  'user_web_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    domain: text('domain').notNull(),
+    name: text('name').notNull(),
+    storageState: jsonb('storage_state').$type<PlaywrightStorageState>().notNull(),
+    cookieCount: integer('cookie_count').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_user_web_sessions_user_domain').on(table.userId, table.domain),
+    index('idx_user_web_sessions_user_id').on(table.userId),
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type ScrapingJobRow = typeof scrapingJobs.$inferSelect;
@@ -105,3 +144,5 @@ export type JobRunRow = typeof jobRuns.$inferSelect;
 export type NewJobRunRow = typeof jobRuns.$inferInsert;
 export type UserIntegrationRow = typeof userIntegrations.$inferSelect;
 export type NewUserIntegrationRow = typeof userIntegrations.$inferInsert;
+export type UserWebSessionRow = typeof userWebSessions.$inferSelect;
+export type NewUserWebSessionRow = typeof userWebSessions.$inferInsert;
