@@ -23,13 +23,13 @@ Analyze the file '${domFilePath}' and satisfy the user's request: "${userPrompt}
 MANDATORY: Save the output strictly in valid JSON format at the path '${outputFilePath}'.
 Do not output text in the terminal. Do not request interactive confirmation.
 
-Selector Guidelines:
-- Avoid obfuscated dynamic classes (hashes from Tailwind or Styled Components).
-- Prioritize 'data-testid', semantic IDs, stable hierarchies, and standard HTML5 tags.
-- NEVER select temporary loading placeholders, skeleton containers, spinners, or elements containing temporary loading text (e.g. elements with classes like 'skeleton', 'loading', 'placeholder', or attributes like aria-busy="true"). Target the stable parent container or the actual data element that holds real content.
-- CRITICAL: NEVER select the document <title> tag (such as 'title', 'head > title', 'title#root-title') or <head> elements for content or product fields. Always locate data within the visible <body> content (e.g. <h1>, <h2>, [data-testid], main semantic containers).
-- If the page is a security challenge, captcha, account verification, or access denied screen rather than actual page content, output an empty fields object {} to indicate that valid content could not be found.
-- To extract links use attribute "href"; for images use "src"; for text use "text".
+Selector Strategy:
+- Primary 'selector': Prefer semantic attributes (id, data-testid, itemprop) or text label anchors (e.g. p:contains("Starting at") + p).
+- 'fallbackSelectors': Provide 1-2 resilient alternative selectors in descending priority order (e.g. readable utility classes like font-mono, text-2xl or structural path).
+- Classes: Use readable, semantic, or utility class names. Avoid only random compiler-generated hashes (e.g. css-1a2b3c, _3kP9x).
+- Clean Target: Never select <title>, <head>, or temporary loading/skeleton placeholders (classes containing 'skeleton', 'loading', or aria-busy="true").
+- Security: If the page is a security challenge, captcha, or access denied screen, output an empty fields object {}.
+- Attributes: Use attribute "href" for links, "src" for images, "text" for text content.
 
 Trigger Rule Guidelines:
 - If the user prompt expresses alert conditions, thresholds, or filtering requirements (e.g., "alert only if price is under 3500", "only if in stock", "alert when discount > 20%", "notify if price drops by 10%", "notify if status changes"):
@@ -46,7 +46,12 @@ Expected format:
 {
   "containerSelector": "optional_css_selector_for_repeating_items",
   "fields": {
-    "field1": { "selector": "css_or_xpath_selector", "attribute": "text" },
+    "price": {
+      "selector": "p:contains('Starting at') + p",
+      "fallbackSelectors": [".font-mono.text-2xl"],
+      "attribute": "text",
+      "type": "number"
+    },
     "link": { "selector": "a.detail", "attribute": "href" }
   },
   "triggerRules": [

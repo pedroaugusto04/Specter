@@ -410,7 +410,7 @@ export function CreateJobForm({
             </button>
           </div>
           <p className="leading-relaxed">
-            By default, you receive an alert whenever any tracked content changes on the page. 
+            By default, you receive an alert whenever any tracked content changes on the page.
             Conditional triggers let you filter notifications so you only get alerted <strong>when specific events occur</strong>.
           </p>
           <div className="space-y-1.5 pt-1 text-[11px]">
@@ -437,7 +437,7 @@ export function CreateJobForm({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <FormField
-          label="Monitoring Frequency (Cron Schedule)"
+          label="Monitoring Frequency"
           htmlFor="cron-preset"
           required
           error={!useCustomCron ? fieldErrors.cronExpression : undefined}

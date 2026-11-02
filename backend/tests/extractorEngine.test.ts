@@ -108,4 +108,81 @@ describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
 
     expect(result).toEqual({});
   });
+
+  describe('Fallback Selectors Cascade', () => {
+    const htmlSnippet = `
+      <html>
+        <body>
+          <div class="product">
+            <p class="label">Starting at</p>
+            <p class="font-mono text-2xl font-bold">$2215.00</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    it('uses primary selector when it successfully matches valid content', () => {
+      const result = extractUsingConfig(htmlSnippet, {
+        fields: {
+          price: {
+            selector: 'p:contains("Starting at") + p',
+            fallbackSelectors: ['.font-mono.text-2xl', '.unknown-selector'],
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({ price: 2215 });
+    });
+
+    it('cascades to fallbackSelectors when primary selector is not found in the DOM', () => {
+      const result = extractUsingConfig(htmlSnippet, {
+        fields: {
+          price: {
+            selector: '#non-existent-id',
+            fallbackSelectors: [
+              '.non-existent-class',
+              '.font-mono.text-2xl',
+              'p:contains("Starting at") + p',
+            ],
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({ price: 2215 });
+    });
+
+    it('cascades to fallbackSelectors when primary selector matches but fails type coercion', () => {
+      const result = extractUsingConfig(htmlSnippet, {
+        fields: {
+          price: {
+            selector: '.product .label', // Matches "Starting at", which cannot coerce to number
+            fallbackSelectors: ['.font-mono.text-2xl'],
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({ price: 2215 });
+    });
+
+    it('returns empty result when primary and all fallback selectors fail', () => {
+      const result = extractUsingConfig(htmlSnippet, {
+        fields: {
+          price: {
+            selector: '#not-there',
+            fallbackSelectors: ['.also-not-there', '.not-found-either'],
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({});
+    });
+  });
 });

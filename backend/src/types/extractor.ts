@@ -1,5 +1,6 @@
 export interface FieldExtractor {
   selector: string;
+  fallbackSelectors?: string[];
   attribute?: 'text' | 'href' | 'src' | string;
   type?: 'string' | 'number' | 'boolean';
 }

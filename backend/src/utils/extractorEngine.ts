@@ -12,12 +12,14 @@ export function normalizeFieldDefinition(def: ExtractorFieldDefinition): Require
   if (typeof def === 'string') {
     return {
       selector: def,
+      fallbackSelectors: [],
       attribute: 'text',
       type: 'string',
     };
   }
   return {
     selector: def.selector,
+    fallbackSelectors: Array.isArray(def.fallbackSelectors) ? def.fallbackSelectors : [],
     attribute: def.attribute ?? 'text',
     type: def.type ?? 'string',
   };
@@ -69,24 +71,30 @@ function coerceValue(
   return trimmed;
 }
 
-function extractSingleValue(
+function tryExtractSelector(
   $: cheerio.CheerioAPI,
   scope: cheerio.Cheerio<AnyNode> | null,
-  fieldDef: Required<FieldExtractor>
+  selector: string,
+  attribute: string,
+  type: 'string' | 'number' | 'boolean'
 ): string | number | boolean | null {
-  const { selector, attribute, type } = fieldDef;
   if (!selector || !selector.trim()) {
     return null;
   }
 
   let target: cheerio.Cheerio<AnyNode>;
-  if (scope) {
-    target = selector === ':scope' || selector === '.' ? scope : scope.find(selector).first();
-    if (target.length === 0 && scope.is(selector)) {
-      target = scope;
+  try {
+    if (scope) {
+      target = selector === ':scope' || selector === '.' ? scope : scope.find(selector).first();
+      if (target.length === 0 && scope.is(selector)) {
+        target = scope;
+      }
+    } else {
+      target = $(selector).first();
     }
-  } else {
-    target = $(selector).first();
+  } catch {
+    // In case an invalid or unsupported selector was passed
+    return null;
   }
 
   if (target.length === 0) {
@@ -101,6 +109,30 @@ function extractSingleValue(
   }
 
   return coerceValue(raw, type);
+}
+
+function extractSingleValue(
+  $: cheerio.CheerioAPI,
+  scope: cheerio.Cheerio<AnyNode> | null,
+  fieldDef: Required<FieldExtractor>
+): string | number | boolean | null {
+  const { selector, fallbackSelectors, attribute, type } = fieldDef;
+
+  // 1. Try primary selector
+  const primaryResult = tryExtractSelector($, scope, selector, attribute, type);
+  if (primaryResult !== null) {
+    return primaryResult;
+  }
+
+  // 2. Cascade through fallbackSelectors in priority order
+  for (const fallback of fallbackSelectors) {
+    const fallbackResult = tryExtractSelector($, scope, fallback, attribute, type);
+    if (fallbackResult !== null) {
+      return fallbackResult;
+    }
+  }
+
+  return null;
 }
 
 function isRecordNonEmpty(record: ExtractedRecord): boolean {
@@ -215,7 +247,10 @@ export function validateExtractionSmokeTest(
     fieldDefs.length > 0 &&
     fieldDefs.every((def) => {
       const norm = normalizeFieldDefinition(def);
-      return isDisallowedHeadSelector(norm.selector);
+      return (
+        isDisallowedHeadSelector(norm.selector) &&
+        norm.fallbackSelectors.every((fb) => isDisallowedHeadSelector(fb))
+      );
     });
 
   if (allTargetHead) {
