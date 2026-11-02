@@ -1,5 +1,5 @@
 {
-  "name": "dynamic-scrapper-workspace",
+  "name": "specter-workspace",
   "private": true,
   "scripts": {
     "dev": "docker compose -f docker-compose.dev.yml up",
@@ -10,3 +10,4 @@
     "prod:down": "docker compose down"
   }
 }
+

@@ -1,4 +1,4 @@
-# Dynamic-Scrapper — Scraper & Monitor Autônomo com IA
+# Specter — Scraper & Monitor Autônomo com IA
 
 Plataforma autônoma de extração e monitoramento web que combina **geração pontual de seletores via IA** (`ICompilerProvider`: AGY CLI / Codex) com **execução determinística contínua** (BullMQ + Playwright + Cheerio + Fastify + Drizzle ORM + Next.js), operando com **0 consumo de tokens de LLM** nas checagens rotineiras e **Auto-Cura (*Self-Healing*)** em caso de alterações de layout.
 
@@ -68,3 +68,4 @@ npm test
 npm run typecheck
 npm run build
 ```
+

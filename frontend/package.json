@@ -1,5 +1,5 @@
 {
-  "name": "dynamic-scrapper-frontend",
+  "name": "specter-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -26,3 +26,4 @@
     "typescript": "^5.7.2"
   }
 }
+

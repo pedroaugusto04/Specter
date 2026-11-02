@@ -17,7 +17,7 @@ write_kv NODE_ENV "production"
 write_kv PORT "${APP_PORT:-$DEFAULT_PORT}"
 write_kv HOST "${HOST:-0.0.0.0}"
 
-# Production defaults for Dynamic-Scrapper
+# Production defaults for Specter
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-dynamic_scrapper}"
@@ -97,3 +97,4 @@ for key in "${keys[@]}"; do
 done
 
 chmod 600 "$OUTPUT_FILE"
+

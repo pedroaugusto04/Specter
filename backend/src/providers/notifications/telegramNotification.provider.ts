@@ -128,7 +128,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
     }
 
     lines.push('');
-    lines.push('<i>Dynamic-Scapper • Autonomous Web Monitor</i>');
+    lines.push('<i>Specter • Autonomous Web Monitor</i>');
 
     return lines.join('\n');
   }
@@ -151,7 +151,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       const text = [
         '✅ <b>Specter Telegram Integration Test</b>',
         '',
-        'Your Telegram notification channel is successfully connected to <b>Dynamic-Scapper</b>!',
+        'Your Telegram notification channel is successfully connected to <b>Specter</b>!',
         'Future monitor alerts and self-healing updates will be delivered here in real time.',
         '',
         `<i>Sent at: ${new Date().toISOString()}</i>`,

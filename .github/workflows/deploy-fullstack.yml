@@ -32,7 +32,7 @@ permissions:
   packages: write
 
 env:
-  APP_NAME: ${{ vars.APP_NAME || 'Dynamic Scrapper' }}
+  APP_NAME: \$\{\{ vars.APP_NAME || 'Specter' \}\}
   APP_DIR_NAME: ${{ vars.APP_DIR_NAME || 'dynamic-scrapper' }}
   FRONTEND_DEPLOY_PATH: ${{ vars.FRONTEND_DEPLOY_PATH || '/var/www/dynamic-scrapper' }}
   RELOAD_NGINX: ${{ vars.RELOAD_NGINX || 'true' }}
@@ -356,3 +356,4 @@ jobs:
             else
               echo "Nginx nao instalado; pulando reload."
             fi
+

@@ -75,7 +75,7 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
         deliveryId,
         timestamp,
         message: 'Specter Webhook integration test event',
-        service: 'Dynamic-Scapper',
+        service: 'Specter',
       };
 
       const rawBody = JSON.stringify(bodyObj);

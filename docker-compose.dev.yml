@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: dynamic-scrapper-postgres-dev
+    container_name: specter-postgres-dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: dynamic-scrapper-redis-dev
+    container_name: specter-redis-dev
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     ports:
@@ -37,7 +37,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-    container_name: dynamic-scrapper-backend-dev
+    container_name: specter-backend-dev
     restart: unless-stopped
     command: ["npm", "run", "dev"]
     environment:
@@ -78,7 +78,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: dynamic-scrapper-frontend-dev
+    container_name: specter-frontend-dev
     restart: unless-stopped
     command: ["npm", "run", "dev"]
     environment:
@@ -100,3 +100,4 @@ volumes:
   postgres_dev_data:
   redis_dev_data:
   agy_profile:
+

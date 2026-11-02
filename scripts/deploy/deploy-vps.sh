@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# Local VPS Deploy Script (Dynamic Scrapper)
+# Local VPS Deploy Script (Specter)
 # Follows the architecture pattern of FeConnect
 # ==============================================================================
 
@@ -84,3 +84,4 @@ echo "6. Limpando imagens Docker não utilizadas..."
 docker image prune -f --filter "until=168h" || true
 
 echo "✅ Deploy finalizado com sucesso na VPS!"
+

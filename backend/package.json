@@ -1,5 +1,5 @@
 {
-  "name": "dynamic-scrapper-backend",
+  "name": "specter-backend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -41,3 +41,4 @@
     "vitest": "^2.1.8"
   }
 }
+
