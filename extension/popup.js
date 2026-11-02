@@ -469,8 +469,8 @@ btnSync.addEventListener('click', async () => {
     if (!res.ok) {
       showAlert(json.message || 'Error syncing session.', 'error');
     } else {
-      showAlert(`🎉 Session synced successfully! (${activeCookies.length} cookies). Specter will now browse authenticated on this site.`, 'success');
-      btnSync.innerHTML = '<span>⚡ Update Session in Specter</span>';
+      showAlert(` Session synced successfully! (${activeCookies.length} cookies). Specter will now browse authenticated on this site.`, 'success');
+      btnSync.innerHTML = '<span> Update Session in Specter</span>';
     }
   } catch (err) {
     showAlert(`Network error: ${err.message}`, 'error');
