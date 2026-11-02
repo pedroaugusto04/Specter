@@ -24,6 +24,32 @@ import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
 type StatusFilter = 'ALL' | 'ACTIVE' | 'HEALING' | 'PAUSED';
 
+function formatDisplayUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const pathname = parsed.pathname === '/' ? '' : parsed.pathname;
+    return `${host}${pathname}`;
+  } catch {
+    return rawUrl.replace(/^https?:\/\/(www\.)?/, '');
+  }
+}
+
+function formatCompactDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d);
+  } catch {
+    return isoString;
+  }
+}
+
 function renderStatusPill(status: JobStatus) {
   switch (status) {
     case 'ACTIVE':
@@ -249,11 +275,11 @@ export function JobsTable({
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
                 <th className="py-3 px-3 sm:px-4">Target</th>
-                <th className="w-24 sm:w-28 px-2.5 sm:px-3 py-3">Status</th>
-                <th className="w-28 sm:w-32 px-2.5 sm:px-3 py-3">Schedule</th>
-                <th className="w-16 sm:w-20 px-2.5 sm:px-3 py-3">Failures</th>
-                <th className="w-28 sm:w-32 px-2.5 sm:px-3 py-3">Last Checked</th>
-                <th className="w-36 sm:w-44 py-3 pr-3 pl-2 sm:pr-4 text-right">Actions</th>
+                <th className="w-[110px] px-2.5 py-3">Status</th>
+                <th className="w-[110px] px-2.5 py-3">Schedule</th>
+                <th className="w-[75px] px-2.5 py-3">Failures</th>
+                <th className="w-[130px] px-2.5 py-3">Last Checked</th>
+                <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -284,21 +310,21 @@ export function JobsTable({
                           target="_blank"
                           rel="noreferrer"
                           title={job.url}
-                          className="truncate hover:underline underline-offset-4 text-xs sm:text-sm font-medium block max-w-full"
+                          className="truncate max-w-[180px] sm:max-w-[220px] hover:underline underline-offset-4 text-xs sm:text-sm font-medium inline-block"
                         >
-                          {job.url}
+                          {formatDisplayUrl(job.url)}
                         </a>
                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                       </div>
                       <p
-                        className="mt-0.5 truncate text-xs text-muted-foreground block max-w-full"
+                        className="mt-0.5 truncate max-w-[180px] sm:max-w-[220px] text-xs text-muted-foreground block"
                         title={job.userPrompt}
                       >
                         {job.userPrompt}
                       </p>
                       {parsedError && (
                         <div
-                          className="mt-1.5 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 min-w-0"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 max-w-[200px]"
                           title={`${parsedError.title}: ${parsedError.description}`}
                         >
                           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
@@ -310,12 +336,12 @@ export function JobsTable({
                     </td>
 
                     {/* Status Pill */}
-                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3">
+                    <td className="whitespace-nowrap px-2.5 py-3">
                       {renderStatusPill(job.status)}
                     </td>
 
                     {/* Cron */}
-                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="whitespace-nowrap px-2.5 py-3 font-mono text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3 text-muted-foreground/70" />
                         <span className="truncate">{job.cronExpression}</span>
@@ -323,7 +349,7 @@ export function JobsTable({
                     </td>
 
                     {/* Failures */}
-                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 text-xs">
+                    <td className="whitespace-nowrap px-2.5 py-3 text-xs">
                       <span
                         className={
                           job.failureCount > 0
@@ -336,13 +362,16 @@ export function JobsTable({
                     </td>
 
                     {/* Updated At */}
-                    <td className="whitespace-nowrap px-2.5 sm:px-3 py-3 text-xs text-muted-foreground font-mono">
-                      {formatDateTime(job.updatedAt)}
+                    <td
+                      className="whitespace-nowrap px-2.5 py-3 text-xs text-muted-foreground font-mono"
+                      title={formatDateTime(job.updatedAt)}
+                    >
+                      {formatCompactDate(job.updatedAt)}
                     </td>
 
                     {/* Action Buttons */}
-                    <td className="whitespace-nowrap py-3 pr-3 pl-2 sm:pr-4 text-right">
-                      <div className="inline-flex items-center gap-0.5">
+                    <td className="w-[210px] whitespace-nowrap py-3 pr-3 pl-2 text-right">
+                      <div className="inline-flex items-center justify-end gap-1">
                         {/* Edit */}
                         <Button
                           variant="ghost"
@@ -356,10 +385,10 @@ export function JobsTable({
                                 : 'Edit monitor configuration'
                           }
                           aria-label="Edit monitor configuration"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() => onEditJob(job)}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
 
                         {/* Run immediate */}
@@ -377,15 +406,15 @@ export function JobsTable({
                                   : 'Run immediate extraction'
                           }
                           aria-label="Run immediate extraction"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
                             handleAction(job.id, 'run', () => api.triggerNow(job.id))
                           }
                         >
                           {isRunning ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
                           ) : (
-                            <Zap className="h-4 w-4" />
+                            <Zap className="h-3.5 w-3.5" />
                           )}
                         </Button>
 
@@ -396,10 +425,10 @@ export function JobsTable({
                           disabled={isDeleting}
                           title="View snapshots, compiled selectors and diff history"
                           aria-label="View snapshots, compiled selectors and diff history"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() => onSelectJobForHistory(job)}
                         >
-                          <History className="h-4 w-4" />
+                          <History className="h-3.5 w-3.5" />
                         </Button>
 
                         {/* Recompile */}
@@ -415,7 +444,7 @@ export function JobsTable({
                                 : 'Recompile selectors'
                           }
                           aria-label="Recompile selectors"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
                             handleAction(job.id, 'recompile', () =>
                               api.triggerRecompile(job.id)
@@ -423,9 +452,9 @@ export function JobsTable({
                           }
                         >
                           {isCompiling ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
                           ) : (
-                            <RefreshCw className="h-4 w-4" />
+                            <RefreshCw className="h-3.5 w-3.5" />
                           )}
                         </Button>
 
@@ -444,7 +473,7 @@ export function JobsTable({
                                   : 'Pause schedule'
                           }
                           aria-label={isPaused ? 'Resume schedule' : 'Pause schedule'}
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
                             handleAction(job.id, 'pause', () =>
                               api.togglePause(job.id, !isPaused)
@@ -452,11 +481,11 @@ export function JobsTable({
                           }
                         >
                           {isPausing ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
                           ) : isPaused ? (
-                            <Play className="h-4 w-4 text-foreground" />
+                            <Play className="h-3.5 w-3.5 text-foreground" />
                           ) : (
-                            <Pause className="h-4 w-4" />
+                            <Pause className="h-3.5 w-3.5" />
                           )}
                         </Button>
 
@@ -473,7 +502,7 @@ export function JobsTable({
                                 : 'Delete monitor'
                           }
                           aria-label="Delete monitor"
-                          className="h-8 w-8 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted"
                           onClick={async () => {
                             const confirmed = await modal.confirm({
                               title: 'Delete Monitor',
@@ -488,9 +517,9 @@ export function JobsTable({
                           }}
                         >
                           {isDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           )}
                         </Button>
                       </div>
