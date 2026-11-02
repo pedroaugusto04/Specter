@@ -350,7 +350,7 @@ export function CreateJobForm({
               type="button"
               onClick={() => setShowTriggerInfo((prev) => !prev)}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted"
-              title="Tip: You can filter alerts by price thresholds (<, >, etc.)"
+              title="Tip: You can set alert conditions directly in the prompt or configure them later"
               aria-label="Toggle conditional trigger tips"
             >
               <HelpCircle className="h-3.5 w-3.5" />
@@ -362,20 +362,20 @@ export function CreateJobForm({
         error={fieldErrors.userPrompt}
         hint={
           <span>
-            Describe the fields and data attributes to extract (min. 5 chars).
+            Describe what to extract (min. 5 chars).
             <button
               type="button"
               onClick={() => setShowTriggerInfo((prev) => !prev)}
               className="ml-1 text-primary hover:underline font-medium inline-flex items-center gap-0.5"
             >
-              Learn about price triggers
+              Learn how alert conditions work
             </button>
           </span>
         }
       >
         <Textarea
           id="user-prompt"
-          placeholder="e.g. Extract the product title, current price, stock availability, and the purchase link."
+          placeholder={`e.g. Extract the product title, current price, and stock status.\n\nOptional condition: Notify only if price drops by 10% or if status changes to 'Available'.`}
           value={userPrompt}
           hasError={Boolean(fieldErrors.userPrompt)}
           aria-describedby={fieldErrors.userPrompt ? 'user-prompt-error' : undefined}
@@ -383,17 +383,17 @@ export function CreateJobForm({
             setUserPrompt(e.target.value);
             clearFieldError('userPrompt');
           }}
-          rows={3}
+          rows={4}
         />
       </FormField>
 
-      {/* Info Callout for Price / Conditional Triggers */}
+      {/* Info Callout for Conditional Triggers */}
       {showTriggerInfo && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2 text-xs text-muted-foreground">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2.5 text-xs text-muted-foreground">
           <div className="flex items-center justify-between font-medium text-foreground">
             <span className="flex items-center gap-1.5">
-              <HelpCircle className="h-3.5 w-3.5 text-primary" />
-              Price Difference & Conditional Alert Triggers
+              <HelpCircle className="h-4 w-4 text-primary" />
+              How Smart Alerts & Trigger Conditions Work
             </span>
             <button
               type="button"
@@ -403,23 +403,28 @@ export function CreateJobForm({
               Dismiss
             </button>
           </div>
-          <p>
-            Once your monitor is created and its fields (such as <code className="text-foreground font-mono">price</code>) are discovered, you can set granular alert triggers so notifications only fire when specific conditions are met.
+          <p className="leading-relaxed">
+            By default, you receive an alert whenever any tracked content changes on the page. 
+            Conditional triggers let you filter notifications so you only get alerted <strong>when specific events occur</strong>.
           </p>
-          <div className="space-y-1 pt-1 text-[11px]">
-            <div className="font-semibold text-foreground">Supported comparison operators:</div>
-            <ul className="list-disc list-inside space-y-0.5 pl-1">
-              <li><code className="text-foreground font-mono">&lt; Less than (lt)</code> / <code className="text-foreground font-mono">&le; (lte)</code>: Trigger when price drops below a threshold.</li>
-              <li><code className="text-foreground font-mono">&gt; Greater than (gt)</code> / <code className="text-foreground font-mono">&ge; (gte)</code>: Trigger when price exceeds a threshold.</li>
-              <li><code className="text-foreground font-mono">== (eq)</code> / <code className="text-foreground font-mono">!= (neq)</code>: Exact equality for price, stock, or status.</li>
-              <li><code className="text-foreground font-mono">Contains / Does not contain</code>: Substring checks (e.g. availability).</li>
+          <div className="space-y-1.5 pt-1 text-[11px]">
+            <div className="font-semibold text-foreground">What you can monitor:</div>
+            <ul className="list-disc list-inside space-y-1 pl-1">
+              <li><strong className="text-foreground">Relative variations (numbers & text):</strong> Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any text/status changes compared to the prior check.</li>
+              <li><strong className="text-foreground">Fixed target thresholds:</strong> Alert only if a value passes a specific limit (e.g. less than 100 or greater than 50).</li>
+              <li><strong className="text-foreground">Specific text & keyword matches:</strong> Alert when a field contains or equals specific words (e.g. &quot;Available&quot;, &quot;Approved&quot;, &quot;Open&quot;).</li>
             </ul>
           </div>
-          <div className="rounded border border-border/60 bg-background/50 p-2 font-mono text-[11px] text-foreground">
-            <strong>Example rule:</strong> &quot;Notify me only if <span className="text-primary font-semibold">price &lt; 299.99</span>&quot;
-            <div className="mt-1 text-[11px] text-muted-foreground font-sans">
-              You can configure this anytime by clicking <strong>Edit</strong> on any active monitor.
-            </div>
+          <div className="rounded border border-primary/25 bg-background/70 p-2.5 text-[11px] text-foreground space-y-1.5">
+            <div className="font-semibold text-primary">💡 Two easy ways to configure conditions:</div>
+            <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-0.5">
+              <li>
+                <strong className="text-foreground">1. Right now in the prompt:</strong> Simply add your condition in plain text above (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em> or <em>&quot;Alert when status changes&quot;</em>). The AI configures it automatically during compilation.
+              </li>
+              <li>
+                <strong className="text-foreground">2. Later via Edit Monitor:</strong> Once your monitor completes its initial check and detects the fields, click <strong>Edit</strong> anytime on the dashboard to pick variables and adjust rules with visual dropdowns.
+              </li>
+            </ul>
           </div>
         </div>
       )}

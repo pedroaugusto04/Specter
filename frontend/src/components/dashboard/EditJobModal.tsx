@@ -273,9 +273,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               <div className="flex items-center gap-1.5">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <span>Conditional Alert Triggers</span>
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (Zero-token rule evaluation)
-                  </span>
                 </h3>
                 <button
                   type="button"
@@ -307,11 +304,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
           {/* Collapsible Info / Help Box */}
           {showTriggerHelp && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2 text-xs text-muted-foreground transition-all">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2.5 text-xs text-muted-foreground transition-all">
               <div className="flex items-center justify-between font-medium text-foreground">
                 <span className="flex items-center gap-1.5">
-                  <HelpCircle className="h-3.5 w-3.5 text-primary" />
-                  How Price & Field Triggers Work
+                  <HelpCircle className="h-4 w-4 text-primary" />
+                  How Alerts & Trigger Rules Work
                 </span>
                 <button
                   type="button"
@@ -321,22 +318,36 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
                   Dismiss
                 </button>
               </div>
-              <p>
-                By default, Specter notifies you whenever any monitored content changes. With conditional triggers, you only receive alerts when specific criteria are satisfied (e.g. price drops below a threshold).
+
+              <p className="leading-relaxed">
+                By default, you receive an alert whenever anything changes on the page. 
+                With trigger rules, you only get notified <strong>when changes match what you care about</strong> (such as when a numeric value drops or a status changes).
               </p>
-              <div className="space-y-1 pt-1 text-[11px]">
-                <div className="font-semibold text-foreground">Available Operators:</div>
-                <ul className="list-disc list-inside space-y-0.5 pl-1">
-                  <li><code className="text-foreground font-mono">&lt; Less than (lt)</code> / <code className="text-foreground font-mono">&le; (lte)</code>: Trigger when numeric price drops (e.g. <span className="font-mono text-foreground">price &lt; 150</span>).</li>
-                  <li><code className="text-foreground font-mono">&gt; Greater than (gt)</code> / <code className="text-foreground font-mono">&ge; (gte)</code>: Trigger on target increases.</li>
-                  <li><code className="text-foreground font-mono">== (eq)</code> / <code className="text-foreground font-mono">!= (neq)</code>: Exact equality for numbers, booleans, or text.</li>
-                  <li><code className="text-foreground font-mono">Contains / Does not contain</code>: Substring matching (e.g. <span className="font-mono text-foreground">status contains &quot;in stock&quot;</span>).</li>
+
+              <div className="space-y-1.5 pt-1 text-[11px]">
+                <div className="font-semibold text-foreground">What you can monitor:</div>
+                <ul className="list-disc list-inside space-y-1 pl-1">
+                  <li>
+                    <strong className="text-foreground">Relative changes (numbers & values):</strong> Alert if a value drops compared to the previous check (any drop or by a specific percentage, e.g. 10%), or rises.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Fixed target thresholds:</strong> Alert if a value passes a specific limit (e.g. less than 100 or greater than 500).
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Text & status changes:</strong> Alert when a text field changes (e.g. status changes to &quot;Available&quot;), or contains specific keywords.
+                  </li>
                 </ul>
               </div>
-              <div className="rounded border border-border/60 bg-background/50 p-2 font-mono text-[11px] text-foreground">
-                <strong>Example:</strong> Alert when a product price drops below $250.00:
-                <div className="mt-1 text-muted-foreground">
-                  Field: <span className="text-foreground">price</span> &nbsp;|&nbsp; Operator: <span className="text-foreground">&lt; Less than</span> &nbsp;|&nbsp; Value: <span className="text-foreground">250</span>
+
+              <div className="rounded border border-border/60 bg-background/60 p-2.5 text-[11px] space-y-1.5">
+                <div className="font-semibold text-foreground">How to set it up:</div>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-0.5">
+                  <li>Choose the <strong className="text-foreground">Field</strong> detected by the AI (e.g. <code className="text-foreground font-mono">value</code>, <code className="text-foreground font-mono">price</code>, or <code className="text-foreground font-mono">status</code>).</li>
+                  <li>Choose the <strong className="text-foreground">Condition</strong> (e.g. <em>&quot;Drops by % or more&quot;</em>, <em>&quot;Decreased (any drop)&quot;</em>, or <em>&quot;Changed&quot;</em>).</li>
+                  <li>Enter the <strong className="text-foreground">Target value</strong> if needed (conditions like <em>Decreased</em> or <em>Changed</em> detect differences automatically without needing a number).</li>
+                </ol>
+                <div className="pt-1 text-[11px] text-muted-foreground">
+                  💡 <em>Multiple rules: use <strong>ALL conditions</strong> if everything must happen, or <strong>ANY condition</strong> to alert if any one rule is met.</em>
                 </div>
               </div>
             </div>
@@ -406,37 +417,57 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
                       value={rule.operator}
                       onChange={(e) => {
                         const updated = [...triggerRules];
-                        updated[idx] = { ...rule, operator: e.target.value as TriggerOperator };
+                        const newOp = e.target.value as TriggerOperator;
+                        updated[idx] = { ...rule, operator: newOp };
                         setTriggerRules(updated);
                       }}
                       className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
                     >
-                      <option value="lt">&lt; Less than</option>
-                      <option value="lte">&le; Less or equal</option>
-                      <option value="gt">&gt; Greater than</option>
-                      <option value="gte">&ge; Greater or equal</option>
-                      <option value="eq">== Equals</option>
-                      <option value="neq">!= Not equals</option>
-                      <option value="contains">Contains</option>
-                      <option value="not_contains">Does not contain</option>
+                      <optgroup label="Relative Changes (vs Previous Check)">
+                        <option value="percentage_drop">Drops by % or more</option>
+                        <option value="percentage_increase">Increases by % or more</option>
+                        <option value="decreased">Decreased (any drop)</option>
+                        <option value="increased">Increased (any rise)</option>
+                        <option value="changes">Changed (any text or value)</option>
+                      </optgroup>
+                      <optgroup label="Fixed Thresholds & Matches">
+                        <option value="lt">&lt; Less than</option>
+                        <option value="lte">&le; Less or equal</option>
+                        <option value="gt">&gt; Greater than</option>
+                        <option value="gte">&ge; Greater or equal</option>
+                        <option value="eq">== Equals</option>
+                        <option value="neq">!= Not equals</option>
+                        <option value="contains">Contains text</option>
+                        <option value="not_contains">Does not contain</option>
+                      </optgroup>
                     </select>
                   </div>
 
                   {/* Value */}
                   <div className="w-full sm:w-1/3">
-                    <Input
-                      placeholder="Target value"
-                      value={String(rule.value)}
-                      className="h-8 text-xs"
-                      onChange={(e) => {
-                        const updated = [...triggerRules];
-                        const raw = e.target.value;
-                        const num = Number(raw);
-                        const val = raw !== '' && !isNaN(num) ? num : raw;
-                        updated[idx] = { ...rule, value: val };
-                        setTriggerRules(updated);
-                      }}
-                    />
+                    {['decreased', 'increased', 'changes'].includes(rule.operator) ? (
+                      <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
+                        Any change detected
+                      </div>
+                    ) : (
+                      <Input
+                        placeholder={
+                          ['percentage_drop', 'percentage_increase'].includes(rule.operator)
+                            ? 'Percentage (e.g. 10)'
+                            : 'Target value (e.g. 150)'
+                        }
+                        value={String(rule.value ?? '')}
+                        className="h-8 text-xs"
+                        onChange={(e) => {
+                          const updated = [...triggerRules];
+                          const raw = e.target.value;
+                          const num = Number(raw);
+                          const val = raw !== '' && !isNaN(num) ? num : raw;
+                          updated[idx] = { ...rule, value: val };
+                          setTriggerRules(updated);
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* Delete Button */}

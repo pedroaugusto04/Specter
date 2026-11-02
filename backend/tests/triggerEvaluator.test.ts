@@ -114,6 +114,37 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       expect(evaluateSingleRule('Brand New PS5 Slim', ruleNotContains).satisfied).toBe(true);
       expect(evaluateSingleRule('Refurbished PS5 Slim', ruleNotContains).satisfied).toBe(false);
     });
+
+    it('evaluates relative percentage drops and increases against previous value', () => {
+      const ruleDrop10: TriggerRule = { field: 'price', operator: 'percentage_drop', value: 10 };
+      // Previous: 1000, Actual: 850 (15% drop >= 10%)
+      expect(evaluateSingleRule('R$ 850,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(true);
+      // Previous: 1000, Actual: 950 (5% drop < 10%)
+      expect(evaluateSingleRule('R$ 950,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(false);
+      // Price increased
+      expect(evaluateSingleRule('R$ 1.100,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(false);
+
+      const ruleInc15: TriggerRule = { field: 'price', operator: 'percentage_increase', value: 15 };
+      // Previous: 100, Actual: 120 (20% increase >= 15%)
+      expect(evaluateSingleRule(120, ruleInc15, 100).satisfied).toBe(true);
+      // Previous: 100, Actual: 110 (10% increase < 15%)
+      expect(evaluateSingleRule(110, ruleInc15, 100).satisfied).toBe(false);
+    });
+
+    it('evaluates simple relative changes (decreased, increased, changes)', () => {
+      const ruleDec: TriggerRule = { field: 'price', operator: 'decreased', value: '' };
+      expect(evaluateSingleRule(90, ruleDec, 100).satisfied).toBe(true);
+      expect(evaluateSingleRule(100, ruleDec, 100).satisfied).toBe(false);
+      expect(evaluateSingleRule(110, ruleDec, 100).satisfied).toBe(false);
+
+      const ruleInc: TriggerRule = { field: 'price', operator: 'increased', value: '' };
+      expect(evaluateSingleRule(110, ruleInc, 100).satisfied).toBe(true);
+      expect(evaluateSingleRule(90, ruleInc, 100).satisfied).toBe(false);
+
+      const ruleChanges: TriggerRule = { field: 'status', operator: 'changes', value: '' };
+      expect(evaluateSingleRule('In Stock', ruleChanges, 'Out of Stock').satisfied).toBe(true);
+      expect(evaluateSingleRule('In Stock', ruleChanges, 'in stock').satisfied).toBe(false);
+    });
   });
 
   describe('evaluateTriggerRules', () => {
@@ -299,6 +330,62 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       expect(alert.jobId).toBe(job.id);
       expect(alert.triggerReasons).toBeDefined();
       expect(alert.triggerReasons?.[0]).toContain('price (3399) < 3500');
+    });
+
+    it('evaluates relative triggers (percentage_drop) in ScrapeExecutionService', async () => {
+      const extractorConfig: ExtractorConfig = {
+        fields: {
+          title: { selector: 'h1', attribute: 'text' },
+          price: { selector: '.price', attribute: 'text' },
+        },
+        triggerRules: [{ field: 'price', operator: 'percentage_drop', value: 10 }],
+      };
+
+      const job = await repository.createJob({
+        url: 'https://store.example.com/ps5',
+        userPrompt: 'Alert if PS5 price drops by 10% or more',
+        notificationEmail: 'user@example.com',
+        cronExpression: '0 */6 * * *',
+      });
+
+      await repository.updateJob(job.id, {
+        extractorConfig,
+        status: 'ACTIVE',
+      });
+
+      // Prior run: price was 1000
+      await repository.createRun({
+        jobId: job.id,
+        extractedData: { title: 'Headphones', price: 'R$ 1.000,00' },
+        normalizedHash: 'hash_prior',
+        hasChanges: 'INITIAL',
+        status: 'SUCCESS',
+        httpStatus: 200,
+        durationMs: 40,
+      });
+
+      // Case 1: drops from 1000 to 950 (5% drop < 10% threshold) -> suppressed
+      scraper.setHandler(async () => ({
+        rawHtml: `<h1>Headphones</h1><span class="price">R$ 950,00</span>`,
+        httpStatus: 200,
+        url: job.url,
+        durationMs: 25,
+      }));
+
+      await scrapeService.executeScrape(job.id);
+      expect(notifier.sentAlerts).toHaveLength(0);
+
+      // Case 2: drops from 950 to 800 (15.8% drop >= 10% threshold) -> triggers alert
+      scraper.setHandler(async () => ({
+        rawHtml: `<h1>Headphones</h1><span class="price">R$ 800,00</span>`,
+        httpStatus: 200,
+        url: job.url,
+        durationMs: 25,
+      }));
+
+      await scrapeService.executeScrape(job.id);
+      expect(notifier.sentAlerts).toHaveLength(1);
+      expect(notifier.sentAlerts[0]!.triggerReasons?.[0]).toContain('dropped by');
     });
   });
 });

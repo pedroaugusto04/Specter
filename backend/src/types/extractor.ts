@@ -14,7 +14,12 @@ export type TriggerOperator =
   | 'eq'
   | 'neq'
   | 'contains'
-  | 'not_contains';
+  | 'not_contains'
+  | 'percentage_drop'
+  | 'percentage_increase'
+  | 'decreased'
+  | 'increased'
+  | 'changes';
 
 export interface TriggerRule {
   field: string;

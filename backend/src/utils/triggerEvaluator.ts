@@ -71,10 +71,12 @@ export function parseBooleanValue(val: unknown): boolean | null {
 
 /**
  * Evaluates a single rule against a concrete value extracted from the page.
+ * Optionally accepts previousValue to evaluate relative changes (e.g. percentage drops or decreases).
  */
 export function evaluateSingleRule(
   actualValue: unknown,
-  rule: TriggerRule
+  rule: TriggerRule,
+  previousValue?: unknown
 ): { satisfied: boolean; reason: string } {
   const { field, operator, value: targetValue } = rule;
 
@@ -119,7 +121,116 @@ export function evaluateSingleRule(
     };
   }
 
-  // 2. Equality comparisons: eq, neq
+  // 2. Relative percentage changes: percentage_drop, percentage_increase
+  if (operator === 'percentage_drop' || operator === 'percentage_increase') {
+    const actualNum = parseNumericValue(actualValue);
+    const prevNum = parseNumericValue(previousValue);
+    const targetPct = parseNumericValue(targetValue);
+
+    if (actualNum === null || prevNum === null || targetPct === null || prevNum <= 0) {
+      return {
+        satisfied: false,
+        reason: `Field '${field}' requires a previous positive numeric value (${String(previousValue)}), current value (${String(actualValue)}), and percentage target (${String(targetValue)}).`,
+      };
+    }
+
+    if (operator === 'percentage_drop') {
+      if (actualNum >= prevNum) {
+        return {
+          satisfied: false,
+          reason: `${field} did not drop (was ${prevNum}, now ${actualNum}).`,
+        };
+      }
+      const dropPct = ((prevNum - actualNum) / prevNum) * 100;
+      const satisfied = dropPct >= targetPct;
+      return {
+        satisfied,
+        reason: satisfied
+          ? `${field} dropped by ${dropPct.toFixed(1)}% (from ${prevNum} to ${actualNum}) >= ${targetPct}%`
+          : `${field} dropped by ${dropPct.toFixed(1)}%, which is below target ${targetPct}%`,
+      };
+    } else {
+      if (actualNum <= prevNum) {
+        return {
+          satisfied: false,
+          reason: `${field} did not increase (was ${prevNum}, now ${actualNum}).`,
+        };
+      }
+      const incPct = ((actualNum - prevNum) / prevNum) * 100;
+      const satisfied = incPct >= targetPct;
+      return {
+        satisfied,
+        reason: satisfied
+          ? `${field} increased by ${incPct.toFixed(1)}% (from ${prevNum} to ${actualNum}) >= ${targetPct}%`
+          : `${field} increased by ${incPct.toFixed(1)}%, which is below target ${targetPct}%`,
+      };
+    }
+  }
+
+  // 3. Simple relative changes: decreased, increased
+  if (operator === 'decreased' || operator === 'increased') {
+    const actualNum = parseNumericValue(actualValue);
+    const prevNum = parseNumericValue(previousValue);
+
+    if (actualNum === null || prevNum === null) {
+      return {
+        satisfied: false,
+        reason: `Field '${field}' requires a prior numeric value (${String(previousValue)}) and current value (${String(actualValue)}) for comparison.`,
+      };
+    }
+
+    if (operator === 'decreased') {
+      const satisfied = actualNum < prevNum;
+      return {
+        satisfied,
+        reason: satisfied
+          ? `${field} decreased from ${prevNum} to ${actualNum}`
+          : `${field} did not decrease (was ${prevNum}, now ${actualNum})`,
+      };
+    } else {
+      const satisfied = actualNum > prevNum;
+      return {
+        satisfied,
+        reason: satisfied
+          ? `${field} increased from ${prevNum} to ${actualNum}`
+          : `${field} did not increase (was ${prevNum}, now ${actualNum})`,
+      };
+    }
+  }
+
+  // 4. Any value or text change relative to previous: changes
+  if (operator === 'changes') {
+    if (previousValue === undefined || previousValue === null) {
+      return {
+        satisfied: false,
+        reason: `No previous value recorded for '${field}' to detect a change.`,
+      };
+    }
+
+    const actualNum = parseNumericValue(actualValue);
+    const prevNum = parseNumericValue(previousValue);
+    if (actualNum !== null && prevNum !== null) {
+      const satisfied = actualNum !== prevNum;
+      return {
+        satisfied,
+        reason: satisfied
+          ? `${field} changed from ${prevNum} to ${actualNum}`
+          : `${field} remained unchanged at ${actualNum}`,
+      };
+    }
+
+    const actualStr = String(actualValue ?? '').trim();
+    const prevStr = String(previousValue ?? '').trim();
+    const satisfied = actualStr.toLowerCase() !== prevStr.toLowerCase();
+    return {
+      satisfied,
+      reason: satisfied
+        ? `${field} changed from "${prevStr}" to "${actualStr}"`
+        : `${field} remained unchanged ("${actualStr}")`,
+    };
+  }
+
+  // 5. Equality comparisons: eq, neq
   if (operator === 'eq' || operator === 'neq') {
     // Try numeric equality first if both represent numbers
     const actualNum = parseNumericValue(actualValue);
@@ -160,7 +271,7 @@ export function evaluateSingleRule(
     };
   }
 
-  // 3. Substring checks: contains, not_contains
+  // 6. Substring checks: contains, not_contains
   if (operator === 'contains' || operator === 'not_contains') {
     const actualStr = String(actualValue ?? '').toLowerCase();
     const targetStr = String(targetValue ?? '').toLowerCase();
@@ -183,35 +294,48 @@ export function evaluateSingleRule(
  */
 function isRuleSatisfiedInPayload(
   payload: ExtractedPayload,
-  rule: TriggerRule
+  rule: TriggerRule,
+  previousPayload?: ExtractedPayload | null
 ): { satisfied: boolean; reason: string } {
   if ('items' in payload && Array.isArray(payload.items)) {
-    for (const record of payload.items) {
+    const prevItems =
+      previousPayload && 'items' in previousPayload && Array.isArray(previousPayload.items)
+        ? previousPayload.items
+        : [];
+
+    for (let i = 0; i < payload.items.length; i++) {
+      const record = payload.items[i];
       const actual = record[rule.field];
-      const result = evaluateSingleRule(actual, rule);
+      const prev = prevItems[i]?.[rule.field];
+      const result = evaluateSingleRule(actual, rule, prev);
       if (result.satisfied) {
         return result;
       }
     }
     return {
       satisfied: false,
-      reason: `No item in list satisfied condition '${rule.field} ${rule.operator} ${rule.value}'.`,
+      reason: `No item in list satisfied condition '${rule.field} ${rule.operator}${rule.value !== undefined && rule.value !== '' ? ` ${rule.value}` : ''}'.`,
     };
   }
 
   const record = payload as ExtractedRecord;
+  const prevRecord =
+    previousPayload && !('items' in previousPayload) ? (previousPayload as ExtractedRecord) : undefined;
   const actual = record[rule.field];
-  return evaluateSingleRule(actual, rule);
+  const prev = prevRecord?.[rule.field];
+  return evaluateSingleRule(actual, rule, prev);
 }
 
 /**
  * Evaluates all trigger rules on the extracted payload.
  * If triggerRules is empty, returns triggered: true (standard change alert behavior).
+ * Optionally accepts previousPayload to evaluate relative changes (deltas, drops, changes).
  */
 export function evaluateTriggerRules(
   payload: ExtractedPayload | null,
   rules?: TriggerRule[],
-  matchMode: 'any' | 'all' = 'any'
+  matchMode: 'any' | 'all' = 'any',
+  previousPayload?: ExtractedPayload | null
 ): TriggerEvaluationResult {
   if (!rules || rules.length === 0) {
     return {
@@ -236,7 +360,7 @@ export function evaluateTriggerRules(
   let allSatisfied = true;
 
   for (const rule of rules) {
-    const result = isRuleSatisfiedInPayload(payload, rule);
+    const result = isRuleSatisfiedInPayload(payload, rule, previousPayload);
     if (result.satisfied) {
       matchedRules.push(rule);
       reasons.push(result.reason);

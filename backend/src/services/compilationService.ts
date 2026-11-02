@@ -100,7 +100,8 @@ export class CompilationService {
           const triggerResult = evaluateTriggerRules(
             smokeTest.extractedData,
             compiledSchema.triggerRules,
-            compiledSchema.triggerMatchMode
+            compiledSchema.triggerMatchMode,
+            previousRun.extractedData
           );
 
           if (!triggerResult.triggered) {

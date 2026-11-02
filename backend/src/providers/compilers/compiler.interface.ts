@@ -31,12 +31,13 @@ Selector Guidelines:
 - To extract links use attribute "href"; for images use "src"; for text use "text".
 
 Trigger Rule Guidelines:
-- If the user prompt expresses alert conditions, thresholds, or filtering requirements (e.g., "alert only if price is under 3500", "only if in stock", "alert when discount > 20%", "notify if available"):
+- If the user prompt expresses alert conditions, thresholds, or filtering requirements (e.g., "alert only if price is under 3500", "only if in stock", "alert when discount > 20%", "notify if price drops by 10%", "notify if status changes"):
   1. Define the necessary field in the "fields" map (e.g. "price", "stock_status", "discount").
   2. Add corresponding condition(s) to "triggerRules".
   3. Supported operators:
-     - Numeric: "lt" (<), "lte" (<=), "gt" (>), "gte" (>=), "eq" (==), "neq" (!=)
-     - Text / Boolean: "eq", "neq", "contains", "not_contains"
+     - Fixed Numeric: "lt" (<), "lte" (<=), "gt" (>), "gte" (>=), "eq" (==), "neq" (!=)
+     - Relative changes: "percentage_drop" (drops by X% or more), "percentage_increase" (increases by X% or more), "decreased" (price decreased), "increased" (price increased), "changes" (any change in value or text)
+     - Text / Boolean: "eq", "neq", "contains", "not_contains", "changes"
   4. Set "triggerMatchMode" to "all" (if all conditions must hold) or "any" (if any condition can trigger). Default is "all".
 - If no conditions or thresholds are requested, omit "triggerRules" or supply an empty array [].
 

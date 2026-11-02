@@ -20,7 +20,21 @@ export const cronExpressionSchema = z
 
 export const triggerRuleSchema = z.object({
   field: z.string().trim().min(1, 'Field is required'),
-  operator: z.enum(['lt', 'lte', 'gt', 'gte', 'eq', 'neq', 'contains', 'not_contains']),
+  operator: z.enum([
+    'lt',
+    'lte',
+    'gt',
+    'gte',
+    'eq',
+    'neq',
+    'contains',
+    'not_contains',
+    'percentage_drop',
+    'percentage_increase',
+    'decreased',
+    'increased',
+    'changes',
+  ]),
   value: z.union([z.string(), z.number(), z.boolean()]),
 });
 

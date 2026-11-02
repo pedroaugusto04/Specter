@@ -115,7 +115,8 @@ export class ScrapeExecutionService {
           const triggerResult = evaluateTriggerRules(
             extractedData,
             job.extractorConfig?.triggerRules,
-            job.extractorConfig?.triggerMatchMode
+            job.extractorConfig?.triggerMatchMode,
+            previousRun.extractedData
           );
 
           if (!triggerResult.triggered) {
