@@ -38,9 +38,9 @@ env:
   RELOAD_NGINX: ${{ vars.RELOAD_NGINX || 'true' }}
   DOCKER_PLATFORMS: ${{ vars.DOCKER_PLATFORMS || 'linux/arm64' }}
   APP_PORT: ${{ vars.PORT || '3001' }}
-  CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
-  NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '/scrapper' }}
-  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/scrapper/api' }}
+  CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
+  NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '' }}
+  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/api' }}
   COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'agy' }}
   SCRAPER_ENGINE: ${{ vars.SCRAPER_ENGINE || 'playwright' }}
   SCRAPER_CONCURRENCY: ${{ vars.SCRAPER_CONCURRENCY || '3' }}

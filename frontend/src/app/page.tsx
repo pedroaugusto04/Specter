@@ -49,19 +49,18 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Minimalist Top Bar */}
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <SpecterLogo size="md" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <ThemeToggle />
             <Button
               onClick={() => setIsCreateModalOpen(true)}
-              size="sm"
-              className="h-8 px-3 text-xs font-medium"
+              className="h-9 px-3.5 sm:px-4 text-xs sm:text-sm font-medium"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               <span>New Monitor</span>
             </Button>
           </div>
@@ -69,26 +68,26 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <main className="flex-1 mx-auto w-full max-w-7xl space-y-6 sm:space-y-8 px-4 py-6 sm:py-8 sm:px-6 lg:px-8">
         {/* Section Heading */}
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
               Monitors
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Scheduled web extraction and structured diff tracking.
             </p>
           </div>
-          <div className="text-[11px] font-mono text-muted-foreground">
+          <div className="text-xs font-mono text-muted-foreground">
             Auto-sync: 10s interval
           </div>
         </div>
 
         {connectionWarning && (
-          <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs text-foreground flex items-center justify-between">
+          <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs sm:text-sm text-foreground flex items-center justify-between">
             <span>{connectionWarning}</span>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Offline
             </span>
           </div>
@@ -110,7 +109,7 @@ export default function DashboardPage() {
 
       {/* Minimal Footer */}
       <footer className="border-t border-border bg-card/40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 text-[11px] font-mono text-muted-foreground">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 text-xs font-mono text-muted-foreground">
           <span>Specter Web Monitor</span>
         </div>
       </footer>

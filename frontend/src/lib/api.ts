@@ -112,12 +112,21 @@ export class ApiError extends Error {
 }
 
 function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    // Dynamically detect context: if loaded on /scrapper (dev/staging), route API calls to /scrapper
+    if (window.location.pathname.startsWith('/scrapper')) {
+      return '/scrapper';
+    }
+    // In production root (specterdev.online), route API calls to root (/api)
+    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (envUrl) {
+      return envUrl.replace(/\/$/, '').replace(/\/api$/, '');
+    }
+    return '';
+  }
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (envUrl) {
     return envUrl.replace(/\/$/, '').replace(/\/api$/, '');
-  }
-  if (typeof window !== 'undefined') {
-    return '/scrapper';
   }
   return 'http://localhost:3001';
 }

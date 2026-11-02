@@ -122,50 +122,50 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
           onClick={handleCancel}
         >
           <div
-            className="w-full max-w-md rounded-lg border border-border bg-card text-card-foreground p-6 shadow-xl cursor-default"
+            className="w-full max-w-md rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
                     dialogState.variant === 'destructive'
                       ? 'bg-red-50 border-red-200 text-red-600 dark:bg-red-950/50 dark:border-red-900/50 dark:text-red-400'
                       : 'bg-muted border-border text-foreground'
                   }`}
                 >
                   {dialogState.variant === 'destructive' ? (
-                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="h-4.5 w-4.5" />
                   ) : (
-                    <Info className="h-4 w-4" />
+                    <Info className="h-4.5 w-4.5" />
                   )}
                 </div>
-                <h3 className="text-sm font-semibold text-foreground leading-snug">
+                <h3 className="text-base font-semibold text-foreground leading-snug">
                   {dialogState.title}
                 </h3>
               </div>
               <button
                 onClick={handleCancel}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="Close dialog"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="mt-3 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+            <p className="mt-3.5 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
               {dialogState.message}
             </p>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2.5">
               {dialogState.type === 'confirm' && (
-                <Button variant="outline" size="sm" onClick={handleCancel}>
+                <Button variant="outline" className="h-9 px-4 text-sm" onClick={handleCancel}>
                   {dialogState.cancelLabel}
                 </Button>
               )}
               <Button
                 variant={dialogState.variant === 'destructive' ? 'destructive' : 'default'}
-                size="sm"
+                className="h-9 px-4 text-sm"
                 onClick={handleConfirm}
                 autoFocus
               >

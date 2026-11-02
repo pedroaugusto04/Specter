@@ -45,17 +45,17 @@ export function JobRunsDrawer({
     >
       <div className="space-y-6">
         {/* Compiled Extractor Schema */}
-        <section className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-            <Code2 className="h-3.5 w-3.5" />
+        <section className="space-y-2.5">
+          <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+            <Code2 className="h-4 w-4" />
             Extraction Schema
           </div>
           {job.extractorConfig ? (
-            <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
+            <pre className="max-h-56 overflow-auto rounded-lg border border-border bg-muted/50 p-3.5 font-mono text-xs text-foreground">
               {JSON.stringify(job.extractorConfig, null, 2)}
             </pre>
           ) : (
-            <p className="rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+            <p className="rounded-lg border border-border bg-muted/20 p-3.5 text-xs sm:text-sm text-muted-foreground">
               Extraction schema has not been generated yet.
             </p>
           )}
@@ -63,27 +63,27 @@ export function JobRunsDrawer({
 
         {/* Latest Diff Summary */}
         {latestDiff && latestDiff.hasChanges && (
-          <section className="space-y-2">
-            <div className="flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-              <GitCompare className="h-3.5 w-3.5" />
+          <section className="space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              <GitCompare className="h-4 w-4" />
               Latest Diff ({latestDiff.totalChanges} changes)
             </div>
-            <div className="overflow-hidden rounded-md border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 font-mono text-[11px] uppercase text-muted-foreground border-b border-border">
+            <div className="overflow-hidden rounded-lg border border-border">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-muted/40 font-mono text-xs uppercase text-muted-foreground border-b border-border">
                   <tr>
-                    <th className="px-3 py-2">Field</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Previous</th>
-                    <th className="px-3 py-2">Current</th>
+                    <th className="px-3.5 py-2.5">Field</th>
+                    <th className="px-3.5 py-2.5">Type</th>
+                    <th className="px-3.5 py-2.5">Previous</th>
+                    <th className="px-3.5 py-2.5">Current</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {[...latestDiff.modified, ...latestDiff.added, ...latestDiff.removed].map(
                     (item) => (
                       <tr key={item.field}>
-                        <td className="px-3 py-2 font-mono font-medium text-foreground">{item.field}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-3.5 py-2.5 font-mono font-medium text-foreground">{item.field}</td>
+                        <td className="px-3.5 py-2.5">
                           <Badge
                             variant={
                               item.changeType === 'MODIFIED'
@@ -96,10 +96,10 @@ export function JobRunsDrawer({
                             {item.changeType}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground font-mono">
+                        <td className="px-3.5 py-2.5 text-muted-foreground font-mono">
                           {item.previousValue === null ? '—' : String(item.previousValue)}
                         </td>
-                        <td className="px-3 py-2 font-mono font-semibold text-foreground">
+                        <td className="px-3.5 py-2.5 font-mono font-semibold text-foreground">
                           {item.currentValue === null ? '—' : String(item.currentValue)}
                         </td>
                       </tr>
@@ -112,15 +112,15 @@ export function JobRunsDrawer({
         )}
 
         {/* Execution History */}
-        <section className="space-y-3">
-          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+        <section className="space-y-3.5">
+          <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
             Run History ({runs.length})
           </h3>
 
           {loading ? (
-            <p className="text-xs text-muted-foreground">Loading snapshot history...</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Loading snapshot history...</p>
           ) : runs.length === 0 ? (
-            <p className="rounded-md border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
+            <p className="rounded-lg border border-border bg-muted/20 p-4 text-xs sm:text-sm text-muted-foreground">
               No runs recorded for this monitor yet.
             </p>
           ) : (
@@ -131,9 +131,9 @@ export function JobRunsDrawer({
                 return (
                   <div
                     key={run.id}
-                    className="rounded-md border border-border bg-card p-4"
+                    className="rounded-lg border border-border bg-card p-4 sm:p-5"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2">
                         <Badge variant={run.status === 'SUCCESS' ? 'success' : 'destructive'}>
                           {run.status}
@@ -162,18 +162,18 @@ export function JobRunsDrawer({
                     </div>
 
                     {run.normalizedHash && (
-                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground truncate">
+                      <p className="mt-2 font-mono text-xs text-muted-foreground truncate">
                         SHA-256: {run.normalizedHash}
                       </p>
                     )}
 
                     {parsedError && (
-                      <div className="mt-2.5 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                        <div className="flex items-start gap-2">
+                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                        <div className="flex items-start gap-2.5">
                           {parsedError.category === 'anti-bot' ? (
-                            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                            <ShieldAlert className="h-4.5 w-4.5 shrink-0 mt-0.5" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold">
@@ -188,7 +188,7 @@ export function JobRunsDrawer({
                     )}
 
                     {run.extractedData && (
-                      <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-muted/50 p-2.5 font-mono text-xs text-foreground">
+                      <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
                         {JSON.stringify(run.extractedData, null, 2)}
                       </pre>
                     )}

@@ -270,7 +270,7 @@ export function CreateJobForm({
             aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
             aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
             className={cn(
-              'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
+              'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
               !useCustomCron && fieldErrors.cronExpression
                 ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
                 : 'border-input'
@@ -314,7 +314,7 @@ export function CreateJobForm({
                 setCustomCron(e.target.value);
                 clearFieldError('cronExpression');
               }}
-              className="font-mono text-xs"
+              className="font-mono text-sm"
             />
           </FormField>
         )}
@@ -323,19 +323,19 @@ export function CreateJobForm({
       {globalError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          className="rounded-md border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
         >
           {globalError}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-2.5 pt-2">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          <Button type="button" variant="outline" className="h-10 px-4 text-sm" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" className="h-10 px-5 text-sm" disabled={loading}>
           <Plus className="h-4 w-4" />
           {loading ? 'Creating...' : 'Create Monitor'}
         </Button>

@@ -64,8 +64,8 @@ echo "5. Compilando e atualizando Frontend..."
 if [ -d "frontend" ]; then
   cd frontend
   npm ci --no-audit --no-fund
-  NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-/scrapper}" \
-  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/scrapper/api}" \
+  NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-}" \
+  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
   npm run build
 
   echo "Sincronizando arquivos do frontend para $FRONTEND_DEPLOY_PATH..."
