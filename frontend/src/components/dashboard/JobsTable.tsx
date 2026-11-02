@@ -245,15 +245,15 @@ export function JobsTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
+          <table className="w-full border-collapse text-left text-sm table-fixed">
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
-                <th className="min-w-[240px] max-w-md py-3.5 px-4 sm:px-5">Target</th>
-                <th className="px-4 py-3.5">Status</th>
-                <th className="px-4 py-3.5">Schedule</th>
-                <th className="px-4 py-3.5">Failures</th>
-                <th className="px-4 py-3.5">Last Checked</th>
-                <th className="py-3.5 pr-4 pl-3 sm:pr-5 text-right">Actions</th>
+                <th className="w-[38%] min-w-[200px] max-w-[320px] py-3.5 px-4 sm:px-5">Target</th>
+                <th className="w-28 px-4 py-3.5">Status</th>
+                <th className="w-36 px-4 py-3.5">Schedule</th>
+                <th className="w-24 px-4 py-3.5">Failures</th>
+                <th className="w-36 px-4 py-3.5">Last Checked</th>
+                <th className="w-48 py-3.5 pr-4 pl-3 sm:pr-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -277,8 +277,8 @@ export function JobsTable({
                     className="group hover:bg-muted/30 transition-colors"
                   >
                     {/* Target & Prompt */}
-                    <td className="min-w-[240px] max-w-md py-4 px-4 sm:px-5">
-                      <div className="flex items-center gap-2 font-medium text-foreground min-w-0">
+                    <td className="w-[38%] min-w-[200px] max-w-[320px] py-4 px-4 sm:px-5">
+                      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
                         <a
                           href={job.url}
                           target="_blank"
@@ -291,14 +291,14 @@ export function JobsTable({
                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                       </div>
                       <p
-                        className="mt-1 line-clamp-2 text-xs sm:text-sm text-muted-foreground"
+                        className="mt-1 truncate text-xs text-muted-foreground"
                         title={job.userPrompt}
                       >
                         {job.userPrompt}
                       </p>
                       {parsedError && (
                         <div
-                          className="mt-2 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 min-w-0"
+                          className="mt-2 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 min-w-0"
                           title={parsedError.description}
                         >
                           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
