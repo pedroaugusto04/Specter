@@ -300,7 +300,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               <div className="flex items-center justify-between font-medium text-foreground">
                 <span className="flex items-center gap-1.5">
                   <HelpCircle className="h-4 w-4 text-primary" />
-                  How Alerts & Trigger Rules Work
+                  How Smart Alerts & Trigger Conditions Work
                 </span>
                 <button
                   type="button"
@@ -312,35 +312,29 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               </div>
 
               <p className="leading-relaxed">
-                By default, you receive an alert whenever anything changes on the page. 
-                With trigger rules, you only get notified <strong>when changes match what you care about</strong> (such as when a numeric value drops or a status changes).
+                By default, you receive an alert whenever any tracked content changes on the page. 
+                Conditional triggers let you filter notifications so you only get alerted <strong>when specific events occur</strong>.
               </p>
 
               <div className="space-y-1.5 pt-1 text-[11px]">
                 <div className="font-semibold text-foreground">What you can monitor:</div>
                 <ul className="list-disc list-inside space-y-1 pl-1">
-                  <li>
-                    <strong className="text-foreground">Relative changes (numbers & values):</strong> Alert if a value drops compared to the previous check (any drop or by a specific percentage, e.g. 10%), or rises.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Fixed target thresholds:</strong> Alert if a value passes a specific limit (e.g. less than 100 or greater than 500).
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Text & status changes:</strong> Alert when a text field changes (e.g. status changes to &quot;Available&quot;), or contains specific keywords.
-                  </li>
+                  <li><strong className="text-foreground">Relative variations (numbers & text):</strong> Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any text/status changes compared to the prior check.</li>
+                  <li><strong className="text-foreground">Fixed target thresholds:</strong> Alert only if a value passes a specific limit (e.g. less than 100 or greater than 50).</li>
+                  <li><strong className="text-foreground">Specific text & keyword matches:</strong> Alert when a field contains or equals specific words (e.g. &quot;Available&quot;, &quot;Approved&quot;, &quot;Open&quot;).</li>
                 </ul>
               </div>
 
-              <div className="rounded border border-border/60 bg-background/60 p-2.5 text-[11px] space-y-1.5">
-                <div className="font-semibold text-foreground">How to set it up:</div>
-                <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-0.5">
-                  <li>Choose the <strong className="text-foreground">Field</strong> detected by the AI (e.g. <code className="text-foreground font-mono">value</code>, <code className="text-foreground font-mono">price</code>, or <code className="text-foreground font-mono">status</code>).</li>
-                  <li>Choose the <strong className="text-foreground">Condition</strong> (e.g. <em>&quot;Drops by % or more&quot;</em>, <em>&quot;Decreased (any drop)&quot;</em>, or <em>&quot;Changed&quot;</em>).</li>
-                  <li>Enter the <strong className="text-foreground">Target value</strong> if needed (conditions like <em>Decreased</em> or <em>Changed</em> detect differences automatically without needing a number).</li>
-                </ol>
-                <div className="pt-1 text-[11px] text-muted-foreground">
-                  💡 <em>Multiple rules: use <strong>ALL conditions</strong> if everything must happen, or <strong>ANY condition</strong> to alert if any one rule is met.</em>
-                </div>
+              <div className="rounded border border-primary/25 bg-background/70 p-2.5 text-[11px] text-foreground space-y-1.5">
+                <div className="font-semibold text-primary">💡 Two ways to configure conditions:</div>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-0.5">
+                  <li>
+                    <strong className="text-foreground">1. In the extraction prompt:</strong> Add your condition in plain text in the extraction instructions (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em>).
+                  </li>
+                  <li>
+                    <strong className="text-foreground">2. Here via dropdown rules:</strong> Use the conditions list below to pick detected variables, operators, and target thresholds with visual controls.
+                  </li>
+                </ul>
               </div>
             </div>
           )}
