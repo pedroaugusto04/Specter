@@ -30,12 +30,26 @@ Selector Guidelines:
 - If the page is a security challenge, captcha, account verification, or access denied screen rather than actual page content, output an empty fields object {} to indicate that valid content could not be found.
 - To extract links use attribute "href"; for images use "src"; for text use "text".
 
+Trigger Rule Guidelines:
+- If the user prompt expresses alert conditions, thresholds, or filtering requirements (e.g., "alert only if price is under 3500", "only if in stock", "alert when discount > 20%", "notify if available"):
+  1. Define the necessary field in the "fields" map (e.g. "price", "stock_status", "discount").
+  2. Add corresponding condition(s) to "triggerRules".
+  3. Supported operators:
+     - Numeric: "lt" (<), "lte" (<=), "gt" (>), "gte" (>=), "eq" (==), "neq" (!=)
+     - Text / Boolean: "eq", "neq", "contains", "not_contains"
+  4. Set "triggerMatchMode" to "all" (if all conditions must hold) or "any" (if any condition can trigger). Default is "all".
+- If no conditions or thresholds are requested, omit "triggerRules" or supply an empty array [].
+
 Expected format:
 {
   "containerSelector": "optional_css_selector_for_repeating_items",
   "fields": {
     "field1": { "selector": "css_or_xpath_selector", "attribute": "text" },
     "link": { "selector": "a.detail", "attribute": "href" }
-  }
+  },
+  "triggerRules": [
+    { "field": "price", "operator": "lt", "value": 3500 }
+  ],
+  "triggerMatchMode": "all"
 }`;
 }

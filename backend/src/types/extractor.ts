@@ -6,10 +6,28 @@ export interface FieldExtractor {
 
 export type ExtractorFieldDefinition = string | FieldExtractor;
 
+export type TriggerOperator =
+  | 'lt'
+  | 'lte'
+  | 'gt'
+  | 'gte'
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'not_contains';
+
+export interface TriggerRule {
+  field: string;
+  operator: TriggerOperator;
+  value: string | number | boolean;
+}
+
 export interface ExtractorSchema {
   containerSelector?: string;
   fields: Record<string, ExtractorFieldDefinition>;
   paginationSelector?: string;
+  triggerRules?: TriggerRule[];
+  triggerMatchMode?: 'any' | 'all';
 }
 
 /**

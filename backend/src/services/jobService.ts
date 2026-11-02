@@ -9,8 +9,9 @@ import {
 import { JobMapper, type JobRunDto, type ScrapingJobDto } from '../mappers/jobMapper.js';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
-import type { DashboardStats, IJobRepository } from '../repositories/jobRepository.js';
+import type { DashboardStats, IJobRepository, UpdateJobPatch } from '../repositories/jobRepository.js';
 import type { DiffSummary, JobStatus } from '../types/domain.js';
+import type { TriggerRule } from '../types/extractor.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { normalizeUrl } from '../utils/urlNormalizer.js';
@@ -30,17 +31,19 @@ export interface UpdateScrapingJobRequest {
   notificationEmail?: string;
   webhookUrl?: string | null;
   cronExpression?: string;
+  triggerRules?: TriggerRule[];
+  triggerMatchMode?: 'any' | 'all';
 }
 
 export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
-  private readonly scraperEngine: IScraperEngine;
+  private readonly scraperEngine?: IScraperEngine;
 
   constructor(
     jobRepository: IJobRepository,
     jobScheduler: IJobScheduler,
-    scraperEngine: IScraperEngine
+    scraperEngine?: IScraperEngine
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
@@ -49,13 +52,14 @@ export class JobService {
 
   async probeUrl(targetUrl: string): Promise<{ accessible: boolean; reason?: string }> {
     const normalizedUrl = normalizeUrl(targetUrl);
+    if (!this.scraperEngine) {
+      return { accessible: true };
+    }
 
     try {
-      // 30s allows remote residential proxies with JS rendering enough time to solve challenges
       await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000 });
       return { accessible: true };
     } catch (err) {
-      // Log the full internal error and unblocker breakdown for developer debugging
       logger.warn('URL accessibility verification failed during probe', {
         url: normalizedUrl,
         internalError: err instanceof Error ? err.message : String(err),
@@ -106,6 +110,12 @@ export class JobService {
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, 'initial');
 
+    logger.info('Created new scraping job and enqueued initial compilation', {
+      jobId: createdEntity.id,
+      url: createdEntity.url,
+      userId: createdEntity.userId,
+    });
+
     return JobMapper.entityToDto(createdEntity);
   }
 
@@ -132,14 +142,7 @@ export class JobService {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
-    const patch: {
-      url?: string;
-      userPrompt?: string;
-      notificationEmail?: string;
-  webhookUrl?: string | null;
-      cronExpression?: string;
-      bullmqRepeatableKey?: string | null;
-    } = {};
+    const patch: UpdateJobPatch = {};
 
     if (request.url !== undefined) {
       patch.url = normalizeUrl(request.url);
@@ -165,13 +168,13 @@ export class JobService {
       patch.cronExpression = trimmedCron;
     }
 
-    if (patch.url !== undefined && patch.url !== existing.url) {
-      const probe = await this.probeUrl(patch.url);
-      if (!probe.accessible) {
-        throw new ValidationError(
-          probe.reason || 'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).',
-          [{ field: 'url', message: probe.reason || 'Anti-bot or access protection detected on target URL.' }]
-        );
+    if (request.triggerRules !== undefined || request.triggerMatchMode !== undefined) {
+      if (existing.extractorConfig) {
+        patch.extractorConfig = {
+          ...existing.extractorConfig,
+          ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
+          ...(request.triggerMatchMode !== undefined ? { triggerMatchMode: request.triggerMatchMode } : {}),
+        };
       }
     }
 

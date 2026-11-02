@@ -56,6 +56,14 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       lines.push(`🎯 <b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
     }
 
+    if (payload.triggerReasons && payload.triggerReasons.length > 0) {
+      lines.push('');
+      lines.push('🎯 <b>Trigger Conditions Met:</b>');
+      for (const reason of payload.triggerReasons) {
+        lines.push(`• <code>${escapeHtml(reason)}</code>`);
+      }
+    }
+
     const detectedTime = payload.detectedAt
       ? payload.detectedAt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
       : new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';

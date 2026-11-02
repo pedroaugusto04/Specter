@@ -24,6 +24,7 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
       targetUrl: payload.targetUrl,
       userPrompt: payload.userPrompt ?? null,
       detectedAt: payload.detectedAt ? payload.detectedAt.toISOString() : timestamp,
+      triggerReasons: payload.triggerReasons ?? [],
       diffSummary: payload.diffSummary,
       data: payload.data,
     };

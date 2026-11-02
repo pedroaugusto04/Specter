@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Check, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
-import { ApiError, api, type ScrapingJobDto } from '@/lib/api';
+import { ApiError, api, type ScrapingJobDto, type TriggerOperator, type TriggerRule } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
 
@@ -25,6 +25,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
+  const [triggerRules, setTriggerRules] = React.useState<TriggerRule[]>([]);
+  const [triggerMatchMode, setTriggerMatchMode] = React.useState<'any' | 'all'>('all');
   const [loading, setLoading] = React.useState(false);
 
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -48,6 +50,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         setUseCustomCron(true);
       }
 
+      setTriggerRules(
+        job.extractorConfig?.triggerRules ? [...job.extractorConfig.triggerRules] : []
+      );
+      setTriggerMatchMode(job.extractorConfig?.triggerMatchMode || 'all');
+
       setFieldErrors({});
       setGlobalError(null);
     }
@@ -59,13 +66,22 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
     job && (url.trim() !== job.url || userPrompt.trim() !== job.userPrompt)
   );
 
+  const rulesChanged = React.useMemo(() => {
+    const origRules = job?.extractorConfig?.triggerRules || [];
+    const origMode = job?.extractorConfig?.triggerMatchMode || 'all';
+    if (triggerMatchMode !== origMode) return true;
+    if (triggerRules.length !== origRules.length) return true;
+    return JSON.stringify(triggerRules) !== JSON.stringify(origRules);
+  }, [job, triggerRules, triggerMatchMode]);
+
   const isDirty = Boolean(
     job &&
       (url.trim() !== job.url ||
         userPrompt.trim() !== job.userPrompt ||
         notificationEmail.trim() !== job.notificationEmail ||
         webhookUrl.trim() !== (job.webhookUrl || '') ||
-        effectiveCron.trim() !== job.cronExpression)
+        effectiveCron.trim() !== job.cronExpression ||
+        rulesChanged)
   );
 
   const clearFieldError = (field: JobFormField) => {
@@ -122,6 +138,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         notificationEmail: notificationEmail.trim() || undefined,
         webhookUrl: webhookUrl.trim() || null,
         cronExpression: effectiveCron.trim(),
+        triggerRules,
+        triggerMatchMode,
       });
 
       onUpdated();
@@ -144,13 +162,15 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
     }
   };
 
+  const availableExtractorFields = Object.keys(job?.extractorConfig?.fields || {});
+
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
       isDirty={isDirty}
       title="Edit Monitor"
-      description="Update target URL, extraction instructions, or check schedule."
+      description="Update target URL, extraction instructions, conditional alert rules, or check schedule."
       confirmTitle="Discard Unsaved Changes?"
       confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
@@ -245,7 +265,167 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
           />
         </FormField>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* CONDITIONAL ALERT TRIGGERS */}
+        <div className="space-y-3 pt-2 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <span>Conditional Alert Triggers</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  (Zero-token rule evaluation)
+                </span>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Only send notifications when extracted fields meet these conditions.
+              </p>
+            </div>
+            {triggerRules.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Match:</span>
+                <button
+                  type="button"
+                  onClick={() => setTriggerMatchMode(triggerMatchMode === 'all' ? 'any' : 'all')}
+                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+                >
+                  {triggerMatchMode === 'all' ? 'ALL conditions' : 'ANY condition'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {triggerRules.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+              No trigger conditions active. Alerts will trigger on any detected change.
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    const defaultField = availableExtractorFields[0] || 'price';
+                    setTriggerRules([...triggerRules, { field: defaultField, operator: 'lt', value: '' }]);
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Trigger Rule
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {triggerRules.map((rule, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2"
+                >
+                  {/* Field */}
+                  <div className="w-full sm:w-1/3">
+                    {availableExtractorFields.length > 0 ? (
+                      <select
+                        value={rule.field}
+                        onChange={(e) => {
+                          const updated = [...triggerRules];
+                          updated[idx] = { ...rule, field: e.target.value };
+                          setTriggerRules(updated);
+                        }}
+                        className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
+                      >
+                        {availableExtractorFields.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        placeholder="field (e.g. price)"
+                        value={rule.field}
+                        className="h-8 text-xs"
+                        onChange={(e) => {
+                          const updated = [...triggerRules];
+                          updated[idx] = { ...rule, field: e.target.value };
+                          setTriggerRules(updated);
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Operator */}
+                  <div className="w-full sm:w-1/3">
+                    <select
+                      value={rule.operator}
+                      onChange={(e) => {
+                        const updated = [...triggerRules];
+                        updated[idx] = { ...rule, operator: e.target.value as TriggerOperator };
+                        setTriggerRules(updated);
+                      }}
+                      className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
+                    >
+                      <option value="lt">&lt; Less than</option>
+                      <option value="lte">&le; Less or equal</option>
+                      <option value="gt">&gt; Greater than</option>
+                      <option value="gte">&ge; Greater or equal</option>
+                      <option value="eq">== Equals</option>
+                      <option value="neq">!= Not equals</option>
+                      <option value="contains">Contains</option>
+                      <option value="not_contains">Does not contain</option>
+                    </select>
+                  </div>
+
+                  {/* Value */}
+                  <div className="w-full sm:w-1/3">
+                    <Input
+                      placeholder="Target value"
+                      value={String(rule.value)}
+                      className="h-8 text-xs"
+                      onChange={(e) => {
+                        const updated = [...triggerRules];
+                        const raw = e.target.value;
+                        const num = Number(raw);
+                        const val = raw !== '' && !isNaN(num) ? num : raw;
+                        updated[idx] = { ...rule, value: val };
+                        setTriggerRules(updated);
+                      }}
+                    />
+                  </div>
+
+                  {/* Delete Button */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                    onClick={() => {
+                      setTriggerRules(triggerRules.filter((_, i) => i !== idx));
+                    }}
+                    title="Remove rule"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+
+              <div className="flex justify-start pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    const defaultField = availableExtractorFields[0] || 'price';
+                    setTriggerRules([...triggerRules, { field: defaultField, operator: 'lt', value: '' }]);
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Condition
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-2 border-t border-border">
           <FormField
             label="Check Frequency"
             htmlFor="edit-cron-preset"

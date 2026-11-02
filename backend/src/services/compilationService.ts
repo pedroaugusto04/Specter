@@ -10,6 +10,7 @@ import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { validateExtractionSmokeTest } from '../utils/extractorEngine.js';
 import { sanitizeHtml } from '../utils/htmlSanitizer.js';
 import { logger } from '../utils/logger.js';
+import { evaluateTriggerRules } from '../utils/triggerEvaluator.js';
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
@@ -96,29 +97,43 @@ export class CompilationService {
       if (hasChanges === 'YES' && previousRun) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
         if (diffSummary.hasChanges) {
-          const changeNoun =
-            diffSummary.totalChanges === 1
-              ? '1 change detected'
-              : `${diffSummary.totalChanges} changes detected`;
-          await this.notificationProvider
-            .sendAlert({
-              to: job.notificationEmail?.trim() || undefined,
-              subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
+          const triggerResult = evaluateTriggerRules(
+            smokeTest.extractedData,
+            compiledSchema.triggerRules,
+            compiledSchema.triggerMatchMode
+          );
+
+          if (!triggerResult.triggered) {
+            logger.info('Change detected on healing but notification suppressed because trigger conditions were not met', {
               jobId: job.id,
-              userId: job.userId,
-              targetUrl: job.url,
-              userPrompt: job.userPrompt,
-              webhookUrl: job.webhookUrl ?? undefined,
-              detectedAt: new Date(),
-              diffSummary,
-              data: smokeTest.extractedData,
-            })
-            .catch((notifyErr) => {
-              logger.warn('Failed to send notification after self-healing compilation', {
-                jobId: job.id,
-                errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
-              });
+              reasons: triggerResult.reasons,
             });
+          } else {
+            const changeNoun =
+              diffSummary.totalChanges === 1
+                ? '1 change detected'
+                : `${diffSummary.totalChanges} changes detected`;
+            await this.notificationProvider
+              .sendAlert({
+                to: job.notificationEmail?.trim() || undefined,
+                subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
+                jobId: job.id,
+                userId: job.userId,
+                targetUrl: job.url,
+                userPrompt: job.userPrompt,
+                webhookUrl: job.webhookUrl ?? undefined,
+                detectedAt: new Date(),
+                diffSummary,
+                data: smokeTest.extractedData,
+                triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
+              })
+              .catch((notifyErr) => {
+                logger.warn('Failed to send notification after self-healing compilation', {
+                  jobId: job.id,
+                  errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
+                });
+              });
+          }
         }
       }
 

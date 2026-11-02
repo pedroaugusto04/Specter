@@ -18,6 +18,14 @@ export const cronExpressionSchema = z
     }
   });
 
+export const triggerRuleSchema = z.object({
+  field: z.string().trim().min(1, 'Field is required'),
+  operator: z.enum(['lt', 'lte', 'gt', 'gte', 'eq', 'neq', 'contains', 'not_contains']),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+export const triggerMatchModeSchema = z.enum(['any', 'all']);
+
 export const jobProbeSchema = z.object({
   url: z
     .string({ required_error: 'Target URL is required' })
@@ -97,6 +105,8 @@ export const jobUpdateSchema = z.object({
     .or(z.literal(''))
     .nullable(),
   cronExpression: cronExpressionSchema.optional(),
+  triggerRules: z.array(triggerRuleSchema).optional(),
+  triggerMatchMode: triggerMatchModeSchema.optional(),
 });
 
 export const jobPauseSchema = z.object({
@@ -142,7 +152,6 @@ export const authLoginSchema = z.object({
     .string({ required_error: 'Password is required' })
     .min(1, 'Password is required'),
 });
-
 
 export const updateIntegrationsSchema = z.object({
   telegramEnabled: z.boolean().default(false),

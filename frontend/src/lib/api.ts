@@ -14,10 +14,28 @@ export interface FieldExtractor {
   type?: 'string' | 'number' | 'boolean';
 }
 
+export type TriggerOperator =
+  | 'lt'
+  | 'lte'
+  | 'gt'
+  | 'gte'
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'not_contains';
+
+export interface TriggerRule {
+  field: string;
+  operator: TriggerOperator;
+  value: string | number | boolean;
+}
+
 export interface ExtractorConfig {
   containerSelector?: string;
   fields: Record<string, string | FieldExtractor>;
   paginationSelector?: string;
+  triggerRules?: TriggerRule[];
+  triggerMatchMode?: 'any' | 'all';
 }
 
 export interface UserDto {
@@ -33,7 +51,7 @@ export interface ScrapingJobDto {
   url: string;
   userPrompt: string;
   notificationEmail: string;
-    webhookUrl?: string | null;
+  webhookUrl?: string | null;
   cronExpression: string;
   extractorConfig: ExtractorConfig | null;
   status: JobStatus;
@@ -268,6 +286,8 @@ export const api = {
       notificationEmail?: string;
       webhookUrl?: string | null;
       cronExpression?: string;
+      triggerRules?: TriggerRule[];
+      triggerMatchMode?: 'any' | 'all';
     }
   ): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>(`/api/jobs/${id}`, {

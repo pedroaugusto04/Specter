@@ -15,6 +15,7 @@ import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js'
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
+import { evaluateTriggerRules } from '../utils/triggerEvaluator.js';
 
 export interface ScrapeExecutionServiceDeps {
   jobRepository: IJobRepository;
@@ -111,22 +112,36 @@ export class ScrapeExecutionService {
       if (hasChanges === 'YES' && previousRun) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, extractedData);
         if (diffSummary.hasChanges) {
-          const changeNoun =
-            diffSummary.totalChanges === 1
-              ? '1 change detected'
-              : `${diffSummary.totalChanges} changes detected`;
-          await this.notificationProvider.sendAlert({
-            to: job.notificationEmail?.trim() || undefined,
-            subject: `[Specter] ${changeNoun}: ${job.url}`,
-            jobId: job.id,
-            userId: job.userId,
-            targetUrl: job.url,
-            userPrompt: job.userPrompt,
-            webhookUrl: job.webhookUrl ?? undefined,
-            detectedAt: new Date(),
-            diffSummary,
-            data: extractedData,
-          });
+          const triggerResult = evaluateTriggerRules(
+            extractedData,
+            job.extractorConfig?.triggerRules,
+            job.extractorConfig?.triggerMatchMode
+          );
+
+          if (!triggerResult.triggered) {
+            logger.info('Change detected but notification suppressed because trigger conditions were not met', {
+              jobId: job.id,
+              reasons: triggerResult.reasons,
+            });
+          } else {
+            const changeNoun =
+              diffSummary.totalChanges === 1
+                ? '1 change detected'
+                : `${diffSummary.totalChanges} changes detected`;
+            await this.notificationProvider.sendAlert({
+              to: job.notificationEmail?.trim() || undefined,
+              subject: `[Specter] ${changeNoun}: ${job.url}`,
+              jobId: job.id,
+              userId: job.userId,
+              targetUrl: job.url,
+              userPrompt: job.userPrompt,
+              webhookUrl: job.webhookUrl ?? undefined,
+              detectedAt: new Date(),
+              diffSummary,
+              data: extractedData,
+              triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
+            });
+          }
         }
       }
 

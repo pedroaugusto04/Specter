@@ -75,6 +75,22 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
        </tr>`
     : '';
 
+  const triggerBlockHtml =
+    payload.triggerReasons && payload.triggerReasons.length > 0
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
+          <tr>
+            <td>
+              <div style="font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+                &#x1F3AF; Trigger Conditions Met
+              </div>
+              <ul style="margin:0;padding-left:18px;color:#1e3a8a;font-size:13px;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
+                ${payload.triggerReasons.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}
+              </ul>
+            </td>
+          </tr>
+        </table>`
+      : '';
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -154,6 +170,9 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                   </td>
                 </tr>
               </table>
+
+              <!-- TRIGGER REASONS (IF PRESENT) -->
+              ${triggerBlockHtml}
 
               <!-- ATTRIBUTES DIFF TABLE -->
               <div style="margin-bottom:28px;">
@@ -235,6 +254,9 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     `Date: ${formattedDate}`,
     `Job ID: ${payload.jobId}`,
     ``,
+    payload.triggerReasons && payload.triggerReasons.length > 0
+      ? `TRIGGER CONDITIONS MET:\n${payload.triggerReasons.map((r) => `- ${r}`).join('\n')}\n`
+      : null,
     `CHANGE SUMMARY:`,
     `------------------------------------------------------------`,
     payload.diffSummary.summaryText,
