@@ -2,7 +2,7 @@ import type { DiffSummary } from '../../types/domain.js';
 import type { ExtractedPayload } from '../../types/extractor.js';
 
 export interface AlertPayload {
-  to: string;
+  to?: string;
   subject: string;
   jobId: string;
   targetUrl: string;
@@ -10,6 +10,8 @@ export interface AlertPayload {
   detectedAt?: Date;
   diffSummary: DiffSummary;
   data: ExtractedPayload;
+  userId?: string;
+  webhookUrl?: string | null;
 }
 
 export interface INotificationProvider {

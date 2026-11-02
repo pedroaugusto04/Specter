@@ -16,6 +16,7 @@ export interface CreateJobInput {
   url: string;
   userPrompt: string;
   notificationEmail: string;
+  webhookUrl?: string | null;
   cronExpression: string;
 }
 
@@ -23,6 +24,7 @@ export interface UpdateJobPatch {
   url?: string;
   userPrompt?: string;
   notificationEmail?: string;
+  webhookUrl?: string | null;
   cronExpression?: string;
   bullmqRepeatableKey?: string | null;
   extractorConfig?: ExtractorConfig | null;
@@ -81,6 +83,7 @@ export class DrizzleJobRepository implements IJobRepository {
         url: input.url,
         userPrompt: input.userPrompt,
         notificationEmail: input.notificationEmail,
+        webhookUrl: input.webhookUrl ?? null,
         cronExpression: input.cronExpression,
         status: 'PENDING_COMPILATION',
         failureCount: 0,

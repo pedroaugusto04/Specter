@@ -110,17 +110,19 @@ export class ScrapeExecutionService {
       // Send notification only when actual changes occur compared to a prior snapshot
       if (hasChanges === 'YES' && previousRun) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, extractedData);
-        if (diffSummary.hasChanges && job.notificationEmail && job.notificationEmail.trim()) {
+        if (diffSummary.hasChanges) {
           const changeNoun =
             diffSummary.totalChanges === 1
               ? '1 change detected'
               : `${diffSummary.totalChanges} changes detected`;
           await this.notificationProvider.sendAlert({
-            to: job.notificationEmail.trim(),
+            to: job.notificationEmail?.trim() || undefined,
             subject: `[Specter] ${changeNoun}: ${job.url}`,
             jobId: job.id,
+            userId: job.userId,
             targetUrl: job.url,
             userPrompt: job.userPrompt,
+            webhookUrl: job.webhookUrl ?? undefined,
             detectedAt: new Date(),
             diffSummary,
             data: extractedData,

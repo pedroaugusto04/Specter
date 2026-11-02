@@ -21,12 +21,26 @@ export interface UserEntity {
   updatedAt: Date;
 }
 
+export interface UserIntegrationEntity {
+  id: string;
+  userId: string;
+  telegramEnabled: boolean;
+  telegramBotToken: string | null;
+  telegramChatId: string | null;
+  webhookEnabled: boolean;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ScrapingJobEntity {
   id: string;
   userId: string;
   url: string;
   userPrompt: string;
   notificationEmail: string;
+  webhookUrl?: string | null;
   cronExpression: string;
   bullmqRepeatableKey: string | null;
   extractorConfig: ExtractorConfig | null;

@@ -101,6 +101,7 @@ export class InMemoryJobRepository implements IJobRepository {
       url: input.url,
       userPrompt: input.userPrompt,
       notificationEmail: input.notificationEmail,
+      webhookUrl: input.webhookUrl ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
       extractorConfig: null,
@@ -299,5 +300,34 @@ export class MockJobScheduler implements IJobScheduler {
 
   async removeRepeatableJob(jobId: string): Promise<void> {
     this.scheduledRepeatables.delete(jobId);
+  }
+}
+
+
+export class InMemoryIntegrationRepository {
+  public integrations = new Map<string, any>();
+
+  async findByUserId(userId: string): Promise<any | null> {
+    const item = this.integrations.get(userId);
+    return item ? { ...item } : null;
+  }
+
+  async upsert(userId: string, input: any): Promise<any> {
+    const existing = this.integrations.get(userId);
+    const now = new Date();
+    const entity = {
+      id: existing?.id ?? crypto.randomUUID(),
+      userId,
+      telegramEnabled: input.telegramEnabled ?? existing?.telegramEnabled ?? false,
+      telegramBotToken: input.telegramBotToken !== undefined ? input.telegramBotToken : (existing?.telegramBotToken ?? null),
+      telegramChatId: input.telegramChatId !== undefined ? input.telegramChatId : (existing?.telegramChatId ?? null),
+      webhookEnabled: input.webhookEnabled ?? existing?.webhookEnabled ?? false,
+      webhookUrl: input.webhookUrl !== undefined ? input.webhookUrl : (existing?.webhookUrl ?? null),
+      webhookSecret: input.webhookSecret !== undefined ? input.webhookSecret : (existing?.webhookSecret ?? null),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    this.integrations.set(userId, entity);
+    return { ...entity };
   }
 }

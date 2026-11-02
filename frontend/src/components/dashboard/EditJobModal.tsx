@@ -21,6 +21,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
+  const [webhookUrl, setWebhookUrl] = React.useState('');
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
@@ -34,6 +35,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       setUrl(job.url);
       setUserPrompt(job.userPrompt);
       setNotificationEmail(job.notificationEmail);
+      setWebhookUrl(job.webhookUrl || '');
 
       const isPreset = CRON_PRESETS.some((p) => p.value === job.cronExpression);
       if (isPreset) {
@@ -62,6 +64,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       (url.trim() !== job.url ||
         userPrompt.trim() !== job.userPrompt ||
         notificationEmail.trim() !== job.notificationEmail ||
+        webhookUrl.trim() !== (job.webhookUrl || '') ||
         effectiveCron.trim() !== job.cronExpression)
   );
 
@@ -117,6 +120,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         url: url.trim(),
         userPrompt: userPrompt.trim(),
         notificationEmail: notificationEmail.trim() || undefined,
+        webhookUrl: webhookUrl.trim() || null,
         cronExpression: effectiveCron.trim(),
       });
 
@@ -208,6 +212,20 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         </div>
 
         <FormField
+          label="Custom Webhook URL"
+          htmlFor="edit-job-webhook"
+          hint="Optional. Custom endpoint URL for this specific monitor."
+        >
+          <Input
+            id="edit-job-webhook"
+            type="url"
+            placeholder="https://your-domain.com/webhook (optional)"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+          />
+        </FormField>
+
+        <FormField
           label="Extraction Instructions"
           htmlFor="edit-user-prompt"
           required
@@ -229,7 +247,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
-            label="Check Frequency (Minimum floor: 15 min)"
+            label="Check Frequency"
             htmlFor="edit-cron-preset"
             required
             error={!useCustomCron ? fieldErrors.cronExpression : undefined}

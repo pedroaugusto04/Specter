@@ -93,29 +93,33 @@ export class CompilationService {
         durationMs,
       });
 
-      if (hasChanges === 'YES' && previousRun && job.notificationEmail && job.notificationEmail.trim()) {
+      if (hasChanges === 'YES' && previousRun) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
-        const changeNoun =
-          diffSummary.totalChanges === 1
-            ? '1 change detected'
-            : `${diffSummary.totalChanges} changes detected`;
-        await this.notificationProvider
-          .sendAlert({
-            to: job.notificationEmail.trim(),
-            subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
-            jobId: job.id,
-            targetUrl: job.url,
-            userPrompt: job.userPrompt,
-            detectedAt: new Date(),
-            diffSummary,
-            data: smokeTest.extractedData,
-          })
-          .catch((notifyErr) => {
-            logger.warn('Failed to send notification after self-healing compilation', {
+        if (diffSummary.hasChanges) {
+          const changeNoun =
+            diffSummary.totalChanges === 1
+              ? '1 change detected'
+              : `${diffSummary.totalChanges} changes detected`;
+          await this.notificationProvider
+            .sendAlert({
+              to: job.notificationEmail?.trim() || undefined,
+              subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
               jobId: job.id,
-              errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
+              userId: job.userId,
+              targetUrl: job.url,
+              userPrompt: job.userPrompt,
+              webhookUrl: job.webhookUrl ?? undefined,
+              detectedAt: new Date(),
+              diffSummary,
+              data: smokeTest.extractedData,
+            })
+            .catch((notifyErr) => {
+              logger.warn('Failed to send notification after self-healing compilation', {
+                jobId: job.id,
+                errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
+              });
             });
-          });
+        }
       }
 
       // 6. Schedule repeatable job in BullMQ and activate job

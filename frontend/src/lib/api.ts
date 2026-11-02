@@ -33,6 +33,7 @@ export interface ScrapingJobDto {
   url: string;
   userPrompt: string;
   notificationEmail: string;
+    webhookUrl?: string | null;
   cronExpression: string;
   extractorConfig: ExtractorConfig | null;
   status: JobStatus;
@@ -79,6 +80,16 @@ export interface DashboardStats {
   failedOrPausedJobs: number;
   totalRuns: number;
   DetectedChangesCount: number;
+}
+
+export interface UserIntegrationsDto {
+  id?: string;
+  userId?: string;
+  telegramEnabled: boolean;
+  telegramChatId?: string | null;
+  webhookEnabled: boolean;
+  webhookUrl?: string | null;
+  webhookSecret?: string | null;
 }
 
 export interface ApiValidationErrorDetail {
@@ -240,6 +251,7 @@ export const api = {
     url: string;
     userPrompt: string;
     notificationEmail: string;
+    webhookUrl?: string | null;
     cronExpression: string;
   }): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>('/api/jobs', {
@@ -254,6 +266,7 @@ export const api = {
       url?: string;
       userPrompt?: string;
       notificationEmail?: string;
+      webhookUrl?: string | null;
       cronExpression?: string;
     }
   ): Promise<ScrapingJobDto> {
@@ -287,6 +300,42 @@ export const api = {
   deleteJob(id: string): Promise<void> {
     return request<void>(`/api/jobs/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  getIntegrations(): Promise<UserIntegrationsDto> {
+    return request<UserIntegrationsDto>('/api/integrations');
+  },
+
+  updateIntegrations(input: {
+    telegramEnabled: boolean;
+    telegramChatId?: string | null;
+    webhookEnabled: boolean;
+    webhookUrl?: string | null;
+    webhookSecret?: string | null;
+  }): Promise<UserIntegrationsDto> {
+    return request<UserIntegrationsDto>('/api/integrations', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  },
+
+  testTelegram(input: {
+    chatId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/integrations/telegram/test', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  testWebhook(input: {
+    webhookUrl: string;
+    secret?: string | null;
+  }): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/integrations/webhook/test', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   },
 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Radio } from 'lucide-react';
 import { ProfileModal } from '@/components/auth/ProfileModal';
 import { UserAvatarMenu } from '@/components/auth/UserAvatarMenu';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -9,6 +9,7 @@ import { SpecterLogo } from '@/components/brand/SpecterLogo';
 import { PENDING_JOB_STORAGE_KEY } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
 import { EditJobModal } from '@/components/dashboard/EditJobModal';
+import { IntegrationsModal } from '@/components/dashboard/IntegrationsModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
 import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
+  const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = React.useState(false);
   const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
@@ -110,6 +112,16 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2.5">
             <ThemeToggle />
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsIntegrationsModalOpen(true)}
+              className="h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-medium"
+              title="Configure Telegram and Webhook integrations"
+            >
+              <Radio className="h-4 w-4 sm:mr-1.5 text-primary" />
+              <span className="hidden sm:inline">Integrations</span>
+            </Button>
+            <Button
               onClick={() => setIsCreateModalOpen(true)}
               className="h-9 px-3.5 sm:px-4 text-xs sm:text-sm font-medium"
             >
@@ -120,6 +132,7 @@ export default function DashboardPage() {
               <UserAvatarMenu
                 user={user}
                 onOpenProfile={() => setIsProfileModalOpen(true)}
+                onOpenIntegrations={() => setIsIntegrationsModalOpen(true)}
                 onLogout={handleLogout}
               />
             ) : (
@@ -221,6 +234,10 @@ export default function DashboardPage() {
 
       {/* Snapshot and Diff Drawer */}
       <JobRunsDrawer job={selectedJob} onClose={() => setSelectedJob(null)} />
+      <IntegrationsModal
+        isOpen={isIntegrationsModalOpen}
+        onClose={() => setIsIntegrationsModalOpen(false)}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ export interface ScrapingJobDto {
   url: string;
   userPrompt: string;
   notificationEmail: string;
+  webhookUrl: string | null;
   cronExpression: string;
   extractorConfig: ExtractorConfig | null;
   status: JobStatus;
@@ -44,6 +45,7 @@ export const JobMapper = {
       url: row.url,
       userPrompt: row.userPrompt,
       notificationEmail: row.notificationEmail,
+      webhookUrl: row.webhookUrl ?? null,
       cronExpression: row.cronExpression,
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       extractorConfig: row.extractorConfig ?? null,
@@ -62,6 +64,7 @@ export const JobMapper = {
       url: entity.url,
       userPrompt: entity.userPrompt,
       notificationEmail: entity.notificationEmail,
+      webhookUrl: entity.webhookUrl ?? null,
       cronExpression: entity.cronExpression,
       extractorConfig: entity.extractorConfig,
       status: entity.status,

@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 export const CRON_PRESETS = [
-  { label: 'Every 15 minutes (Minimum floor)', value: '*/15 * * * *' },
+  { label: 'Every 15 minutes', value: '*/15 * * * *' },
   { label: 'Every 30 minutes', value: '*/30 * * * *' },
   { label: 'Every 1 hour', value: '0 * * * *' },
   { label: 'Every 6 hours (Default)', value: '0 */6 * * *' },

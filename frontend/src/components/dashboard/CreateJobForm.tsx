@@ -41,6 +41,7 @@ export function CreateJobForm({
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
+  const [webhookUrl, setWebhookUrl] = React.useState('');
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
@@ -61,6 +62,7 @@ export function CreateJobForm({
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
     notificationEmail.trim().length > 0 ||
+    webhookUrl.trim().length > 0 ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
 
@@ -135,12 +137,14 @@ export function CreateJobForm({
         url: url.trim(),
         userPrompt: userPrompt.trim(),
         notificationEmail: notificationEmail.trim() || activeUser?.email || '',
+        webhookUrl: webhookUrl.trim() || null,
         cronExpression: effectiveCron.trim(),
       });
 
       setUrl('');
       setUserPrompt('');
       setNotificationEmail('');
+      setWebhookUrl('');
       setCronPreset('0 */6 * * *');
       setCustomCron('0 */6 * * *');
       setUseCustomCron(false);
@@ -226,6 +230,7 @@ export function CreateJobForm({
                   url: url.trim(),
                   userPrompt: userPrompt.trim(),
                   notificationEmail: notificationEmail.trim(),
+                  webhookUrl: webhookUrl.trim() || null,
                   cronExpression: effectiveCron.trim(),
                 })
               );
@@ -321,6 +326,20 @@ export function CreateJobForm({
           />
         </FormField>
       </div>
+
+      <FormField
+        label="Custom Webhook URL"
+        htmlFor="job-webhook"
+        hint="Optional. Destination endpoint URL for this specific monitor."
+      >
+        <Input
+          id="job-webhook"
+          type="url"
+          placeholder="https://your-domain.com/webhook (optional)"
+          value={webhookUrl}
+          onChange={(e) => setWebhookUrl(e.target.value)}
+        />
+      </FormField>
 
       <FormField
         label="Extraction Instructions"

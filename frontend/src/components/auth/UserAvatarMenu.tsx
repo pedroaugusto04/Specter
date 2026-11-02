@@ -1,16 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDown, LogOut, ShieldCheck, User } from 'lucide-react';
+import { ChevronDown, LogOut, Radio, ShieldCheck, User } from 'lucide-react';
 import type { UserDto } from '@/lib/api';
 
 export interface UserAvatarMenuProps {
   user: UserDto;
   onOpenProfile: () => void;
+  onOpenIntegrations?: () => void;
   onLogout: () => void | Promise<void>;
 }
 
-export function UserAvatarMenu({ user, onOpenProfile, onLogout }: UserAvatarMenuProps) {
+export function UserAvatarMenu({ user, onOpenProfile, onOpenIntegrations, onLogout }: UserAvatarMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -102,6 +103,20 @@ export function UserAvatarMenu({ user, onOpenProfile, onLogout }: UserAvatarMenu
               <User className="h-3.5 w-3.5 text-muted-foreground" />
               <span>Profile</span>
             </button>
+            {onOpenIntegrations && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenIntegrations();
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+              >
+                <Radio className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Integrations</span>
+              </button>
+            )}
           </div>
 
           <div className="border-t border-border/60 py-1">

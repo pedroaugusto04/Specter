@@ -20,6 +20,7 @@ export interface CreateScrapingJobRequest {
   url: string;
   userPrompt: string;
   notificationEmail?: string;
+  webhookUrl?: string | null;
   cronExpression?: string;
 }
 
@@ -27,6 +28,7 @@ export interface UpdateScrapingJobRequest {
   url?: string;
   userPrompt?: string;
   notificationEmail?: string;
+  webhookUrl?: string | null;
   cronExpression?: string;
 }
 
@@ -101,6 +103,7 @@ export class JobService {
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
       notificationEmail: (request.notificationEmail ?? '').trim(),
+      webhookUrl: request.webhookUrl?.trim() || null,
       cronExpression,
     });
 
@@ -136,6 +139,7 @@ export class JobService {
       url?: string;
       userPrompt?: string;
       notificationEmail?: string;
+  webhookUrl?: string | null;
       cronExpression?: string;
       bullmqRepeatableKey?: string | null;
     } = {};
@@ -148,6 +152,9 @@ export class JobService {
     }
     if (request.notificationEmail !== undefined) {
       patch.notificationEmail = request.notificationEmail.trim();
+    }
+    if (request.webhookUrl !== undefined) {
+      patch.webhookUrl = request.webhookUrl?.trim() || null;
     }
     if (request.cronExpression !== undefined) {
       const trimmedCron = request.cronExpression.trim();

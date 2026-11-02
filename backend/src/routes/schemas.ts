@@ -51,6 +51,16 @@ export const jobInputSchema = z.object({
     .optional()
     .or(z.literal(''))
     .default(''),
+  webhookUrl: z
+    .string()
+    .trim()
+    .url('Webhook URL must be a valid HTTP or HTTPS URL')
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+      message: 'Webhook URL must start with http:// or https://',
+    })
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
 });
 
@@ -76,6 +86,16 @@ export const jobUpdateSchema = z.object({
     .email('Please enter a valid alert email address (e.g. alerts@company.com)')
     .optional()
     .or(z.literal('')),
+  webhookUrl: z
+    .string()
+    .trim()
+    .url('Webhook URL must be a valid HTTP or HTTPS URL')
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+      message: 'Webhook URL must start with http:// or https://',
+    })
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
   cronExpression: cronExpressionSchema.optional(),
 });
 
@@ -121,4 +141,37 @@ export const authLoginSchema = z.object({
   password: z
     .string({ required_error: 'Password is required' })
     .min(1, 'Password is required'),
+});
+
+
+export const updateIntegrationsSchema = z.object({
+  telegramEnabled: z.boolean().default(false),
+  telegramChatId: z.string().trim().optional().nullable(),
+  webhookEnabled: z.boolean().default(false),
+  webhookUrl: z
+    .string()
+    .trim()
+    .url('Webhook URL must be a valid HTTP or HTTPS URL')
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+      message: 'Webhook URL must start with http:// or https://',
+    })
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  webhookSecret: z.string().trim().optional().nullable(),
+});
+
+export const testTelegramSchema = z.object({
+  chatId: z.string().trim().min(1, 'Telegram Chat ID is required'),
+});
+
+export const testWebhookSchema = z.object({
+  webhookUrl: z
+    .string({ required_error: 'Webhook URL is required' })
+    .trim()
+    .url('Webhook URL must be a valid HTTP or HTTPS URL')
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+      message: 'Webhook URL must start with http:// or https://',
+    }),
+  secret: z.string().trim().optional().nullable(),
 });

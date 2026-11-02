@@ -17,6 +17,10 @@ export class ResendNotificationProvider implements INotificationProvider {
   }
 
   async sendAlert(payload: AlertPayload): Promise<void> {
+    if (!payload.to) {
+      throw new Error('Cannot send email alert: recipient email address (payload.to) is missing.');
+    }
+
     const { html, text } = buildSpecterAlertEmail(payload);
 
     // Format sender name nicely as "Specter <sender@domain.com>" if not already formatted

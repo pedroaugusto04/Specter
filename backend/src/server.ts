@@ -3,13 +3,18 @@ import { env } from './config/env.js';
 import { closeDb } from './db/index.js';
 import { createCompilerProvider } from './providers/compilers/compiler.factory.js';
 import { createNotificationProvider } from './providers/notifications/notification.factory.js';
+import { NotificationDispatcher } from './providers/notifications/notificationDispatcher.js';
+import { TelegramNotificationProvider } from './providers/notifications/telegramNotification.provider.js';
+import { WebhookNotificationProvider } from './providers/notifications/webhookNotification.provider.js';
 import { createScraperEngine } from './providers/scraping/scraper.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
+import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
 import { DrizzleUserRepository } from './repositories/userRepository.js';
 import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
+import { IntegrationService } from './services/integrationService.js';
 import { JobService } from './services/jobService.js';
 import { RetentionService } from './services/retentionService.js';
 import { ScrapeExecutionService } from './services/scrapeExecutionService.js';
@@ -19,29 +24,45 @@ import { WorkerManager } from './workers/workers.js';
 async function bootstrap(): Promise<void> {
   const jobRepository = new DrizzleJobRepository();
   const userRepository = new DrizzleUserRepository();
+  const integrationRepository = new DrizzleIntegrationRepository();
   const jobScheduler = new BullMqJobScheduler();
   const compilerProvider = createCompilerProvider();
   const scraperEngine = createScraperEngine();
-  const notificationProvider = createNotificationProvider();
+
+  const emailNotificationProvider = createNotificationProvider();
+  const telegramProvider = new TelegramNotificationProvider();
+  const webhookProvider = new WebhookNotificationProvider();
+
+  const notificationDispatcher = new NotificationDispatcher({
+    emailProvider: emailNotificationProvider,
+    telegramProvider,
+    webhookProvider,
+    integrationRepository,
+  });
 
   const compilationService = new CompilationService({
     jobRepository,
     scraperEngine,
     compilerProvider,
-    notificationProvider,
+    notificationProvider: notificationDispatcher,
     jobScheduler,
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
     jobRepository,
     scraperEngine,
-    notificationProvider,
+    notificationProvider: notificationDispatcher,
     jobScheduler,
   });
 
   const retentionService = new RetentionService(jobRepository);
   const jobService = new JobService(jobRepository, jobScheduler, scraperEngine);
   const authService = new AuthService(userRepository);
+  const integrationService = new IntegrationService(
+    integrationRepository,
+    telegramProvider,
+    webhookProvider
+  );
 
   // Run migrations automatically on startup
   try {
@@ -76,7 +97,7 @@ async function bootstrap(): Promise<void> {
   });
   workerManager.start();
 
-  const app = await buildApp({ jobService, authService });
+  const app = await buildApp({ jobService, authService, integrationService });
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);
@@ -90,17 +111,24 @@ async function bootstrap(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
-  await app.listen({ port: env.PORT, host: env.HOST });
-  logger.info(`Backend server listening on http://${env.HOST}:${env.PORT}`, {
-    compilerProvider: compilerProvider.name,
-    scraperEngine: scraperEngine.name,
-    notificationProvider: notificationProvider.name,
-  });
+  try {
+    await app.listen({ port: env.PORT, host: env.HOST });
+    logger.info(`Specter Backend API is running on http://${env.HOST}:${env.PORT}`, {
+      port: env.PORT,
+      host: env.HOST,
+      environment: env.NODE_ENV,
+    });
+  } catch (error) {
+    logger.error('Failed to bind server port', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
 }
 
-bootstrap().catch((err) => {
-  logger.error('Fatal error during application bootstrap', {
-    errorMessage: err instanceof Error ? err.message : String(err),
+bootstrap().catch((error) => {
+  logger.error('Fatal startup bootstrap crash', {
+    errorMessage: error instanceof Error ? error.message : String(error),
   });
   process.exit(1);
 });

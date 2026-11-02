@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, jsonb, integer, index, boolean } from 'drizzle-orm/pg-core';
 import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
 
 export const users = pgTable(
@@ -15,6 +15,28 @@ export const users = pgTable(
   (table) => [index('idx_users_email').on(table.email)]
 );
 
+export const userIntegrations = pgTable(
+  'user_integrations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull().unique(),
+
+    // Telegram Integration
+    telegramEnabled: boolean('telegram_enabled').default(false).notNull(),
+    telegramBotToken: text('telegram_bot_token'),
+    telegramChatId: text('telegram_chat_id'),
+
+    // Webhook Integration
+    webhookEnabled: boolean('webhook_enabled').default(false).notNull(),
+    webhookUrl: text('webhook_url'),
+    webhookSecret: text('webhook_secret'),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_user_integrations_user_id').on(table.userId)]
+);
+
 export const scrapingJobs = pgTable(
   'scraping_jobs',
   {
@@ -23,6 +45,7 @@ export const scrapingJobs = pgTable(
     url: text('url').notNull(),
     userPrompt: text('user_prompt').notNull(),
     notificationEmail: text('notification_email').notNull(),
+    webhookUrl: text('webhook_url'),
 
     // Scheduling
     cronExpression: text('cron_expression').notNull().default('0 */6 * * *'),
@@ -80,3 +103,5 @@ export type ScrapingJobRow = typeof scrapingJobs.$inferSelect;
 export type NewScrapingJobRow = typeof scrapingJobs.$inferInsert;
 export type JobRunRow = typeof jobRuns.$inferSelect;
 export type NewJobRunRow = typeof jobRuns.$inferInsert;
+export type UserIntegrationRow = typeof userIntegrations.$inferSelect;
+export type NewUserIntegrationRow = typeof userIntegrations.$inferInsert;
