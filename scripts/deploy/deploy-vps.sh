@@ -6,10 +6,10 @@ set -euo pipefail
 # Follows the architecture pattern of FeConnect
 # ==============================================================================
 
-APP_DIR="${APP_DIR:-$HOME/dynamic-scrapper}"
+APP_DIR="${APP_DIR:-$HOME/specter}"
 BRANCH="${BRANCH:-main}"
-FRONTEND_DEPLOY_PATH="${FRONTEND_DEPLOY_PATH:-/var/www/dynamic-scrapper}"
-DOCKER_IMAGE_NAME="dynamic-scrapper-backend:latest"
+FRONTEND_DEPLOY_PATH="${FRONTEND_DEPLOY_PATH:-/var/www/specter}"
+DOCKER_IMAGE_NAME="specter-backend:latest"
 COMPOSE_FILE="docker-compose.prod.yml"
 
 echo "=== Iniciando deploy na VPS ==="
@@ -84,4 +84,5 @@ echo "6. Limpando imagens Docker não utilizadas..."
 docker image prune -f --filter "until=168h" || true
 
 echo "✅ Deploy finalizado com sucesso na VPS!"
+
 

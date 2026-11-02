@@ -32,9 +32,9 @@ permissions:
   packages: write
 
 env:
-  APP_NAME: \$\{\{ vars.APP_NAME || 'Specter' \}\}
-  APP_DIR_NAME: ${{ vars.APP_DIR_NAME || 'dynamic-scrapper' }}
-  FRONTEND_DEPLOY_PATH: ${{ vars.FRONTEND_DEPLOY_PATH || '/var/www/dynamic-scrapper' }}
+  APP_NAME: ${{ vars.APP_NAME || 'Specter' }}
+  APP_DIR_NAME: ${{ vars.APP_DIR_NAME || 'specter' }}
+  FRONTEND_DEPLOY_PATH: ${{ vars.FRONTEND_DEPLOY_PATH || '/var/www/specter' }}
   RELOAD_NGINX: ${{ vars.RELOAD_NGINX || 'true' }}
   DOCKER_PLATFORMS: ${{ vars.DOCKER_PLATFORMS || 'linux/arm64' }}
   APP_PORT: ${{ vars.PORT || '3001' }}
@@ -142,9 +142,9 @@ jobs:
         id: image_meta
         run: |
           if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-            RAW_REPO="${{ secrets.DOCKERHUB_USERNAME }}/dynamic-scrapper-backend"
+            RAW_REPO="${{ secrets.DOCKERHUB_USERNAME }}/specter-backend"
           else
-            RAW_REPO="ghcr.io/${{ github.repository_owner }}/dynamic-scrapper-backend"
+            RAW_REPO="ghcr.io/${{ github.repository_owner }}/specter-backend"
           fi
           LOWER_REPO=$(echo "$RAW_REPO" | tr '[:upper:]' '[:lower:]')
           echo "image_repo=$LOWER_REPO" >> "$GITHUB_OUTPUT"
@@ -356,4 +356,6 @@ jobs:
             else
               echo "Nginx nao instalado; pulando reload."
             fi
+
+
 

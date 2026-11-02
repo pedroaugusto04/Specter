@@ -7,26 +7,26 @@ x-default-logging: &default-logging
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: dynamic-scrapper-postgres
+    container_name: specter-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-dynamic_scrapper}
+      POSTGRES_DB: ${POSTGRES_DB:-specter}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dynamic_scrapper}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}"]
       interval: 10s
       timeout: 5s
       retries: 5
     logging: *default-logging
     networks:
-      - dynamic-scrapper-net
+      - specter-net
 
   redis:
     image: redis:7-alpine
-    container_name: dynamic-scrapper-redis
+    container_name: specter-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
@@ -38,11 +38,11 @@ services:
       retries: 5
     logging: *default-logging
     networks:
-      - dynamic-scrapper-net
+      - specter-net
 
   backend:
     image: ${DOCKER_IMAGE}
-    container_name: dynamic-scrapper-backend
+    container_name: specter-backend
     restart: unless-stopped
     env_file:
       - .env.prod
@@ -50,7 +50,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-dynamic_scrapper}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-specter}
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -70,12 +70,13 @@ services:
         condition: service_healthy
     logging: *default-logging
     networks:
-      - dynamic-scrapper-net
+      - specter-net
 
 networks:
-  dynamic-scrapper-net:
+  specter-net:
     driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
+

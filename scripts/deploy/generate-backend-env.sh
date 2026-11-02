@@ -20,7 +20,7 @@ write_kv HOST "${HOST:-0.0.0.0}"
 # Production defaults for Specter
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
-POSTGRES_DB="${POSTGRES_DB:-dynamic_scrapper}"
+POSTGRES_DB="${POSTGRES_DB:-specter}"
 DATABASE_URL="${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}"
 REDIS_URL="${REDIS_URL:-redis://redis:6379}"
 REDIS_HOST="${REDIS_HOST:-redis}"
@@ -97,4 +97,5 @@ for key in "${keys[@]}"; do
 done
 
 chmod 600 "$OUTPUT_FILE"
+
 

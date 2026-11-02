@@ -6,14 +6,14 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-dynamic_scrapper}
+      POSTGRES_DB: ${POSTGRES_DB:-specter}
     ports:
       - "${POSTGRES_PORT:-5445}:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
       - ./backend/drizzle/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dynamic_scrapper}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
       PORT: 3001
       HOST: 0.0.0.0
       CORS_ORIGIN: "http://localhost:3000,http://localhost:3005"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-dynamic_scrapper}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-specter}
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -100,4 +100,5 @@ volumes:
   postgres_dev_data:
   redis_dev_data:
   agy_profile:
+
 
