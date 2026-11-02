@@ -35,6 +35,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
           '--disable-infobars',
           '--window-size=1920,1080',
         ],
+        ...(env.HTTP_PROXY ? { proxy: { server: env.HTTP_PROXY } } : {}),
       });
 
       context = await browser.newContext({
