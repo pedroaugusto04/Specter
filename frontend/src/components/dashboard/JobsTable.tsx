@@ -274,11 +274,11 @@ export function JobsTable({
           <table className="w-full border-collapse text-left text-sm table-fixed">
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
-                <th className="py-3 px-3 sm:px-4">Target</th>
-                <th className="w-[110px] px-2.5 py-3">Status</th>
-                <th className="w-[110px] px-2.5 py-3">Schedule</th>
-                <th className="w-[75px] px-2.5 py-3">Failures</th>
-                <th className="w-[130px] px-2.5 py-3">Last Checked</th>
+                <th className="w-[200px] sm:w-[240px] md:w-[280px] py-3 px-3 sm:px-4">Target</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="w-[120px] px-3 py-3">Schedule</th>
+                <th className="w-[85px] px-3 py-3">Failures</th>
+                <th className="w-[140px] px-3 py-3">Last Checked</th>
                 <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -336,12 +336,12 @@ export function JobsTable({
                     </td>
 
                     {/* Status Pill */}
-                    <td className="whitespace-nowrap px-2.5 py-3">
+                    <td className="whitespace-nowrap px-3 py-3">
                       {renderStatusPill(job.status)}
                     </td>
 
                     {/* Cron */}
-                    <td className="whitespace-nowrap px-2.5 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3 text-muted-foreground/70" />
                         <span className="truncate">{job.cronExpression}</span>
@@ -349,7 +349,7 @@ export function JobsTable({
                     </td>
 
                     {/* Failures */}
-                    <td className="whitespace-nowrap px-2.5 py-3 text-xs">
+                    <td className="whitespace-nowrap px-3 py-3 text-xs">
                       <span
                         className={
                           job.failureCount > 0
@@ -363,7 +363,7 @@ export function JobsTable({
 
                     {/* Updated At */}
                     <td
-                      className="whitespace-nowrap px-2.5 py-3 text-xs text-muted-foreground font-mono"
+                      className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground font-mono"
                       title={formatDateTime(job.updatedAt)}
                     >
                       {formatCompactDate(job.updatedAt)}
