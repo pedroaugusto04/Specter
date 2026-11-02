@@ -68,4 +68,11 @@ export class IntegrationService {
   }): Promise<WebhookTestResult> {
     return this.webhookProvider.sendTestEvent(input);
   }
+
+  async getBotUsername(): Promise<string | null> {
+    if (typeof this.telegramProvider.getBotUsername === 'function') {
+      return this.telegramProvider.getBotUsername();
+    }
+    return null;
+  }
 }

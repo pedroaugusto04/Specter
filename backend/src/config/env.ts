@@ -50,6 +50,7 @@ export const envSchema = z.object({
   RESEND_API_KEY: z.string().optional().default(''),
   NOTIFICATION_FROM_EMAIL: z.string().min(1).default('onboarding@resend.dev'),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
+  TELEGRAM_BOT_USERNAME: z.string().optional().default(''),
 
   // Authentication & Stateless JWT Cookies
   JWT_SECRET: z

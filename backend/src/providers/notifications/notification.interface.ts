@@ -33,6 +33,7 @@ export interface ITelegramNotificationProvider {
   readonly name: string;
   sendAlert(payload: AlertPayload, options: TelegramSendOptions): Promise<void>;
   sendTestMessage(input: { chatId: string }): Promise<TelegramTestResult>;
+  getBotUsername?(): Promise<string | null>;
 }
 
 export interface WebhookSendOptions {

@@ -274,6 +274,66 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(getBody2.data.telegramEnabled).toBe(true);
     expect(getBody2.data.webhookUrl).toBe('https://webhook.site/demo');
 
+    // 4. Test Telegram endpoint returns success and data payload
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const testTelRes = await app.inject({
+      method: 'POST',
+      url: '/api/integrations/telegram/test',
+      payload: { chatId: '12345678' },
+    });
+    expect(testTelRes.statusCode).toBe(200);
+    const testTelBody = JSON.parse(testTelRes.body);
+    expect(testTelBody.success).toBe(true);
+    expect(testTelBody.message).toBeDefined();
+    expect(testTelBody.data.message).toBeDefined();
+
     await app.close();
+  });
+
+  it('TelegramNotificationProvider parses Telegram API 403 error when bot cannot initiate conversation', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        ok: false,
+        error_code: 403,
+        description: "Forbidden: bot can't initiate conversation with a user",
+      }),
+    });
+
+    const telegramProvider = new TelegramNotificationProvider('test-token');
+    const result = await telegramProvider.sendTestMessage({ chatId: '99999' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("bot can't initiate conversation");
+    expect(result.error).toContain('Start (/start)');
+  });
+
+  it('TelegramNotificationProvider getBotUsername retrieves username from getMe API and caches it', async () => {
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(async () => {
+      callCount++;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          result: { id: 12345, is_bot: true, username: 'SpecterTestBot' },
+        }),
+      };
+    });
+
+    const telegramProvider = new TelegramNotificationProvider('test-token');
+    const username1 = await telegramProvider.getBotUsername();
+    const username2 = await telegramProvider.getBotUsername();
+
+    expect(username1).toBe('SpecterTestBot');
+    expect(username2).toBe('SpecterTestBot');
+    expect(callCount).toBe(1); // Cached after first call
   });
 });

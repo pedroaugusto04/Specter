@@ -17,7 +17,8 @@ export function registerIntegrationRoutes(
     const user = await resolveAuthenticatedUser(request, reply, authService, false);
     const userId = user?.id ?? 'default-user';
     const data = await integrationService.getIntegrations(userId);
-    return { data };
+    const botUsername = await integrationService.getBotUsername();
+    return { data: { ...data, botUsername } };
   });
 
   app.put('/api/integrations', async (request, reply) => {
@@ -32,8 +33,9 @@ export function registerIntegrationRoutes(
       webhookUrl: input.webhookUrl || null,
       webhookSecret: input.webhookSecret || null,
     });
+    const botUsername = await integrationService.getBotUsername();
 
-    return { data: updated };
+    return { data: { ...updated, botUsername } };
   });
 
   app.post('/api/integrations/telegram/test', async (request, reply) => {
@@ -49,7 +51,8 @@ export function registerIntegrationRoutes(
       });
     }
 
-    return { success: true, message: 'Telegram test message sent successfully.' };
+    const payload = { success: true, message: 'Telegram test message sent successfully.' };
+    return { ...payload, data: payload };
   });
 
   app.post('/api/integrations/webhook/test', async (request, reply) => {
@@ -66,9 +69,10 @@ export function registerIntegrationRoutes(
       });
     }
 
-    return {
+    const payload = {
       success: true,
       message: 'Webhook test event delivered successfully.',
     };
+    return { ...payload, data: payload };
   });
 }

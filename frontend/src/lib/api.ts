@@ -108,6 +108,7 @@ export interface UserIntegrationsDto {
   webhookEnabled: boolean;
   webhookUrl?: string | null;
   webhookSecret?: string | null;
+  botUsername?: string | null;
 }
 
 export interface ApiValidationErrorDetail {
@@ -210,7 +211,7 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     );
   }
 
-  return body.data as T;
+  return (body.data !== undefined ? body.data : body) as T;
 }
 
 export const api = {

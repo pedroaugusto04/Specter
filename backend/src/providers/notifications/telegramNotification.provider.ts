@@ -25,9 +25,49 @@ function formatValue(val: unknown): string {
 export class TelegramNotificationProvider implements ITelegramNotificationProvider {
   public readonly name = 'telegram';
   private readonly botToken: string;
+  private cachedBotUsername: string | null = null;
 
   constructor(botToken?: string) {
     this.botToken = (botToken ?? env.TELEGRAM_BOT_TOKEN).trim();
+  }
+
+  async getBotUsername(): Promise<string | null> {
+    const configuredUsername = env.TELEGRAM_BOT_USERNAME?.trim();
+    if (configuredUsername) {
+      return configuredUsername.replace(/^@/, '');
+    }
+
+    if (this.cachedBotUsername) {
+      return this.cachedBotUsername;
+    }
+
+    if (!this.botToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${this.botToken}/getMe`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+
+      if (response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          result?: { username?: string };
+        } | null;
+
+        if (body?.ok && body.result?.username) {
+          this.cachedBotUsername = body.result.username;
+          return this.cachedBotUsername;
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to resolve Telegram bot username via getMe', {
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return null;
   }
 
   private resolveToken(): string {
@@ -145,7 +185,26 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
     });
 
     if (!response.ok) {
-      throw new Error('Unable to deliver message to Telegram. Please verify your Chat ID and make sure you have started a conversation with the bot.');
+      const errBody = (await response.json().catch(() => null)) as {
+        description?: string;
+        error_code?: number;
+      } | null;
+
+      if (errBody?.description) {
+        if (
+          errBody.description.includes("can't initiate conversation") ||
+          errBody.description.includes('chat not found')
+        ) {
+          throw new Error(
+            `Telegram delivery failed: ${errBody.description}. Make sure you have opened the bot in Telegram and clicked Start (/start) first.`
+          );
+        }
+        throw new Error(`Telegram delivery failed: ${errBody.description}`);
+      }
+
+      throw new Error(
+        'Unable to deliver message to Telegram. Please verify your Chat ID and make sure you have started a conversation with the bot.'
+      );
     }
   }
 }

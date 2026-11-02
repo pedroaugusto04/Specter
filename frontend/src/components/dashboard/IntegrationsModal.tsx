@@ -38,6 +38,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
   // Telegram state
   const [telegramEnabled, setTelegramEnabled] = React.useState(false);
   const [telegramChatId, setTelegramChatId] = React.useState('');
+  const [telegramBotUsername, setTelegramBotUsername] = React.useState<string | null>(null);
   const [isTestingTelegram, setIsTestingTelegram] = React.useState(false);
   const [telegramTestStatus, setTelegramTestStatus] = React.useState<{
     ok: boolean;
@@ -69,6 +70,9 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
       setInitialData(data);
       setTelegramEnabled(Boolean(data.telegramEnabled));
       setTelegramChatId(data.telegramChatId || '');
+      setTelegramBotUsername(
+        data.botUsername || process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || null
+      );
       setWebhookEnabled(Boolean(data.webhookEnabled));
       setWebhookUrl(data.webhookUrl || '');
       setWebhookSecret(data.webhookSecret || '');
@@ -144,7 +148,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
       const res = await api.testTelegram({
         chatId: telegramChatId.trim(),
       });
-      setTelegramTestStatus({ ok: true, msg: res.message || 'Test message sent successfully!' });
+      setTelegramTestStatus({ ok: true, msg: res?.message || 'Test message sent successfully!' });
     } catch (err) {
       setTelegramTestStatus({
         ok: false,
@@ -168,7 +172,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
         webhookUrl: webhookUrl.trim(),
         secret: webhookSecret.trim() || null,
       });
-      setWebhookTestStatus({ ok: true, msg: res.message || 'Webhook test event delivered!' });
+      setWebhookTestStatus({ ok: true, msg: res?.message || 'Webhook test event delivered!' });
     } catch (err) {
       setWebhookTestStatus({
         ok: false,
@@ -282,6 +286,83 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                   />
                 </div>
 
+                {/* Telegram Bot Instructions & Quick Link */}
+                <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-sky-500 shrink-0" />
+                      <span className="text-xs font-semibold text-foreground">
+                        Como conectar o bot do Telegram
+                      </span>
+                    </div>
+                    {telegramBotUsername && (
+                      <a
+                        href={`https://t.me/${telegramBotUsername}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-500 hover:text-sky-400 hover:underline transition-colors"
+                      >
+                        <span>@{telegramBotUsername}</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+
+                  <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside leading-relaxed">
+                    <li>
+                      {telegramBotUsername ? (
+                        <span>
+                          Abra o bot{' '}
+                          <a
+                            href={`https://t.me/${telegramBotUsername}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-foreground underline decoration-sky-500 underline-offset-2 hover:text-sky-400"
+                          >
+                            @{telegramBotUsername}
+                          </a>{' '}
+                          e clique em <strong className="text-foreground">Iniciar (/start)</strong>. O Telegram exige que você inicie a conversa antes de ele permitir que o bot envie mensagens.
+                        </span>
+                      ) : (
+                        <span>
+                          Abra o bot do Specter no Telegram e envie <strong className="text-foreground">/start</strong>. O Telegram proíbe bots de enviarem mensagens para quem nunca interagiu com eles.
+                        </span>
+                      )}
+                    </li>
+                    <li>
+                      Descubra o seu <strong className="text-foreground">Chat ID</strong> (você pode verificar seu ID enviando uma mensagem para o{' '}
+                      <a
+                        href="https://t.me/userinfobot"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-foreground hover:underline inline-flex items-center gap-0.5"
+                      >
+                        @userinfobot
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                      ).
+                    </li>
+                    <li>
+                      Cole o Chat ID no campo abaixo e clique em <strong className="text-foreground">Send Test Message</strong>.
+                    </li>
+                  </ol>
+
+                  {telegramBotUsername && (
+                    <div className="pt-1">
+                      <a
+                        href={`https://t.me/${telegramBotUsername}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 w-full rounded-md border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 px-3 py-1.5 text-xs font-medium text-sky-500 transition-colors"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Iniciar conversa com @{telegramBotUsername} no Telegram</span>
+                        <ExternalLink className="h-3 w-3 ml-0.5" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
                 {/* Chat ID Field */}
                 <FormField
                   label="Telegram Chat ID"
@@ -306,7 +387,40 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     </div>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Tip: Send <span className="font-mono text-foreground">/start</span> to the bot on Telegram, or check your ID with <span className="font-mono text-foreground">@userinfobot</span>.
+                    {telegramBotUsername ? (
+                      <>
+                        Dica: Inicie em{' '}
+                        <a
+                          href={`https://t.me/${telegramBotUsername}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-foreground hover:underline"
+                        >
+                          @{telegramBotUsername}
+                        </a>{' '}
+                        e descubra seu Chat ID com{' '}
+                        <a
+                          href="https://t.me/userinfobot"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-foreground hover:underline"
+                        >
+                          @userinfobot
+                        </a>.
+                      </>
+                    ) : (
+                      <>
+                        Dica: Envie <span className="font-mono text-foreground">/start</span> para o bot e descubra seu Chat ID com{' '}
+                        <a
+                          href="https://t.me/userinfobot"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-foreground hover:underline"
+                        >
+                          @userinfobot
+                        </a>.
+                      </>
+                    )}
                   </p>
                 </FormField>
 
