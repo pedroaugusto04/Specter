@@ -102,7 +102,7 @@ export function JobsTable({
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 pr-4">Target & Prompt</th>
+                  <th className="w-48 max-w-[200px] py-3 pr-4">Target</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Cron</th>
                   <th className="px-3 py-3">Failures</th>
@@ -127,24 +127,28 @@ export function JobsTable({
 
                   return (
                     <tr key={job.id} className="hover:bg-slate-50/70">
-                      <td className="max-w-md py-3.5 pr-4">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                      <td className="w-48 max-w-[200px] py-3.5 pr-4">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-900 min-w-0">
                           <a
                             href={job.url}
                             target="_blank"
                             rel="noreferrer"
+                            title={job.url}
                             className="truncate hover:underline"
                           >
                             {job.url}
                           </a>
                           <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                         </div>
-                        <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
+                        <p
+                          className="mt-0.5 truncate text-xs text-slate-500"
+                          title={job.userPrompt}
+                        >
                           {job.userPrompt}
                         </p>
                         {parsedError && (
                           <div
-                            className="mt-1 flex items-center gap-1.5 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-700"
+                            className="mt-1 flex items-center gap-1.5 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-700 min-w-0"
                             title={parsedError.description}
                           >
                             <ShieldAlert className="h-3 w-3 shrink-0 text-red-500" />
@@ -187,7 +191,7 @@ export function JobsTable({
                           {/* Edit: disabled while compiling, running or deleting */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isJobBusy || isCompiling}
                             title={
                               isCompiling
@@ -196,16 +200,16 @@ export function JobsTable({
                                   ? 'Cannot edit monitor while extraction is in progress'
                                   : 'Edit monitor configuration'
                             }
+                            aria-label="Edit monitor configuration"
                             onClick={() => onEditJob(job)}
                           >
                             <Pencil className="h-3.5 w-3.5" />
-                            Edit
                           </Button>
 
                           {/* Run: disabled while compiling or if any action is busy; shows loading when running */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isJobBusy || isCompiling}
                             title={
                               isCompiling
@@ -216,6 +220,7 @@ export function JobsTable({
                                     ? 'Action in progress...'
                                     : 'Run immediate extraction'
                             }
+                            aria-label="Run immediate extraction"
                             onClick={() =>
                               handleAction(job.id, 'run', () => api.triggerNow(job.id))
                             }
@@ -225,25 +230,24 @@ export function JobsTable({
                             ) : (
                               <Zap className="h-3.5 w-3.5" />
                             )}
-                            <span>{isRunning ? 'Running...' : 'Run'}</span>
                           </Button>
 
                           {/* History & Diff: read-only, remains enabled unless the row is being deleted */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isDeleting}
                             title="View snapshots, compiled selectors and diff history"
+                            aria-label="View snapshots, compiled selectors and diff history"
                             onClick={() => onSelectJobForHistory(job)}
                           >
                             <History className="h-3.5 w-3.5" />
-                            History & Diff
                           </Button>
 
                           {/* Recompile: disabled while compiling or running; shows loading spinner while compiling */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isJobBusy || isCompiling}
                             title={
                               isCompiling
@@ -252,6 +256,7 @@ export function JobsTable({
                                   ? 'Cannot recompile while extraction is running'
                                   : 'Force AI re-compilation of selectors'
                             }
+                            aria-label="Force AI re-compilation of selectors"
                             onClick={() =>
                               handleAction(job.id, 'recompile', () =>
                                 api.triggerRecompile(job.id)
@@ -268,7 +273,7 @@ export function JobsTable({
                           {/* Pause/Resume schedule: disabled during busy action or while compiling */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isJobBusy || isCompiling}
                             title={
                               isCompiling
@@ -279,6 +284,7 @@ export function JobsTable({
                                     ? 'Resume schedule'
                                     : 'Pause schedule'
                             }
+                            aria-label={isPaused ? 'Resume schedule' : 'Pause schedule'}
                             onClick={() =>
                               handleAction(job.id, 'pause', () =>
                                 api.togglePause(job.id, !isPaused)
@@ -297,7 +303,7 @@ export function JobsTable({
                           {/* Delete: disabled while any action is in flight */}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={isJobBusy}
                             title={
                               isRunning
@@ -306,6 +312,7 @@ export function JobsTable({
                                   ? 'Cannot delete while recompile request is running'
                                   : 'Delete monitor'
                             }
+                            aria-label="Delete monitor"
                             onClick={async () => {
                               const confirmed = await modal.confirm({
                                 title: 'Delete Monitor',
