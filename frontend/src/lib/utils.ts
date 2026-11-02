@@ -79,25 +79,30 @@ export interface ParsedError {
   title: string;
   description: string;
   category: 'anti-bot' | 'timeout' | 'selector' | 'validation' | 'generic';
-  technicalDetails?: string;
 }
 
 /**
- * Parses raw error strings (which may contain Node stack traces or internal URLs)
- * into a clear, transparent, and user-friendly structured message.
+ * Transforms raw error messages into purely user-friendly explanatory text,
+ * completely omitting stack traces, source file paths, or internal code details.
  */
 export function parseErrorMessage(raw: string | null | undefined): ParsedError | null {
   if (!raw || !raw.trim()) return null;
 
-  const text = raw.trim();
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  const firstLine = lines[0] ?? text;
+  // Discard any line that looks like a stack trace or code location
+  const cleanLines = raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(
+      (l) =>
+        Boolean(l) &&
+        !l.startsWith('at ') &&
+        !l.includes('file:///') &&
+        !l.includes('/app/') &&
+        !l.includes('node_modules')
+    );
 
-  // Extract stack trace or file path lines if present
-  const hasStack = lines.some((l) => l.startsWith('at ') || l.includes('file:///') || l.includes('/app/'));
-  const technicalDetails = hasStack ? text : undefined;
-
-  const lower = firstLine.toLowerCase();
+  const firstLine = cleanLines[0] ?? '';
+  const lower = (firstLine || raw).toLowerCase();
 
   if (
     lower.includes('anti-bot') ||
@@ -120,7 +125,6 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
       category: 'anti-bot',
       title: 'Bloqueio Anti-Bot Detectado',
       description,
-      technicalDetails,
     };
   }
 
@@ -129,20 +133,23 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
       category: 'timeout',
       title: 'Tempo Limite Esgotado',
       description: 'O site demorou muito para responder e a navegação excedeu o tempo limite configurado.',
-      technicalDetails,
     };
   }
 
-  if (lower.includes('selector') || lower.includes('incompatibilidade') || lower.includes('smoke test') || lower.includes('seletores')) {
+  if (
+    lower.includes('selector') ||
+    lower.includes('incompatibilidade') ||
+    lower.includes('smoke test') ||
+    lower.includes('seletores')
+  ) {
     return {
       category: 'selector',
       title: 'Incompatibilidade de Seletores',
       description: 'Os dados não foram encontrados na página atual. O layout do site pode ter sido modificado.',
-      technicalDetails,
     };
   }
 
-  // Generic fallback: clean technical noise from title
+  // Strip error class names (e.g. "Error: ", "TypeError: ") and file paths
   const cleaned = firstLine
     .replace(/^[A-Za-z0-9_]+Error:\s*/, '')
     .replace(/\(?file:\/\/\/[^)]*\)?/g, '')
@@ -150,10 +157,25 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
     .replace(/[A-Za-z]:\\[^\s)]*/g, '')
     .trim();
 
+  // If the error message was pure technical noise, show a user-friendly generic message
+  const isTechnicalNoise =
+    !cleaned ||
+    cleaned.includes('Cannot read properties') ||
+    cleaned.includes('is not a function') ||
+    cleaned.includes('ECONNREFUSED') ||
+    cleaned.includes('ETIMEDOUT');
+
+  if (isTechnicalNoise) {
+    return {
+      category: 'generic',
+      title: 'Falha na Execução',
+      description: 'Ocorreu uma instabilidade inesperada ao processar esta requisição.',
+    };
+  }
+
   return {
     category: 'generic',
-    title: cleaned || 'Falha na Execução',
-    description: cleaned || 'Ocorreu um erro durante o processamento do monitor.',
-    technicalDetails,
+    title: cleaned,
+    description: cleaned,
   };
 }

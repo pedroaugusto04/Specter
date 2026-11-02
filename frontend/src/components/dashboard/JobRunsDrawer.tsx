@@ -182,16 +182,6 @@ export function JobRunsDrawer({
                             <p className="mt-0.5 text-red-800 leading-relaxed">
                               {parsedError.description}
                             </p>
-                            {parsedError.technicalDetails && (
-                              <details className="mt-2 text-[11px] text-red-700">
-                                <summary className="cursor-pointer font-medium hover:underline select-none">
-                                  Ver detalhes técnicos
-                                </summary>
-                                <pre className="mt-1 max-h-36 overflow-auto rounded border border-red-200 bg-white/80 p-2 font-mono text-[10px] text-red-900 whitespace-pre-wrap">
-                                  {parsedError.technicalDetails}
-                                </pre>
-                              </details>
-                            )}
                           </div>
                         </div>
                       </div>
