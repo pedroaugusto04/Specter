@@ -11,6 +11,7 @@ import {
   Key,
   Layers,
   Loader2,
+  Lock,
   MessageSquare,
   Radio,
   Send,
@@ -285,7 +286,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
             )}
           >
             <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            <span className="truncate">Sessões Web</span>
+            <span className="truncate">Web Sessions</span>
             {sessions.length > 0 && (
               <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 {sessions.length}
@@ -632,11 +633,11 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-sm font-semibold text-foreground">
-                        Sessões Autenticadas (Extensão Specter)
+                        Authenticated Web Sessions (Specter Companion)
                       </h4>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Permite que o Specter acesse sites que exigem login, 2FA ou proteção por senha.
-                        A extensão captura a sua sessão já autenticada no navegador com 1 clique, sem precisar informar senhas.
+                        Allows Specter to access websites requiring login, 2FA, or password protection.
+                        The extension captures your active authenticated browser session with 1 click, without exposing your raw passwords.
                       </p>
                     </div>
                   </div>
@@ -644,42 +645,45 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                   <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1.5 border border-border/50">
                     <div className="font-medium text-foreground flex items-center gap-1.5">
                       <Globe className="h-3.5 w-3.5 text-primary" />
-                      Como usar a extensão Companion:
+                      How to use the Companion extension:
                     </div>
                     <ol className="list-decimal list-inside text-muted-foreground space-y-1 pl-1">
-                      <li>Carregue a pasta <code className="text-foreground bg-muted px-1 py-0.5 rounded">extension/</code> no seu Chrome (<code className="text-foreground">chrome://extensions</code> em Modo Desenvolvedor).</li>
-                      <li>Entre no site desejado pelo seu navegador normal onde você já está logado.</li>
-                      <li>Clique no ícone da extensão Specter e aperte <strong>"Sincronizar com o Specter"</strong>.</li>
+                      <li>Load the <code className="text-foreground bg-muted px-1 py-0.5 rounded">extension/</code> folder in Chrome (<code className="text-foreground">chrome://extensions</code> in Developer Mode) or install from the Chrome Web Store.</li>
+                      <li>Visit and log in to the desired target website in your normal browser.</li>
+                      <li>Click the Specter extension icon and select <strong>&quot;Sync Session with Specter&quot;</strong>.</li>
                     </ol>
                   </div>
 
-                  <div className="rounded-md bg-emerald-500/10 p-3 text-xs border border-emerald-500/20 text-muted-foreground leading-relaxed">
-                    <span className="font-semibold text-emerald-400">🔒 Privacidade & Segurança de Dados:</span>{' '}
-                    A extensão coleta estritamente os cookies de sessão do domínio ativo na aba para permitir que os robôs monitorem páginas logadas em seu nome.
-                    Nenhuma senha, dados de formulários, cartão de crédito ou histórico de outros sites são coletados ou transmitidos. Você pode revogar qualquer sessão a qualquer momento com 1 clique no botão abaixo.
+                  <div className="rounded-md bg-muted/40 p-3 text-xs border border-border/50 text-muted-foreground leading-relaxed">
+                    <div className="font-medium text-foreground flex items-center gap-1.5 mb-1">
+                      <Lock className="h-3.5 w-3.5 text-foreground" />
+                      Privacy & Data Security
+                    </div>
+                    The extension strictly collects session cookies for the active domain in your tab to allow scraping bots to navigate authenticated portals on your behalf.
+                    No passwords, form data, credit card numbers, or browsing history of other sites are ever collected or transferred. You can revoke any synced session at any time with 1 click below.
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                    <span>Sessões Salvas ({sessions.length})</span>
+                    <span>Saved Sessions ({sessions.length})</span>
                     <button
                       type="button"
                       onClick={() => void fetchSessions()}
                       className="text-primary hover:underline inline-flex items-center gap-1"
                     >
-                      Atualizar lista
+                      Refresh list
                     </button>
                   </div>
 
                   {isLoadingSessions ? (
                     <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span>Carregando sessões sincronizadas...</span>
+                      <span>Loading synced sessions...</span>
                     </div>
                   ) : sessions.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
-                      Nenhuma sessão web sincronizada ainda. Instale a extensão Specter e sincronize seus sites logados com 1 clique.
+                      No web sessions synced yet. Install the Specter Companion extension and sync your logged-in sites with 1 click.
                     </div>
                   ) : (
                     <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
@@ -693,7 +697,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                               )}
                             </div>
                             <div className="text-[11px] text-muted-foreground">
-                              {sess.cookieCount} cookies • Sincronizado em {new Date(sess.updatedAt).toLocaleDateString('pt-BR')} às {new Date(sess.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              {sess.cookieCount} cookies • Synced on {new Date(sess.updatedAt).toLocaleDateString('en-US')} at {new Date(sess.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
                           <Button
@@ -703,7 +707,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                             disabled={deletingSessionId === sess.id}
                             onClick={() => void handleDeleteSession(sess.id)}
                             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-border"
-                            title="Revogar esta sessão"
+                            title="Revoke this session"
                           >
                             {deletingSessionId === sess.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -722,7 +726,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
               <Button type="button" variant="outline" onClick={onClose} className="h-9 text-xs">
-                {activeTab === 'sessions' ? 'Fechar' : 'Close'}
+                Close
               </Button>
               {activeTab !== 'sessions' && (
                 <Button
