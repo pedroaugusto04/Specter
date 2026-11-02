@@ -41,6 +41,7 @@ export function CreateJobForm({
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
+  const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
@@ -63,7 +64,7 @@ export function CreateJobForm({
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
     notificationEmail.trim().length > 0 ||
-    webhookUrl.trim().length > 0 ||
+    (showCustomWebhook && webhookUrl.trim().length > 0) ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
 
@@ -138,13 +139,14 @@ export function CreateJobForm({
         url: url.trim(),
         userPrompt: userPrompt.trim(),
         notificationEmail: notificationEmail.trim() || activeUser?.email || '',
-        webhookUrl: webhookUrl.trim() || null,
+        webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
         cronExpression: effectiveCron.trim(),
       });
 
       setUrl('');
       setUserPrompt('');
       setNotificationEmail('');
+      setShowCustomWebhook(false);
       setWebhookUrl('');
       setCronPreset('0 */6 * * *');
       setCustomCron('0 */6 * * *');
@@ -231,7 +233,7 @@ export function CreateJobForm({
                   url: url.trim(),
                   userPrompt: userPrompt.trim(),
                   notificationEmail: notificationEmail.trim(),
-                  webhookUrl: webhookUrl.trim() || null,
+                  webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
                   cronExpression: effectiveCron.trim(),
                 })
               );
@@ -329,20 +331,6 @@ export function CreateJobForm({
       </div>
 
       <FormField
-        label="Custom Webhook URL"
-        htmlFor="job-webhook"
-        hint="Optional. Destination endpoint URL for this specific monitor."
-      >
-        <Input
-          id="job-webhook"
-          type="url"
-          placeholder="https://your-domain.com/webhook (optional)"
-          value={webhookUrl}
-          onChange={(e) => setWebhookUrl(e.target.value)}
-        />
-      </FormField>
-
-      <FormField
         label={
           <div className="flex items-center gap-1.5">
             <span>Extraction Instructions</span>
@@ -416,10 +404,10 @@ export function CreateJobForm({
             </ul>
           </div>
           <div className="rounded border border-primary/25 bg-background/70 p-2.5 text-[11px] text-foreground space-y-1.5">
-            <div className="font-semibold text-primary">💡 Two easy ways to configure conditions:</div>
+            <div className="font-semibold text-primary">💡 Two ways to configure conditions:</div>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-0.5">
               <li>
-                <strong className="text-foreground">1. Right now in the prompt:</strong> Simply add your condition in plain text above (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em> or <em>&quot;Alert when status changes&quot;</em>). The AI configures it automatically during compilation.
+                <strong className="text-foreground">1. Right now in the prompt:</strong> Simply add your condition in plain text above (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em> or <em>&quot;Alert when status changes&quot;</em>). Specter configures it automatically during compilation.
               </li>
               <li>
                 <strong className="text-foreground">2. Later via Edit Monitor:</strong> Once your monitor completes its initial check and detects the fields, click <strong>Edit</strong> anytime on the dashboard to pick variables and adjust rules with visual dropdowns.
@@ -486,6 +474,41 @@ export function CreateJobForm({
                 clearFieldError('cronExpression');
               }}
               className="font-mono text-sm"
+            />
+          </FormField>
+        )}
+      </div>
+
+      <div className="space-y-3 pt-1">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showCustomWebhook}
+            onChange={(e) => {
+              setShowCustomWebhook(e.target.checked);
+              if (!e.target.checked) {
+                setWebhookUrl('');
+              }
+            }}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+          />
+          <span className="text-sm font-medium text-foreground">
+            Send notifications to a custom webhook URL
+          </span>
+        </label>
+
+        {showCustomWebhook && (
+          <FormField
+            label="Custom Webhook URL"
+            htmlFor="job-webhook"
+            hint="Optional. Destination endpoint URL for this specific monitor."
+          >
+            <Input
+              id="job-webhook"
+              type="url"
+              placeholder="https://your-domain.com/webhook (optional)"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
             />
           </FormField>
         )}
