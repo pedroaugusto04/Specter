@@ -37,6 +37,15 @@ export interface JobRunDto {
   executedAt: string;
 }
 
+export interface DashboardStatsDto {
+  totalJobs: number;
+  activeJobs: number;
+  healingOrCompilingJobs: number;
+  failedOrPausedJobs: number;
+  totalRuns: number;
+  DetectedChangesCount: number;
+}
+
 export const JobMapper = {
   rowToEntity(row: ScrapingJobRow): ScrapingJobEntity {
     return {

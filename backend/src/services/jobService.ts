@@ -35,12 +35,12 @@ export interface UpdateScrapingJobRequest {
 export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
-  private readonly scraperEngine?: IScraperEngine;
+  private readonly scraperEngine: IScraperEngine;
 
   constructor(
     jobRepository: IJobRepository,
     jobScheduler: IJobScheduler,
-    scraperEngine?: IScraperEngine
+    scraperEngine: IScraperEngine
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
@@ -49,9 +49,6 @@ export class JobService {
 
   async probeUrl(targetUrl: string): Promise<{ accessible: boolean; reason?: string }> {
     const normalizedUrl = normalizeUrl(targetUrl);
-    if (!this.scraperEngine) {
-      return { accessible: true };
-    }
 
     try {
       // 30s allows remote residential proxies with JS rendering enough time to solve challenges
@@ -168,7 +165,7 @@ export class JobService {
       patch.cronExpression = trimmedCron;
     }
 
-    if (patch.url !== undefined && patch.url !== existing.url && this.scraperEngine) {
+    if (patch.url !== undefined && patch.url !== existing.url) {
       const probe = await this.probeUrl(patch.url);
       if (!probe.accessible) {
         throw new ValidationError(

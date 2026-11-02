@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { userIntegrations, type UserIntegrationRow } from '../db/schema.js';
+import { IntegrationMapper } from '../mappers/integrationMapper.js';
 import type { UserIntegrationEntity } from '../types/domain.js';
 
 export interface UpsertIntegrationInput {
@@ -17,20 +18,7 @@ export interface IIntegrationRepository {
   upsert(userId: string, input: UpsertIntegrationInput): Promise<UserIntegrationEntity>;
 }
 
-export function integrationRowToEntity(row: UserIntegrationRow): UserIntegrationEntity {
-  return {
-    id: row.id,
-    userId: row.userId,
-    telegramEnabled: row.telegramEnabled,
-    telegramBotToken: row.telegramBotToken ?? null,
-    telegramChatId: row.telegramChatId ?? null,
-    webhookEnabled: row.webhookEnabled,
-    webhookUrl: row.webhookUrl ?? null,
-    webhookSecret: row.webhookSecret ?? null,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
+export const integrationRowToEntity = IntegrationMapper.rowToEntity;
 
 export class DrizzleIntegrationRepository implements IIntegrationRepository {
   private readonly db: Database;

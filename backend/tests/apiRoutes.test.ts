@@ -2,25 +2,68 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { AntiBotBlockedError } from '../src/errors/domainErrors.js';
+import { TelegramNotificationProvider } from '../src/providers/notifications/telegramNotification.provider.js';
+import { WebhookNotificationProvider } from '../src/providers/notifications/webhookNotification.provider.js';
+import { AuthService } from '../src/services/authService.js';
+import { IntegrationService } from '../src/services/integrationService.js';
 import { JobService } from '../src/services/jobService.js';
 import {
+  InMemoryIntegrationRepository,
   InMemoryJobRepository,
+  InMemoryUserRepository,
   MockJobScheduler,
   MockScraperEngine,
 } from './helpers/testDoubles.js';
+
+function extractCookieHeader(setCookieHeader: string | string[] | undefined): string {
+  if (!setCookieHeader) return '';
+  const list = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+  return list
+    .map((cookieStr) => cookieStr.split(';')[0]?.trim())
+    .filter(Boolean)
+    .join('; ');
+}
 
 describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
   let app: FastifyInstance;
   let repository: InMemoryJobRepository;
   let scheduler: MockJobScheduler;
   let scraperEngine: MockScraperEngine;
+  let authCookie: string;
 
   beforeEach(async () => {
     repository = new InMemoryJobRepository();
     scheduler = new MockJobScheduler();
     scraperEngine = new MockScraperEngine();
+
+    const userRepository = new InMemoryUserRepository();
+    const integrationRepository = new InMemoryIntegrationRepository();
+
     const jobService = new JobService(repository, scheduler, scraperEngine);
-    app = await buildApp({ jobService, enableLogger: false });
+    const authService = new AuthService(userRepository, {
+      jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
+    });
+    const telegramProvider = new TelegramNotificationProvider('test-token');
+    const webhookProvider = new WebhookNotificationProvider();
+    const integrationService = new IntegrationService(
+      integrationRepository,
+      telegramProvider,
+      webhookProvider
+    );
+
+    app = await buildApp({
+      jobService,
+      authService,
+      integrationService,
+      enableLogger: false,
+    });
+
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'api-tester@example.com', password: 'password123', name: 'Tester' },
+    });
+    authCookie = extractCookieHeader(regRes.headers['set-cookie']);
   });
 
   afterEach(async () => {
@@ -31,6 +74,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'https://news.example.com/tech',
         userPrompt: 'Extract main headline and article link',
@@ -57,6 +101,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'https://news.example.com/tech',
         userPrompt: 'Extract main headline',
@@ -77,6 +122,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'invalid-url',
         userPrompt: 'abc', // less than 5 chars
@@ -98,6 +144,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'https://shop.example.com/gpu',
         userPrompt: 'Monitor graphics card price',
@@ -111,6 +158,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const pauseRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${jobId}/pause`,
+      headers: { cookie: authCookie },
       payload: { paused: true },
     });
     expect(pauseRes.statusCode).toBe(200);
@@ -120,6 +168,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const resumeRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${jobId}/pause`,
+      headers: { cookie: authCookie },
       payload: { paused: false },
     });
     expect(resumeRes.statusCode).toBe(200);
@@ -128,6 +177,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const triggerRes = await app.inject({
       method: 'POST',
       url: `/api/jobs/${jobId}/trigger`,
+      headers: { cookie: authCookie },
     });
     expect(triggerRes.statusCode).toBe(200);
 
@@ -135,6 +185,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const listRes = await app.inject({
       method: 'GET',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
     });
     expect(listRes.statusCode).toBe(200);
     expect(listRes.json().data).toHaveLength(1);
@@ -143,12 +194,14 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const deleteRes = await app.inject({
       method: 'DELETE',
       url: `/api/jobs/${jobId}`,
+      headers: { cookie: authCookie },
     });
     expect(deleteRes.statusCode).toBe(204);
 
     const checkRes = await app.inject({
       method: 'GET',
       url: `/api/jobs/${jobId}`,
+      headers: { cookie: authCookie },
     });
     expect(checkRes.statusCode).toBe(404);
   });
@@ -158,6 +211,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'https://store.example.com/shoes',
         userPrompt: 'Extract shoe name and current price in USD',
@@ -180,6 +234,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const updateCronRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
+      headers: { cookie: authCookie },
       payload: {
         cronExpression: '0 */12 * * *',
       },
@@ -195,6 +250,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const updatePromptRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
+      headers: { cookie: authCookie },
       payload: {
         userPrompt: 'Extract shoe name, stock quantity, and current price in USD',
       },
@@ -213,6 +269,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const invalidRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
+      headers: { cookie: authCookie },
       payload: {
         cronExpression: '*/2 * * * *', // violates 15m floor
       },
@@ -224,6 +281,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const notFoundRes = await app.inject({
       method: 'PATCH',
       url: '/api/jobs/00000000-0000-0000-0000-000000000000',
+      headers: { cookie: authCookie },
       payload: {
         notificationEmail: 'valid@example.com',
       },
@@ -264,6 +322,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const createJobRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',
+      headers: { cookie: authCookie },
       payload: {
         url: 'https://www.mercadolivre.com.br/produto-xyz',
         userPrompt: 'Extract title and price',

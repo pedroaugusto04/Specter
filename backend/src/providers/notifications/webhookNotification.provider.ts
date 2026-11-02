@@ -1,19 +1,15 @@
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
-import type { AlertPayload } from './notification.interface.js';
+import type {
+  AlertPayload,
+  IWebhookNotificationProvider,
+  WebhookSendOptions,
+  WebhookTestResult,
+} from './notification.interface.js';
 
-export interface WebhookSendOptions {
-  webhookUrl: string;
-  secret?: string | null;
-}
+export type { WebhookSendOptions, WebhookTestResult };
 
-export interface WebhookTestResult {
-  ok: boolean;
-  status?: number;
-  error?: string;
-}
-
-export class WebhookNotificationProvider {
+export class WebhookNotificationProvider implements IWebhookNotificationProvider {
   public readonly name = 'webhook';
 
   async sendAlert(payload: AlertPayload, options: WebhookSendOptions): Promise<void> {

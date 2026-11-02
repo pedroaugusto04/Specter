@@ -26,13 +26,9 @@ function resolveDynamicCallbackUrl(request: FastifyRequest): string {
 export async function resolveAuthenticatedUser(
   request: FastifyRequest,
   reply: FastifyReply,
-  authService?: AuthService,
+  authService: AuthService,
   requireAuth = false
 ): Promise<UserDto | null> {
-  if (!authService) {
-    return null;
-  }
-
   const cookies = parseCookies(request.headers.cookie);
   const session = await authService.resolveSession(
     cookies[ACCESS_COOKIE_NAME],

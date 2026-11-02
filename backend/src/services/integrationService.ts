@@ -2,38 +2,39 @@ import {
   type IIntegrationRepository,
   type UpsertIntegrationInput,
 } from '../repositories/integrationRepository.js';
+import type {
+  ITelegramNotificationProvider,
+  IWebhookNotificationProvider,
+  TelegramTestResult,
+  WebhookTestResult,
+} from '../providers/notifications/notification.interface.js';
 import {
-  TelegramNotificationProvider,
-  type TelegramTestResult,
-} from '../providers/notifications/telegramNotification.provider.js';
-import {
-  WebhookNotificationProvider,
-  type WebhookTestResult,
-} from '../providers/notifications/webhookNotification.provider.js';
-import type { UserIntegrationEntity } from '../types/domain.js';
+  IntegrationMapper,
+  type UserIntegrationsDto,
+} from '../mappers/integrationMapper.js';
 
 export class IntegrationService {
   private readonly integrationRepository: IIntegrationRepository;
-  private readonly telegramProvider: TelegramNotificationProvider;
-  private readonly webhookProvider: WebhookNotificationProvider;
+  private readonly telegramProvider: ITelegramNotificationProvider;
+  private readonly webhookProvider: IWebhookNotificationProvider;
 
   constructor(
     integrationRepository: IIntegrationRepository,
-    telegramProvider?: TelegramNotificationProvider,
-    webhookProvider?: WebhookNotificationProvider
+    telegramProvider: ITelegramNotificationProvider,
+    webhookProvider: IWebhookNotificationProvider
   ) {
     this.integrationRepository = integrationRepository;
-    this.telegramProvider = telegramProvider ?? new TelegramNotificationProvider();
-    this.webhookProvider = webhookProvider ?? new WebhookNotificationProvider();
+    this.telegramProvider = telegramProvider;
+    this.webhookProvider = webhookProvider;
   }
 
-  async getIntegrations(userId: string): Promise<UserIntegrationEntity> {
+  async getIntegrations(userId: string): Promise<UserIntegrationsDto> {
     const existing = await this.integrationRepository.findByUserId(userId);
     if (existing) {
-      return existing;
+      return IntegrationMapper.entityToDto(existing);
     }
 
-    return {
+    return IntegrationMapper.entityToDto({
       id: '',
       userId,
       telegramEnabled: false,
@@ -44,14 +45,15 @@ export class IntegrationService {
       webhookSecret: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
+    });
   }
 
   async updateIntegrations(
     userId: string,
     input: UpsertIntegrationInput
-  ): Promise<UserIntegrationEntity> {
-    return this.integrationRepository.upsert(userId, input);
+  ): Promise<UserIntegrationsDto> {
+    const updated = await this.integrationRepository.upsert(userId, input);
+    return IntegrationMapper.entityToDto(updated);
   }
 
   async testTelegram(input: {

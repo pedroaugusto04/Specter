@@ -1,15 +1,13 @@
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
-import type { AlertPayload } from './notification.interface.js';
+import type {
+  AlertPayload,
+  ITelegramNotificationProvider,
+  TelegramSendOptions,
+  TelegramTestResult,
+} from './notification.interface.js';
 
-export interface TelegramSendOptions {
-  chatId: string;
-}
-
-export interface TelegramTestResult {
-  ok: boolean;
-  error?: string;
-}
+export type { TelegramSendOptions, TelegramTestResult };
 
 function escapeHtml(str: string): string {
   return str
@@ -24,7 +22,7 @@ function formatValue(val: unknown): string {
   return escapeHtml(String(val));
 }
 
-export class TelegramNotificationProvider {
+export class TelegramNotificationProvider implements ITelegramNotificationProvider {
   public readonly name = 'telegram';
   private readonly botToken: string;
 

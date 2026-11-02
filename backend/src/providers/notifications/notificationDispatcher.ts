@@ -1,27 +1,30 @@
 import type { IIntegrationRepository } from '../../repositories/integrationRepository.js';
 import { logger } from '../../utils/logger.js';
-import type { AlertPayload, INotificationProvider } from './notification.interface.js';
-import { TelegramNotificationProvider } from './telegramNotification.provider.js';
-import { WebhookNotificationProvider } from './webhookNotification.provider.js';
+import type {
+  AlertPayload,
+  INotificationProvider,
+  ITelegramNotificationProvider,
+  IWebhookNotificationProvider,
+} from './notification.interface.js';
 
 export interface NotificationDispatcherDeps {
   emailProvider: INotificationProvider;
-  telegramProvider?: TelegramNotificationProvider;
-  webhookProvider?: WebhookNotificationProvider;
+  telegramProvider: ITelegramNotificationProvider;
+  webhookProvider: IWebhookNotificationProvider;
   integrationRepository: IIntegrationRepository;
 }
 
 export class NotificationDispatcher implements INotificationProvider {
   public readonly name = 'composite-dispatcher';
   public readonly emailProvider: INotificationProvider;
-  public readonly telegramProvider: TelegramNotificationProvider;
-  public readonly webhookProvider: WebhookNotificationProvider;
+  public readonly telegramProvider: ITelegramNotificationProvider;
+  public readonly webhookProvider: IWebhookNotificationProvider;
   public readonly integrationRepository: IIntegrationRepository;
 
   constructor(deps: NotificationDispatcherDeps) {
     this.emailProvider = deps.emailProvider;
-    this.telegramProvider = deps.telegramProvider ?? new TelegramNotificationProvider();
-    this.webhookProvider = deps.webhookProvider ?? new WebhookNotificationProvider();
+    this.telegramProvider = deps.telegramProvider;
+    this.webhookProvider = deps.webhookProvider;
     this.integrationRepository = deps.integrationRepository;
   }
 

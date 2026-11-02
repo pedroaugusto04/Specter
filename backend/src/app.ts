@@ -10,8 +10,8 @@ import type { JobService } from './services/jobService.js';
 
 export interface BuildAppOptions {
   jobService: JobService;
-  authService?: AuthService;
-  integrationService?: IntegrationService;
+  authService: AuthService;
+  integrationService: IntegrationService;
   enableLogger?: boolean;
 }
 
@@ -26,12 +26,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
-  if (options.authService) {
-    registerAuthRoutes(app, options.authService);
-  }
-  if (options.integrationService) {
-    registerIntegrationRoutes(app, options.integrationService, options.authService);
-  }
+  registerAuthRoutes(app, options.authService);
+  registerIntegrationRoutes(app, options.integrationService, options.authService);
   registerJobRoutes(app, options.jobService, options.authService);
 
   return app;

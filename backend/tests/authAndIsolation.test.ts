@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/services/authService.js';
+import { IntegrationService } from '../src/services/integrationService.js';
 import { JobService } from '../src/services/jobService.js';
+import { TelegramNotificationProvider } from '../src/providers/notifications/telegramNotification.provider.js';
+import { WebhookNotificationProvider } from '../src/providers/notifications/webhookNotification.provider.js';
 import {
+  InMemoryIntegrationRepository,
   InMemoryJobRepository,
   InMemoryUserRepository,
   MockJobScheduler,
@@ -40,8 +44,21 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       refreshExpiresSeconds: 604800,
       cookieSecure: true,
     });
+    const integrationRepository = new InMemoryIntegrationRepository();
+    const telegramProvider = new TelegramNotificationProvider('test-token');
+    const webhookProvider = new WebhookNotificationProvider();
+    const integrationService = new IntegrationService(
+      integrationRepository,
+      telegramProvider,
+      webhookProvider
+    );
 
-    app = await buildApp({ jobService, authService, enableLogger: false });
+    app = await buildApp({
+      jobService,
+      authService,
+      integrationService,
+      enableLogger: false,
+    });
   });
 
   afterEach(async () => {

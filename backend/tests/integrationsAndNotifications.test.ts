@@ -6,12 +6,15 @@ import { TelegramNotificationProvider } from '../src/providers/notifications/tel
 import { WebhookNotificationProvider } from '../src/providers/notifications/webhookNotification.provider.js';
 import { IntegrationService } from '../src/services/integrationService.js';
 import { JobService } from '../src/services/jobService.js';
+import { AuthService } from '../src/services/authService.js';
 import type { AlertPayload } from '../src/providers/notifications/notification.interface.js';
 import {
   InMemoryIntegrationRepository,
   InMemoryJobRepository,
+  InMemoryUserRepository,
   MockJobScheduler,
   MockNotificationProvider,
+  MockScraperEngine,
 } from './helpers/testDoubles.js';
 
 describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
@@ -173,6 +176,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const dispatcher = new NotificationDispatcher({
       emailProvider,
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
+      webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo as any,
     });
 
@@ -196,6 +200,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const dispatcher = new NotificationDispatcher({
       emailProvider,
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
+      webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo as any,
     });
 
@@ -211,12 +216,23 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
   it('Integration HTTP REST endpoints allow retrieving and updating integration settings', async () => {
     const jobRepo = new InMemoryJobRepository();
     const jobScheduler = new MockJobScheduler();
+    const scraperEngine = new MockScraperEngine();
     const integrationRepo = new InMemoryIntegrationRepository();
-    const jobService = new JobService(jobRepo as any, jobScheduler);
-    const integrationService = new IntegrationService(integrationRepo as any);
+    const userRepo = new InMemoryUserRepository();
+    const authService = new AuthService(userRepo);
+    const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
+    const webhookProvider = new WebhookNotificationProvider();
+
+    const jobService = new JobService(jobRepo as any, jobScheduler, scraperEngine);
+    const integrationService = new IntegrationService(
+      integrationRepo as any,
+      telegramProvider,
+      webhookProvider
+    );
 
     const app = await buildApp({
       jobService,
+      authService,
       integrationService,
       enableLogger: false,
     });

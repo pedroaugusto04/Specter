@@ -18,3 +18,35 @@ export interface INotificationProvider {
   readonly name: string;
   sendAlert(payload: AlertPayload): Promise<void>;
 }
+
+export interface TelegramSendOptions {
+  chatId: string;
+}
+
+export interface TelegramTestResult {
+  ok: boolean;
+  error?: string;
+}
+
+export interface ITelegramNotificationProvider {
+  readonly name: string;
+  sendAlert(payload: AlertPayload, options: TelegramSendOptions): Promise<void>;
+  sendTestMessage(input: { chatId: string }): Promise<TelegramTestResult>;
+}
+
+export interface WebhookSendOptions {
+  webhookUrl: string;
+  secret?: string | null;
+}
+
+export interface WebhookTestResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
+export interface IWebhookNotificationProvider {
+  readonly name: string;
+  sendAlert(payload: AlertPayload, options: WebhookSendOptions): Promise<void>;
+  sendTestEvent(input: { webhookUrl: string; secret?: string | null }): Promise<WebhookTestResult>;
+}

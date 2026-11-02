@@ -11,29 +11,18 @@ import {
 export function registerIntegrationRoutes(
   app: FastifyInstance,
   integrationService: IntegrationService,
-  authService?: AuthService
+  authService: AuthService
 ): void {
   app.get('/api/integrations', async (request, reply) => {
-    let userId = 'default-user';
-    if (authService) {
-      const user = await resolveAuthenticatedUser(request, reply, authService, false);
-      if (user) {
-        userId = user.id;
-      }
-    }
-
+    const user = await resolveAuthenticatedUser(request, reply, authService, false);
+    const userId = user?.id ?? 'default-user';
     const data = await integrationService.getIntegrations(userId);
     return { data };
   });
 
   app.put('/api/integrations', async (request, reply) => {
-    let userId = 'default-user';
-    if (authService) {
-      const user = await resolveAuthenticatedUser(request, reply, authService, false);
-      if (user) {
-        userId = user.id;
-      }
-    }
+    const user = await resolveAuthenticatedUser(request, reply, authService, false);
+    const userId = user?.id ?? 'default-user';
 
     const input = updateIntegrationsSchema.parse(request.body);
     const updated = await integrationService.updateIntegrations(userId, {
@@ -54,7 +43,9 @@ export function registerIntegrationRoutes(
     if (!result.ok) {
       return reply.status(400).send({
         error: 'TELEGRAM_TEST_FAILED',
-        message: result.error ?? 'Telegram notification is currently unavailable. Please verify your Chat ID or try again later.',
+        message:
+          result.error ??
+          'Telegram notification is currently unavailable. Please verify your Chat ID or try again later.',
       });
     }
 
@@ -68,7 +59,9 @@ export function registerIntegrationRoutes(
     if (!result.ok) {
       return reply.status(400).send({
         error: 'WEBHOOK_TEST_FAILED',
-        message: result.error ?? 'Webhook delivery failed. Please verify that the endpoint URL is accessible.',
+        message:
+          result.error ??
+          'Webhook delivery failed. Please verify that the endpoint URL is accessible.',
         status: result.status,
       });
     }
