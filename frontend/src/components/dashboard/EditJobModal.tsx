@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Check, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, HelpCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
@@ -27,6 +27,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
   const [useCustomCron, setUseCustomCron] = React.useState(false);
   const [triggerRules, setTriggerRules] = React.useState<TriggerRule[]>([]);
   const [triggerMatchMode, setTriggerMatchMode] = React.useState<'any' | 'all'>('all');
+  const [showTriggerHelp, setShowTriggerHelp] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -269,12 +270,23 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         <div className="space-y-3 pt-2 border-t border-border">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <span>Conditional Alert Triggers</span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  (Zero-token rule evaluation)
-                </span>
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Conditional Alert Triggers</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (Zero-token rule evaluation)
+                  </span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowTriggerHelp((prev) => !prev)}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted"
+                  title="How do price and conditional alert triggers work?"
+                  aria-label="Toggle conditional alert trigger info"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Only send notifications when extracted fields meet these conditions.
               </p>
@@ -292,6 +304,43 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               </div>
             )}
           </div>
+
+          {/* Collapsible Info / Help Box */}
+          {showTriggerHelp && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2 text-xs text-muted-foreground transition-all">
+              <div className="flex items-center justify-between font-medium text-foreground">
+                <span className="flex items-center gap-1.5">
+                  <HelpCircle className="h-3.5 w-3.5 text-primary" />
+                  How Price & Field Triggers Work
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowTriggerHelp(false)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <p>
+                By default, Specter notifies you whenever any monitored content changes. With conditional triggers, you only receive alerts when specific criteria are satisfied (e.g. price drops below a threshold).
+              </p>
+              <div className="space-y-1 pt-1 text-[11px]">
+                <div className="font-semibold text-foreground">Available Operators:</div>
+                <ul className="list-disc list-inside space-y-0.5 pl-1">
+                  <li><code className="text-foreground font-mono">&lt; Less than (lt)</code> / <code className="text-foreground font-mono">&le; (lte)</code>: Trigger when numeric price drops (e.g. <span className="font-mono text-foreground">price &lt; 150</span>).</li>
+                  <li><code className="text-foreground font-mono">&gt; Greater than (gt)</code> / <code className="text-foreground font-mono">&ge; (gte)</code>: Trigger on target increases.</li>
+                  <li><code className="text-foreground font-mono">== (eq)</code> / <code className="text-foreground font-mono">!= (neq)</code>: Exact equality for numbers, booleans, or text.</li>
+                  <li><code className="text-foreground font-mono">Contains / Does not contain</code>: Substring matching (e.g. <span className="font-mono text-foreground">status contains &quot;in stock&quot;</span>).</li>
+                </ul>
+              </div>
+              <div className="rounded border border-border/60 bg-background/50 p-2 font-mono text-[11px] text-foreground">
+                <strong>Example:</strong> Alert when a product price drops below $250.00:
+                <div className="mt-1 text-muted-foreground">
+                  Field: <span className="text-foreground">price</span> &nbsp;|&nbsp; Operator: <span className="text-foreground">&lt; Less than</span> &nbsp;|&nbsp; Value: <span className="text-foreground">250</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {triggerRules.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">

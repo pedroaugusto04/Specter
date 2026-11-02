@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, Loader2, Plus } from 'lucide-react';
+import { CheckCircle2, HelpCircle, Loader2, Plus } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +45,7 @@ export function CreateJobForm({
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
+  const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -342,11 +343,35 @@ export function CreateJobForm({
       </FormField>
 
       <FormField
-        label="Extraction Instructions"
+        label={
+          <div className="flex items-center gap-1.5">
+            <span>Extraction Instructions</span>
+            <button
+              type="button"
+              onClick={() => setShowTriggerInfo((prev) => !prev)}
+              className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted"
+              title="Tip: You can filter alerts by price thresholds (<, >, etc.)"
+              aria-label="Toggle conditional trigger tips"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        }
         htmlFor="user-prompt"
         required
         error={fieldErrors.userPrompt}
-        hint="Describe the fields and data attributes to extract (min. 5 chars)."
+        hint={
+          <span>
+            Describe the fields and data attributes to extract (min. 5 chars).
+            <button
+              type="button"
+              onClick={() => setShowTriggerInfo((prev) => !prev)}
+              className="ml-1 text-primary hover:underline font-medium inline-flex items-center gap-0.5"
+            >
+              Learn about price triggers
+            </button>
+          </span>
+        }
       >
         <Textarea
           id="user-prompt"
@@ -361,6 +386,43 @@ export function CreateJobForm({
           rows={3}
         />
       </FormField>
+
+      {/* Info Callout for Price / Conditional Triggers */}
+      {showTriggerInfo && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between font-medium text-foreground">
+            <span className="flex items-center gap-1.5">
+              <HelpCircle className="h-3.5 w-3.5 text-primary" />
+              Price Difference & Conditional Alert Triggers
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowTriggerInfo(false)}
+              className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Dismiss
+            </button>
+          </div>
+          <p>
+            Once your monitor is created and its fields (such as <code className="text-foreground font-mono">price</code>) are discovered, you can set granular alert triggers so notifications only fire when specific conditions are met.
+          </p>
+          <div className="space-y-1 pt-1 text-[11px]">
+            <div className="font-semibold text-foreground">Supported comparison operators:</div>
+            <ul className="list-disc list-inside space-y-0.5 pl-1">
+              <li><code className="text-foreground font-mono">&lt; Less than (lt)</code> / <code className="text-foreground font-mono">&le; (lte)</code>: Trigger when price drops below a threshold.</li>
+              <li><code className="text-foreground font-mono">&gt; Greater than (gt)</code> / <code className="text-foreground font-mono">&ge; (gte)</code>: Trigger when price exceeds a threshold.</li>
+              <li><code className="text-foreground font-mono">== (eq)</code> / <code className="text-foreground font-mono">!= (neq)</code>: Exact equality for price, stock, or status.</li>
+              <li><code className="text-foreground font-mono">Contains / Does not contain</code>: Substring checks (e.g. availability).</li>
+            </ul>
+          </div>
+          <div className="rounded border border-border/60 bg-background/50 p-2 font-mono text-[11px] text-foreground">
+            <strong>Example rule:</strong> &quot;Notify me only if <span className="text-primary font-semibold">price &lt; 299.99</span>&quot;
+            <div className="mt-1 text-[11px] text-muted-foreground font-sans">
+              You can configure this anytime by clicking <strong>Edit</strong> on any active monitor.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <FormField

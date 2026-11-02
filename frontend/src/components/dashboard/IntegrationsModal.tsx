@@ -292,7 +292,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     <div className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-sky-500 shrink-0" />
                       <span className="text-xs font-semibold text-foreground">
-                        Como conectar o bot do Telegram
+                        How to connect the Telegram bot
                       </span>
                     </div>
                     {telegramBotUsername && (
@@ -312,7 +312,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     <li>
                       {telegramBotUsername ? (
                         <span>
-                          Abra o bot{' '}
+                          Open the bot{' '}
                           <a
                             href={`https://t.me/${telegramBotUsername}`}
                             target="_blank"
@@ -321,16 +321,16 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                           >
                             @{telegramBotUsername}
                           </a>{' '}
-                          e clique em <strong className="text-foreground">Iniciar (/start)</strong>. O Telegram exige que você inicie a conversa antes de ele permitir que o bot envie mensagens.
+                          and click <strong className="text-foreground">Start (/start)</strong>. Telegram requires you to start the chat before it allows the bot to send you messages.
                         </span>
                       ) : (
                         <span>
-                          Abra o bot do Specter no Telegram e envie <strong className="text-foreground">/start</strong>. O Telegram proíbe bots de enviarem mensagens para quem nunca interagiu com eles.
+                          Open the Specter bot on Telegram and send <strong className="text-foreground">/start</strong>. Telegram prohibits bots from sending messages to users who haven&apos;t started a conversation first.
                         </span>
                       )}
                     </li>
                     <li>
-                      Descubra o seu <strong className="text-foreground">Chat ID</strong> (você pode verificar seu ID enviando uma mensagem para o{' '}
+                      Discover your <strong className="text-foreground">Chat ID</strong> (you can check your ID by sending a message to{' '}
                       <a
                         href="https://t.me/userinfobot"
                         target="_blank"
@@ -343,7 +343,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                       ).
                     </li>
                     <li>
-                      Cole o Chat ID no campo abaixo e clique em <strong className="text-foreground">Send Test Message</strong>.
+                      Paste your Chat ID in the field below and click <strong className="text-foreground">Send Test Message</strong>.
                     </li>
                   </ol>
 
@@ -356,7 +356,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                         className="inline-flex items-center justify-center gap-1.5 w-full rounded-md border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 px-3 py-1.5 text-xs font-medium text-sky-500 transition-colors"
                       >
                         <Send className="h-3.5 w-3.5" />
-                        <span>Iniciar conversa com @{telegramBotUsername} no Telegram</span>
+                        <span>Start conversation with @{telegramBotUsername} on Telegram</span>
                         <ExternalLink className="h-3 w-3 ml-0.5" />
                       </a>
                     </div>
@@ -389,7 +389,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {telegramBotUsername ? (
                       <>
-                        Dica: Inicie em{' '}
+                        Tip: Start a chat at{' '}
                         <a
                           href={`https://t.me/${telegramBotUsername}`}
                           target="_blank"
@@ -398,7 +398,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                         >
                           @{telegramBotUsername}
                         </a>{' '}
-                        e descubra seu Chat ID com{' '}
+                        and find your Chat ID with{' '}
                         <a
                           href="https://t.me/userinfobot"
                           target="_blank"
@@ -410,7 +410,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                       </>
                     ) : (
                       <>
-                        Dica: Envie <span className="font-mono text-foreground">/start</span> para o bot e descubra seu Chat ID com{' '}
+                        Tip: Send <span className="font-mono text-foreground">/start</span> to the bot and find your Chat ID with{' '}
                         <a
                           href="https://t.me/userinfobot"
                           target="_blank"
