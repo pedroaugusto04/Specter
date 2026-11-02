@@ -109,22 +109,26 @@ export class JobService {
     return JobMapper.entityToDto(createdEntity);
   }
 
-  async listJobs(statusFilter?: JobStatus): Promise<ScrapingJobDto[]> {
-    const entities = await this.jobRepository.findAll(statusFilter);
+  async listJobs(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobDto[]> {
+    const entities = await this.jobRepository.findAll(statusFilter, userId);
     return entities.map(JobMapper.entityToDto);
   }
 
-  async getJobById(id: string): Promise<ScrapingJobDto> {
+  async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
     const entity = await this.jobRepository.findById(id);
-    if (!entity) {
+    if (!entity || (userId && entity.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
     return JobMapper.entityToDto(entity);
   }
 
-  async updateJob(id: string, request: UpdateScrapingJobRequest): Promise<ScrapingJobDto> {
+  async updateJob(
+    id: string,
+    request: UpdateScrapingJobRequest,
+    userId?: string
+  ): Promise<ScrapingJobDto> {
     const existing = await this.jobRepository.findById(id);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
@@ -202,9 +206,9 @@ export class JobService {
     return JobMapper.entityToDto(finalEntity ?? updated);
   }
 
-  async setJobPauseState(id: string, paused: boolean): Promise<ScrapingJobDto> {
+  async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
     const existing = await this.jobRepository.findById(id);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
@@ -236,9 +240,12 @@ export class JobService {
     return JobMapper.entityToDto(updated ?? existing);
   }
 
-  async triggerManualScrape(id: string): Promise<{ queued: boolean; mode: 'scrape' | 'compile' }> {
+  async triggerManualScrape(
+    id: string,
+    userId?: string
+  ): Promise<{ queued: boolean; mode: 'scrape' | 'compile' }> {
     const existing = await this.jobRepository.findById(id);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
@@ -251,9 +258,9 @@ export class JobService {
     return { queued: true, mode: 'scrape' };
   }
 
-  async triggerManualRecompile(id: string): Promise<ScrapingJobDto> {
+  async triggerManualRecompile(id: string, userId?: string): Promise<ScrapingJobDto> {
     const existing = await this.jobRepository.findById(id);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
@@ -267,9 +274,9 @@ export class JobService {
     return JobMapper.entityToDto(updated ?? existing);
   }
 
-  async deleteJob(id: string): Promise<void> {
+  async deleteJob(id: string, userId?: string): Promise<void> {
     const existing = await this.jobRepository.findById(id);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
@@ -279,10 +286,11 @@ export class JobService {
 
   async getJobRuns(
     jobId: string,
-    limit = 50
+    limit = 50,
+    userId?: string
   ): Promise<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }> {
     const existing = await this.jobRepository.findById(jobId);
-    if (!existing) {
+    if (!existing || (userId && existing.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${jobId}`);
     }
 
@@ -301,7 +309,7 @@ export class JobService {
     return { runs, latestDiff };
   }
 
-  async getDashboardStats(): Promise<DashboardStats> {
-    return this.jobRepository.getStats();
+  async getDashboardStats(userId?: string): Promise<DashboardStats> {
+    return this.jobRepository.getStats(userId);
   }
 }

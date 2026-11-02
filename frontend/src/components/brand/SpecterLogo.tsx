@@ -14,8 +14,8 @@ export function SpecterLogo({
 }: SpecterLogoProps) {
   const sizeMap = {
     sm: { icon: 'h-6 w-6 rounded-md', text: 'text-sm' },
-    md: { icon: 'h-7 w-7 rounded-md', text: 'text-[15px]' },
-    lg: { icon: 'h-9 w-9 rounded-lg', text: 'text-lg' },
+    md: { icon: 'h-8 w-8 rounded-lg', text: 'text-base' },
+    lg: { icon: 'h-10 w-10 rounded-lg', text: 'text-lg' },
   };
 
   const currentSize = sizeMap[size];

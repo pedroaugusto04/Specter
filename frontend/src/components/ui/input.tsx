@@ -11,7 +11,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ref={ref}
       aria-invalid={hasError ? true : props['aria-invalid']}
       className={cn(
-        'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
+        'flex h-10 w-full rounded-md border border-input bg-background px-3.5 py-2 text-sm transition-colors text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
         hasError &&
           'border-red-600 text-foreground placeholder:text-muted-foreground focus-visible:border-red-600 focus-visible:ring-red-600/20 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20',
         className
@@ -32,7 +32,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       ref={ref}
       aria-invalid={hasError ? true : props['aria-invalid']}
       className={cn(
-        'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
+        'flex min-h-[96px] w-full rounded-md border border-input bg-background px-3.5 py-2.5 text-sm transition-colors text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
         hasError &&
           'border-red-600 text-foreground placeholder:text-muted-foreground focus-visible:border-red-600 focus-visible:ring-red-600/20 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20',
         className

@@ -49,6 +49,19 @@ export const envSchema = z.object({
   NOTIFICATION_PROVIDER: z.enum(['resend', 'console']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),
   NOTIFICATION_FROM_EMAIL: z.string().min(1).default('onboarding@resend.dev'),
+
+  // Authentication & Stateless JWT Cookies
+  JWT_SECRET: z
+    .string()
+    .min(16, 'JWT_SECRET must contain at least 16 characters')
+    .default('specter-dev-jwt-secret-change-in-production'),
+  JWT_ACCESS_EXPIRES_SECONDS: z.coerce.number().int().min(60).default(900),
+  JWT_REFRESH_EXPIRES_SECONDS: z.coerce.number().int().min(300).default(604800),
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+  FRONTEND_URL: z.string().min(1).default('http://localhost:3000'),
+  GOOGLE_CLIENT_ID: z.string().optional().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
+  GOOGLE_CALLBACK_URL: z.string().optional().default(''),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -65,7 +78,11 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 
   const parsed = result.data;
 
-  if (parsed.NOTIFICATION_PROVIDER === 'resend' && !parsed.RESEND_API_KEY) {
+  if (
+    parsed.NOTIFICATION_PROVIDER === 'resend' &&
+    !parsed.RESEND_API_KEY &&
+    parsed.NODE_ENV !== 'test'
+  ) {
     throw new Error(
       'Invalid environment configuration:\n  - RESEND_API_KEY: Required when NOTIFICATION_PROVIDER is set to "resend"'
     );

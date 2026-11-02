@@ -14,11 +14,11 @@ function escapeHtml(value: unknown): string {
 function formatDate(date: Date | string | undefined): string {
   const d = date ? new Date(date) : new Date();
   try {
-    return new Intl.DateTimeFormat('pt-BR', {
+    return new Intl.DateTimeFormat('en-US', {
       dateStyle: 'long',
       timeStyle: 'medium',
-      timeZone: 'America/Sao_Paulo',
-    }).format(d) + ' (Horário de Brasília)';
+      timeZone: 'UTC',
+    }).format(d) + ' (UTC)';
   } catch {
     return d.toISOString();
   }
@@ -31,7 +31,7 @@ function formatDate(date: Date | string | undefined): string {
 export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; text: string } {
   const formattedDate = formatDate(payload.detectedAt);
   const totalChanges = payload.diffSummary.totalChanges;
-  const changeNoun = totalChanges === 1 ? 'alteração detectada' : 'alterações detectadas';
+  const changeNoun = totalChanges === 1 ? 'change detected' : 'changes detected';
 
   const allChanges = [
     ...payload.diffSummary.modified,
@@ -46,15 +46,15 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
       let currValueHtml = '';
 
       if (change.changeType === 'MODIFIED') {
-        badgeHtml = `<span style="display:inline-block;background-color:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Modificado</span>`;
+        badgeHtml = `<span style="display:inline-block;background-color:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Modified</span>`;
         prevValueHtml = `<span style="color:#71717a;text-decoration:line-through;font-size:13px;word-break:break-all;">${escapeHtml(change.previousValue)}</span>`;
         currValueHtml = `<span style="color:#09090b;font-weight:600;font-size:13px;background-color:#fef9c3;padding:2px 6px;border-radius:4px;word-break:break-all;">${escapeHtml(change.currentValue)}</span>`;
       } else if (change.changeType === 'ADDED') {
-        badgeHtml = `<span style="display:inline-block;background-color:#dcfce7;color:#166534;border:1px solid #bbf7d0;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Novo</span>`;
+        badgeHtml = `<span style="display:inline-block;background-color:#dcfce7;color:#166534;border:1px solid #bbf7d0;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">New</span>`;
         prevValueHtml = `<span style="color:#a1a1aa;font-size:13px;">—</span>`;
         currValueHtml = `<span style="color:#15803d;font-weight:600;font-size:13px;background-color:#dcfce7;padding:2px 6px;border-radius:4px;word-break:break-all;">${escapeHtml(change.currentValue)}</span>`;
       } else {
-        badgeHtml = `<span style="display:inline-block;background-color:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Removido</span>`;
+        badgeHtml = `<span style="display:inline-block;background-color:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Removed</span>`;
         prevValueHtml = `<span style="color:#dc2626;text-decoration:line-through;font-size:13px;word-break:break-all;">${escapeHtml(change.previousValue)}</span>`;
         currValueHtml = `<span style="color:#a1a1aa;font-size:13px;">—</span>`;
       }
@@ -70,13 +70,13 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
 
   const promptBlockHtml = payload.userPrompt
     ? `<tr>
-        <td style="padding:6px 0;font-size:12px;color:#71717a;width:120px;font-weight:500;">Instrução / Prompt:</td>
+        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Instruction / Prompt:</td>
         <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${escapeHtml(payload.userPrompt)}</td>
        </tr>`
     : '';
 
   const html = `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -103,7 +103,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                         </td>
                         <td style="vertical-align:middle;">
                           <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;line-height:1;">SPECTER</div>
-                          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;color:#a1a1aa;text-transform:uppercase;margin-top:4px;">Monitor de Extração Inteligente</div>
+                          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;color:#a1a1aa;text-transform:uppercase;margin-top:4px;">Intelligent Extraction Monitor</div>
                         </td>
                       </tr>
                     </table>
@@ -122,10 +122,10 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
           <tr>
             <td style="padding:32px 32px 20px 32px;">
               <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.4px;line-height:1.3;">
-                Mudança detectada no alvo monitorado
+                Change detected on monitored target
               </h1>
               <p style="margin:0 0 24px 0;font-size:14px;color:#52525b;line-height:1.6;">
-                O Specter identificou divergências nos atributos extraídos em relação à execução anterior. Confira os dados atualizados abaixo:
+                Specter identified differences in the extracted attributes compared to the previous execution. Review the updated data below:
               </p>
 
               <!-- Target Metadata Card -->
@@ -134,7 +134,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                   <td>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:120px;font-weight:500;">Alvo Monitorado:</td>
+                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Monitored Target:</td>
                         <td style="padding:6px 0;font-size:13px;word-break:break-all;">
                           <a href="${escapeHtml(payload.targetUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:none;">
                             ${escapeHtml(payload.targetUrl)} &#x2197;
@@ -143,11 +143,11 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                       </tr>
                       ${promptBlockHtml}
                       <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:120px;font-weight:500;">Data do Registro:</td>
+                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Detected At:</td>
                         <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${formattedDate}</td>
                       </tr>
                       <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:120px;font-weight:500;">ID da Tarefa:</td>
+                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Job ID:</td>
                         <td style="padding:6px 0;font-size:12px;color:#71717a;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${escapeHtml(payload.jobId)}</td>
                       </tr>
                     </table>
@@ -158,15 +158,15 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
               <!-- ATTRIBUTES DIFF TABLE -->
               <div style="margin-bottom:28px;">
                 <h2 style="margin:0 0 12px 0;font-size:15px;font-weight:700;color:#09090b;">
-                  Resumo das Alterações (${totalChanges})
+                  Change Summary (${totalChanges})
                 </h2>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;background-color:#ffffff;">
                   <thead>
                     <tr style="background-color:#fafafa;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.5px;">
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Atributo</th>
+                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Attribute</th>
                       <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Status</th>
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Valor Anterior</th>
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Novo Valor</th>
+                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Previous Value</th>
+                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">New Value</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -178,7 +178,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
               <!-- FULL SNAPSHOT (JSON ACCORDION) -->
               <details style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
                 <summary style="font-size:13px;font-weight:600;color:#3f3f46;cursor:pointer;user-select:none;">
-                  &#x1F4CB; Ver snapshot completo dos dados extraídos (JSON)
+                  &#x1F4CB; View full extracted data snapshot (JSON)
                 </summary>
                 <div style="margin-top:12px;">
                   <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;background-color:#09090b;color:#fafafa;padding:14px;border-radius:6px;overflow-x:auto;line-height:1.5;">${escapeHtml(JSON.stringify(payload.data, null, 2))}</pre>
@@ -194,11 +194,11 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                 <tr>
                   <td align="center">
                     <div style="font-size:13px;font-weight:700;color:#f4f4f5;margin-bottom:6px;">
-                      SPECTER &bull; Sistema Autônomo de Monitoramento Web
+                      SPECTER &bull; Autonomous Web Monitoring System
                     </div>
                     <div style="font-size:12px;color:#a1a1aa;line-height:1.6;margin-bottom:12px;">
-                      Você recebeu esta notificação porque este e-mail foi cadastrado para receber alertas desta tarefa.<br>
-                      Enviado com alta confiabilidade via Resend.
+                      You received this notification because this email was configured to receive alerts for this monitor.<br>
+                      Delivered reliably via Resend.
                     </div>
                     <div style="font-size:11px;color:#71717a;">
                       Job ID: <code style="color:#a1a1aa;">${escapeHtml(payload.jobId)}</code> &bull; ${formattedDate}
@@ -211,11 +211,11 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
 
         </table>
 
-        <!-- Legal / Unsubscribe Note -->
+        <!-- Legal / Automated Note -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;margin-top:16px;">
           <tr>
             <td align="center" style="font-size:11px;color:#a1a1aa;line-height:1.5;">
-              Este é um e-mail transacional automatizado gerado pelo seu ambiente Specter. Por favor, não responda a esta mensagem.
+              This is an automated transactional email generated by your Specter environment. Please do not reply to this message.
             </td>
           </tr>
         </table>
@@ -227,21 +227,21 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
 </html>`;
 
   const textLines = [
-    `[SPECTER] ${totalChanges} ${changeNoun.toUpperCase()} NO ALVO MONITORADO`,
+    `[SPECTER] ${totalChanges} ${changeNoun.toUpperCase()} ON MONITORED TARGET`,
     `============================================================`,
     ``,
-    `Alvo: ${payload.targetUrl}`,
-    payload.userPrompt ? `Instrução: ${payload.userPrompt}` : null,
-    `Data: ${formattedDate}`,
+    `Target: ${payload.targetUrl}`,
+    payload.userPrompt ? `Instruction: ${payload.userPrompt}` : null,
+    `Date: ${formattedDate}`,
     `Job ID: ${payload.jobId}`,
     ``,
-    `RESUMO DAS ALTERAÇÕES:`,
+    `CHANGE SUMMARY:`,
     `------------------------------------------------------------`,
     payload.diffSummary.summaryText,
     ``,
     `------------------------------------------------------------`,
-    `Specter - Monitor de Extração Inteligente`,
-    `Mensagem transacional automática via Resend`,
+    `Specter - Intelligent Extraction Monitor`,
+    `Automated transactional notification via Resend`,
   ]
     .filter(Boolean)
     .join('\n');

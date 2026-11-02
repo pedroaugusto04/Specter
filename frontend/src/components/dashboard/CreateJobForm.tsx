@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { CheckCircle2, Loader2, Plus } from 'lucide-react';
+import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -11,11 +12,16 @@ import {
 } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, type UserDto } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 
+export const PENDING_JOB_STORAGE_KEY = 'specter_pending_job';
+
 export interface CreateJobFormProps {
+  user?: UserDto | null;
+  onAuthenticated?: (user: UserDto) => void;
+  onStepChange?: (step: 'form' | 'auth') => void;
   onCreated: () => void;
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -23,11 +29,15 @@ export interface CreateJobFormProps {
 }
 
 export function CreateJobForm({
+  user,
+  onAuthenticated,
+  onStepChange,
   onCreated,
   onCancel,
   onDirtyChange,
   isModal = false,
 }: CreateJobFormProps) {
+  const [step, setStep] = React.useState<'form' | 'auth'>('form');
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
@@ -117,6 +127,53 @@ export function CreateJobForm({
     }
   };
 
+  const executeCreateJob = async (activeUser?: UserDto | null) => {
+    setLoading(true);
+    setGlobalError(null);
+    try {
+      await api.createJob({
+        url: url.trim(),
+        userPrompt: userPrompt.trim(),
+        notificationEmail: notificationEmail.trim() || activeUser?.email || '',
+        cronExpression: effectiveCron.trim(),
+      });
+
+      setUrl('');
+      setUserPrompt('');
+      setNotificationEmail('');
+      setCronPreset('0 */6 * * *');
+      setCustomCron('0 */6 * * *');
+      setUseCustomCron(false);
+      setFieldErrors({});
+      setProbeState({ status: 'idle' });
+      setStep('form');
+      onStepChange?.('form');
+      onCreated();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setStep('auth');
+          onStepChange?.('auth');
+          return;
+        }
+        if (Object.keys(err.fieldErrors).length > 0) {
+          setStep('form');
+          onStepChange?.('form');
+          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
+          return;
+        }
+        setGlobalError(err.message);
+      } else if (err instanceof Error) {
+        setGlobalError(err.message);
+      } else {
+        setGlobalError('An unexpected error occurred while creating the monitor.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError(null);
@@ -134,41 +191,69 @@ export function CreateJobForm({
       return;
     }
 
-    setLoading(true);
-    try {
-      await api.createJob({
-        url: url.trim(),
-        userPrompt: userPrompt.trim(),
-        notificationEmail: notificationEmail.trim(),
-        cronExpression: effectiveCron.trim(),
-      });
-
-      setUrl('');
-      setUserPrompt('');
-      setNotificationEmail('');
-      setCronPreset('0 */6 * * *');
-      setCustomCron('0 */6 * * *');
-      setUseCustomCron(false);
-      setFieldErrors({});
-      setProbeState({ status: 'idle' });
-      onCreated();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (Object.keys(err.fieldErrors).length > 0) {
-          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          return;
-        }
-        setGlobalError(err.message);
-      } else if (err instanceof Error) {
-        setGlobalError(err.message);
-      } else {
-        setGlobalError('An unexpected error occurred while creating the monitor.');
-      }
-    } finally {
-      setLoading(false);
+    if (!user) {
+      setStep('auth');
+      onStepChange?.('auth');
+      return;
     }
+
+    await executeCreateJob(user);
   };
+
+  if (step === 'auth') {
+    const authStepContent = (
+      <div className="space-y-3">
+        {globalError && (
+          <div
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          >
+            {globalError}
+          </div>
+        )}
+        <AuthForm
+          initialEmail={notificationEmail.trim()}
+          defaultMode="register"
+          onBack={() => {
+            setStep('form');
+            onStepChange?.('form');
+          }}
+          onGoogleBeforeRedirect={() => {
+            try {
+              sessionStorage.setItem(
+                PENDING_JOB_STORAGE_KEY,
+                JSON.stringify({
+                  url: url.trim(),
+                  userPrompt: userPrompt.trim(),
+                  notificationEmail: notificationEmail.trim(),
+                  cronExpression: effectiveCron.trim(),
+                })
+              );
+            } catch {
+              // ignore storage errors
+            }
+          }}
+          onSuccess={async (authenticatedUser) => {
+            onAuthenticated?.(authenticatedUser);
+            await executeCreateJob(authenticatedUser);
+          }}
+        />
+      </div>
+    );
+
+    if (isModal) {
+      return authStepContent;
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Sign in to activate monitor</CardTitle>
+        </CardHeader>
+        <CardContent>{authStepContent}</CardContent>
+      </Card>
+    );
+  }
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -270,7 +355,7 @@ export function CreateJobForm({
             aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
             aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
             className={cn(
-              'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
+              'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
               !useCustomCron && fieldErrors.cronExpression
                 ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
                 : 'border-input'
@@ -314,7 +399,7 @@ export function CreateJobForm({
                 setCustomCron(e.target.value);
                 clearFieldError('cronExpression');
               }}
-              className="font-mono text-xs"
+              className="font-mono text-sm"
             />
           </FormField>
         )}
@@ -323,19 +408,19 @@ export function CreateJobForm({
       {globalError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          className="rounded-md border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
         >
           {globalError}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-2.5 pt-2">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          <Button type="button" variant="outline" className="h-10 px-4 text-sm" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" className="h-10 px-5 text-sm" disabled={loading}>
           <Plus className="h-4 w-4" />
           {loading ? 'Creating...' : 'Create Monitor'}
         </Button>

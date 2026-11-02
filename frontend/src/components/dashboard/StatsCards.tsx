@@ -32,28 +32,28 @@ export function StatsCards({ stats }: { stats: DashboardStats | null }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 divide-y divide-border rounded-lg border border-border bg-card sm:grid-cols-2 sm:divide-y-0 sm:divide-x lg:grid-cols-4 overflow-hidden">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px rounded-lg border border-border bg-border overflow-hidden">
       {items.map((item) => {
         const Icon = item.icon;
         return (
           <div
             key={item.label}
-            className="p-4 sm:p-5 transition-colors hover:bg-muted/30"
+            className="bg-card p-5 sm:p-6 transition-colors hover:bg-muted/20"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground">
                 {item.label}
               </span>
-              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <Icon className="h-4 w-4 text-muted-foreground" />
             </div>
 
-            <div className="mt-2.5 flex items-baseline">
-              <span className="font-mono text-2xl font-semibold tracking-tight text-foreground">
+            <div className="mt-3 flex items-baseline">
+              <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">
                 {item.value}
               </span>
             </div>
 
-            <p className="mt-1 text-xs text-muted-foreground truncate">{item.sub}</p>
+            <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground truncate">{item.sub}</p>
           </div>
         );
       })}

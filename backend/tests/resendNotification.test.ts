@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Resend } from 'resend';
+import { parseEnv } from '../src/config/env.js';
 import { buildSpecterAlertEmail } from '../src/providers/notifications/emailTemplate.js';
 import { createNotificationProvider } from '../src/providers/notifications/notification.factory.js';
 import type { AlertPayload } from '../src/providers/notifications/notification.interface.js';
@@ -9,10 +10,10 @@ import { SPECTER_LOGO_PNG_BUFFER } from '../src/providers/notifications/specterL
 describe('Specter Resend Notifications & Email Template', () => {
   const samplePayload: AlertPayload = {
     to: 'user@example.com',
-    subject: '[Specter] 3 alterações detectadas: https://loja.exemplo.com/produto/123',
+    subject: '[Specter] 3 changes detected: https://store.example.com/product/123',
     jobId: '01923456-789a-bcde-f012-3456789abcde',
-    targetUrl: 'https://loja.exemplo.com/produto/123',
-    userPrompt: 'Extrair título, preço promocional e disponibilidade de estoque',
+    targetUrl: 'https://store.example.com/product/123',
+    userPrompt: 'Extract title, promotional price and stock availability',
     detectedAt: new Date('2026-11-02T10:30:00Z'),
     diffSummary: {
       hasChanges: true,
@@ -21,8 +22,8 @@ describe('Specter Resend Notifications & Email Template', () => {
         {
           field: 'price',
           changeType: 'MODIFIED',
-          previousValue: 'R$ 499,00',
-          currentValue: 'R$ 399,00',
+          previousValue: '$ 499.00',
+          currentValue: '$ 399.00',
         },
       ],
       added: [
@@ -30,24 +31,24 @@ describe('Specter Resend Notifications & Email Template', () => {
           field: 'shipping',
           changeType: 'ADDED',
           previousValue: null,
-          currentValue: 'Frete Grátis para todo Brasil',
+          currentValue: 'Free Worldwide Shipping',
         },
       ],
       removed: [
         {
           field: 'oldPromoTag',
           changeType: 'REMOVED',
-          previousValue: 'Cupom 10%',
+          previousValue: 'Coupon 10%',
           currentValue: null,
         },
       ],
-      summaryText: '• [Modified] price: "R$ 499,00" → "R$ 399,00"\n• [Added] shipping: "Frete Grátis para todo Brasil"\n• [Removed] oldPromoTag: (previously "Cupom 10%")',
+      summaryText: '• [Modified] price: "$ 499.00" → "$ 399.00"\n• [Added] shipping: "Free Worldwide Shipping"\n• [Removed] oldPromoTag: (previously "Coupon 10%")',
       summaryHtml: '<table>...</table>',
     },
     data: {
       title: 'Headphone Bluetooth ANC Pro',
-      price: 'R$ 399,00',
-      shipping: 'Frete Grátis para todo Brasil',
+      price: '$ 399.00',
+      shipping: 'Free Worldwide Shipping',
       inStock: true,
     },
   };
@@ -58,36 +59,36 @@ describe('Specter Resend Notifications & Email Template', () => {
 
       // Specter Brand Header & Logo
       expect(html).toContain('SPECTER');
-      expect(html).toContain('Monitor de Extração Inteligente');
+      expect(html).toContain('Intelligent Extraction Monitor');
       expect(html).toContain('cid:specter-logo');
       expect(html).toContain('alt="Specter"');
 
       // Target Metadata
-      expect(html).toContain('https://loja.exemplo.com/produto/123');
-      expect(html).toContain('Extrair título, preço promocional e disponibilidade de estoque');
+      expect(html).toContain('https://store.example.com/product/123');
+      expect(html).toContain('Extract title, promotional price and stock availability');
       expect(html).toContain('01923456-789a-bcde-f012-3456789abcde');
 
       // Change Badges & Values
-      expect(html).toContain('Modificado');
-      expect(html).toContain('Novo');
-      expect(html).toContain('Removido');
-      expect(html).toContain('R$ 499,00');
-      expect(html).toContain('R$ 399,00');
-      expect(html).toContain('Frete Grátis para todo Brasil');
-      expect(html).toContain('Cupom 10%');
+      expect(html).toContain('Modified');
+      expect(html).toContain('New');
+      expect(html).toContain('Removed');
+      expect(html).toContain('$ 499.00');
+      expect(html).toContain('$ 399.00');
+      expect(html).toContain('Free Worldwide Shipping');
+      expect(html).toContain('Coupon 10%');
 
       // JSON Snapshot Accordion
       expect(html).toContain('Headphone Bluetooth ANC Pro');
       expect(html).toContain('<details');
 
       // Specter Footer
-      expect(html).toContain('Sistema Autônomo de Monitoramento Web');
+      expect(html).toContain('Autonomous Web Monitoring System');
       expect(html).toContain('Resend');
 
       // Plain Text version
       expect(text).toContain('[SPECTER]');
-      expect(text).toContain('https://loja.exemplo.com/produto/123');
-      expect(text).toContain('price: "R$ 499,00" → "R$ 399,00"');
+      expect(text).toContain('https://store.example.com/product/123');
+      expect(text).toContain('price: "$ 499.00" → "$ 399.00"');
     });
 
     it('escapes unsafe HTML to prevent injection vulnerabilities', () => {
@@ -199,6 +200,39 @@ describe('Specter Resend Notifications & Email Template', () => {
     it('falls back to ConsoleNotificationProvider when provider is console or key is placeholder', () => {
       const consoleProvider = createNotificationProvider('console');
       expect(consoleProvider.name).toBe('console');
+    });
+  });
+
+  describe('Environment Configuration for Resend', () => {
+    it('throws when NOTIFICATION_PROVIDER is resend and RESEND_API_KEY is empty in production', () => {
+      expect(() => {
+        parseEnv({
+          NODE_ENV: 'production',
+          NOTIFICATION_PROVIDER: 'resend',
+          RESEND_API_KEY: '',
+        });
+      }).toThrow('RESEND_API_KEY: Required when NOTIFICATION_PROVIDER is set to "resend"');
+    });
+
+    it('succeeds when NOTIFICATION_PROVIDER is resend and RESEND_API_KEY is provided', () => {
+      const parsed = parseEnv({
+        NODE_ENV: 'production',
+        NOTIFICATION_PROVIDER: 'resend',
+        RESEND_API_KEY: 're_valid_test_key_123',
+      });
+      expect(parsed.NOTIFICATION_PROVIDER).toBe('resend');
+      expect(parsed.RESEND_API_KEY).toBe('re_valid_test_key_123');
+      expect(parsed.NOTIFICATION_FROM_EMAIL).toBe('onboarding@resend.dev');
+    });
+
+    it('allows NOTIFICATION_PROVIDER=resend in test environment without crashing on missing key', () => {
+      const parsed = parseEnv({
+        NODE_ENV: 'test',
+        NOTIFICATION_PROVIDER: 'resend',
+        RESEND_API_KEY: '',
+      });
+      expect(parsed.NOTIFICATION_PROVIDER).toBe('resend');
+      expect(parsed.RESEND_API_KEY).toBe('');
     });
   });
 });

@@ -97,12 +97,12 @@ export class CompilationService {
         const diffSummary = buildDiffSummary(previousRun.extractedData, smokeTest.extractedData);
         const changeNoun =
           diffSummary.totalChanges === 1
-            ? '1 alteração detectada'
-            : `${diffSummary.totalChanges} alterações detectadas`;
+            ? '1 change detected'
+            : `${diffSummary.totalChanges} changes detected`;
         await this.notificationProvider
           .sendAlert({
             to: job.notificationEmail.trim(),
-            subject: `[Specter] ${changeNoun} (Auto-recuperação): ${job.url}`,
+            subject: `[Specter] ${changeNoun} (Self-healing): ${job.url}`,
             jobId: job.id,
             targetUrl: job.url,
             userPrompt: job.userPrompt,

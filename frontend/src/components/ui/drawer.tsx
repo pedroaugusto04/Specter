@@ -26,7 +26,7 @@ export function Drawer({
   description,
   children,
   footer,
-  widthClass = 'max-w-3xl',
+  widthClass = 'w-full max-w-full sm:max-w-2xl lg:max-w-3xl',
   confirmTitle,
   confirmMessage,
 }: DrawerProps) {
@@ -57,23 +57,23 @@ export function Drawer({
       aria-modal="true"
     >
       <div
-        className={`flex h-full w-full ${widthClass} flex-col border-l border-border bg-card text-card-foreground shadow-xl`}
+        className={`flex h-full w-full ${widthClass} flex-col border-l border-border bg-card text-card-foreground shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || description) && (
-          <div className="flex items-start justify-between border-b border-border px-6 py-4">
+          <div className="flex items-start justify-between border-b border-border px-5 py-4 sm:px-6 sm:py-4.5">
             <div className="min-w-0 pr-4">
               {title && (
-                <div className="text-sm font-semibold text-foreground font-mono truncate">{title}</div>
+                <div className="text-base sm:text-lg font-semibold text-foreground font-mono truncate">{title}</div>
               )}
               {description && (
-                <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
+                <div className="mt-1 text-xs sm:text-sm text-muted-foreground">{description}</div>
               )}
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => void requestClose()}
               aria-label="Close panel"
             >
@@ -82,10 +82,10 @@ export function Drawer({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6">{children}</div>
 
         {footer && (
-          <div className="border-t border-border bg-muted/30 px-6 py-3">{footer}</div>
+          <div className="border-t border-border bg-muted/30 px-5 py-3.5 sm:px-6 sm:py-4">{footer}</div>
         )}
       </div>
     </div>

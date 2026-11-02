@@ -7,6 +7,8 @@ import { createScraperEngine } from './providers/scraping/scraper.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
+import { DrizzleUserRepository } from './repositories/userRepository.js';
+import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
 import { JobService } from './services/jobService.js';
 import { RetentionService } from './services/retentionService.js';
@@ -16,6 +18,7 @@ import { WorkerManager } from './workers/workers.js';
 
 async function bootstrap(): Promise<void> {
   const jobRepository = new DrizzleJobRepository();
+  const userRepository = new DrizzleUserRepository();
   const jobScheduler = new BullMqJobScheduler();
   const compilerProvider = createCompilerProvider();
   const scraperEngine = createScraperEngine();
@@ -38,6 +41,7 @@ async function bootstrap(): Promise<void> {
 
   const retentionService = new RetentionService(jobRepository);
   const jobService = new JobService(jobRepository, jobScheduler, scraperEngine);
+  const authService = new AuthService(userRepository);
 
   // Run migrations automatically on startup
   try {
@@ -72,7 +76,7 @@ async function bootstrap(): Promise<void> {
   });
   workerManager.start();
 
-  const app = await buildApp({ jobService });
+  const app = await buildApp({ jobService, authService });
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);

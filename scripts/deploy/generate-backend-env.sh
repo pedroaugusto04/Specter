@@ -25,11 +25,21 @@ DATABASE_URL="${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}
 REDIS_URL="${REDIS_URL:-redis://redis:6379}"
 REDIS_HOST="${REDIS_HOST:-redis}"
 REDIS_PORT="${REDIS_PORT:-6379}"
-CORS_ORIGIN="${CORS_ORIGIN:-https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com}"
+CORS_ORIGIN="${CORS_ORIGIN:-https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com}"
 COMPILER_PROVIDER="${COMPILER_PROVIDER:-agy}"
 NOTIFICATION_PROVIDER="${NOTIFICATION_PROVIDER:-console}"
+NOTIFICATION_FROM_EMAIL="${NOTIFICATION_FROM_EMAIL:-onboarding@resend.dev}"
+RESEND_API_KEY="${RESEND_API_KEY:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 SCRAPER_ENGINE="${SCRAPER_ENGINE:-playwright}"
+
+# Guardrail: If NOTIFICATION_PROVIDER is resend but RESEND_API_KEY is not provided,
+# warn and safely fall back to console to prevent container boot crash loops.
+if [ "$NOTIFICATION_PROVIDER" = "resend" ] && [ -z "${RESEND_API_KEY:-}" ]; then
+  echo "⚠️ AVISO: NOTIFICATION_PROVIDER está definido como 'resend', mas RESEND_API_KEY não foi configurada."
+  echo "   Revertendo NOTIFICATION_PROVIDER para 'console' para garantir inicialização segura do backend."
+  NOTIFICATION_PROVIDER="console"
+fi
 
 keys=(
   POSTGRES_USER
@@ -68,6 +78,14 @@ keys=(
   SCRAPINGBEE_API_KEY
   CRAWLBASE_TOKEN
   HTTP_PROXY
+  JWT_SECRET
+  JWT_ACCESS_EXPIRES_SECONDS
+  JWT_REFRESH_EXPIRES_SECONDS
+  COOKIE_SECURE
+  FRONTEND_URL
+  GOOGLE_CLIENT_ID
+  GOOGLE_CLIENT_SECRET
+  GOOGLE_CALLBACK_URL
 )
 
 for key in "${keys[@]}"; do

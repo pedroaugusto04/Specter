@@ -8,6 +8,13 @@
       "when": 1793567851639,
       "tag": "0000_safe_squadron_supreme",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793603830179,
+      "tag": "0001_little_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

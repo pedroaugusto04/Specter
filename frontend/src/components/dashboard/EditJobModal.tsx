@@ -152,8 +152,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {willRecompile && (
-          <div className="flex items-start gap-2.5 rounded-md border border-border bg-muted/60 p-3 text-xs text-foreground">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-foreground mt-0.5" />
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/60 p-3.5 text-xs sm:text-sm text-foreground">
+            <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-foreground mt-0.5" />
             <div>
               <p className="font-semibold text-foreground">Schema Re-compilation</p>
               <p className="mt-0.5 text-muted-foreground leading-relaxed">
@@ -239,7 +239,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
               aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined}
               className={cn(
-                'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
                 !useCustomCron && fieldErrors.cronExpression
                   ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
                   : 'border-input'
@@ -291,17 +291,17 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         {globalError && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+            className="rounded-md border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
           >
             {globalError}
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+        <div className="flex justify-end gap-2.5 pt-2">
+          <Button type="button" variant="outline" className="h-10 px-4 text-sm" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading || !isDirty}>
+          <Button type="submit" className="h-10 px-5 text-sm" disabled={loading || !isDirty}>
             {loading ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" />

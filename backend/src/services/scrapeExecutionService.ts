@@ -113,8 +113,8 @@ export class ScrapeExecutionService {
         if (diffSummary.hasChanges && job.notificationEmail && job.notificationEmail.trim()) {
           const changeNoun =
             diffSummary.totalChanges === 1
-              ? '1 alteração detectada'
-              : `${diffSummary.totalChanges} alterações detectadas`;
+              ? '1 change detected'
+              : `${diffSummary.totalChanges} changes detected`;
           await this.notificationProvider.sendAlert({
             to: job.notificationEmail.trim(),
             subject: `[Specter] ${changeNoun}: ${job.url}`,
@@ -192,7 +192,7 @@ export class ScrapeExecutionService {
           await this.jobRepository.updateJob(job.id, {
             status: 'FAILED',
             failureCount: newFailureCount,
-            lastError: `Limite de auto-recuperação excedido (${this.maxHealingRetries}): ${userMessage}`,
+            lastError: `Self-healing retry limit exceeded (${this.maxHealingRetries}): ${userMessage}`,
           });
           logger.warn('Job exceeded max self-healing retries and transitioned to FAILED', {
             jobId: job.id,

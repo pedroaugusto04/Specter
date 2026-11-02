@@ -26,6 +26,14 @@ if [ -d ".git" ]; then
 fi
 
 echo "2. Configurando arquivo de ambiente (.env.prod)..."
+if [ -f ".env" ]; then
+  echo "✔ Carregando variáveis locais de .env..."
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 if [ -f "backend.env" ]; then
   cp backend.env .env.prod
 elif [ -f ".env.prod" ]; then
@@ -56,8 +64,8 @@ echo "5. Compilando e atualizando Frontend..."
 if [ -d "frontend" ]; then
   cd frontend
   npm ci --no-audit --no-fund
-  NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-/scrapper}" \
-  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/scrapper/api}" \
+  NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-}" \
+  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
   npm run build
 
   echo "Sincronizando arquivos do frontend para $FRONTEND_DEPLOY_PATH..."
