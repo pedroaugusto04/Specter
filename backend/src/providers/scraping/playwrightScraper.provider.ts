@@ -111,15 +111,69 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
       const httpStatus = response?.status() ?? 200;
 
+      // 1. Ensure load event completes if possible (stylesheets, scripts)
+      await page
+        .waitForLoadState('load', { timeout: Math.min(6000, timeoutMs) })
+        .catch(() => {});
+
+      // 2. Network stabilization wait for SPA hydration
+      await page
+        .waitForLoadState('networkidle', { timeout: Math.min(5000, timeoutMs) })
+        .catch(() => {});
+
+      // 3. Generic accessibility stabilization: wait for W3C aria-busy to be cleared
+      await page
+        .waitForFunction('!document.querySelector(\'[aria-busy="true"]\')', null, {
+          timeout: Math.min(3000, timeoutMs),
+        })
+        .catch(() => {});
+
+      // 4. Target element attachment wait if specified
       if (options?.waitForSelector) {
         await page
-          .waitForSelector(options.waitForSelector, { timeout: Math.min(5000, timeoutMs) })
+          .waitForSelector(options.waitForSelector, {
+            state: 'attached',
+            timeout: Math.min(5000, timeoutMs),
+          })
           .catch(() => {});
       }
 
-      // Brief network stabilization wait for SPA hydration
+      // 5. DOM Mutation Quiescence (Universal language- and framework-agnostic stabilization)
+      // Monitors active DOM mutations (React/Vue/Angular hydration, client-side fetches)
+      // and resolves as soon as the DOM remains completely quiet for 500ms.
       await page
-        .waitForLoadState('networkidle', { timeout: Math.min(5000, timeoutMs) })
+        .evaluate(`
+          new Promise((resolve) => {
+            let timeoutId;
+            const quietWindowMs = 500;
+            const maxWaitMs = 3500;
+
+            const observer = new MutationObserver(() => {
+              clearTimeout(timeoutId);
+              timeoutId = setTimeout(() => {
+                observer.disconnect();
+                resolve();
+              }, quietWindowMs);
+            });
+
+            observer.observe(document.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              characterData: true,
+            });
+
+            timeoutId = setTimeout(() => {
+              observer.disconnect();
+              resolve();
+            }, quietWindowMs);
+
+            setTimeout(() => {
+              observer.disconnect();
+              resolve();
+            }, maxWaitMs);
+          })
+        `)
         .catch(() => {});
 
       const rawHtml = await page.content();

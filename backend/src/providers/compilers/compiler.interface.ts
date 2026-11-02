@@ -26,6 +26,7 @@ Do not output text in the terminal. Do not request interactive confirmation.
 Selector Guidelines:
 - Avoid obfuscated dynamic classes (hashes from Tailwind or Styled Components).
 - Prioritize 'data-testid', semantic IDs, stable hierarchies, and standard HTML5 tags.
+- NEVER select temporary loading placeholders, skeleton containers, spinners, or elements containing temporary loading text (e.g. elements with classes like 'skeleton', 'loading', 'placeholder', or attributes like aria-busy="true"). Target the stable parent container or the actual data element that holds real content.
 - CRITICAL: NEVER select the document <title> tag (such as 'title', 'head > title', 'title#root-title') or <head> elements for content or product fields. Always locate data within the visible <body> content (e.g. <h1>, <h2>, [data-testid], main semantic containers).
 - If the page is a security challenge, captcha, account verification, or access denied screen rather than actual page content, output an empty fields object {} to indicate that valid content could not be found.
 - To extract links use attribute "href"; for images use "src"; for text use "text".

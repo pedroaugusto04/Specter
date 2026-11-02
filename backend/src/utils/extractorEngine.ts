@@ -52,7 +52,7 @@ function coerceValue(
     }
 
     const parsed = Number(normalizedNumberStr);
-    return Number.isNaN(parsed) ? trimmed : parsed;
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   if (targetType === 'boolean') {

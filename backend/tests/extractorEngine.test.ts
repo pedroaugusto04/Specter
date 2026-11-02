@@ -88,4 +88,24 @@ describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
     expect(smoke.valid).toBe(false);
     expect(smoke.reason).toContain('target document <title> or <head> metadata');
   });
+
+  it('coerces non-numeric text to null when field type is number', () => {
+    const htmlWithInvalidNumber = `
+      <html>
+        <body>
+          <div class="card">
+            <span class="price">Aguarde processando</span>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const result = extractUsingConfig(htmlWithInvalidNumber, {
+      fields: {
+        price: { selector: '.card .price', attribute: 'text', type: 'number' },
+      },
+    });
+
+    expect(result).toEqual({});
+  });
 });
