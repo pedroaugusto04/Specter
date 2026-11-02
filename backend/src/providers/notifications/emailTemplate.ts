@@ -81,7 +81,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
           <tr>
             <td>
               <div style="font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
-                &#x1F3AF; Trigger Conditions Met
+                Trigger Conditions Met
               </div>
               <ul style="margin:0;padding-left:18px;color:#1e3a8a;font-size:13px;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
                 ${payload.triggerReasons.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}

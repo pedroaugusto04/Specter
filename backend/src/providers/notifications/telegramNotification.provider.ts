@@ -58,7 +58,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
 
     if (payload.triggerReasons && payload.triggerReasons.length > 0) {
       lines.push('');
-      lines.push('🎯 <b>Trigger Conditions Met:</b>');
+      lines.push('<b>Trigger Conditions Met:</b>');
       for (const reason of payload.triggerReasons) {
         lines.push(`• <code>${escapeHtml(reason)}</code>`);
       }
@@ -69,7 +69,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       : new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     lines.push(`⏱ <b>Time:</b> ${detectedTime}`);
     lines.push('');
-    lines.push('📊 <b>Detected Changes:</b>');
+    lines.push('<b>Detected Changes:</b>');
 
     const allChanges = [
       ...diff.modified.map((c) => `• <b>${escapeHtml(c.field)}</b>: <s>${formatValue(c.previousValue)}</s> ➔ <b>${formatValue(c.currentValue)}</b>`),

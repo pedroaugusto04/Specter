@@ -127,6 +127,7 @@ jobs:
           NOTIFICATION_PROVIDER: console
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY || 're_test_dummy_key' }}
           NOTIFICATION_FROM_EMAIL: ${{ env.NOTIFICATION_FROM_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || vars.TELEGRAM_BOT_TOKEN }}
         run: |
           npm run test
 
@@ -190,6 +191,7 @@ jobs:
           NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || env.NOTIFICATION_PROVIDER }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}
           NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || env.NOTIFICATION_FROM_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || vars.TELEGRAM_BOT_TOKEN }}
           SCRAPER_ENGINE: ${{ env.SCRAPER_ENGINE }}
           SCRAPER_CONCURRENCY: ${{ env.SCRAPER_CONCURRENCY }}
           PLAYWRIGHT_TIMEOUT_MS: ${{ env.PLAYWRIGHT_TIMEOUT_MS }}
