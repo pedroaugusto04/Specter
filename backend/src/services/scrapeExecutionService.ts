@@ -111,11 +111,17 @@ export class ScrapeExecutionService {
       if (hasChanges === 'YES' && previousRun) {
         const diffSummary = buildDiffSummary(previousRun.extractedData, extractedData);
         if (diffSummary.hasChanges && job.notificationEmail && job.notificationEmail.trim()) {
+          const changeNoun =
+            diffSummary.totalChanges === 1
+              ? '1 alteração detectada'
+              : `${diffSummary.totalChanges} alterações detectadas`;
           await this.notificationProvider.sendAlert({
             to: job.notificationEmail.trim(),
-            subject: `[Update] ${job.url}`,
+            subject: `[Specter] ${changeNoun}: ${job.url}`,
             jobId: job.id,
             targetUrl: job.url,
+            userPrompt: job.userPrompt,
+            detectedAt: new Date(),
             diffSummary,
             data: extractedData,
           });

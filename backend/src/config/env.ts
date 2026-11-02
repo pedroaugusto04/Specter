@@ -48,7 +48,7 @@ export const envSchema = z.object({
   // Notifications
   NOTIFICATION_PROVIDER: z.enum(['resend', 'console']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),
-  NOTIFICATION_FROM_EMAIL: z.string().email().default('alerts@scraper.local'),
+  NOTIFICATION_FROM_EMAIL: z.string().min(1).default('onboarding@resend.dev'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

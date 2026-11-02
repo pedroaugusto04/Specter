@@ -6,6 +6,8 @@ export interface AlertPayload {
   subject: string;
   jobId: string;
   targetUrl: string;
+  userPrompt?: string;
+  detectedAt?: Date;
   diffSummary: DiffSummary;
   data: ExtractedPayload;
 }
