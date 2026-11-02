@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import {
   AntiBotBlockedError,
   NavigationTimeoutError,
@@ -50,20 +51,30 @@ export class JobService {
     }
 
     try {
-      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 7000 });
+      // 18s allows remote proxy unblockers with JS rendering enough time to solve challenges
+      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 18000 });
       return { accessible: true };
     } catch (err) {
       if (err instanceof AntiBotBlockedError) {
+        const hasUnblockers =
+          Boolean(env.ZENROWS_API_KEY) ||
+          Boolean(env.SCRAPERAPI_KEY) ||
+          Boolean(env.SCRAPINGBEE_API_KEY) ||
+          Boolean(env.CRAWLBASE_TOKEN);
+
+        const guidance = hasUnblockers
+          ? `Anti-bot protection active. All configured unblocker providers failed or exhausted their credits: ${err.message}`
+          : 'This website blocks automated requests (Anti-Bot / CAPTCHA detected). To monitor protected websites like Mercado Livre or Amazon, add an unblocker API key (ZENROWS_API_KEY or SCRAPERAPI_KEY) to your .env file.';
+
         return {
           accessible: false,
-          reason:
-            'This website blocks automated access (Anti-Bot / CAPTCHA protection detected). Continuous monitoring is not supported for this address.',
+          reason: guidance,
         };
       }
       if (err instanceof NavigationTimeoutError) {
         return {
           accessible: false,
-          reason: 'The target website timed out and did not respond within 7 seconds.',
+          reason: 'The target website or unblocker timed out during accessibility verification (18s). Please try again.',
         };
       }
       return {
