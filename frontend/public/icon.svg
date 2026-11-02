@@ -1,5 +1,21 @@
 <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="specter-s-grad" x1="6" y1="6" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8" />
+      <stop offset="0.45" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#A855F7" />
+    </linearGradient>
+  </defs>
   <rect width="32" height="32" rx="7" fill="#09090B"/>
-  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#27272A"/>
-  <path d="M21 9.5H12.5C10.567 9.5 9 11.067 9 13C9 14.933 10.567 16.5 12.5 16.5H19.5C21.433 16.5 23 18.067 23 20C23 21.933 21.433 23.5 19.5 23.5H11" stroke="#FFFFFF" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="rgba(255,255,255,0.1)"/>
+  <path d="M4 16H28" stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="2 2" />
+  <path
+    d="M22 8.5H13C10.2386 8.5 8 10.7386 8 13.5C8 16.2614 10.2386 18.5 13 18.5H19C21.7614 18.5 24 20.7386 24 23.5C24 26.2614 21.7614 28.5 19 28.5H10"
+    stroke="url(#specter-s-grad)"
+    stroke-width="2.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="22" cy="8.5" r="1.5" fill="#38BDF8" />
+  <circle cx="10" cy="28.5" r="1.5" fill="#A855F7" />
 </svg>

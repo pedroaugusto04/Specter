@@ -7,6 +7,7 @@ import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
 import { EditJobModal } from '@/components/dashboard/EditJobModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
 import { JobsTable } from '@/components/dashboard/JobsTable';
+import { StatsCards } from '@/components/dashboard/StatsCards';
 import { Button } from '@/components/ui/button';
 import { api, type DashboardStats, type ScrapingJobDto } from '@/lib/api';
 
@@ -45,33 +46,49 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Utilitarian Navigation Bar */}
-      <header className="border-b border-zinc-800 bg-zinc-950">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <SpecterLogo size="md" />
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-zinc-950/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <SpecterLogo size="md" />
+            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-white/[0.08]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-xs font-mono text-zinc-400 tracking-wide uppercase">
+                Radar Active
+              </span>
+            </div>
+          </div>
 
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            size="sm"
-            className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md bg-zinc-100 text-zinc-950 hover:bg-zinc-200"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>New Monitor</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              size="sm"
+              className="flex items-center gap-1.5 shadow-sm bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-3.5 h-8 rounded-lg"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New Monitor</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Main Console Workspace */}
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      {/* Main Content Area */}
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {connectionWarning && (
-          <div className="mb-4 rounded-md border border-amber-900/60 bg-amber-950/30 px-3.5 py-2.5 text-xs text-amber-300">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-950/30 px-4 py-3 text-xs text-amber-300 backdrop-blur-sm">
             {connectionWarning}
           </div>
         )}
 
+        {/* High-Density KPI Cards */}
+        <StatsCards stats={stats} />
+
+        {/* Central Fleet Monitoring Console */}
         <JobsTable
           jobs={jobs}
-          stats={stats}
           onRefresh={loadDashboard}
           isRefreshing={isRefreshing}
           onSelectJobForHistory={(job) => setSelectedJob(job)}
@@ -80,12 +97,14 @@ export default function DashboardPage() {
         />
       </main>
 
+      {/* Creation Modal */}
       <CreateJobModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={loadDashboard}
       />
 
+      {/* Edit Modal */}
       <EditJobModal
         job={editingJob}
         isOpen={Boolean(editingJob)}
@@ -93,6 +112,7 @@ export default function DashboardPage() {
         onUpdated={loadDashboard}
       />
 
+      {/* Snapshot and Diff Drawer */}
       <JobRunsDrawer job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
   );
