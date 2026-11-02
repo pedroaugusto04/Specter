@@ -157,6 +157,9 @@ export function CreateJobForm({
       });
       setUrl('');
       setUserPrompt('');
+      setCronPreset('0 */6 * * *');
+      setCustomCron('0 */6 * * *');
+      setUseCustomCron(false);
       setFieldErrors({});
       setGlobalError(null);
       setProbeState({ status: 'idle' });
@@ -268,62 +271,52 @@ export function CreateJobForm({
         />
       </FormField>
 
-      <div className="space-y-2">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-          Monitoring Frequency (Cron Schedule)
-        </label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {CRON_PRESETS.map((preset) => {
-            const isSelected = !useCustomCron && cronPreset === preset.value;
-            return (
-              <button
-                key={preset.value}
-                type="button"
-                onClick={() => {
-                  setUseCustomCron(false);
-                  setCronPreset(preset.value);
-                  clearFieldError('cronExpression');
-                }}
-                className={cn(
-                  'rounded-lg border px-3 py-2 text-left transition-colors',
-                  isSelected
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                )}
-              >
-                <div className="text-xs font-medium">{preset.label}</div>
-                <div
-                  className={cn(
-                    'font-mono text-[11px]',
-                    isSelected ? 'text-slate-300' : 'text-slate-400'
-                  )}
-                >
-                  {preset.value}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              setUseCustomCron(!useCustomCron);
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <FormField
+          label="Monitoring Frequency (Cron Schedule)"
+          htmlFor="cron-preset"
+          required
+          error={!useCustomCron ? fieldErrors.cronExpression : undefined}
+          hint={!useCustomCron ? 'Minimum allowed interval floor is 15 minutes.' : undefined}
+        >
+          <select
+            id="cron-preset"
+            aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
+            aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
+            className={cn(
+              'flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+              !useCustomCron && fieldErrors.cronExpression
+                ? 'border-red-400 text-red-950 focus-visible:border-red-500 focus-visible:ring-red-500/30 bg-red-50/20'
+                : 'border-slate-200 focus-visible:ring-slate-900'
+            )}
+            value={useCustomCron ? 'custom' : cronPreset}
+            onChange={(e) => {
               clearFieldError('cronExpression');
+              if (e.target.value === 'custom') {
+                setUseCustomCron(true);
+              } else {
+                setUseCustomCron(false);
+                setCronPreset(e.target.value);
+                setCustomCron(e.target.value);
+              }
             }}
-            className="text-xs font-medium text-slate-600 hover:text-slate-900"
           >
-            {useCustomCron ? '← Use standard schedule presets' : '+ Use custom cron expression'}
-          </button>
-        </div>
+            {CRON_PRESETS.map((preset) => (
+              <option key={preset.value} value={preset.value}>
+                {preset.label} ({preset.value})
+              </option>
+            ))}
+            <option value="custom">Custom Cron Expression...</option>
+          </select>
+        </FormField>
 
         {useCustomCron && (
           <FormField
-            label="Custom Cron Expression"
+            label="Custom Cron Expression (min. 15m)"
             htmlFor="custom-cron"
+            required
             error={fieldErrors.cronExpression}
-            hint="Format: minute hour day month weekday. Minimum allowed interval is 15 minutes."
+            hint="5 space-delimited fields: minute hour day month weekday."
           >
             <Input
               id="custom-cron"
