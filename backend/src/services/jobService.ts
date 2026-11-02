@@ -37,10 +37,10 @@ export class JobService {
 
     const cronCheck = validateCronFrequency(cronExpression);
     if (!cronCheck.valid) {
-      throw new ValidationError(
+      const msg =
         cronCheck.error ??
-          'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.'
-      );
+        'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
+      throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
     }
 
     const createdEntity = await this.jobRepository.createJob({
@@ -96,10 +96,10 @@ export class JobService {
       const trimmedCron = request.cronExpression.trim();
       const cronCheck = validateCronFrequency(trimmedCron);
       if (!cronCheck.valid) {
-        throw new ValidationError(
+        const msg =
           cronCheck.error ??
-            'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.'
-        );
+          'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
+        throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
       }
       patch.cronExpression = trimmedCron;
 

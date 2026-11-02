@@ -5,7 +5,10 @@ export function normalizeUrl(rawUrl: string): string {
   try {
     const parsed = new URL(trimmed);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new ValidationError('Only HTTP and HTTPS protocols are permitted.');
+      throw new ValidationError(
+        'Only HTTP and HTTPS protocols are permitted.',
+        [{ field: 'url', message: 'Target URL must start with http:// or https://' }]
+      );
     }
     parsed.hash = '';
     return parsed.toString();
@@ -13,6 +16,10 @@ export function normalizeUrl(rawUrl: string): string {
     if (err instanceof ValidationError) {
       throw err;
     }
-    throw new ValidationError(`Invalid URL: "${rawUrl}"`, err);
+    throw new ValidationError(
+      `Invalid URL: "${rawUrl}"`,
+      [{ field: 'url', message: 'Target URL must be a valid URL format (e.g. https://example.com)' }],
+      err
+    );
   }
 }

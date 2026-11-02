@@ -93,13 +93,34 @@ export class CompilerValidationError extends DomainError {
 }
 
 export class ValidationError extends DomainError {
-  constructor(message: string, cause?: unknown) {
+  public readonly details: Array<{ field: string; message: string }>;
+  public readonly fields: Record<string, string>;
+
+  constructor(
+    message: string,
+    detailsOrCause?: Array<{ field: string; message: string }> | unknown,
+    cause?: unknown
+  ) {
+    const isDetailsArray = Array.isArray(detailsOrCause);
+    const actualCause = isDetailsArray ? cause : detailsOrCause;
+    const actualDetails = isDetailsArray
+      ? (detailsOrCause as Array<{ field: string; message: string }>)
+      : [{ field: 'root', message }];
+
     super(message, {
       code: 'VALIDATION_ERROR',
       statusCode: 400,
       isRetryable: false,
-      cause,
+      cause: actualCause,
     });
+
+    this.details = actualDetails.length > 0 ? actualDetails : [{ field: 'root', message }];
+    this.fields = {};
+    for (const d of this.details) {
+      if (!this.fields[d.field]) {
+        this.fields[d.field] = d.message;
+      }
+    }
   }
 }
 

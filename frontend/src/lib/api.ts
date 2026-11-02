@@ -74,6 +74,43 @@ export interface DashboardStats {
   DetectedChangesCount: number;
 }
 
+export interface ApiValidationErrorDetail {
+  field: string;
+  message: string;
+}
+
+export class ApiError extends Error {
+  public readonly status: number;
+  public readonly code?: string;
+  public readonly details?: ApiValidationErrorDetail[];
+  public readonly fieldErrors: Record<string, string>;
+
+  constructor(
+    message: string,
+    status: number,
+    data?: {
+      error?: string;
+      message?: string;
+      details?: ApiValidationErrorDetail[];
+      fields?: Record<string, string>;
+    }
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = data?.error;
+    this.details = data?.details;
+    this.fieldErrors = { ...(data?.fields ?? {}) };
+    if (data?.details && Object.keys(this.fieldErrors).length === 0) {
+      for (const item of data.details) {
+        if (item.field && item.message && !this.fieldErrors[item.field]) {
+          this.fieldErrors[item.field] = item.message;
+        }
+      }
+    }
+  }
+}
+
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (envUrl) {
@@ -108,7 +145,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body?.message || `Request failed (${response.status})`);
+    throw new ApiError(
+      body?.message || `Request failed (${response.status})`,
+      response.status,
+      body
+    );
   }
 
   return body.data as T;

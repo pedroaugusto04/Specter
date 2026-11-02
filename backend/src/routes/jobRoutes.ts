@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
-import { DomainError } from '../errors/domainErrors.js';
+import { DomainError, ValidationError } from '../errors/domainErrors.js';
 import type { JobService } from '../services/jobService.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -15,13 +15,29 @@ export function registerJobRoutes(app: FastifyInstance, jobService: JobService):
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
       const details = error.issues.map((i) => ({
-        field: i.path.join('.'),
+        field: i.path.join('.') || 'root',
         message: i.message,
       }));
+      const fields: Record<string, string> = {};
+      for (const item of details) {
+        if (!fields[item.field]) {
+          fields[item.field] = item.message;
+        }
+      }
       return reply.status(400).send({
         error: 'VALIDATION_ERROR',
         message: details[0]?.message ?? 'Invalid input data.',
         details,
+        fields,
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return reply.status(error.statusCode).send({
+        error: error.code,
+        message: error.message,
+        details: error.details,
+        fields: error.fields,
       });
     }
 

@@ -62,6 +62,29 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const body = response.json();
     expect(body.error).toBe('VALIDATION_ERROR');
     expect(body.message).toContain('15 minutes');
+    expect(body.fields).toBeDefined();
+    expect(body.fields.cronExpression).toContain('15 minutes');
+  });
+
+  it('returns HTTP 400 with standardized field errors for invalid input data', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      payload: {
+        url: 'invalid-url',
+        userPrompt: 'abc', // less than 5 chars
+        notificationEmail: 'not-an-email',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body.error).toBe('VALIDATION_ERROR');
+    expect(Array.isArray(body.details)).toBe(true);
+    expect(body.fields).toBeDefined();
+    expect(body.fields.url).toBeDefined();
+    expect(body.fields.userPrompt).toContain('5 characters');
+    expect(body.fields.notificationEmail).toContain('email');
   });
 
   it('supports listing jobs, pausing/resuming, manual trigger, and deleting a job', async () => {

@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
-import { api } from '@/lib/api';
-import { CRON_PRESETS, validateClientCron } from '@/lib/utils';
+import { ApiError, api } from '@/lib/api';
+import { cn, CRON_PRESETS } from '@/lib/utils';
+import { validateJobForm, type JobFormField } from '@/lib/validation';
 
 export interface CreateJobFormProps {
   onCreated: () => void;
@@ -34,7 +35,9 @@ export function CreateJobForm({
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+
+  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
+  const [globalError, setGlobalError] = React.useState<string | null>(null);
 
   const effectiveCron = useCustomCron ? customCron : cronPreset;
 
@@ -49,91 +52,175 @@ export function CreateJobForm({
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
 
+  const clearFieldError = (field: JobFormField) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const focusFirstInvalidField = (errors: Partial<Record<JobFormField, string>>) => {
+    const errorKeys = Object.keys(errors) as JobFormField[];
+    if (errorKeys.length === 0) return;
+
+    const firstKey = errorKeys[0];
+    const fieldIdMap: Record<JobFormField, string> = {
+      url: 'target-url',
+      notificationEmail: 'notify-email',
+      userPrompt: 'user-prompt',
+      cronExpression: useCustomCron ? 'custom-cron' : 'cron-preset',
+    };
+
+    const elementId = fieldIdMap[firstKey];
+    if (elementId) {
+      const element = document.getElementById(elementId);
+      element?.focus();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setGlobalError(null);
 
-    const cronValidation = validateClientCron(effectiveCron);
-    if (!cronValidation.valid) {
-      setError(cronValidation.error ?? 'Invalid cron expression.');
+    // Standardized client-side validation
+    const validation = validateJobForm({
+      url,
+      userPrompt,
+      notificationEmail,
+      cronExpression: effectiveCron,
+    });
+
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      focusFirstInvalidField(validation.errors);
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
+
     try {
       await api.createJob({
-        url,
-        userPrompt,
-        notificationEmail,
+        url: url.trim(),
+        userPrompt: userPrompt.trim(),
+        notificationEmail: notificationEmail.trim(),
         cronExpression: effectiveCron.trim(),
       });
       setUrl('');
       setUserPrompt('');
-      setError(null);
+      setFieldErrors({});
+      setGlobalError(null);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create monitoring job.');
+      if (err instanceof ApiError) {
+        if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+          const apiFieldErrors = err.fieldErrors as Partial<Record<JobFormField, string>>;
+          setFieldErrors(apiFieldErrors);
+          focusFirstInvalidField(apiFieldErrors);
+
+          // If there is a root or general error distinct from standard fields
+          if (err.fieldErrors.root) {
+            setGlobalError(err.fieldErrors.root);
+          }
+        } else {
+          setGlobalError(err.message || 'Validation failed on server.');
+        }
+      } else {
+        setGlobalError(err instanceof Error ? err.message : 'Failed to create monitoring job.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const formContent = (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-700" htmlFor="target-url">
-            Target URL
-          </label>
+        <FormField
+          label="Target URL"
+          htmlFor="target-url"
+          required
+          error={fieldErrors.url}
+          hint="Website URL to monitor for dynamic updates."
+        >
           <Input
             id="target-url"
             type="url"
-            required
             placeholder="https://example.com/products/item"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            hasError={Boolean(fieldErrors.url)}
+            aria-describedby={fieldErrors.url ? 'target-url-error' : undefined}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              clearFieldError('url');
+            }}
           />
-        </div>
+        </FormField>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-700" htmlFor="notify-email">
-            Alert Email (Resend)
-          </label>
+        <FormField
+          label="Alert Email (Resend)"
+          htmlFor="notify-email"
+          required
+          error={fieldErrors.notificationEmail}
+          hint="Destination email for detected change reports."
+        >
           <Input
             id="notify-email"
             type="email"
-            required
             placeholder="alerts@company.com"
             value={notificationEmail}
-            onChange={(e) => setNotificationEmail(e.target.value)}
+            hasError={Boolean(fieldErrors.notificationEmail)}
+            aria-describedby={fieldErrors.notificationEmail ? 'notify-email-error' : undefined}
+            onChange={(e) => {
+              setNotificationEmail(e.target.value);
+              clearFieldError('notificationEmail');
+            }}
           />
-        </div>
+        </FormField>
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-slate-700" htmlFor="user-prompt">
-          Extraction Instructions (AI Selector Compiler Prompt)
-        </label>
+      <FormField
+        label="Extraction Instructions (AI Selector Compiler Prompt)"
+        htmlFor="user-prompt"
+        required
+        error={fieldErrors.userPrompt}
+        hint="Natural language instructions describing the data attributes to scrape (min. 5 chars)."
+      >
         <Textarea
           id="user-prompt"
-          required
-          minLength={5}
           placeholder="e.g. Extract the product title, current price, stock availability, and the purchase link."
           value={userPrompt}
-          onChange={(e) => setUserPrompt(e.target.value)}
+          hasError={Boolean(fieldErrors.userPrompt)}
+          aria-describedby={fieldErrors.userPrompt ? 'user-prompt-error' : undefined}
+          onChange={(e) => {
+            setUserPrompt(e.target.value);
+            clearFieldError('userPrompt');
+          }}
         />
-      </div>
+      </FormField>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-700" htmlFor="cron-preset">
-            Check Frequency (Minimum floor: 15 min)
-          </label>
+        <FormField
+          label="Check Frequency (Minimum floor: 15 min)"
+          htmlFor="cron-preset"
+          required
+          error={!useCustomCron ? fieldErrors.cronExpression : undefined}
+        >
           <select
             id="cron-preset"
-            className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
+            aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
+            className={cn(
+              'flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+              !useCustomCron && fieldErrors.cronExpression
+                ? 'border-red-400 text-red-950 focus-visible:border-red-500 focus-visible:ring-red-500/30 bg-red-50/20'
+                : 'border-slate-200 focus-visible:ring-slate-900'
+            )}
             value={useCustomCron ? 'custom' : cronPreset}
             onChange={(e) => {
+              clearFieldError('cronExpression');
               if (e.target.value === 'custom') {
                 setUseCustomCron(true);
               } else {
@@ -150,27 +237,37 @@ export function CreateJobForm({
             ))}
             <option value="custom">Custom Cron Expression...</option>
           </select>
-        </div>
+        </FormField>
 
         {useCustomCron && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-700" htmlFor="custom-cron">
-              Cron Expression (5 fields, min. 15m)
-            </label>
+          <FormField
+            label="Cron Expression (5 fields, min. 15m)"
+            htmlFor="custom-cron"
+            required
+            error={fieldErrors.cronExpression}
+            hint="5 space-delimited fields: min hour day month weekday."
+          >
             <Input
               id="custom-cron"
-              required
               placeholder="*/15 * * * *"
               value={customCron}
-              onChange={(e) => setCustomCron(e.target.value)}
+              hasError={Boolean(fieldErrors.cronExpression)}
+              aria-describedby={fieldErrors.cronExpression ? 'custom-cron-error' : undefined}
+              onChange={(e) => {
+                setCustomCron(e.target.value);
+                clearFieldError('cronExpression');
+              }}
             />
-          </div>
+          </FormField>
         )}
       </div>
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
+      {globalError && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 animate-in fade-in-50 duration-200"
+        >
+          {globalError}
         </div>
       )}
 
