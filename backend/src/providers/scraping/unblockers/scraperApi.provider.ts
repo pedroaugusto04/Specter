@@ -37,6 +37,10 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('render', 'true');
 
+      if (targetUrl.includes('.com.br')) {
+        endpoint.searchParams.set('country_code', 'br');
+      }
+
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
         signal: controller.signal,

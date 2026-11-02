@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 import {
   AntiBotBlockedError,
   NavigationTimeoutError,
@@ -51,38 +52,34 @@ export class JobService {
     }
 
     try {
-      // 18s allows remote proxy unblockers with JS rendering enough time to solve challenges
-      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 18000 });
+      // 30s allows remote residential proxies with JS rendering enough time to solve challenges
+      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 30000 });
       return { accessible: true };
     } catch (err) {
+      // Log the full internal error and unblocker breakdown for developer debugging
+      logger.warn('URL accessibility verification failed during probe', {
+        url: normalizedUrl,
+        internalError: err instanceof Error ? err.message : String(err),
+      });
+
       if (err instanceof AntiBotBlockedError) {
-        const hasUnblockers =
-          Boolean(env.ZENROWS_API_KEY) ||
-          Boolean(env.SCRAPERAPI_KEY) ||
-          Boolean(env.SCRAPINGBEE_API_KEY) ||
-          Boolean(env.CRAWLBASE_TOKEN);
-
-        const guidance = hasUnblockers
-          ? `Anti-bot protection active. All configured unblocker providers failed or exhausted their credits: ${err.message}`
-          : 'This website blocks automated requests (Anti-Bot / CAPTCHA detected). To monitor protected websites like Mercado Livre or Amazon, add an unblocker API key (ZENROWS_API_KEY or SCRAPERAPI_KEY) to your .env file.';
-
         return {
           accessible: false,
-          reason: guidance,
+          reason:
+            'This website is currently protected by automated security checks (Anti-Bot / CAPTCHA) or taking too long to respond. Please verify the URL or try again in a few moments.',
         };
       }
       if (err instanceof NavigationTimeoutError) {
         return {
           accessible: false,
-          reason: 'The target website or unblocker timed out during accessibility verification (18s). Please try again.',
+          reason:
+            'The target website took too long to respond during verification. Please try again in a few moments.',
         };
       }
       return {
         accessible: false,
         reason:
-          err instanceof Error
-            ? err.message
-            : 'Unable to connect to the target website.',
+          'Unable to verify target website accessibility. Please verify the URL and try again.',
       };
     }
   }

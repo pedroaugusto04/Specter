@@ -37,6 +37,12 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('js_render', 'true');
       endpoint.searchParams.set('premium_proxy', 'true');
+      // Block heavy assets (images, media, fonts) to accelerate page loading by 3-5x
+      endpoint.searchParams.set('block_resources', 'image,media,font');
+
+      if (targetUrl.includes('.com.br')) {
+        endpoint.searchParams.set('proxy_country', 'br');
+      }
 
       if (options?.waitForSelector) {
         endpoint.searchParams.set('wait_for', options.waitForSelector);

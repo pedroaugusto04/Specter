@@ -37,6 +37,10 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('javascript', 'true');
 
+      if (targetUrl.includes('.com.br')) {
+        endpoint.searchParams.set('country', 'BR');
+      }
+
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
         signal: controller.signal,
