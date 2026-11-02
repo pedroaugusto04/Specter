@@ -47,6 +47,7 @@ export interface ScrapingJobEntity {
   status: JobStatus;
   lastError: string | null;
   failureCount: number;
+  captureScreenshotOnChange: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +62,7 @@ export interface JobRunEntity {
   errorMessage: string | null;
   httpStatus: number | null;
   durationMs: number | null;
+  screenshotUrl: string | null;
   executedAt: Date;
 }
 

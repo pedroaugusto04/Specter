@@ -62,6 +62,7 @@ export interface ScrapingJobDto {
   status: JobStatus;
   lastError: string | null;
   failureCount: number;
+  captureScreenshotOnChange: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +77,7 @@ export interface JobRunDto {
   errorMessage: string | null;
   httpStatus: number | null;
   durationMs: number | null;
+  screenshotUrl: string | null;
   executedAt: string;
 }
 
@@ -286,6 +288,7 @@ export const api = {
     notificationEmail: string;
     webhookUrl?: string | null;
     cronExpression: string;
+    captureScreenshotOnChange?: boolean;
   }): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>('/api/jobs', {
       method: 'POST',
@@ -301,6 +304,7 @@ export const api = {
       notificationEmail?: string;
       webhookUrl?: string | null;
       cronExpression?: string;
+      captureScreenshotOnChange?: boolean;
       triggerRules?: TriggerRule[];
       triggerMatchMode?: 'any' | 'all';
     }

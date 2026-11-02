@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertCircle, Code2, GitCompare, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Camera, Code2, ExternalLink, GitCompare, ShieldAlert, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { api, type DiffSummary, type JobRunDto, type ScrapingJobDto } from '@/lib/api';
@@ -17,6 +17,7 @@ export function JobRunsDrawer({
   const [runs, setRuns] = React.useState<JobRunDto[]>([]);
   const [latestDiff, setLatestDiff] = React.useState<DiffSummary | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!job) return;
@@ -108,6 +109,36 @@ export function JobRunsDrawer({
                 </tbody>
               </table>
             </div>
+
+            {runs[0]?.screenshotUrl && (
+              <div className="overflow-hidden rounded-lg border border-border bg-muted/20">
+                <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                  <span className="flex items-center gap-1.5 font-mono">
+                    <Camera className="h-3.5 w-3.5 text-primary" />
+                    Latest Change Visual Proof
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedScreenshot(runs[0].screenshotUrl)}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                    Zoom Full Size
+                  </button>
+                </div>
+                <div
+                  className="relative group cursor-pointer overflow-hidden max-h-56"
+                  onClick={() => setSelectedScreenshot(runs[0].screenshotUrl)}
+                >
+                  <img
+                    src={runs[0].screenshotUrl}
+                    alt="Latest visual diff snapshot"
+                    className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.01]"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -187,6 +218,36 @@ export function JobRunsDrawer({
                       </div>
                     )}
 
+                    {run.screenshotUrl && (
+                      <div className="mt-3 overflow-hidden rounded-md border border-border bg-muted/20">
+                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <Camera className="h-3.5 w-3.5 text-primary" />
+                            Visual Diff Screenshot
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedScreenshot(run.screenshotUrl)}
+                            className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
+                          >
+                            <ZoomIn className="h-3 w-3" />
+                            Zoom
+                          </button>
+                        </div>
+                        <div
+                          className="relative group cursor-pointer overflow-hidden max-h-48"
+                          onClick={() => setSelectedScreenshot(run.screenshotUrl)}
+                        >
+                          <img
+                            src={run.screenshotUrl}
+                            alt="Visual snapshot"
+                            className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
+                            loading="lazy"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {run.extractedData && (
                       <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
                         {JSON.stringify(run.extractedData, null, 2)}
@@ -198,6 +259,51 @@ export function JobRunsDrawer({
             </div>
           )}
         </section>
+
+        {/* Screenshot Modal / Lightbox */}
+        {selectedScreenshot && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={() => setSelectedScreenshot(null)}
+          >
+            <div
+              className="relative max-h-[90vh] max-w-4xl w-full overflow-hidden rounded-xl border border-border bg-card p-2 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border pb-2 px-2 text-xs font-mono">
+                <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                  <Camera className="h-4 w-4 text-primary" />
+                  Visual Proof Snapshot
+                </span>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={selectedScreenshot}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open full size
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedScreenshot(null)}
+                    className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-[80vh] overflow-auto p-2">
+                <img
+                  src={selectedScreenshot}
+                  alt="Visual Proof Snapshot Full"
+                  className="w-full rounded-lg object-contain shadow-sm"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Drawer>
   );

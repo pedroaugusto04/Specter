@@ -7,6 +7,7 @@ import { NotificationDispatcher } from './providers/notifications/notificationDi
 import { TelegramNotificationProvider } from './providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from './providers/notifications/webhookNotification.provider.js';
 import { createScraperEngine } from './providers/scraping/scraper.factory.js';
+import { createStorageProvider } from './providers/storage/index.js';
 import { BullMqJobScheduler } from './queues/queues.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
@@ -31,6 +32,7 @@ async function bootstrap(): Promise<void> {
   const jobScheduler = new BullMqJobScheduler();
   const compilerProvider = createCompilerProvider();
   const scraperEngine = createScraperEngine();
+  const storageProvider = createStorageProvider();
 
   const emailNotificationProvider = createNotificationProvider();
   const telegramProvider = new TelegramNotificationProvider();
@@ -57,6 +59,7 @@ async function bootstrap(): Promise<void> {
     scraperEngine,
     notificationProvider: notificationDispatcher,
     jobScheduler,
+    storageProvider,
     sessionRepository,
   });
 

@@ -13,6 +13,7 @@ export interface AlertPayload {
   userId?: string;
   webhookUrl?: string | null;
   triggerReasons?: string[];
+  screenshotUrl?: string;
 }
 
 export interface INotificationProvider {

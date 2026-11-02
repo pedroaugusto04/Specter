@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
+import { Camera, CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +43,7 @@ export function CreateJobForm({
   const [notificationEmail, setNotificationEmail] = React.useState('');
   const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
+  const [captureScreenshotOnChange, setCaptureScreenshotOnChange] = React.useState(false);
   const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
@@ -66,6 +67,7 @@ export function CreateJobForm({
     userPrompt.trim().length > 0 ||
     notificationEmail.trim().length > 0 ||
     (showCustomWebhook && webhookUrl.trim().length > 0) ||
+    captureScreenshotOnChange ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
 
@@ -148,6 +150,7 @@ export function CreateJobForm({
         notificationEmail: notificationEmail.trim() || activeUser?.email || '',
         webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
         cronExpression: effectiveCron.trim(),
+        captureScreenshotOnChange,
       });
 
       setUrl('');
@@ -155,6 +158,7 @@ export function CreateJobForm({
       setNotificationEmail('');
       setShowCustomWebhook(false);
       setWebhookUrl('');
+      setCaptureScreenshotOnChange(false);
       setCronPreset('0 */6 * * *');
       setCustomCron('0 */6 * * *');
       setUseCustomCron(false);
@@ -491,6 +495,25 @@ export function CreateJobForm({
             />
           </FormField>
         )}
+
+        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-border/80 bg-muted/20 p-3 hover:bg-muted/40 transition-colors">
+          <input
+            type="checkbox"
+            id="capture-screenshot"
+            checked={captureScreenshotOnChange}
+            onChange={(e) => setCaptureScreenshotOnChange(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+          />
+          <div className="flex-1">
+            <span className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5">
+              <Camera className="h-3.5 w-3.5 text-muted-foreground" />
+              Capture visual screenshot on detected change
+            </span>
+            <span className="block text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              Uploads a visual proof snapshot to Supabase Storage only when page content changes. Disabled by default to preserve storage.
+            </span>
+          </div>
+        </label>
       </div>
 
       <div className="space-y-3 pt-1">
@@ -526,6 +549,25 @@ export function CreateJobForm({
             />
           </FormField>
         )}
+
+        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-border/80 bg-muted/20 p-3 hover:bg-muted/40 transition-colors">
+          <input
+            type="checkbox"
+            id="capture-screenshot"
+            checked={captureScreenshotOnChange}
+            onChange={(e) => setCaptureScreenshotOnChange(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+          />
+          <div className="flex-1">
+            <span className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5">
+              <Camera className="h-3.5 w-3.5 text-muted-foreground" />
+              Capture visual screenshot on detected change
+            </span>
+            <span className="block text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              Uploads a visual proof snapshot to Supabase Storage only when page content changes. Disabled by default to preserve storage.
+            </span>
+          </div>
+        </label>
       </div>
 
       {globalError && (

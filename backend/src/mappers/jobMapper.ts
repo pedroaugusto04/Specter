@@ -20,6 +20,7 @@ export interface ScrapingJobDto {
   status: JobStatus;
   lastError: string | null;
   failureCount: number;
+  captureScreenshotOnChange: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,7 @@ export interface JobRunDto {
   errorMessage: string | null;
   httpStatus: number | null;
   durationMs: number | null;
+  screenshotUrl: string | null;
   executedAt: string;
 }
 
@@ -61,6 +63,7 @@ export const JobMapper = {
       status: row.status,
       lastError: row.lastError ?? null,
       failureCount: row.failureCount,
+      captureScreenshotOnChange: row.captureScreenshotOnChange ?? false,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -79,6 +82,7 @@ export const JobMapper = {
       status: entity.status,
       lastError: entity.lastError,
       failureCount: entity.failureCount,
+      captureScreenshotOnChange: entity.captureScreenshotOnChange,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
     };
@@ -99,6 +103,7 @@ export const JobMapper = {
       errorMessage: row.errorMessage ?? null,
       httpStatus: row.httpStatus ?? null,
       durationMs: row.durationMs ?? null,
+      screenshotUrl: row.screenshotUrl ?? null,
       executedAt: row.executedAt,
     };
   },
@@ -114,6 +119,7 @@ export const JobMapper = {
       errorMessage: entity.errorMessage,
       httpStatus: entity.httpStatus,
       durationMs: entity.durationMs,
+      screenshotUrl: entity.screenshotUrl,
       executedAt: entity.executedAt.toISOString(),
     };
   },

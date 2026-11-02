@@ -24,6 +24,7 @@ export interface CreateScrapingJobRequest {
   notificationEmail?: string;
   webhookUrl?: string | null;
   cronExpression?: string;
+  captureScreenshotOnChange?: boolean;
 }
 
 export interface UpdateScrapingJobRequest {
@@ -32,6 +33,7 @@ export interface UpdateScrapingJobRequest {
   notificationEmail?: string;
   webhookUrl?: string | null;
   cronExpression?: string;
+  captureScreenshotOnChange?: boolean;
   triggerRules?: TriggerRule[];
   triggerMatchMode?: 'any' | 'all';
 }
@@ -125,6 +127,7 @@ export class JobService {
       notificationEmail: (request.notificationEmail ?? '').trim(),
       webhookUrl: request.webhookUrl?.trim() || null,
       cronExpression,
+      captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, 'initial');
@@ -174,6 +177,9 @@ export class JobService {
     }
     if (request.webhookUrl !== undefined) {
       patch.webhookUrl = request.webhookUrl?.trim() || null;
+    }
+    if (request.captureScreenshotOnChange !== undefined) {
+      patch.captureScreenshotOnChange = request.captureScreenshotOnChange;
     }
     if (request.cronExpression !== undefined) {
       const trimmedCron = request.cronExpression.trim();

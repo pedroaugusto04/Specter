@@ -8,6 +8,7 @@ import {
 } from '../errors/domainErrors.js';
 import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
+import { createStorageProvider, type IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
@@ -23,6 +24,7 @@ export interface ScrapeExecutionServiceDeps {
   scraperEngine: IScraperEngine;
   notificationProvider: INotificationProvider;
   jobScheduler: IJobScheduler;
+  storageProvider?: IStorageProvider;
   sessionRepository?: ISessionRepository;
   consecutiveFailuresForHealing?: number;
   maxHealingRetries?: number;
@@ -33,6 +35,7 @@ export class ScrapeExecutionService {
   private readonly scraperEngine: IScraperEngine;
   private readonly notificationProvider: INotificationProvider;
   private readonly jobScheduler: IJobScheduler;
+  private readonly storageProvider: IStorageProvider;
   private readonly sessionRepository?: ISessionRepository;
   private readonly consecutiveFailuresForHealing: number;
   private readonly maxHealingRetries: number;
@@ -42,6 +45,7 @@ export class ScrapeExecutionService {
     this.scraperEngine = deps.scraperEngine;
     this.notificationProvider = deps.notificationProvider;
     this.jobScheduler = deps.jobScheduler;
+    this.storageProvider = deps.storageProvider ?? createStorageProvider();
     this.sessionRepository = deps.sessionRepository;
     this.consecutiveFailuresForHealing =
       deps.consecutiveFailuresForHealing ?? env.CONSECUTIVE_FAILURES_FOR_HEALING;
@@ -90,6 +94,7 @@ export class ScrapeExecutionService {
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
         waitForSelector: job.extractorConfig.containerSelector,
         storageState,
+        captureScreenshot: job.captureScreenshotOnChange,
       });
       httpStatus = scrapeResult.httpStatus;
 
@@ -109,6 +114,25 @@ export class ScrapeExecutionService {
         hasChanges = previousRun.normalizedHash === currentHash ? 'NO' : 'YES';
       }
 
+      let screenshotUrl: string | null = null;
+      if (hasChanges === 'YES' && scrapeResult.screenshot && this.storageProvider.isEnabled) {
+        try {
+          const runTimestamp = Date.now();
+          const storageKey = `jobs/${job.id}/${runTimestamp}.jpg`;
+          const uploadRes = await this.storageProvider.upload(
+            storageKey,
+            scrapeResult.screenshot,
+            'image/jpeg'
+          );
+          screenshotUrl = uploadRes.publicUrl;
+        } catch (uploadErr) {
+          logger.error('Failed to upload screenshot to Supabase Storage', {
+            jobId: job.id,
+            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+          });
+        }
+      }
+
       const durationMs = Date.now() - startTime;
 
       const runRecord = await this.jobRepository.createRun({
@@ -119,6 +143,7 @@ export class ScrapeExecutionService {
         status: 'SUCCESS',
         httpStatus,
         durationMs,
+        screenshotUrl,
       });
 
       // Reset failure counter and ensure ACTIVE status on successful run
@@ -163,6 +188,7 @@ export class ScrapeExecutionService {
               diffSummary,
               data: extractedData,
               triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
+              screenshotUrl: screenshotUrl ?? undefined,
             });
           }
         }

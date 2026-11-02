@@ -64,6 +64,11 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   GOOGLE_CALLBACK_URL: z.string().optional().default(''),
+
+  // Supabase Object Storage (Screenshots & Visual Diffs)
+  SUPABASE_URL: z.string().optional().default(''),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(''),
+  SUPABASE_STORAGE_BUCKET: z.string().min(1).default('specter-screenshots'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

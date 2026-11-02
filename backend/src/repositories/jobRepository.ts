@@ -18,6 +18,7 @@ export interface CreateJobInput {
   notificationEmail: string;
   webhookUrl?: string | null;
   cronExpression: string;
+  captureScreenshotOnChange?: boolean;
 }
 
 export interface UpdateJobPatch {
@@ -31,6 +32,7 @@ export interface UpdateJobPatch {
   status?: JobStatus;
   lastError?: string | null;
   failureCount?: number;
+  captureScreenshotOnChange?: boolean;
 }
 
 export interface CreateJobRunInput {
@@ -42,6 +44,7 @@ export interface CreateJobRunInput {
   errorMessage?: string | null;
   httpStatus?: number | null;
   durationMs?: number | null;
+  screenshotUrl?: string | null;
   executedAt?: Date;
 }
 
@@ -85,6 +88,7 @@ export class DrizzleJobRepository implements IJobRepository {
         notificationEmail: input.notificationEmail,
         webhookUrl: input.webhookUrl ?? null,
         cronExpression: input.cronExpression,
+        captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
         status: 'PENDING_COMPILATION',
         failureCount: 0,
       })
@@ -171,6 +175,7 @@ export class DrizzleJobRepository implements IJobRepository {
         errorMessage: input.errorMessage ?? null,
         httpStatus: input.httpStatus ?? null,
         durationMs: input.durationMs ?? null,
+        screenshotUrl: input.screenshotUrl ?? null,
         ...(input.executedAt ? { executedAt: input.executedAt } : {}),
       })
       .returning();

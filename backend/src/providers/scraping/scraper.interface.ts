@@ -4,6 +4,7 @@ export interface ScrapeOptions {
   timeoutMs?: number;
   waitForSelector?: string;
   storageState?: PlaywrightStorageState;
+  captureScreenshot?: boolean;
 }
 
 export interface ScrapeResult {
@@ -11,6 +12,7 @@ export interface ScrapeResult {
   httpStatus: number;
   url: string;
   durationMs: number;
+  screenshot?: Buffer;
 }
 
 export interface IScraperEngine {

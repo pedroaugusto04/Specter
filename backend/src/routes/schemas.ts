@@ -84,6 +84,7 @@ export const jobInputSchema = z.object({
     .or(z.literal(''))
     .nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
+  captureScreenshotOnChange: z.boolean().default(false),
 });
 
 export const jobUpdateSchema = z.object({
@@ -119,6 +120,7 @@ export const jobUpdateSchema = z.object({
     .or(z.literal(''))
     .nullable(),
   cronExpression: cronExpressionSchema.optional(),
+  captureScreenshotOnChange: z.boolean().optional(),
   triggerRules: z.array(triggerRuleSchema).optional(),
   triggerMatchMode: triggerMatchModeSchema.optional(),
 });

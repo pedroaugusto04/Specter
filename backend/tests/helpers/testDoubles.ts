@@ -108,6 +108,7 @@ export class InMemoryJobRepository implements IJobRepository {
       status: 'PENDING_COMPILATION',
       lastError: null,
       failureCount: 0,
+      captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
       createdAt: now,
       updatedAt: now,
     };
@@ -166,6 +167,7 @@ export class InMemoryJobRepository implements IJobRepository {
       errorMessage: input.errorMessage ?? null,
       httpStatus: input.httpStatus ?? null,
       durationMs: input.durationMs ?? null,
+      screenshotUrl: input.screenshotUrl ?? null,
       executedAt: input.executedAt ?? new Date(),
     };
     this.runs.push(entity);

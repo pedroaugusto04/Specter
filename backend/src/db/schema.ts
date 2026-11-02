@@ -63,6 +63,9 @@ export const scrapingJobs = pgTable(
     lastError: text('last_error'),
     failureCount: integer('failure_count').default(0).notNull(),
 
+    // Visual Diff Screenshot Option (Defaults to false)
+    captureScreenshotOnChange: boolean('capture_screenshot_on_change').default(false).notNull(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -88,6 +91,7 @@ export const jobRuns = pgTable(
     errorMessage: text('error_message'),
     httpStatus: integer('http_status'),
     durationMs: integer('duration_ms'),
+    screenshotUrl: text('screenshot_url'),
 
     executedAt: timestamp('executed_at', { withTimezone: true }).defaultNow().notNull(),
   },

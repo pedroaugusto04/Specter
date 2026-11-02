@@ -126,6 +126,42 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       const finalUrl = page.url() || targetUrl;
       const durationMs = Date.now() - startTime;
 
+      let screenshot: Buffer | undefined;
+      if (options?.captureScreenshot) {
+        try {
+          if (options.waitForSelector) {
+            const targetLocator = page.locator(options.waitForSelector).first();
+            const isVisible = await targetLocator.isVisible({ timeout: 1500 }).catch(() => false);
+
+            if (isVisible) {
+              await targetLocator
+                .evaluate((el) => {
+                  el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+                })
+                .catch(() => {});
+
+              // Brief wait for any lazy-loaded images or styles to paint
+              await page.waitForTimeout(200);
+            }
+          }
+
+          screenshot = await page.screenshot({
+            type: 'jpeg',
+            quality: 80,
+            fullPage: false,
+          });
+        } catch {
+          // Graceful fallback to viewport snapshot if targeted scroll fails
+          screenshot = await page
+            .screenshot({
+              type: 'jpeg',
+              quality: 80,
+              fullPage: false,
+            })
+            .catch(() => undefined);
+        }
+      }
+
       // Check HTTP status code, URL redirects, and DOM challenge fingerprints
       detectAntiBotBlock(finalUrl, rawHtml, httpStatus);
 
@@ -134,6 +170,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         httpStatus,
         url: finalUrl,
         durationMs,
+        screenshot,
       };
     } finally {
       if (context) {
