@@ -53,7 +53,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
     ];
 
     if (payload.userPrompt) {
-      lines.push(`🎯 <b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
+      lines.push(`<b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
     }
 
     if (payload.triggerReasons && payload.triggerReasons.length > 0) {
