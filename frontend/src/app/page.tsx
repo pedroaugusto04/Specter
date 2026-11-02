@@ -18,8 +18,10 @@ export default function DashboardPage() {
   const [editingJob, setEditingJob] = React.useState<ScrapingJobDto | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const loadDashboard = React.useCallback(async () => {
+    setIsRefreshing(true);
     try {
       const [jobsData, statsData] = await Promise.all([api.listJobs(), api.getStats()]);
       setJobs(jobsData);
@@ -29,6 +31,8 @@ export default function DashboardPage() {
       setConnectionWarning(
         'Unable to connect to Fastify API. Please verify the backend service is running.'
       );
+    } finally {
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -79,6 +83,7 @@ export default function DashboardPage() {
         <JobsTable
           jobs={jobs}
           onRefresh={loadDashboard}
+          isRefreshing={isRefreshing}
           onSelectJobForHistory={(job) => setSelectedJob(job)}
           onEditJob={(job) => setEditingJob(job)}
         />

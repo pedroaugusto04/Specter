@@ -5,6 +5,7 @@ import {
   Clock,
   ExternalLink,
   History,
+  Loader2,
   Pause,
   Pencil,
   Play,
@@ -19,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useModal } from '@/components/ui/modal-dialog';
 import { api, type JobStatus, type ScrapingJobDto } from '@/lib/api';
 import { formatDateTime, parseErrorMessage } from '@/lib/utils';
+
+type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
 
 function renderStatusBadge(status: JobStatus) {
   switch (status) {
@@ -39,19 +42,25 @@ function renderStatusBadge(status: JobStatus) {
 export function JobsTable({
   jobs,
   onRefresh,
+  isRefreshing = false,
   onSelectJobForHistory,
   onEditJob,
 }: {
   jobs: ScrapingJobDto[];
   onRefresh: () => void;
+  isRefreshing?: boolean;
   onSelectJobForHistory: (job: ScrapingJobDto) => void;
   onEditJob: (job: ScrapingJobDto) => void;
 }) {
-  const [busyJobId, setBusyJobId] = React.useState<string | null>(null);
+  const [activeActions, setActiveActions] = React.useState<Record<string, RowActionType>>({});
   const modal = useModal();
 
-  const handleAction = async (jobId: string, fn: () => Promise<unknown>) => {
-    setBusyJobId(jobId);
+  const handleAction = async (
+    jobId: string,
+    action: RowActionType,
+    fn: () => Promise<unknown>
+  ) => {
+    setActiveActions((prev) => ({ ...prev, [jobId]: action }));
     try {
       await fn();
       onRefresh();
@@ -61,7 +70,11 @@ export function JobsTable({
         message: err instanceof Error ? err.message : 'Error executing action.',
       });
     } finally {
-      setBusyJobId(null);
+      setActiveActions((prev) => {
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
     }
   };
 
@@ -69,9 +82,9 @@ export function JobsTable({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Configured Monitors ({jobs.length})</CardTitle>
-        <Button variant="outline" size="sm" onClick={onRefresh}>
-          <RefreshCw className="h-3.5 w-3.5" />
-          Refresh
+        <Button variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
       </CardHeader>
       <CardContent>
@@ -99,7 +112,16 @@ export function JobsTable({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {jobs.map((job) => {
-                  const isBusy = busyJobId === job.id;
+                  const currentAction = activeActions[job.id];
+                  const isJobBusy = Boolean(currentAction);
+                  const isRunning = currentAction === 'run';
+                  const isRecompilingAction = currentAction === 'recompile';
+                  const isPausing = currentAction === 'pause';
+                  const isDeleting = currentAction === 'delete';
+
+                  const isCompilingState =
+                    job.status === 'PENDING_COMPILATION' || job.status === 'HEALING';
+                  const isCompiling = isCompilingState || isRecompilingAction;
                   const isPaused = job.status === 'PAUSED';
                   const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
 
@@ -162,32 +184,55 @@ export function JobsTable({
 
                       <td className="whitespace-nowrap py-3.5 pl-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
+                          {/* Edit: disabled while compiling, running or deleting */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
-                            title="Edit monitor configuration"
+                            disabled={isJobBusy || isCompiling}
+                            title={
+                              isCompiling
+                                ? 'Cannot edit monitor while AI selector compilation is in progress'
+                                : isRunning
+                                  ? 'Cannot edit monitor while extraction is in progress'
+                                  : 'Edit monitor configuration'
+                            }
                             onClick={() => onEditJob(job)}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                             Edit
                           </Button>
 
+                          {/* Run: disabled while compiling or if any action is busy; shows loading when running */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
-                            title="Run immediate extraction"
-                            onClick={() => handleAction(job.id, () => api.triggerNow(job.id))}
+                            disabled={isJobBusy || isCompiling}
+                            title={
+                              isCompiling
+                                ? 'Cannot run extraction while AI selector compilation is in progress'
+                                : isRunning
+                                  ? 'Executing extraction...'
+                                  : isJobBusy
+                                    ? 'Action in progress...'
+                                    : 'Run immediate extraction'
+                            }
+                            onClick={() =>
+                              handleAction(job.id, 'run', () => api.triggerNow(job.id))
+                            }
                           >
-                            <Zap className="h-3.5 w-3.5" />
-                            Run
+                            {isRunning ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+                            ) : (
+                              <Zap className="h-3.5 w-3.5" />
+                            )}
+                            <span>{isRunning ? 'Running...' : 'Run'}</span>
                           </Button>
 
+                          {/* History & Diff: read-only, remains enabled unless the row is being deleted */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
+                            disabled={isDeleting}
                             title="View snapshots, compiled selectors and diff history"
                             onClick={() => onSelectJobForHistory(job)}
                           >
@@ -195,39 +240,72 @@ export function JobsTable({
                             History & Diff
                           </Button>
 
+                          {/* Recompile: disabled while compiling or running; shows loading spinner while compiling */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
-                            title="Force AI re-compilation of selectors"
+                            disabled={isJobBusy || isCompiling}
+                            title={
+                              isCompiling
+                                ? 'AI compilation is already in progress'
+                                : isRunning
+                                  ? 'Cannot recompile while extraction is running'
+                                  : 'Force AI re-compilation of selectors'
+                            }
                             onClick={() =>
-                              handleAction(job.id, () => api.triggerRecompile(job.id))
+                              handleAction(job.id, 'recompile', () =>
+                                api.triggerRecompile(job.id)
+                              )
                             }
                           >
-                            <RefreshCw className="h-3.5 w-3.5" />
+                            {isCompiling ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
                           </Button>
 
+                          {/* Pause/Resume schedule: disabled during busy action or while compiling */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
-                            title={isPaused ? 'Resume schedule' : 'Pause schedule'}
+                            disabled={isJobBusy || isCompiling}
+                            title={
+                              isCompiling
+                                ? 'Schedule is suspended during AI compilation'
+                                : isRunning
+                                  ? 'Cannot change schedule state while extraction is running'
+                                  : isPaused
+                                    ? 'Resume schedule'
+                                    : 'Pause schedule'
+                            }
                             onClick={() =>
-                              handleAction(job.id, () => api.togglePause(job.id, !isPaused))
+                              handleAction(job.id, 'pause', () =>
+                                api.togglePause(job.id, !isPaused)
+                              )
                             }
                           >
-                            {isPaused ? (
+                            {isPausing ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
+                            ) : isPaused ? (
                               <Play className="h-3.5 w-3.5 text-emerald-600" />
                             ) : (
                               <Pause className="h-3.5 w-3.5 text-slate-600" />
                             )}
                           </Button>
 
+                          {/* Delete: disabled while any action is in flight */}
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isBusy}
-                            title="Delete monitor"
+                            disabled={isJobBusy}
+                            title={
+                              isRunning
+                                ? 'Cannot delete while extraction is in progress'
+                                : isRecompilingAction
+                                  ? 'Cannot delete while recompile request is running'
+                                  : 'Delete monitor'
+                            }
                             onClick={async () => {
                               const confirmed = await modal.confirm({
                                 title: 'Delete Monitor',
@@ -237,11 +315,15 @@ export function JobsTable({
                                 variant: 'destructive',
                               });
                               if (confirmed) {
-                                void handleAction(job.id, () => api.deleteJob(job.id));
+                                void handleAction(job.id, 'delete', () => api.deleteJob(job.id));
                               }
                             }}
                           >
-                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                            {isDeleting ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-red-600" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                            )}
                           </Button>
                         </div>
                       </td>
