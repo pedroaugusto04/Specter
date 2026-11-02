@@ -1,5 +1,6 @@
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
+import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
 const DEFAULT_USER_AGENT =
@@ -27,24 +28,26 @@ export class CheerioScraperEngine implements IScraperEngine {
         headers: {
           'User-Agent': DEFAULT_USER_AGENT,
           'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'sec-ch-ua': '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'Upgrade-Insecure-Requests': '1',
         },
         signal: controller.signal,
       });
 
       const httpStatus = response.status;
-      if (httpStatus === 403 || httpStatus === 429) {
-        throw new AntiBotBlockedError(
-          `Bloqueio anti-bot detectado com HTTP status ${httpStatus} em ${targetUrl}`,
-          httpStatus
-        );
-      }
-
       const rawHtml = await response.text();
+      const finalUrl = response.url || targetUrl;
+
+      // Check HTTP status code, URL redirects, and DOM challenge fingerprints
+      detectAntiBotBlock(finalUrl, rawHtml, httpStatus);
+
       return {
         rawHtml,
         httpStatus,
-        url: response.url || targetUrl,
+        url: finalUrl,
         durationMs: Date.now() - startTime,
       };
     } catch (err) {

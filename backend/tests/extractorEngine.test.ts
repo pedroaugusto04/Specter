@@ -6,20 +6,27 @@ import {
 
 describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
   const sampleHtml = `
-    <div id="catalog">
-      <article class="product-item" data-id="p-101">
-        <h2 class="title">Ergonomic Chair</h2>
-        <span class="price">$ 1,250.50</span>
-        <a class="details-link" href="/products/chair-101">View details</a>
-        <img class="cover" src="https://cdn.example.com/chair.jpg" />
-      </article>
-      <article class="product-item" data-id="p-102">
-        <h2 class="title">Adjustable Standing Desk</h2>
-        <span class="price">$ 2,100.00</span>
-        <a class="details-link" href="/products/desk-102">View details</a>
-        <img class="cover" src="https://cdn.example.com/desk.jpg" />
-      </article>
-    </div>
+    <html>
+      <head>
+        <title id="root-title">Mercado Libre</title>
+      </head>
+      <body>
+        <div id="catalog">
+          <article class="product-item" data-id="p-101">
+            <h2 class="title">Ergonomic Chair</h2>
+            <span class="price">$ 1,250.50</span>
+            <a class="details-link" href="/products/chair-101">View details</a>
+            <img class="cover" src="https://cdn.example.com/chair.jpg" />
+          </article>
+          <article class="product-item" data-id="p-102">
+            <h2 class="title">Adjustable Standing Desk</h2>
+            <span class="price">$ 2,100.00</span>
+            <a class="details-link" href="/products/desk-102">View details</a>
+            <img class="cover" src="https://cdn.example.com/desk.jpg" />
+          </article>
+        </div>
+      </body>
+    </html>
   `;
 
   it('extracts single-object fields including text, href, src, data-* attributes, and numeric coercion', () => {
@@ -69,5 +76,16 @@ describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
 
     expect(smoke.valid).toBe(false);
     expect(smoke.reason).toBeDefined();
+  });
+
+  it('rejects extractor configurations that only target document <title> or <head> tags', () => {
+    const smoke = validateExtractionSmokeTest(sampleHtml, {
+      fields: {
+        title: { selector: 'title#root-title', attribute: 'text' },
+      },
+    });
+
+    expect(smoke.valid).toBe(false);
+    expect(smoke.reason).toContain('target document <title> or <head> metadata');
   });
 });

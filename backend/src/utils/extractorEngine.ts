@@ -181,6 +181,19 @@ export function isExtractedPayloadEmpty(payload: ExtractedPayload | null | undef
   return !values.some((v) => v !== null && v !== undefined && v !== '');
 }
 
+function isDisallowedHeadSelector(selector: string): boolean {
+  const s = selector.trim().toLowerCase();
+  return (
+    s === 'title' ||
+    s.startsWith('title#') ||
+    s.startsWith('title.') ||
+    s.startsWith('title[') ||
+    s.startsWith('head ') ||
+    s.startsWith('head >') ||
+    s === 'head'
+  );
+}
+
 /**
  * Runs a pre-activation smoke test of the compiled ExtractorConfig against the sanitized DOM.
  */
@@ -193,6 +206,24 @@ export function validateExtractionSmokeTest(
       valid: false,
       extractedData: {},
       reason: 'Extractor config has no fields defined.',
+    };
+  }
+
+  // Guardrail: reject extractors where all field selectors target the <title> or <head> tag
+  const fieldDefs = Object.values(config.fields);
+  const allTargetHead =
+    fieldDefs.length > 0 &&
+    fieldDefs.every((def) => {
+      const norm = normalizeFieldDefinition(def);
+      return isDisallowedHeadSelector(norm.selector);
+    });
+
+  if (allTargetHead) {
+    return {
+      valid: false,
+      extractedData: {},
+      reason:
+        'Smoke test failed: selectors target document <title> or <head> metadata instead of visible <body> content.',
     };
   }
 

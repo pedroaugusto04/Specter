@@ -1,6 +1,7 @@
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
+import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
 const DEFAULT_USER_AGENT =
@@ -31,6 +32,8 @@ export class PlaywrightScraperEngine implements IScraperEngine {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
+          '--disable-infobars',
+          '--window-size=1920,1080',
         ],
       });
 
@@ -42,13 +45,36 @@ export class PlaywrightScraperEngine implements IScraperEngine {
           'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
           Accept:
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'sec-ch-ua': '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
           'Upgrade-Insecure-Requests': '1',
         },
       });
 
-      // Mask automation fingerprint (stealth)
+      // Mask automation fingerprint (stealth properties)
       await context.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        const globalTarget = globalThis as unknown as {
+          navigator?: Record<string, unknown>;
+          chrome?: Record<string, unknown>;
+        };
+
+        if (typeof globalTarget.navigator !== 'undefined') {
+          Object.defineProperty(globalTarget.navigator, 'webdriver', { get: () => undefined });
+          Object.defineProperty(globalTarget.navigator, 'languages', {
+            get: () => ['pt-BR', 'pt', 'en-US', 'en'],
+          });
+          Object.defineProperty(globalTarget.navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5],
+          });
+        }
+
+        globalTarget.chrome = {
+          runtime: {},
+          loadTimes: () => {},
+          csi: () => {},
+          app: {},
+        };
       });
 
       const page = await context.newPage();
@@ -83,14 +109,6 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
       const httpStatus = response?.status() ?? 200;
 
-      // Detect WAF / Cloudflare / Rate-Limit blocks without triggering layout self-healing
-      if (httpStatus === 403 || httpStatus === 429) {
-        throw new AntiBotBlockedError(
-          `Bloqueio anti-bot detectado com HTTP status ${httpStatus} em ${targetUrl}`,
-          httpStatus
-        );
-      }
-
       if (options?.waitForSelector) {
         await page
           .waitForSelector(options.waitForSelector, { timeout: Math.min(5000, timeoutMs) })
@@ -103,12 +121,16 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         .catch(() => {});
 
       const rawHtml = await page.content();
+      const finalUrl = page.url() || targetUrl;
       const durationMs = Date.now() - startTime;
+
+      // Check HTTP status code, URL redirects, and DOM challenge fingerprints
+      detectAntiBotBlock(finalUrl, rawHtml, httpStatus);
 
       return {
         rawHtml,
         httpStatus,
-        url: page.url() || targetUrl,
+        url: finalUrl,
         durationMs,
       };
     } finally {

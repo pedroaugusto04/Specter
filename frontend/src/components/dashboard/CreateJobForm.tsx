@@ -182,7 +182,7 @@ export function CreateJobForm({
       </div>
 
       <FormField
-        label="Extraction Instructions (AI Selector Compiler Prompt)"
+        label="Extraction Instructions"
         htmlFor="user-prompt"
         required
         error={fieldErrors.userPrompt}

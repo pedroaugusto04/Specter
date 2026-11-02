@@ -1,5 +1,5 @@
 import { env } from '../../config/env.js';
-import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
+import { CompilerValidationError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { AgyCliCompilerProvider, type CliCompilerOptions } from './agyCliCompiler.provider.js';
 import type { CompilerInput, ExtractorSchema, ICompilerProvider } from './compiler.interface.js';
@@ -59,7 +59,7 @@ export class CodexCompilerProvider implements ICompilerProvider {
             {
               role: 'system',
               content:
-                'You are a web selector compiler. Analyze the provided sanitized HTML and user request, and output ONLY a JSON object matching {"containerSelector"?: string, "fields": Record<string, {"selector": string, "attribute"?: "text"|"href"|"src", "type"?: "string"|"number"|"boolean"}>}. Prefer stable selectors like data-testid, semantic IDs, and HTML5 tags.',
+                'You are a web selector compiler. Analyze the provided sanitized HTML and user request, and output ONLY a JSON object matching {"containerSelector"?: string, "fields": Record<string, {"selector": string, "attribute"?: "text"|"href"|"src", "type"?: "string"|"number"|"boolean"}>}. Prefer stable selectors like data-testid, semantic IDs, and HTML5 tags. NEVER select the document <title> tag or <head> elements for content or product fields. Always locate data within the visible <body> content. If the page appears to be a security challenge, captcha, account verification, or access denied screen, output an empty fields object {}.',
             },
             {
               role: 'user',
@@ -98,20 +98,12 @@ export class CodexCompilerProvider implements ICompilerProvider {
       });
 
       return parsed;
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new CompilerTimeoutError(
-          `Codex compilation timed out after ${this.timeoutMs}ms`,
-          err
-        );
+    } catch (error) {
+      if (error instanceof CompilerValidationError) {
+        throw error;
       }
-      if (err instanceof CompilerValidationError || err instanceof CompilerTimeoutError) {
-        throw err;
-      }
-      throw new CompilerValidationError(
-        `Codex compilation failed: ${err instanceof Error ? err.message : String(err)}`,
-        err
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CompilerValidationError(`Codex/OpenAI compilation failed: ${message}`);
     } finally {
       clearTimeout(timeoutId);
     }
