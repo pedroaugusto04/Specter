@@ -8,6 +8,7 @@ import { EditJobModal } from '@/components/dashboard/EditJobModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
 import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
+import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { api, type DashboardStats, type ScrapingJobDto } from '@/lib/api';
 
@@ -45,28 +46,26 @@ export default function DashboardPage() {
   }, [loadDashboard]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-zinc-950/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      {/* Minimalist Top Bar */}
+      <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <SpecterLogo size="md" />
-            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-white/[0.08]">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-xs font-mono text-zinc-400 tracking-wide uppercase">
-                Radar Active
+            <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-border">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-foreground" />
+              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+                System Online
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button
               onClick={() => setIsCreateModalOpen(true)}
               size="sm"
-              className="flex items-center gap-1.5 shadow-sm bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-3.5 h-8 rounded-lg"
+              className="h-8 px-3 text-xs font-medium"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>New Monitor</span>
@@ -75,18 +74,36 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      {/* Main Workspace */}
+      <main className="flex-1 mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {/* Section Heading */}
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Monitors
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Scheduled web extraction and structured diff tracking.
+            </p>
+          </div>
+          <div className="text-[11px] font-mono text-muted-foreground">
+            Auto-sync: 10s interval
+          </div>
+        </div>
+
         {connectionWarning && (
-          <div className="rounded-xl border border-amber-500/20 bg-amber-950/30 px-4 py-3 text-xs text-amber-300 backdrop-blur-sm">
-            {connectionWarning}
+          <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs text-foreground flex items-center justify-between">
+            <span>{connectionWarning}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              Offline
+            </span>
           </div>
         )}
 
-        {/* High-Density KPI Cards */}
+        {/* Architectural Metric Strip */}
         <StatsCards stats={stats} />
 
-        {/* Central Fleet Monitoring Console */}
+        {/* Central Monitoring Table */}
         <JobsTable
           jobs={jobs}
           onRefresh={loadDashboard}
@@ -96,6 +113,14 @@ export default function DashboardPage() {
           onCreateClick={() => setIsCreateModalOpen(true)}
         />
       </main>
+
+      {/* Minimal Footer */}
+      <footer className="border-t border-border bg-card/40">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 text-[11px] font-mono text-muted-foreground">
+          <span>Specter Web Monitor</span>
+          <span>v1.0</span>
+        </div>
+      </footer>
 
       {/* Creation Modal */}
       <CreateJobModal

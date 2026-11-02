@@ -30,7 +30,7 @@ export function FormField({
         >
           <span>{label}</span>
           {required && (
-            <span className="text-red-400 font-semibold" title="Required field" aria-hidden="true">
+            <span className="text-muted-foreground font-mono" title="Required field" aria-hidden="true">
               *
             </span>
           )}
@@ -44,9 +44,9 @@ export function FormField({
           id={htmlFor ? `${htmlFor}-error` : undefined}
           role="alert"
           aria-live="polite"
-          className="flex items-start gap-1.5 pt-0.5 text-xs font-medium text-red-400 animate-in fade-in-50 duration-200"
+          className="flex items-start gap-1.5 pt-0.5 text-xs font-medium text-red-600 dark:text-red-400"
         >
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
       ) : hint ? (

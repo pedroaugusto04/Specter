@@ -116,31 +116,31 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
 
       {dialogState.isOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150 cursor-pointer"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 dark:bg-black/75 backdrop-blur-[2px] cursor-pointer"
           role="dialog"
           aria-modal="true"
           onClick={handleCancel}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-border bg-card text-card-foreground p-6 shadow-xl animate-in zoom-in-95 duration-150 cursor-default"
+            className="w-full max-w-md rounded-lg border border-border bg-card text-card-foreground p-6 shadow-xl cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${
                     dialogState.variant === 'destructive'
-                      ? 'bg-red-950/60 border-red-900/50 text-red-400'
-                      : 'bg-muted border-border text-muted-foreground'
+                      ? 'bg-red-50 border-red-200 text-red-600 dark:bg-red-950/50 dark:border-red-900/50 dark:text-red-400'
+                      : 'bg-muted border-border text-foreground'
                   }`}
                 >
                   {dialogState.variant === 'destructive' ? (
-                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTriangle className="h-4 w-4" />
                   ) : (
-                    <Info className="h-5 w-5" />
+                    <Info className="h-4 w-4" />
                   )}
                 </div>
-                <h3 className="text-base font-semibold text-foreground leading-snug">
+                <h3 className="text-sm font-semibold text-foreground leading-snug">
                   {dialogState.title}
                 </h3>
               </div>
@@ -153,11 +153,11 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
               </button>
             </div>
 
-            <p className="mt-3 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+            <p className="mt-3 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
               {dialogState.message}
             </p>
 
-            <div className="mt-6 flex justify-end gap-2.5">
+            <div className="mt-6 flex justify-end gap-2">
               {dialogState.type === 'confirm' && (
                 <Button variant="outline" size="sm" onClick={handleCancel}>
                   {dialogState.cancelLabel}

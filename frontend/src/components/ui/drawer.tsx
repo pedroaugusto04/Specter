@@ -51,20 +51,20 @@ export function Drawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex justify-end bg-black/40 dark:bg-black/70 backdrop-blur-[2px]"
       onClick={onBackdropClick}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className={`flex h-full w-full ${widthClass} flex-col border-l border-border bg-card text-card-foreground shadow-2xl animate-in slide-in-from-right duration-200`}
+        className={`flex h-full w-full ${widthClass} flex-col border-l border-border bg-card text-card-foreground shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || description) && (
           <div className="flex items-start justify-between border-b border-border px-6 py-4">
             <div className="min-w-0 pr-4">
               {title && (
-                <div className="text-base font-semibold text-foreground">{title}</div>
+                <div className="text-sm font-semibold text-foreground font-mono truncate">{title}</div>
               )}
               {description && (
                 <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>

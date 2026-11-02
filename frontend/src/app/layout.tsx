@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ModalProvider } from '@/components/ui/modal-dialog';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Specter — Autonomous Web Monitor',
-  description: 'Minimalist autonomous web monitoring and change detection platform.',
+  title: 'Specter — Web Change Monitor',
+  description: 'Minimalist web monitoring and structured change detection.',
   icons: {
-    icon: '/icon.svg',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
     shortcut: '/icon.svg',
     apple: '/icon.svg',
   },
@@ -18,9 +21,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-indigo-500/20 selection:text-indigo-200">
-        <ModalProvider>{children}</ModalProvider>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var saved = localStorage.getItem('specter-theme');
+                if (saved === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-foreground selection:text-background">
+        <ThemeProvider>
+          <ModalProvider>{children}</ModalProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

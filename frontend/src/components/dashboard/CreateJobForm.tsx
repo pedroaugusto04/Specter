@@ -189,8 +189,8 @@ export function CreateJobForm({
                 Checking website accessibility...
               </span>
             ) : probeState.status === 'accessible' && !fieldErrors.url ? (
-              <span className="flex items-center gap-1.5 font-medium text-emerald-400">
-                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <CheckCircle2 className="h-3 w-3 text-foreground" />
                 Website verified and accessible for automated monitoring.
               </span>
             ) : (
@@ -242,7 +242,7 @@ export function CreateJobForm({
         htmlFor="user-prompt"
         required
         error={fieldErrors.userPrompt}
-        hint="Natural language instructions describing the data attributes to scrape (min. 5 chars)."
+        hint="Describe the fields and data attributes to extract (min. 5 chars)."
       >
         <Textarea
           id="user-prompt"
@@ -270,10 +270,10 @@ export function CreateJobForm({
             aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
             aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
             className={cn(
-              'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+              'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
               !useCustomCron && fieldErrors.cronExpression
-                ? 'border-red-500/50 text-red-300 focus-visible:ring-red-500/30 bg-red-950/20'
-                : 'border-input focus-visible:ring-ring'
+                ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
+                : 'border-input'
             )}
             value={useCustomCron ? 'custom' : cronPreset}
             onChange={(e) => {
@@ -323,13 +323,13 @@ export function CreateJobForm({
       {globalError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300"
+          className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
         >
           {globalError}
         </div>
       )}
 
-      <div className="flex justify-end gap-2.5 pt-2">
+      <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
             Cancel

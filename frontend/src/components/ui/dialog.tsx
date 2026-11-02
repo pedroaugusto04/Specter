@@ -51,20 +51,20 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/70 backdrop-blur-[2px]"
       onClick={onBackdropClick}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className={`w-full ${maxWidthClass} rounded-xl border border-border bg-card text-card-foreground shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] overflow-hidden`}
+        className={`w-full ${maxWidthClass} rounded-lg border border-border bg-card text-card-foreground shadow-xl flex flex-col max-h-[90vh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || description) && (
           <div className="flex items-start justify-between border-b border-border px-6 py-4">
             <div className="min-w-0 pr-4">
               {title && (
-                <div className="text-base font-semibold text-foreground">{title}</div>
+                <div className="text-sm font-semibold text-foreground">{title}</div>
               )}
               {description && (
                 <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>

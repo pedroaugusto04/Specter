@@ -46,12 +46,12 @@ export function JobRunsDrawer({
       <div className="space-y-6">
         {/* Compiled Extractor Schema */}
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Code2 className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+            <Code2 className="h-3.5 w-3.5" />
             Extraction Schema
           </div>
           {job.extractorConfig ? (
-            <pre className="max-h-48 overflow-auto rounded-lg border border-border bg-zinc-950 p-3 text-xs text-zinc-200">
+            <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
               {JSON.stringify(job.extractorConfig, null, 2)}
             </pre>
           ) : (
@@ -64,13 +64,13 @@ export function JobRunsDrawer({
         {/* Latest Diff Summary */}
         {latestDiff && latestDiff.hasChanges && (
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <GitCompare className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              <GitCompare className="h-3.5 w-3.5" />
               Latest Diff ({latestDiff.totalChanges} changes)
             </div>
-            <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-hidden rounded-md border border-border">
               <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground">
+                <thead className="bg-muted/40 font-mono text-[11px] uppercase text-muted-foreground border-b border-border">
                   <tr>
                     <th className="px-3 py-2">Field</th>
                     <th className="px-3 py-2">Type</th>
@@ -96,10 +96,10 @@ export function JobRunsDrawer({
                             {item.changeType}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground">
+                        <td className="px-3 py-2 text-muted-foreground font-mono">
                           {item.previousValue === null ? '—' : String(item.previousValue)}
                         </td>
-                        <td className="px-3 py-2 font-semibold text-foreground">
+                        <td className="px-3 py-2 font-mono font-semibold text-foreground">
                           {item.currentValue === null ? '—' : String(item.currentValue)}
                         </td>
                       </tr>
@@ -113,7 +113,7 @@ export function JobRunsDrawer({
 
         {/* Execution History */}
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
             Run History ({runs.length})
           </h3>
 
@@ -131,7 +131,7 @@ export function JobRunsDrawer({
                 return (
                   <div
                     key={run.id}
-                    className="rounded-lg border border-border bg-card p-4 shadow-2xs"
+                    className="rounded-md border border-border bg-card p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -150,36 +150,36 @@ export function JobRunsDrawer({
                           Change: {run.hasChanges}
                         </Badge>
                         {run.httpStatus && (
-                          <span className="text-xs text-muted-foreground">HTTP {run.httpStatus}</span>
+                          <span className="font-mono text-xs text-muted-foreground">HTTP {run.httpStatus}</span>
                         )}
                         {run.durationMs !== null && (
-                          <span className="text-xs text-muted-foreground">{run.durationMs}ms</span>
+                          <span className="font-mono text-xs text-muted-foreground">{run.durationMs}ms</span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="font-mono text-xs text-muted-foreground">
                         {formatDateTime(run.executedAt)}
                       </span>
                     </div>
 
                     {run.normalizedHash && (
-                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground truncate">
                         SHA-256: {run.normalizedHash}
                       </p>
                     )}
 
                     {parsedError && (
-                      <div className="mt-2.5 rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300">
+                      <div className="mt-2.5 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                         <div className="flex items-start gap-2">
                           {parsedError.category === 'anti-bot' ? (
-                            <ShieldAlert className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-red-200">
+                            <p className="font-semibold">
                               {parsedError.title}
                             </p>
-                            <p className="mt-0.5 text-red-300 leading-relaxed">
+                            <p className="mt-0.5 leading-relaxed opacity-90">
                               {parsedError.description}
                             </p>
                           </div>
@@ -188,7 +188,7 @@ export function JobRunsDrawer({
                     )}
 
                     {run.extractedData && (
-                      <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-zinc-950 p-2.5 text-xs text-zinc-200">
+                      <pre className="mt-2 max-h-48 overflow-auto rounded border border-border bg-muted/50 p-2.5 font-mono text-xs text-foreground">
                         {JSON.stringify(run.extractedData, null, 2)}
                       </pre>
                     )}

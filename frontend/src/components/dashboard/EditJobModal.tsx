@@ -29,7 +29,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
-  // Sync state whenever the selected job or open status changes
   React.useEffect(() => {
     if (job && isOpen) {
       setUrl(job.url);
@@ -147,19 +146,19 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
       onClose={onClose}
       isDirty={isDirty}
       title="Edit Monitor"
-      description="Update target URL, extraction prompts, or check schedule."
+      description="Update target URL, extraction instructions, or check schedule."
       confirmTitle="Discard Unsaved Changes?"
       confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {willRecompile && (
-          <div className="flex items-start gap-2.5 rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-xs text-amber-300">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+          <div className="flex items-start gap-2.5 rounded-md border border-border bg-muted/60 p-3 text-xs text-foreground">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-foreground mt-0.5" />
             <div>
-              <p className="font-semibold text-amber-200">Re-compilation Trigger</p>
-              <p className="mt-0.5 text-amber-300/90 leading-relaxed">
-                Modifying the Target URL or Extraction Instructions will invalidate the currently
-                compiled extraction schema. Specter will re-analyze the target web page.
+              <p className="font-semibold text-foreground">Schema Re-compilation</p>
+              <p className="mt-0.5 text-muted-foreground leading-relaxed">
+                Modifying the Target URL or Extraction Instructions will invalidate the current
+                extraction schema and trigger a new analysis of the target page.
               </p>
             </div>
           </div>
@@ -213,7 +212,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
           htmlFor="edit-user-prompt"
           required
           error={fieldErrors.userPrompt}
-          hint="Natural language instructions describing the data attributes to scrape (min. 5 chars)."
+          hint="Describe the fields and data attributes to extract (min. 5 chars)."
         >
           <Textarea
             id="edit-user-prompt"
@@ -240,10 +239,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
               aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined}
               className={cn(
-                'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
                 !useCustomCron && fieldErrors.cronExpression
-                  ? 'border-red-500/50 text-red-300 focus-visible:ring-red-500/30 bg-red-950/20'
-                  : 'border-input focus-visible:ring-ring'
+                  ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
+                  : 'border-input'
               )}
               value={useCustomCron ? 'custom' : cronPreset}
               onChange={(e) => {
@@ -292,13 +291,13 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         {globalError && (
           <div
             role="alert"
-            className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-300 animate-in fade-in-50 duration-200"
+            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
           >
             {globalError}
           </div>
         )}
 
-        <div className="flex justify-end gap-2.5 pt-2">
+        <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
