@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Sparkles } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -13,7 +13,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
 import { ApiError, api } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
-import { validateJobForm, type JobFormField } from '@/lib/validation';
+import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 
 export interface CreateJobFormProps {
   onCreated: () => void;
@@ -38,6 +38,12 @@ export function CreateJobForm({
 
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
   const [globalError, setGlobalError] = React.useState<string | null>(null);
+
+  const [probeState, setProbeState] = React.useState<{
+    status: 'idle' | 'probing' | 'accessible' | 'blocked';
+    urlChecked?: string;
+    reason?: string;
+  }>({ status: 'idle' });
 
   const effectiveCron = useCustomCron ? customCron : cronPreset;
 
@@ -80,6 +86,38 @@ export function CreateJobForm({
     }
   };
 
+  const handleUrlBlur = async () => {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+
+    const urlError = validateUrl(trimmedUrl);
+    if (urlError) {
+      setFieldErrors((prev) => ({ ...prev, url: urlError }));
+      return;
+    }
+
+    if (probeState.urlChecked === trimmedUrl && probeState.status !== 'idle') {
+      return;
+    }
+
+    setProbeState({ status: 'probing', urlChecked: trimmedUrl });
+    try {
+      const res = await api.probeUrl(trimmedUrl);
+      if (res.accessible) {
+        setProbeState({ status: 'accessible', urlChecked: trimmedUrl });
+        clearFieldError('url');
+      } else {
+        const errorMsg =
+          res.reason ||
+          'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).';
+        setProbeState({ status: 'blocked', urlChecked: trimmedUrl, reason: errorMsg });
+        setFieldErrors((prev) => ({ ...prev, url: errorMsg }));
+      }
+    } catch {
+      setProbeState({ status: 'idle', urlChecked: trimmedUrl });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError(null);
@@ -98,6 +136,15 @@ export function CreateJobForm({
       return;
     }
 
+    if (probeState.status === 'blocked' && probeState.urlChecked === url.trim()) {
+      const errorMsg =
+        probeState.reason ||
+        'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).';
+      setFieldErrors((prev) => ({ ...prev, url: errorMsg }));
+      focusFirstInvalidField({ url: errorMsg });
+      return;
+    }
+
     setFieldErrors({});
     setLoading(true);
 
@@ -112,6 +159,7 @@ export function CreateJobForm({
       setUserPrompt('');
       setFieldErrors({});
       setGlobalError(null);
+      setProbeState({ status: 'idle' });
       onCreated();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -143,7 +191,21 @@ export function CreateJobForm({
           htmlFor="target-url"
           required
           error={fieldErrors.url}
-          hint="Website URL to monitor for dynamic updates."
+          hint={
+            probeState.status === 'probing' ? (
+              <span className="flex items-center gap-1.5 text-slate-500">
+                <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+                Checking website accessibility...
+              </span>
+            ) : probeState.status === 'accessible' && !fieldErrors.url ? (
+              <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                Website verified and accessible for automated monitoring.
+              </span>
+            ) : (
+              'Website URL to monitor for dynamic updates.'
+            )
+          }
         >
           <Input
             id="target-url"
@@ -155,7 +217,11 @@ export function CreateJobForm({
             onChange={(e) => {
               setUrl(e.target.value);
               clearFieldError('url');
+              if (probeState.status !== 'idle') {
+                setProbeState({ status: 'idle' });
+              }
             }}
+            onBlur={handleUrlBlur}
           />
         </FormField>
 
@@ -198,58 +264,70 @@ export function CreateJobForm({
             setUserPrompt(e.target.value);
             clearFieldError('userPrompt');
           }}
+          rows={3}
         />
       </FormField>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
-          label="Check Frequency (Minimum floor: 15 min)"
-          htmlFor="cron-preset"
-          required
-          error={!useCustomCron ? fieldErrors.cronExpression : undefined}
-        >
-          <select
-            id="cron-preset"
-            aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
-            aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
-            className={cn(
-              'flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
-              !useCustomCron && fieldErrors.cronExpression
-                ? 'border-red-400 text-red-950 focus-visible:border-red-500 focus-visible:ring-red-500/30 bg-red-50/20'
-                : 'border-slate-200 focus-visible:ring-slate-900'
-            )}
-            value={useCustomCron ? 'custom' : cronPreset}
-            onChange={(e) => {
+      <div className="space-y-2">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          Monitoring Frequency (Cron Schedule)
+        </label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {CRON_PRESETS.map((preset) => {
+            const isSelected = !useCustomCron && cronPreset === preset.value;
+            return (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => {
+                  setUseCustomCron(false);
+                  setCronPreset(preset.value);
+                  clearFieldError('cronExpression');
+                }}
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-left transition-colors',
+                  isSelected
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                )}
+              >
+                <div className="text-xs font-medium">{preset.label}</div>
+                <div
+                  className={cn(
+                    'font-mono text-[11px]',
+                    isSelected ? 'text-slate-300' : 'text-slate-400'
+                  )}
+                >
+                  {preset.value}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setUseCustomCron(!useCustomCron);
               clearFieldError('cronExpression');
-              if (e.target.value === 'custom') {
-                setUseCustomCron(true);
-              } else {
-                setUseCustomCron(false);
-                setCronPreset(e.target.value);
-                setCustomCron(e.target.value);
-              }
             }}
+            className="text-xs font-medium text-slate-600 hover:text-slate-900"
           >
-            {CRON_PRESETS.map((preset) => (
-              <option key={preset.value} value={preset.value}>
-                {preset.label} ({preset.value})
-              </option>
-            ))}
-            <option value="custom">Custom Cron Expression...</option>
-          </select>
-        </FormField>
+            {useCustomCron ? '← Use standard schedule presets' : '+ Use custom cron expression'}
+          </button>
+        </div>
 
         {useCustomCron && (
           <FormField
-            label="Cron Expression (5 fields, min. 15m)"
+            label="Custom Cron Expression"
             htmlFor="custom-cron"
-            required
             error={fieldErrors.cronExpression}
-            hint="5 space-delimited fields: min hour day month weekday."
+            hint="Format: minute hour day month weekday. Minimum allowed interval is 15 minutes."
           >
             <Input
               id="custom-cron"
-              placeholder="*/15 * * * *"
+              placeholder="0 */6 * * *"
               value={customCron}
               hasError={Boolean(fieldErrors.cronExpression)}
               aria-describedby={fieldErrors.cronExpression ? 'custom-cron-error' : undefined}
@@ -257,6 +335,7 @@ export function CreateJobForm({
                 setCustomCron(e.target.value);
                 clearFieldError('cronExpression');
               }}
+              className="font-mono text-xs"
             />
           </FormField>
         )}
@@ -265,7 +344,7 @@ export function CreateJobForm({
       {globalError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 animate-in fade-in-50 duration-200"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
         >
           {globalError}
         </div>

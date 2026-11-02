@@ -6,7 +6,7 @@ export interface FormFieldProps {
   label?: React.ReactNode;
   htmlFor?: string;
   error?: string | null;
-  hint?: string | null;
+  hint?: React.ReactNode;
   required?: boolean;
   children: React.ReactNode;
   className?: string;
@@ -50,7 +50,12 @@ export function FormField({
           <span>{error}</span>
         </p>
       ) : hint ? (
-        <p className="pt-0.5 text-xs text-slate-500">{hint}</p>
+        <div
+          id={htmlFor ? `${htmlFor}-hint` : undefined}
+          className="text-[11px] text-slate-500"
+        >
+          {hint}
+        </div>
       ) : null}
     </div>
   );

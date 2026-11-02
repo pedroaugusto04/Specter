@@ -165,6 +165,13 @@ export const api = {
     return request<ScrapingJobDto[]>(`/api/jobs${query}`);
   },
 
+  probeUrl(url: string): Promise<{ accessible: boolean; reason?: string }> {
+    return request<{ accessible: boolean; reason?: string }>('/api/jobs/probe', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+
   createJob(input: {
     url: string;
     userPrompt: string;

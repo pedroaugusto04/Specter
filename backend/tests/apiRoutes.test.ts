@@ -1,18 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
+import { AntiBotBlockedError } from '../src/errors/domainErrors.js';
 import { JobService } from '../src/services/jobService.js';
-import { InMemoryJobRepository, MockJobScheduler } from './helpers/testDoubles.js';
+import {
+  InMemoryJobRepository,
+  MockJobScheduler,
+  MockScraperEngine,
+} from './helpers/testDoubles.js';
 
 describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
   let app: FastifyInstance;
   let repository: InMemoryJobRepository;
   let scheduler: MockJobScheduler;
+  let scraperEngine: MockScraperEngine;
 
   beforeEach(async () => {
     repository = new InMemoryJobRepository();
     scheduler = new MockJobScheduler();
-    const jobService = new JobService(repository, scheduler);
+    scraperEngine = new MockScraperEngine();
+    const jobService = new JobService(repository, scheduler, scraperEngine);
     app = await buildApp({ jobService, enableLogger: false });
   });
 
@@ -109,70 +116,82 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(pauseRes.statusCode).toBe(200);
     expect(pauseRes.json().data.status).toBe('PAUSED');
 
-    // Stats endpoint
-    const statsRes = await app.inject({
-      method: 'GET',
-      url: '/api/stats',
+    // Resume job
+    const resumeRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${jobId}/pause`,
+      payload: { paused: false },
     });
-    expect(statsRes.statusCode).toBe(200);
-    expect(statsRes.json().data.totalJobs).toBe(1);
+    expect(resumeRes.statusCode).toBe(200);
+
+    // Trigger manual scrape
+    const triggerRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${jobId}/trigger`,
+    });
+    expect(triggerRes.statusCode).toBe(200);
+
+    // List jobs
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/api/jobs',
+    });
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.json().data).toHaveLength(1);
 
     // Delete job
-    const delRes = await app.inject({
+    const deleteRes = await app.inject({
       method: 'DELETE',
       url: `/api/jobs/${jobId}`,
     });
-    expect(delRes.statusCode).toBe(204);
+    expect(deleteRes.statusCode).toBe(204);
 
-    // Verify 404 after deletion
-    const getRes = await app.inject({
+    const checkRes = await app.inject({
       method: 'GET',
       url: `/api/jobs/${jobId}`,
     });
-    expect(getRes.statusCode).toBe(404);
+    expect(checkRes.statusCode).toBe(404);
   });
 
-  it('updates an existing monitor configuration and handles recompilation triggers appropriately', async () => {
-    // 1. Create monitor
+  it('supports partial configuration update (PATCH /api/jobs/:id) and enqueues re-compilation on target changes', async () => {
+    // 1. Create initial job
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',
       payload: {
-        url: 'https://shop.example.com/shoes',
-        userPrompt: 'Extract shoe name and discounted price',
-        notificationEmail: 'alerts@shoeshop.com',
+        url: 'https://store.example.com/shoes',
+        userPrompt: 'Extract shoe name and current price in USD',
+        notificationEmail: 'buyer@example.com',
         cronExpression: '0 */6 * * *',
       },
     });
     expect(createRes.statusCode).toBe(201);
     const job = createRes.json().data;
 
-    // Simulate job was compiled and activated
+    // Simulate compilation completing and job being ACTIVE with a scheduled repeatable
     await repository.updateJob(job.id, {
       status: 'ACTIVE',
-      bullmqRepeatableKey: `repeat:${job.id}:0 */6 * * *`,
+      extractorConfig: { fields: { title: 'h1', price: '.price' } },
+      bullmqRepeatableKey: 'repeat:fake-key',
     });
-    scheduler.scheduledRepeatables.set(job.id, `repeat:${job.id}:0 */6 * * *`);
+    scheduler.scheduledRepeatables.set(job.id, 'repeat:fake-key');
 
-    // 2. Update notification email and cron expression only (no recompile needed)
+    // 2. Update cron expression only: should update schedule without triggering re-compilation
     const updateCronRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
       payload: {
-        notificationEmail: 'newemail@shoeshop.com',
-        cronExpression: '*/30 * * * *',
+        cronExpression: '0 */12 * * *',
       },
     });
     expect(updateCronRes.statusCode).toBe(200);
     const updatedData1 = updateCronRes.json().data;
-    expect(updatedData1.notificationEmail).toBe('newemail@shoeshop.com');
-    expect(updatedData1.cronExpression).toBe('*/30 * * * *');
+    expect(updatedData1.cronExpression).toBe('0 */12 * * *');
     expect(updatedData1.status).toBe('ACTIVE');
-    expect(scheduler.scheduledRepeatables.get(job.id)).toBe(`repeat:${job.id}:*/30 * * * *`);
-    // No new compilation should have been enqueued
-    expect(scheduler.compilationQueue).toHaveLength(1); // Only the initial one from creation
+    expect(scheduler.scheduledRepeatables.get(job.id)).toBe(`repeat:${job.id}:0 */12 * * *`);
+    expect(scheduler.compilationQueue).toHaveLength(1); // Only initial compilation, not re-queued
 
-    // 3. Update extraction prompt (triggers recompilation)
+    // 3. Update prompt: should invalidate schema, reset repeatable, and re-enqueue compilation
     const updatePromptRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
@@ -210,5 +229,53 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       },
     });
     expect(notFoundRes.statusCode).toBe(404);
+  });
+
+  it('pre-flight probe endpoint (POST /api/jobs/probe) reports accessibility and blocks anti-bot protected sites', async () => {
+    // 1. Accessible URL
+    const okRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs/probe',
+      payload: {
+        url: 'https://news.example.com/articles',
+      },
+    });
+    expect(okRes.statusCode).toBe(200);
+    expect(okRes.json().data).toEqual({ accessible: true });
+
+    // 2. Protected URL (e.g. Mercado Livre / Cloudflare anti-bot challenge)
+    scraperEngine.setHandler(async () => {
+      throw new AntiBotBlockedError('Cloudflare challenge detected', 403);
+    });
+
+    const blockedRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs/probe',
+      payload: {
+        url: 'https://www.mercadolivre.com.br/produto-xyz',
+      },
+    });
+    expect(blockedRes.statusCode).toBe(200);
+    const blockedData = blockedRes.json().data;
+    expect(blockedData.accessible).toBe(false);
+    expect(blockedData.reason).toContain('Anti-Bot / CAPTCHA');
+
+    // 3. Attempting to create a job on an anti-bot protected URL fails early at validation
+    const createBlockedRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      payload: {
+        url: 'https://www.mercadolivre.com.br/produto-xyz',
+        userPrompt: 'Extract title and price',
+        notificationEmail: 'user@example.com',
+      },
+    });
+    expect(createBlockedRes.statusCode).toBe(400);
+    const createBlockedJson = createBlockedRes.json();
+    expect(createBlockedJson.error).toBe('VALIDATION_ERROR');
+    expect(createBlockedJson.fields.url).toContain('Anti-Bot / CAPTCHA');
+    // Ensure no job was enqueued or persisted
+    expect(repository.jobs.size).toBe(0);
+    expect(scheduler.compilationQueue).toHaveLength(0);
   });
 });

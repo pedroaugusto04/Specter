@@ -1,5 +1,11 @@
-import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
+import {
+  AntiBotBlockedError,
+  NavigationTimeoutError,
+  NotFoundError,
+  ValidationError,
+} from '../errors/domainErrors.js';
 import { JobMapper, type JobRunDto, type ScrapingJobDto } from '../mappers/jobMapper.js';
+import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { DashboardStats, IJobRepository } from '../repositories/jobRepository.js';
 import type { DiffSummary, JobStatus } from '../types/domain.js';
@@ -25,10 +31,49 @@ export interface UpdateScrapingJobRequest {
 export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
+  private readonly scraperEngine?: IScraperEngine;
 
-  constructor(jobRepository: IJobRepository, jobScheduler: IJobScheduler) {
+  constructor(
+    jobRepository: IJobRepository,
+    jobScheduler: IJobScheduler,
+    scraperEngine?: IScraperEngine
+  ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
+    this.scraperEngine = scraperEngine;
+  }
+
+  async probeUrl(targetUrl: string): Promise<{ accessible: boolean; reason?: string }> {
+    const normalizedUrl = normalizeUrl(targetUrl);
+    if (!this.scraperEngine) {
+      return { accessible: true };
+    }
+
+    try {
+      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 7000 });
+      return { accessible: true };
+    } catch (err) {
+      if (err instanceof AntiBotBlockedError) {
+        return {
+          accessible: false,
+          reason:
+            'This website blocks automated access (Anti-Bot / CAPTCHA protection detected). Continuous monitoring is not supported for this address.',
+        };
+      }
+      if (err instanceof NavigationTimeoutError) {
+        return {
+          accessible: false,
+          reason: 'The target website timed out and did not respond within 7 seconds.',
+        };
+      }
+      return {
+        accessible: false,
+        reason:
+          err instanceof Error
+            ? err.message
+            : 'Unable to connect to the target website.',
+      };
+    }
   }
 
   async createJob(request: CreateScrapingJobRequest): Promise<ScrapingJobDto> {
@@ -41,6 +86,17 @@ export class JobService {
         cronCheck.error ??
         'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
       throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
+    }
+
+    // Pre-flight check: verify URL accessibility and detect active anti-bot protections early
+    if (this.scraperEngine) {
+      const probe = await this.probeUrl(normalizedUrl);
+      if (!probe.accessible) {
+        throw new ValidationError(
+          probe.reason || 'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).',
+          [{ field: 'url', message: probe.reason || 'Anti-bot or access protection detected on target URL.' }]
+        );
+      }
     }
 
     const createdEntity = await this.jobRepository.createJob({
@@ -104,6 +160,16 @@ export class JobService {
       patch.cronExpression = trimmedCron;
     }
 
+    if (patch.url !== undefined && patch.url !== existing.url && this.scraperEngine) {
+      const probe = await this.probeUrl(patch.url);
+      if (!probe.accessible) {
+        throw new ValidationError(
+          probe.reason || 'This website blocks automated access (Anti-Bot / CAPTCHA protection detected).',
+          [{ field: 'url', message: probe.reason || 'Anti-bot or access protection detected on target URL.' }]
+        );
+      }
+    }
+
     const needsRecompile =
       (patch.url !== undefined && patch.url !== existing.url) ||
       (patch.userPrompt !== undefined && patch.userPrompt !== existing.userPrompt);
@@ -126,18 +192,17 @@ export class JobService {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
-    // If URL or prompt changed, trigger recompilation
     if (needsRecompile) {
       await this.jobRepository.updateJob(id, {
         status: 'PENDING_COMPILATION',
         failureCount: 0,
+        lastError: null,
       });
       await this.jobScheduler.enqueueCompilation(id, 'manual');
-      const refreshed = await this.jobRepository.findById(id);
-      return JobMapper.entityToDto(refreshed ?? updated);
     }
 
-    return JobMapper.entityToDto(updated);
+    const finalEntity = await this.jobRepository.findById(id);
+    return JobMapper.entityToDto(finalEntity ?? updated);
   }
 
   async setJobPauseState(id: string, paused: boolean): Promise<ScrapingJobDto> {
@@ -147,7 +212,9 @@ export class JobService {
     }
 
     if (paused) {
-      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      if (existing.bullmqRepeatableKey) {
+        await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      }
       const updated = await this.jobRepository.updateJob(id, {
         status: 'PAUSED',
         bullmqRepeatableKey: null,
@@ -155,12 +222,9 @@ export class JobService {
       return JobMapper.entityToDto(updated ?? existing);
     }
 
-    // Resume job
     if (!existing.extractorConfig) {
-      const updated = await this.jobRepository.updateJob(id, {
-        status: 'PENDING_COMPILATION',
-      });
-      await this.jobScheduler.enqueueCompilation(existing.id, 'initial');
+      const updated = await this.jobRepository.updateJob(id, { status: 'PENDING_COMPILATION' });
+      await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
       return JobMapper.entityToDto(updated ?? existing);
     }
 

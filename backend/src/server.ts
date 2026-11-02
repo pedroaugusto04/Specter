@@ -37,7 +37,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const retentionService = new RetentionService(jobRepository);
-  const jobService = new JobService(jobRepository, jobScheduler);
+  const jobService = new JobService(jobRepository, jobScheduler, scraperEngine);
 
   // Run migrations automatically on startup
   try {

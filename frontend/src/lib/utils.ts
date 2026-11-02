@@ -64,29 +64,33 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
   return { valid: true };
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(isoString: string): string {
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    return new Intl.DateTimeFormat('pt-BR', {
       dateStyle: 'short',
       timeStyle: 'medium',
-    }).format(new Date(iso));
+    }).format(d);
   } catch {
-    return iso;
+    return isoString;
   }
 }
 
-export interface ParsedError {
+export interface ParsedErrorMessage {
+  category: 'anti-bot' | 'timeout' | 'selector' | 'generic';
   title: string;
   description: string;
-  category: 'anti-bot' | 'timeout' | 'selector' | 'validation' | 'generic';
 }
 
 /**
- * Transforms raw error messages into purely user-friendly explanatory text,
- * completely omitting stack traces, source file paths, or internal code details.
+ * Parses raw error strings or exception stack dumps from database runs/jobs
+ * into a structured, human-readable format, shielding users from internal stack traces.
  */
-export function parseErrorMessage(raw: string | null | undefined): ParsedError | null {
-  if (!raw || !raw.trim()) return null;
+export function parseErrorMessage(rawError: string | null | undefined): ParsedErrorMessage | null {
+  if (!rawError) return null;
+  const raw = String(rawError).trim();
+  if (!raw) return null;
 
   // Discard any line that looks like a stack trace or code location
   const cleanLines = raw
@@ -112,18 +116,18 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
     lower.includes('cloudflare') ||
     lower.includes('botblocked')
   ) {
-    let description = 'O site de destino identificou a requisição automatizada e exigiu verificação de segurança.';
-    if (lower.includes('redirecionamento') || lower.includes('account-verification')) {
-      description = 'O site redirecionou para uma tela de verificação humana (CAPTCHA / conta).';
+    let description = 'The target website identified automated access and required a security check.';
+    if (lower.includes('redirect') || lower.includes('redirecionamento') || lower.includes('account-verification')) {
+      description = 'The target website redirected to a human verification screen (CAPTCHA / checkpoint).';
     } else if (lower.includes('403') || lower.includes('429')) {
-      description = 'O site bloqueou o acesso automatizado (HTTP 403/429 - Proteção WAF / Cloudflare).';
-    } else if (lower.includes('conteúdo') || lower.includes('desafio')) {
-      description = 'A página apresentou um desafio interativo de segurança (Cloudflare / CAPTCHA).';
+      description = 'The target website blocked automated access (HTTP 403/429 - WAF / Cloudflare protection).';
+    } else if (lower.includes('challenge') || lower.includes('desafio')) {
+      description = 'The target page presented an interactive security challenge (Cloudflare / CAPTCHA).';
     }
 
     return {
       category: 'anti-bot',
-      title: 'Bloqueio Anti-Bot Detectado',
+      title: 'Anti-Bot Block Detected',
       description,
     };
   }
@@ -131,8 +135,8 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
   if (lower.includes('timeout') || lower.includes('tempo limite')) {
     return {
       category: 'timeout',
-      title: 'Tempo Limite Esgotado',
-      description: 'O site demorou muito para responder e a navegação excedeu o tempo limite configurado.',
+      title: 'Navigation Timeout',
+      description: 'The target website took too long to respond and navigation timed out.',
     };
   }
 
@@ -144,8 +148,8 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
   ) {
     return {
       category: 'selector',
-      title: 'Incompatibilidade de Seletores',
-      description: 'Os dados não foram encontrados na página atual. O layout do site pode ter sido modificado.',
+      title: 'Selector Mismatch',
+      description: 'Requested data was not found on the page. The site layout may have changed.',
     };
   }
 
@@ -168,8 +172,8 @@ export function parseErrorMessage(raw: string | null | undefined): ParsedError |
   if (isTechnicalNoise) {
     return {
       category: 'generic',
-      title: 'Falha na Execução',
-      description: 'Ocorreu uma instabilidade inesperada ao processar esta requisição.',
+      title: 'Execution Failure',
+      description: 'An unexpected instability occurred while processing this request.',
     };
   }
 

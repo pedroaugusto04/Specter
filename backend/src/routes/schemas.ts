@@ -18,6 +18,17 @@ export const cronExpressionSchema = z
     }
   });
 
+export const jobProbeSchema = z.object({
+  url: z
+    .string({ required_error: 'Target URL is required' })
+    .trim()
+    .min(1, 'Target URL is required')
+    .url('Target URL must be a valid URL format (e.g. https://example.com)')
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+      message: 'Target URL must start with http:// or https://',
+    }),
+});
+
 export const jobInputSchema = z.object({
   userId: z.string().trim().min(1).optional(),
   url: z

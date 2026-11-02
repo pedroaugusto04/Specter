@@ -6,6 +6,7 @@ import { logger } from '../utils/logger.js';
 import {
   jobInputSchema,
   jobPauseSchema,
+  jobProbeSchema,
   jobRunsQuerySchema,
   jobStatusQuerySchema,
   jobUpdateSchema,
@@ -74,6 +75,12 @@ export function registerJobRoutes(app: FastifyInstance, jobService: JobService):
     const query = jobStatusQuerySchema.parse(request.query);
     const jobs = await jobService.listJobs(query.status);
     return { data: jobs };
+  });
+
+  app.post('/api/jobs/probe', async (request, reply) => {
+    const { url } = jobProbeSchema.parse(request.body);
+    const result = await jobService.probeUrl(url);
+    return reply.status(200).send({ data: result });
   });
 
   app.get<{ Params: { id: string } }>('/api/jobs/:id', async (request) => {

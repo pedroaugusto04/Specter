@@ -14,30 +14,35 @@ import {
 export function formatUserErrorMessage(error: unknown): string {
   if (error instanceof AntiBotBlockedError) {
     const msg = error.message.toLowerCase();
-    if (msg.includes('redirecionamento') || msg.includes('account-verification') || msg.includes('checkpoint')) {
-      return 'Bloqueio anti-bot detectado: o site redirecionou para uma tela de verificação de segurança ou CAPTCHA.';
+    if (
+      msg.includes('redirect') ||
+      msg.includes('redirecionamento') ||
+      msg.includes('account-verification') ||
+      msg.includes('checkpoint')
+    ) {
+      return 'Anti-bot block detected: target website redirected to a security checkpoint or CAPTCHA verification screen.';
     }
     if (error.httpStatus === 403 || error.httpStatus === 429) {
-      return `Bloqueio anti-bot detectado: o site recusou o acesso (HTTP ${error.httpStatus}).`;
+      return `Anti-bot block detected: target website refused access (HTTP ${error.httpStatus}).`;
     }
-    return 'Bloqueio anti-bot detectado: a página apresentou um desafio de segurança (Cloudflare / CAPTCHA).';
+    return 'Anti-bot block detected: page presented an automated security challenge (Cloudflare / CAPTCHA).';
   }
 
   if (error instanceof NavigationTimeoutError) {
-    return 'Tempo limite esgotado: o site demorou muito para responder e a navegação excedeu o tempo limite.';
+    return 'Navigation timeout: target website took too long to respond.';
   }
 
   if (error instanceof SelectorMismatchError) {
-    return 'Incompatibilidade de seletores: os dados não foram encontrados na página (o layout do site pode ter mudado).';
+    return 'Selector mismatch: requested data could not be found on page (site layout may have changed).';
   }
 
   if (error instanceof CompilerTimeoutError) {
-    return 'Tempo limite de compilação excedido pelo agente de inteligência artificial.';
+    return 'Compilation timeout exceeded by AI extractor agent.';
   }
 
   if (error instanceof CompilerValidationError) {
     const rawReason = error.message ? error.message.replace(/^[A-Za-z0-9_]+Error:\s*/, '') : '';
-    return `Falha na validação do extrator (Smoke test): ${rawReason || 'os seletores compilados pela IA não extraíram os campos solicitados.'}`;
+    return `Extractor validation failed (smoke test): ${rawReason || 'compiled selectors returned no valid data.'}`;
   }
 
   if (error instanceof DomainError) {
@@ -47,7 +52,7 @@ export function formatUserErrorMessage(error: unknown): string {
   const rawMessage = error instanceof Error ? error.message : String(error);
 
   // Take only the first line to discard any attached stack traces
-  const firstLine = rawMessage.split('\n')[0]?.trim() || 'Erro durante a execução.';
+  const firstLine = rawMessage.split('\n')[0]?.trim() || 'Error during execution.';
 
   // Strip error class names e.g. "Error: ", "BotBlockedError: ", "AntiBotBlockedError: "
   const cleaned = firstLine
@@ -58,5 +63,5 @@ export function formatUserErrorMessage(error: unknown): string {
     .replace(/[A-Za-z]:\\[^\s)]*/g, '')
     .trim();
 
-  return cleaned || 'Erro inesperado durante o processamento.';
+  return cleaned || 'Unexpected error occurred during processing.';
 }
