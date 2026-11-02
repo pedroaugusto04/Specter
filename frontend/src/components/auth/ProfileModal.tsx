@@ -4,7 +4,6 @@ import * as React from 'react';
 import {
   Calendar,
   Check,
-  Copy,
   Layers,
   LogOut,
   Mail,
@@ -37,7 +36,6 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const [name, setName] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
@@ -50,16 +48,6 @@ export function ProfileModal({
   }, [user, isOpen]);
 
   if (!user) return null;
-
-  const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(user.id);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
-    } catch {
-      // ignore clipboard error
-    }
-  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,33 +173,6 @@ export function ProfileModal({
               <span className="font-mono text-foreground truncate max-w-[200px]" title={user.email}>
                 {user.email}
               </span>
-            </div>
-
-            {/* User ID */}
-            <div className="flex items-center justify-between py-1 border-b border-border/40">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Shield className="h-3.5 w-3.5" />
-                <span>User ID</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-                  {user.id.slice(0, 8)}...{user.id.slice(-4)}
-                </code>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => void handleCopyId()}
-                  title="Copy full User ID"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                >
-                  {copiedId ? (
-                    <Check className="h-3 w-3 text-emerald-500" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                </Button>
-              </div>
             </div>
 
             {/* Monitors count */}
