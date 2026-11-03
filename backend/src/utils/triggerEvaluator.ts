@@ -1,4 +1,7 @@
-import type { ExtractedPayload, ExtractedRecord, TriggerRule } from '../types/extractor.js';
+import { recordIdentity } from './planExtraction.js';
+import type { TriggerRule } from '../types/extractionPlan.js';
+import type { ExtractedPayload, ExtractedRecord } from '../types/extractor.js';
+import { TriggerMatchMode, TriggerOperator } from '../types/enums.js';
 
 export interface TriggerEvaluationResult {
   triggered: boolean;
@@ -101,9 +104,20 @@ export function evaluateSingleRule(
   previousValue?: unknown
 ): { satisfied: boolean; reason: string } {
   const { field, operator, value: targetValue } = rule;
+  if (actualValue === null || actualValue === undefined)
+    return { satisfied: false, reason: `Field '${field}' is unavailable.` };
 
   // 1. Numeric comparisons: lt, lte, gt, gte
-  if (['lt', 'lte', 'gt', 'gte'].includes(operator)) {
+  if (
+    (
+      [
+        TriggerOperator.LessThan,
+        TriggerOperator.LessThanOrEqual,
+        TriggerOperator.GreaterThan,
+        TriggerOperator.GreaterThanOrEqual,
+      ] as TriggerOperator[]
+    ).includes(operator)
+  ) {
     const actualNum = parseNumericValue(actualValue);
     const targetNum = parseNumericValue(targetValue);
 
@@ -117,19 +131,19 @@ export function evaluateSingleRule(
     let satisfied = false;
     let opSymbol = '';
     switch (operator) {
-      case 'lt':
+      case TriggerOperator.LessThan:
         satisfied = actualNum < targetNum;
         opSymbol = '<';
         break;
-      case 'lte':
+      case TriggerOperator.LessThanOrEqual:
         satisfied = actualNum <= targetNum;
         opSymbol = '<=';
         break;
-      case 'gt':
+      case TriggerOperator.GreaterThan:
         satisfied = actualNum > targetNum;
         opSymbol = '>';
         break;
-      case 'gte':
+      case TriggerOperator.GreaterThanOrEqual:
         satisfied = actualNum >= targetNum;
         opSymbol = '>=';
         break;
@@ -144,7 +158,10 @@ export function evaluateSingleRule(
   }
 
   // 2. Relative percentage changes: percentage_drop, percentage_increase
-  if (operator === 'percentage_drop' || operator === 'percentage_increase') {
+  if (
+    operator === TriggerOperator.PercentageDrop ||
+    operator === TriggerOperator.PercentageIncrease
+  ) {
     const actualNum = parseNumericValue(actualValue);
     const prevNum = parseNumericValue(previousValue);
     const targetPct = parseNumericValue(targetValue);
@@ -156,7 +173,7 @@ export function evaluateSingleRule(
       };
     }
 
-    if (operator === 'percentage_drop') {
+    if (operator === TriggerOperator.PercentageDrop) {
       if (actualNum >= prevNum) {
         return {
           satisfied: false,
@@ -190,7 +207,7 @@ export function evaluateSingleRule(
   }
 
   // 3. Simple relative changes: decreased, increased
-  if (operator === 'decreased' || operator === 'increased') {
+  if (operator === TriggerOperator.Decreased || operator === TriggerOperator.Increased) {
     const actualNum = parseNumericValue(actualValue);
     const prevNum = parseNumericValue(previousValue);
 
@@ -201,7 +218,7 @@ export function evaluateSingleRule(
       };
     }
 
-    if (operator === 'decreased') {
+    if (operator === TriggerOperator.Decreased) {
       const satisfied = actualNum < prevNum;
       return {
         satisfied,
@@ -221,7 +238,7 @@ export function evaluateSingleRule(
   }
 
   // 4. Any value or text change relative to previous: changes
-  if (operator === 'changes') {
+  if (operator === TriggerOperator.Changes) {
     if (previousValue === undefined || previousValue === null) {
       return {
         satisfied: false,
@@ -229,8 +246,8 @@ export function evaluateSingleRule(
       };
     }
 
-    const actualNum = parseNumericValue(actualValue);
-    const prevNum = parseNumericValue(previousValue);
+    const actualNum = typeof actualValue === 'number' ? actualValue : null;
+    const prevNum = typeof previousValue === 'number' ? previousValue : null;
     if (actualNum !== null && prevNum !== null) {
       const satisfied = actualNum !== prevNum;
       return {
@@ -253,14 +270,14 @@ export function evaluateSingleRule(
   }
 
   // 5. Equality comparisons: eq, neq
-  if (operator === 'eq' || operator === 'neq') {
-    // Try numeric equality first if both represent numbers
-    const actualNum = parseNumericValue(actualValue);
-    const targetNum = parseNumericValue(targetValue);
+  if (operator === TriggerOperator.Equal || operator === TriggerOperator.NotEqual) {
+    // Do not interpret identifiers or arbitrary text as numeric values.
+    const actualNum = typeof actualValue === 'number' ? actualValue : null;
+    const targetNum = typeof targetValue === 'number' ? targetValue : null;
     if (actualNum !== null && targetNum !== null) {
       const isEq = actualNum === targetNum;
-      const satisfied = operator === 'eq' ? isEq : !isEq;
-      const symbol = operator === 'eq' ? '==' : '!=';
+      const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
+      const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
       return {
         satisfied,
         reason: `${field} (${actualNum}) ${symbol} ${targetNum}`,
@@ -272,8 +289,8 @@ export function evaluateSingleRule(
     const targetBool = parseBooleanValue(targetValue);
     if (actualBool !== null && targetBool !== null) {
       const isEq = actualBool === targetBool;
-      const satisfied = operator === 'eq' ? isEq : !isEq;
-      const symbol = operator === 'eq' ? '==' : '!=';
+      const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
+      const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
       return {
         satisfied,
         reason: `${field} (${actualBool}) ${symbol} ${targetBool}`,
@@ -288,8 +305,8 @@ export function evaluateSingleRule(
       .trim()
       .toLowerCase();
     const isEq = actualStr === targetStr;
-    const satisfied = operator === 'eq' ? isEq : !isEq;
-    const symbol = operator === 'eq' ? '==' : '!=';
+    const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
+    const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
 
     return {
       satisfied,
@@ -298,16 +315,16 @@ export function evaluateSingleRule(
   }
 
   // 6. Substring checks: contains, not_contains
-  if (operator === 'contains' || operator === 'not_contains') {
+  if (operator === TriggerOperator.Contains || operator === TriggerOperator.NotContains) {
     const actualStr = String(actualValue ?? '').toLowerCase();
     const targetStr = String(targetValue ?? '').toLowerCase();
     const contains = actualStr.includes(targetStr);
-    const satisfied = operator === 'contains' ? contains : !contains;
+    const satisfied = operator === TriggerOperator.Contains ? contains : !contains;
 
     return {
       satisfied,
       reason: satisfied
-        ? `${field} ${operator === 'contains' ? 'contains' : 'does not contain'} "${String(targetValue)}"`
+        ? `${field} ${operator === TriggerOperator.Contains ? TriggerOperator.Contains : 'does not contain'} "${String(targetValue)}"`
         : `${field} does not satisfy ${operator} "${String(targetValue)}"`,
     };
   }
@@ -315,95 +332,59 @@ export function evaluateSingleRule(
   return { satisfied: false, reason: `Unknown trigger operator '${operator}'.` };
 }
 
-/**
- * Checks whether a single rule is satisfied across a single record or an array of records.
- */
-function isRuleSatisfiedInPayload(
-  payload: ExtractedPayload,
-  rule: TriggerRule,
-  previousPayload?: ExtractedPayload | null
-): { satisfied: boolean; reason: string } {
-  if ('items' in payload && Array.isArray(payload.items)) {
-    const prevItems =
-      previousPayload && 'items' in previousPayload && Array.isArray(previousPayload.items)
-        ? previousPayload.items
-        : [];
-
-    for (let i = 0; i < payload.items.length; i++) {
-      const record = payload.items[i];
-      if (!record) continue;
-      const actual = record[rule.field];
-      const prev = prevItems[i]?.[rule.field];
-      const result = evaluateSingleRule(actual, rule, prev);
-      if (result.satisfied) {
-        return result;
-      }
-    }
-    return {
-      satisfied: false,
-      reason: `No item in list satisfied condition '${rule.field} ${rule.operator}${rule.value !== undefined && rule.value !== '' ? ` ${rule.value}` : ''}'.`,
-    };
-  }
-
-  const record = payload as ExtractedRecord;
-  const prevRecord =
-    previousPayload && !('items' in previousPayload)
-      ? (previousPayload as ExtractedRecord)
-      : undefined;
-  const actual = record[rule.field];
-  const prev = prevRecord?.[rule.field];
-  return evaluateSingleRule(actual, rule, prev);
-}
-
-/**
- * Evaluates all trigger rules on the extracted payload.
- * If triggerRules is empty, returns triggered: true (standard change alert behavior).
- * Optionally accepts previousPayload to evaluate relative changes (deltas, drops, changes).
- */
+/** Evaluate conditions within each changed entity, aligned by stable identity. */
 export function evaluateTriggerRules(
   payload: ExtractedPayload | null,
   rules?: TriggerRule[],
-  matchMode: 'any' | 'all' = 'any',
-  previousPayload?: ExtractedPayload | null
+  matchMode: TriggerMatchMode = TriggerMatchMode.All,
+  previousPayload?: ExtractedPayload | null,
+  identityFields: string[] = []
 ): TriggerEvaluationResult {
-  if (!rules || rules.length === 0) {
-    return {
-      triggered: true,
-      hasRules: false,
-      matchedRules: [],
-      reasons: [],
-    };
-  }
-
-  if (!payload) {
+  if (!rules?.length) return { triggered: true, hasRules: false, matchedRules: [], reasons: [] };
+  if (!payload)
+    return { triggered: false, hasRules: true, matchedRules: [], reasons: ['No data available.'] };
+  const records =
+    'items' in payload && Array.isArray(payload.items)
+      ? payload.items
+      : [payload as ExtractedRecord];
+  const previous =
+    previousPayload && 'items' in previousPayload && Array.isArray(previousPayload.items)
+      ? previousPayload.items
+      : previousPayload
+        ? [previousPayload as ExtractedRecord]
+        : [];
+  const collection = 'items' in payload && Array.isArray(payload.items);
+  if (collection && !identityFields.length)
     return {
       triggered: false,
       hasRules: true,
       matchedRules: [],
-      reasons: ['No extracted data available to evaluate trigger conditions.'],
+      reasons: ['Collection identity is required.'],
     };
+  for (const record of records) {
+    const old = collection
+      ? previous.find(
+          (item) => recordIdentity(item, identityFields) === recordIdentity(record, identityFields)
+        )
+      : previous[0];
+    if (old && JSON.stringify(old) === JSON.stringify(record)) continue;
+    const results = rules.map((rule) => ({
+      rule,
+      result: evaluateSingleRule(record[rule.field], rule, old?.[rule.field]),
+    }));
+    const matched = results.filter((entry) => entry.result.satisfied);
+    if (matchMode === TriggerMatchMode.All ? matched.length === rules.length : matched.length > 0)
+      return {
+        triggered: true,
+        hasRules: true,
+        matchedRules: matched.map((entry) => entry.rule),
+        reasons: matched.map((entry) => entry.result.reason),
+      };
   }
-
-  const matchedRules: TriggerRule[] = [];
-  const reasons: string[] = [];
-  let allSatisfied = true;
-
-  for (const rule of rules) {
-    const result = isRuleSatisfiedInPayload(payload, rule, previousPayload);
-    if (result.satisfied) {
-      matchedRules.push(rule);
-      reasons.push(result.reason);
-    } else {
-      allSatisfied = false;
-    }
-  }
-
-  const triggered = matchMode === 'all' ? allSatisfied : matchedRules.length > 0;
-
   return {
-    triggered,
+    triggered: false,
     hasRules: true,
-    matchedRules,
-    reasons: matchedRules.length > 0 ? reasons : ['Trigger conditions not met.'],
+    matchedRules: [],
+    reasons: ['No changed entity satisfied the conditions.'],
   };
 }

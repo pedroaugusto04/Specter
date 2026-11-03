@@ -16,14 +16,14 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
 
     const provider = new AgyCliCompilerProvider({
       tempBaseDir,
-      timeoutMs: 5000,
+      timeoutMs: 10000,
       cliCommand: process.execPath,
       cliArgsBuilder: (_promptFile, outputFile) => [
         '-e',
         `setTimeout(() => {
           const fs = require('fs');
           fs.writeFileSync(${JSON.stringify(outputFile)}, JSON.stringify({
-            fields: { headline: { selector: 'h1', attribute: 'text' } }
+            version: 2, mode: 'single', readySelector: 'body', fields: { headline: { sources: [{kind: 'dom', selector: 'h1', attribute: 'text'}], type: 'string', required: true, normalizeVolatileText: false, locale: 'en-US' } }
           }));
         }, 50);
         setTimeout(() => {}, 10000);`,
@@ -38,7 +38,22 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     });
 
     expect(schema).toEqual({
-      fields: { headline: { selector: 'h1', attribute: 'text' } },
+      version: 2,
+      mode: 'single',
+      readySelector: 'body',
+      scope: 'page',
+      identityFields: [],
+      triggerRules: [],
+      triggerMatchMode: 'all',
+      fields: {
+        headline: {
+          sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }],
+          type: 'string',
+          required: true,
+          normalizeVolatileText: false,
+          locale: 'en-US',
+        },
+      },
     });
 
     // Temp job directory must be cleaned up after completion

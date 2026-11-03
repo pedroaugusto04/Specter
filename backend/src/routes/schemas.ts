@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js';
 import { env } from '../config/env.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 
@@ -20,25 +21,11 @@ export const cronExpressionSchema = z
 
 export const triggerRuleSchema = z.object({
   field: z.string().trim().min(1, 'Field is required'),
-  operator: z.enum([
-    'lt',
-    'lte',
-    'gt',
-    'gte',
-    'eq',
-    'neq',
-    'contains',
-    'not_contains',
-    'percentage_drop',
-    'percentage_increase',
-    'decreased',
-    'increased',
-    'changes',
-  ]),
+  operator: z.nativeEnum(TriggerOperator),
   value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
-export const triggerMatchModeSchema = z.enum(['any', 'all']);
+export const triggerMatchModeSchema = z.nativeEnum(TriggerMatchMode);
 
 export const jobProbeSchema = z.object({
   url: z
@@ -131,9 +118,7 @@ export const jobPauseSchema = z.object({
 
 export const jobStatusQuerySchema = z.object({
   status: z
-    .enum(['PENDING_COMPILATION', 'ACTIVE', 'FAILED', 'HEALING', 'PAUSED'], {
-      errorMap: () => ({ message: 'Invalid status filter' }),
-    })
+    .nativeEnum(JobStatus, { errorMap: () => ({ message: 'Invalid status filter' }) })
     .optional(),
 });
 

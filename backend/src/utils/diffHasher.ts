@@ -155,9 +155,13 @@ function escapeHtml(value: unknown): string {
 /**
  * Builds a human-readable and HTML-formatted diff summary between two payloads.
  */
-export function buildDiffSummary(previousData: unknown, currentData: unknown): DiffSummary {
-  const normalizedPrev = normalizeForDiff(previousData);
-  const normalizedCurr = normalizeForDiff(currentData);
+export function buildDiffSummary(
+  previousData: unknown,
+  currentData: unknown,
+  normalize = true
+): DiffSummary {
+  const normalizedPrev = normalize ? normalizeForDiff(previousData) : sortObjectKeys(previousData);
+  const normalizedCurr = normalize ? normalizeForDiff(currentData) : sortObjectKeys(currentData);
 
   const flatPrev = flattenPayload(normalizedPrev);
   const flatCurr = flattenPayload(normalizedCurr);
@@ -266,4 +270,12 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
     summaryText,
     summaryHtml,
   };
+}
+
+/** Hash validated fields without silently deleting requested data. */
+export function computeExtractionHash(payload: unknown): string {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(sortObjectKeys(payload)))
+    .digest('hex');
 }

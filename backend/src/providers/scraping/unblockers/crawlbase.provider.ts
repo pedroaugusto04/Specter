@@ -38,10 +38,6 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('javascript', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('country', 'BR');
-      }
-
       if (options?.captureScreenshot) {
         endpoint.searchParams.set('screenshot', 'true');
       }

@@ -1,11 +1,9 @@
-import type { ExtractedPayload, ExtractorConfig } from './extractor.js';
+import type { ExtractionPlan, ExtractionReport } from './extractionPlan.js';
+import type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
+import type { ExtractedPayload } from './extractor.js';
 import type { PlaywrightStorageState } from '../db/schema.js';
 
-export type JobStatus = 'PENDING_COMPILATION' | 'ACTIVE' | 'FAILED' | 'HEALING' | 'PAUSED';
-
-export type RunStatus = 'SUCCESS' | 'FAILED';
-
-export type ChangeStatus = 'YES' | 'NO' | 'INITIAL';
+export type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 
 export interface UserEntity {
   id: string;
@@ -51,9 +49,12 @@ export interface ScrapingJobEntity {
   webhookUrl?: string | null;
   cronExpression: string;
   bullmqRepeatableKey: string | null;
-  extractorConfig: ExtractorConfig | null;
+  contractRevision?: string | null;
+  extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;
+  healingAttempts?: number;
+  healingWindowStartedAt?: Date | null;
   failureCount: number;
   captureScreenshotOnChange: boolean;
   createdAt: Date;
@@ -63,6 +64,8 @@ export interface ScrapingJobEntity {
 export interface JobRunEntity {
   id: string;
   jobId: string;
+  contractRevision?: string | null;
+  extractionReport?: ExtractionReport | null;
   extractedData: ExtractedPayload | null;
   normalizedHash: string | null;
   hasChanges: ChangeStatus;

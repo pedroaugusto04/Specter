@@ -1,42 +1,17 @@
-export type JobStatus = 'PENDING_COMPILATION' | 'ACTIVE' | 'FAILED' | 'HEALING' | 'PAUSED';
-
-export type RunStatus = 'SUCCESS' | 'FAILED';
-export type ChangeStatus = 'YES' | 'NO' | 'INITIAL';
-
-export interface FieldExtractor {
-  selector: string;
-  attribute?: 'text' | 'href' | 'src' | string;
-  type?: 'string' | 'number' | 'boolean';
-}
-
-export type TriggerOperator =
-  | 'lt'
-  | 'lte'
-  | 'gt'
-  | 'gte'
-  | 'eq'
-  | 'neq'
-  | 'contains'
-  | 'not_contains'
-  | 'percentage_drop'
-  | 'percentage_increase'
-  | 'decreased'
-  | 'increased'
-  | 'changes';
-
-export interface TriggerRule {
-  field: string;
-  operator: TriggerOperator;
-  value: string | number | boolean;
-}
-
-export interface ExtractorConfig {
-  containerSelector?: string;
-  fields: Record<string, string | FieldExtractor>;
-  paginationSelector?: string;
-  triggerRules?: TriggerRule[];
-  triggerMatchMode?: 'any' | 'all';
-}
+import type {
+  ExtractionPlan,
+  ExtractionScope,
+  TriggerMatchMode,
+  TriggerRule,
+} from './extractionPlan';
+import type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
+export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
+export type {
+  ExtractionPlan,
+  TriggerMatchMode,
+  TriggerOperator,
+  TriggerRule,
+} from './extractionPlan';
 
 export interface UserDto {
   id: string;
@@ -54,7 +29,7 @@ export interface ScrapingJobDto {
   notificationEmail: string;
   webhookUrl?: string | null;
   cronExpression: string;
-  extractorConfig: ExtractorConfig | null;
+  extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;
   failureCount: number;
@@ -64,6 +39,13 @@ export interface ScrapingJobDto {
 }
 
 export interface JobRunDto {
+  extractionReport?: {
+    quality: ExtractionQuality;
+    scope: ExtractionScope;
+    pagesVisited: number;
+    issues: string[];
+    sourcesUsed: Record<string, number>;
+  } | null;
   id: string;
   jobId: string;
   extractedData: Record<string, unknown> | null;
@@ -302,7 +284,7 @@ export const api = {
       cronExpression?: string;
       captureScreenshotOnChange?: boolean;
       triggerRules?: TriggerRule[];
-      triggerMatchMode?: 'any' | 'all';
+      triggerMatchMode?: TriggerMatchMode;
     }
   ): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>(`/api/jobs/${id}`, {

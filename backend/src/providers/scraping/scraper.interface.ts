@@ -1,3 +1,5 @@
+import type { ExtractionPlan } from '../../types/extractionPlan.js';
+import type { PlanExecutionResult } from '../../services/planExecutionService.js';
 import type { PlaywrightStorageState } from '../../db/schema.js';
 
 export interface ScrapeOptions {
@@ -17,5 +19,10 @@ export interface ScrapeResult {
 
 export interface IScraperEngine {
   readonly name: string;
+  executePlan?(
+    url: string,
+    plan: ExtractionPlan,
+    options?: ScrapeOptions
+  ): Promise<PlanExecutionResult>;
   fetchHtml(url: string, options?: ScrapeOptions): Promise<ScrapeResult>;
 }

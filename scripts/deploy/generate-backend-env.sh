@@ -36,8 +36,8 @@ SCRAPER_ENGINE="${SCRAPER_ENGINE:-playwright}"
 # Guardrail: If NOTIFICATION_PROVIDER is resend but RESEND_API_KEY is not provided,
 # warn and safely fall back to console to prevent container boot crash loops.
 if [ "$NOTIFICATION_PROVIDER" = "resend" ] && [ -z "${RESEND_API_KEY:-}" ]; then
-  echo "⚠️ AVISO: NOTIFICATION_PROVIDER está definido como 'resend', mas RESEND_API_KEY não foi configurada."
-  echo "   Revertendo NOTIFICATION_PROVIDER para 'console' para garantir inicialização segura do backend."
+  echo "WARNING: NOTIFICATION_PROVIDER is 'resend', but RESEND_API_KEY is missing."
+  echo "   Using NOTIFICATION_PROVIDER='console' so the backend can start."
   NOTIFICATION_PROVIDER="console"
 fi
 
@@ -62,6 +62,14 @@ keys=(
   SCRAPER_ENGINE
   SCRAPER_CONCURRENCY
   PLAYWRIGHT_TIMEOUT_MS
+  EXTRACTION_MAX_PAGES
+  EXTRACTION_MAX_ACTIONS
+  EXTRACTION_MAX_ITEMS
+  EXTRACTION_TIMEOUT_MS
+  COMPILATION_BUDGET_MS
+  COMPILATION_MAX_ATTEMPTS
+  COMPILATION_MAX_EVIDENCE_CHARS
+  HEALING_WINDOW_MS
   MIN_CRON_INTERVAL_MINUTES
   CONSECUTIVE_FAILURES_FOR_HEALING
   MAX_HEALING_RETRIES

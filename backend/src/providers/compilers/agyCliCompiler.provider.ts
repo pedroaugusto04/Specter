@@ -1,3 +1,4 @@
+import { parseCompilerOutput } from '../../types/extractionPlan.js';
 import { spawn, type SpawnOptions } from 'child_process';
 import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
@@ -5,9 +6,9 @@ import { env } from '../../config/env.js';
 import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import {
-  buildCompilerPrompt,
+  buildCliCompilerPrompt,
   type CompilerInput,
-  type ExtractorSchema,
+  type ExtractionPlan,
   type ICompilerProvider,
 } from './compiler.interface.js';
 
@@ -42,9 +43,10 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
     this.spawnFn = options.spawnFn ?? spawn;
   }
 
-  async compile(input: CompilerInput): Promise<ExtractorSchema> {
+  async compile(input: CompilerInput): Promise<ExtractionPlan> {
     const { jobId, sanitizedHtml, userPrompt } = input;
     const startTime = Date.now();
+    const timeoutMs = Math.min(input.timeoutMs ?? this.timeoutMs, this.timeoutMs);
     const safeJobDirName = jobId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const tempDir = path.resolve(this.tempBaseDir, safeJobDirName);
 
@@ -55,9 +57,13 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
     const outputFile = path.join(tempDir, 'extractor.json');
 
     await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
-    await fs.writeFile(promptFile, buildCompilerPrompt(domFile, outputFile, userPrompt), 'utf-8');
+    await fs.writeFile(
+      promptFile,
+      buildCliCompilerPrompt(domFile, outputFile, userPrompt),
+      'utf-8'
+    );
 
-    return new Promise<ExtractorSchema>((resolve, reject) => {
+    return new Promise<ExtractionPlan>((resolve, reject) => {
       let settled = false;
       let watcherClosed = false;
       let fileWatcher: FSWatcher | null = null;
@@ -84,11 +90,11 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       };
 
-      const tryReadOutputFile = async (): Promise<ExtractorSchema | null> => {
+      const tryReadOutputFile = async (): Promise<ExtractionPlan | null> => {
         try {
           const content = await fs.readFile(outputFile, 'utf-8');
           if (!content.trim()) return null;
-          const parsed = JSON.parse(content) as ExtractorSchema;
+          const parsed = parseCompilerOutput(JSON.parse(content));
           if (!parsed || typeof parsed !== 'object' || !parsed.fields) {
             throw new CompilerValidationError(
               'Compiled extractor.json is missing required "fields" property.'
@@ -99,7 +105,10 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
           if (err instanceof CompilerValidationError) {
             throw err;
           }
-          return null;
+          if (err instanceof SyntaxError) return null;
+          throw new CompilerValidationError(
+            err instanceof Error ? err.message : 'Invalid extraction plan.'
+          );
         }
       };
 
@@ -121,11 +130,11 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
           });
           reject(
             new CompilerTimeoutError(
-              `${this.name.toUpperCase()} compilation timed out after ${this.timeoutMs}ms`
+              `${this.name.toUpperCase()} compilation timed out after ${timeoutMs}ms`
             )
           );
         });
-      }, this.timeoutMs);
+      }, timeoutMs);
 
       try {
         fileWatcher = watch(tempDir, async (_eventType, filename) => {

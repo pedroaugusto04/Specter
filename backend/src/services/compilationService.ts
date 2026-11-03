@@ -1,3 +1,5 @@
+import { assertExecutionLease } from '../queues/executionLease.js';
+import { randomUUID } from 'crypto';
 import { CompilerValidationError, DomainError, NotFoundError } from '../errors/domainErrors.js';
 import type { ICompilerProvider } from '../providers/compilers/compiler.interface.js';
 import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
@@ -6,11 +8,20 @@ import { createStorageProvider, type IStorageProvider } from '../providers/stora
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type { ChangeStatus, ScrapingJobEntity } from '../types/domain.js';
-import { computeNormalizedHash } from '../utils/diffHasher.js';
+import type { ScrapingJobEntity } from '../types/domain.js';
+import {
+  ChangeStatus,
+  ExtractionQuality,
+  isAcceptedExtractionQuality,
+  JobStatus,
+  RunStatus,
+} from '../types/enums.js';
+import { computeExtractionHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import { validateExtractionSmokeTest } from '../utils/extractorEngine.js';
-import { sanitizeHtml } from '../utils/htmlSanitizer.js';
+import { PlanExecutionService } from './planExecutionService.js';
+import { extractionPlanSchema, type ExtractionPlan } from '../types/extractionPlan.js';
+import { env } from '../config/env.js';
+import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
 import { uploadScreenshotIfEligible } from '../utils/screenshotHelper.js';
@@ -84,37 +95,98 @@ export class CompilationService {
       httpStatus = scrapeResult.httpStatus;
 
       // 2. Sanitize DOM and prune repeated sibling nodes before forwarding to AI
-      const sanitizedHtml = sanitizeHtml(scrapeResult.rawHtml);
+      const sanitizedHtml = buildCompilerEvidence(
+        scrapeResult.rawHtml,
+        env.COMPILATION_MAX_EVIDENCE_CHARS
+      );
 
-      // 3. Compile extractor schema via pluggable AI Compiler Provider
-      const compiledSchema = await this.compilerProvider.compile({
-        jobId: job.id,
-        sanitizedHtml,
-        userPrompt: job.userPrompt,
-      });
-
-      // 4. Pre-activation smoke test against sanitized DOM
-      const smokeTest = validateExtractionSmokeTest(sanitizedHtml, compiledSchema);
-      if (!smokeTest.valid) {
-        throw new CompilerValidationError(
-          smokeTest.reason ?? 'Smoke-test failed: compiled selectors returned empty extraction.'
-        );
+      let feedback = '';
+      let compiledSchema: ExtractionPlan | undefined;
+      let execution;
+      for (let attempt = 0; attempt < env.COMPILATION_MAX_ATTEMPTS; attempt++) {
+        if (Date.now() - startTime >= env.COMPILATION_BUDGET_MS) break;
+        try {
+          compiledSchema = extractionPlanSchema.parse(
+            await this.compilerProvider.compile({
+              jobId: job.id,
+              timeoutMs: Math.max(1, env.COMPILATION_BUDGET_MS - (Date.now() - startTime)),
+              sanitizedHtml: sanitizedHtml,
+              userPrompt: `${job.userPrompt}\nTarget URL: ${job.url}\nValidation feedback: ${feedback || 'None'}\nEvidence may be sampled or truncated.`,
+            })
+          );
+          if (job.extractionPlan && job.status === JobStatus.Healing) {
+            const contract = (plan: ExtractionPlan) =>
+              JSON.stringify({
+                fields: Object.entries(plan!.fields).map(([name, field]) => [
+                  name,
+                  field.type,
+                  field.required,
+                ]),
+                identity: plan!.identityFields,
+                rules: plan!.triggerRules,
+                mode: plan!.triggerMatchMode,
+                scope: plan!.scope,
+              });
+            if (contract(job.extractionPlan) !== contract(compiledSchema))
+              throw new CompilerValidationError(
+                'Recovery changed the extraction intent. Review the monitor instructions.'
+              );
+          }
+          execution = await new PlanExecutionService(this.scraperEngine).execute(
+            job.url,
+            compiledSchema,
+            {
+              storageState,
+              captureScreenshot: job.captureScreenshotOnChange,
+              timeoutMs: Math.max(1, env.COMPILATION_BUDGET_MS - (Date.now() - startTime)),
+            }
+          );
+          if (!isAcceptedExtractionQuality(execution.report.quality))
+            throw new CompilerValidationError(execution.report.issues.join(' '));
+          if (execution.report.quality === ExtractionQuality.Empty && !job.extractionPlan)
+            throw new CompilerValidationError(
+              'Initial empty collection cannot validate the requested field sources. Retry when records are available.'
+            );
+          break;
+        } catch (error) {
+          execution = undefined;
+          feedback = error instanceof Error ? error.message : 'Compilation validation failed.';
+        }
       }
+      if (!execution || !compiledSchema)
+        throw new CompilerValidationError(feedback || 'Compilation budget exhausted.');
+      const smokeTest = { extractedData: execution.data };
+      await assertExecutionLease();
+      const latest = await this.jobRepository.findById(job.id);
+      if (
+        !latest ||
+        latest.status === JobStatus.Paused ||
+        latest.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return latest ?? job;
 
+      const contractRevision = job.extractionPlan
+        ? (job.contractRevision ?? randomUUID())
+        : randomUUID();
       // 5. Compute hash and record initial/healing snapshot
-      const normalizedHash = computeNormalizedHash(smokeTest.extractedData);
-      const previousRun = await this.jobRepository.findLatestSuccessfulRun(job.id);
+      const normalizedHash = computeExtractionHash(smokeTest.extractedData);
+      const previousRun = job.extractionPlan
+        ? await this.jobRepository.findLatestSuccessfulRun(job.id)
+        : null;
 
-      let hasChanges: ChangeStatus = 'INITIAL';
+      let hasChanges: ChangeStatus = ChangeStatus.Initial;
       if (previousRun) {
-        hasChanges = previousRun.normalizedHash === normalizedHash ? 'NO' : 'YES';
+        hasChanges =
+          previousRun.normalizedHash === normalizedHash
+            ? ChangeStatus.Unchanged
+            : ChangeStatus.Changed;
       }
 
       const screenshotUrl = await uploadScreenshotIfEligible({
         jobId: job.id,
         captureScreenshotOnChange: job.captureScreenshotOnChange,
         hasChanges,
-        screenshot: scrapeResult.screenshot,
+        screenshot: execution.scrape.screenshot,
         storageProvider: this.storageProvider,
         logContext: 'compilation',
       });
@@ -126,13 +198,15 @@ export class CompilationService {
         extractedData: smokeTest.extractedData,
         normalizedHash,
         hasChanges,
-        status: 'SUCCESS',
+        status: RunStatus.Success,
+        extractionReport: execution.report,
+        contractRevision,
         httpStatus,
         durationMs,
         screenshotUrl,
       });
 
-      if (hasChanges === 'YES' && previousRun) {
+      if (hasChanges === ChangeStatus.Changed && previousRun) {
         await evaluateAndDispatchChangeAlert({
           job,
           currentData: smokeTest.extractedData,
@@ -151,8 +225,9 @@ export class CompilationService {
       );
 
       const updatedJob = await this.jobRepository.updateJob(job.id, {
-        extractorConfig: compiledSchema,
-        status: 'ACTIVE',
+        extractionPlan: compiledSchema,
+        contractRevision,
+        status: JobStatus.Active,
         lastError: null,
         failureCount: 0,
         bullmqRepeatableKey: repeatableKey,
@@ -164,7 +239,7 @@ export class CompilationService {
         provider: this.compilerProvider.name,
       });
 
-      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
 
       return updatedJob ?? job;
     } catch (error) {
@@ -182,25 +257,33 @@ export class CompilationService {
         errorStack,
       });
 
+      await assertExecutionLease();
+      const current = await this.jobRepository.findById(job.id);
+      if (
+        !current ||
+        current.status === JobStatus.Paused ||
+        current.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return current ?? job;
       const userMessage = formatUserErrorMessage(error);
 
       await this.jobRepository.createRun({
         jobId: job.id,
         extractedData: null,
         normalizedHash: null,
-        hasChanges: 'NO',
-        status: 'FAILED',
+        hasChanges: ChangeStatus.Unchanged,
+        status: RunStatus.Failed,
         errorMessage: userMessage,
         httpStatus,
         durationMs,
       });
 
       await this.jobRepository.updateJob(job.id, {
-        status: 'FAILED',
+        status: JobStatus.Failed,
         lastError: userMessage,
       });
 
-      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'FAILED');
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
 
       throw error;
     }

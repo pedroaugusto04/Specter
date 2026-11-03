@@ -1,6 +1,7 @@
 AGENTS.md
 .agents
 docs/*
+!docs/extraction-engine.md
 node_modules/
 dist/
 .next/

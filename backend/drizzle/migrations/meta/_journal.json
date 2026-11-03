@@ -50,6 +50,20 @@
       "when": 1793706197662,
       "tag": "0006_tough_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793740191018,
+      "tag": "0007_thin_misty_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793740481700,
+      "tag": "0008_empty_rockslide",
+      "breakpoints": true
     }
   ]
 }

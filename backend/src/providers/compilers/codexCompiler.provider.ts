@@ -1,8 +1,9 @@
+import { parseCompilerOutput } from '../../types/extractionPlan.js';
 import { env } from '../../config/env.js';
 import { CompilerValidationError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { AgyCliCompilerProvider, type CliCompilerOptions } from './agyCliCompiler.provider.js';
-import type { CompilerInput, ExtractorSchema, ICompilerProvider } from './compiler.interface.js';
+import type { CompilerInput, ExtractionPlan, ICompilerProvider } from './compiler.interface.js';
 import { COMPILER_SYSTEM_INSTRUCTIONS } from './compilerPrompt.js';
 
 export interface CodexCompilerOptions extends CliCompilerOptions {
@@ -37,14 +38,17 @@ export class CodexCompilerProvider implements ICompilerProvider {
     });
   }
 
-  async compile(input: CompilerInput): Promise<ExtractorSchema> {
+  async compile(input: CompilerInput): Promise<ExtractionPlan> {
     if (!this.apiKey) {
       return this.cliFallback.compile(input);
     }
 
     const startTime = Date.now();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      Math.min(input.timeoutMs ?? this.timeoutMs, this.timeoutMs)
+    );
 
     try {
       const response = await this.fetchFn('https://api.openai.com/v1/chat/completions', {
@@ -83,7 +87,7 @@ export class CodexCompilerProvider implements ICompilerProvider {
         throw new CompilerValidationError('Codex/OpenAI response contained no message content.');
       }
 
-      const parsed = JSON.parse(rawContent) as ExtractorSchema;
+      const parsed = parseCompilerOutput(JSON.parse(rawContent));
       if (!parsed || typeof parsed !== 'object' || !parsed.fields) {
         throw new CompilerValidationError(
           'Codex/OpenAI JSON output is missing required "fields" property.'

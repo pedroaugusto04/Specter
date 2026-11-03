@@ -41,6 +41,14 @@ env:
   CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
   NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '' }}
   NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/api' }}
+  EXTRACTION_MAX_PAGES: ${{ vars.EXTRACTION_MAX_PAGES || '10' }}
+  EXTRACTION_MAX_ACTIONS: ${{ vars.EXTRACTION_MAX_ACTIONS || '20' }}
+  EXTRACTION_MAX_ITEMS: ${{ vars.EXTRACTION_MAX_ITEMS || '500' }}
+  EXTRACTION_TIMEOUT_MS: ${{ vars.EXTRACTION_TIMEOUT_MS || '120000' }}
+  COMPILATION_BUDGET_MS: ${{ vars.COMPILATION_BUDGET_MS || '300000' }}
+  COMPILATION_MAX_ATTEMPTS: ${{ vars.COMPILATION_MAX_ATTEMPTS || '3' }}
+  COMPILATION_MAX_EVIDENCE_CHARS: ${{ vars.COMPILATION_MAX_EVIDENCE_CHARS || '200000' }}
+  HEALING_WINDOW_MS: ${{ vars.HEALING_WINDOW_MS || '86400000' }}
   COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'agy' }}
   SCRAPER_ENGINE: ${{ vars.SCRAPER_ENGINE || 'playwright' }}
   SCRAPER_CONCURRENCY: ${{ vars.SCRAPER_CONCURRENCY || '3' }}
@@ -187,6 +195,14 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CORS_ORIGIN: ${{ env.CORS_ORIGIN }}
+          EXTRACTION_MAX_PAGES: ${{ env.EXTRACTION_MAX_PAGES }}
+          EXTRACTION_MAX_ACTIONS: ${{ env.EXTRACTION_MAX_ACTIONS }}
+          EXTRACTION_MAX_ITEMS: ${{ env.EXTRACTION_MAX_ITEMS }}
+          EXTRACTION_TIMEOUT_MS: ${{ env.EXTRACTION_TIMEOUT_MS }}
+          COMPILATION_BUDGET_MS: ${{ env.COMPILATION_BUDGET_MS }}
+          COMPILATION_MAX_ATTEMPTS: ${{ env.COMPILATION_MAX_ATTEMPTS }}
+          COMPILATION_MAX_EVIDENCE_CHARS: ${{ env.COMPILATION_MAX_EVIDENCE_CHARS }}
+          HEALING_WINDOW_MS: ${{ env.HEALING_WINDOW_MS }}
           COMPILER_PROVIDER: ${{ env.COMPILER_PROVIDER }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || env.NOTIFICATION_PROVIDER }}

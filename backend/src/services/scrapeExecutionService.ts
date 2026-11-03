@@ -1,3 +1,5 @@
+import { assertExecutionLease } from '../queues/executionLease.js';
+import type { ExtractionReport } from '../types/extractionPlan.js';
 import { env } from '../config/env.js';
 import {
   AntiBotBlockedError,
@@ -12,16 +14,19 @@ import { createStorageProvider, type IStorageProvider } from '../providers/stora
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type { ChangeStatus, JobRunEntity } from '../types/domain.js';
-import { computeNormalizedHash } from '../utils/diffHasher.js';
+import type { JobRunEntity } from '../types/domain.js';
+import { computeExtractionHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import {
-  extractUsingConfig,
-  isExtractedPayloadEmpty,
-  resolveTargetWaitSelector,
-} from '../utils/extractorEngine.js';
+import { PlanExecutionService } from './planExecutionService.js';
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
+import {
+  ChangeStatus,
+  ExtractionQuality,
+  isAcceptedExtractionQuality,
+  JobStatus,
+  RunStatus,
+} from '../types/enums.js';
 import { uploadScreenshotIfEligible } from '../utils/screenshotHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
@@ -70,18 +75,19 @@ export class ScrapeExecutionService {
       throw new NotFoundError(`Scraping job not found: ${jobId}`);
     }
 
-    if (job.status === 'PAUSED') {
+    if (job.status !== JobStatus.Active) {
       logger.info('Skipping scrape execution for PAUSED job', { jobId: job.id });
       return null;
     }
 
-    if (!job.extractorConfig) {
-      logger.info('Job has no extractorConfig; enqueueing compilation', { jobId: job.id });
+    if (!job.extractionPlan) {
+      logger.info('Job has no extractionPlan; enqueueing compilation', { jobId: job.id });
       await this.jobScheduler.enqueueCompilation(job.id, 'initial');
       return null;
     }
 
     let httpStatus: number | null = null;
+    let extractionReport: ExtractionReport | undefined;
 
     try {
       const storageState = await resolveSessionStorageState(
@@ -94,29 +100,54 @@ export class ScrapeExecutionService {
         }
       );
 
-      const waitSelector =
-        resolveTargetWaitSelector(job.extractorConfig) ??
-        'main, article, [role="main"], h1';
-
-      const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
-        waitForSelector: waitSelector,
-        storageState,
-        captureScreenshot: job.captureScreenshotOnChange,
-      });
+      const execution = await new PlanExecutionService(this.scraperEngine).execute(
+        job.url,
+        job.extractionPlan,
+        {
+          storageState,
+          captureScreenshot: job.captureScreenshotOnChange,
+        }
+      );
+      extractionReport = execution.report;
+      const scrapeResult = execution.scrape;
+      const extractedData = execution.data;
       httpStatus = scrapeResult.httpStatus;
-
-      const extractedData = extractUsingConfig(scrapeResult.rawHtml, job.extractorConfig);
-
-      if (isExtractedPayloadEmpty(extractedData)) {
-        throw new SelectorMismatchError('No data could be extracted with the current selectors.');
+      if (!isAcceptedExtractionQuality(execution.report.quality)) {
+        if (execution.report.quality === ExtractionQuality.Invalid)
+          throw new SelectorMismatchError(execution.report.issues.join(' '));
+        await this.jobRepository.createRun({
+          jobId: job.id,
+          extractedData,
+          hasChanges: ChangeStatus.Unchanged,
+          status: RunStatus.Failed,
+          extractionReport: execution.report,
+          errorMessage: execution.report.issues.join(' '),
+          httpStatus,
+        });
+        await this.jobRepository.updateJob(job.id, {
+          lastError: execution.report.issues.join(' '),
+        });
+        return null;
       }
+      await assertExecutionLease();
+      const latest = await this.jobRepository.findById(job.id);
+      if (
+        !latest ||
+        latest.status !== job.status ||
+        latest.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return null;
 
-      const currentHash = computeNormalizedHash(extractedData);
-      const previousRun = await this.jobRepository.findLatestSuccessfulRun(job.id);
+      const currentHash = computeExtractionHash(extractedData);
+      const candidate = await this.jobRepository.findLatestSuccessfulRun(job.id);
+      const previousRun = candidate?.contractRevision === job.contractRevision ? candidate : null;
 
-      let hasChanges: ChangeStatus = 'INITIAL';
+      let hasChanges: ChangeStatus = ChangeStatus.Initial;
       if (previousRun) {
-        hasChanges = previousRun.normalizedHash === currentHash ? 'NO' : 'YES';
+        hasChanges =
+          previousRun.normalizedHash === currentHash
+            ? ChangeStatus.Unchanged
+            : ChangeStatus.Changed;
       }
 
       const screenshotUrl = await uploadScreenshotIfEligible({
@@ -135,29 +166,31 @@ export class ScrapeExecutionService {
         extractedData,
         normalizedHash: currentHash,
         hasChanges,
-        status: 'SUCCESS',
+        status: RunStatus.Success,
+        extractionReport: execution.report,
+        contractRevision: job.contractRevision,
         httpStatus,
         durationMs,
         screenshotUrl,
       });
 
       // Reset failure counter and ensure ACTIVE status on successful run
-      if (job.failureCount > 0 || job.lastError !== null || job.status !== 'ACTIVE') {
+      if (job.failureCount > 0 || job.lastError !== null || job.status !== JobStatus.Active) {
         await this.jobRepository.updateJob(job.id, {
-          status: 'ACTIVE',
+          status: JobStatus.Active,
           failureCount: 0,
           lastError: null,
         });
       }
 
       // Send notification only when actual changes occur compared to a prior snapshot
-      if (hasChanges === 'YES' && previousRun) {
+      if (hasChanges === ChangeStatus.Changed && previousRun) {
         await evaluateAndDispatchChangeAlert({
           job,
           currentData: extractedData,
           previousData: previousRun.extractedData,
-          triggerRules: job.extractorConfig?.triggerRules,
-          triggerMatchMode: job.extractorConfig?.triggerMatchMode,
+          triggerRules: job.extractionPlan?.triggerRules,
+          triggerMatchMode: job.extractionPlan?.triggerMatchMode,
           notificationProvider: this.notificationProvider,
           screenshotUrl,
         });
@@ -176,7 +209,7 @@ export class ScrapeExecutionService {
         runRecord.id,
         hasChanges
       );
-      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
 
       return runRecord;
     } catch (error) {
@@ -197,14 +230,32 @@ export class ScrapeExecutionService {
         errorStack,
       });
 
+      await assertExecutionLease();
+      const current = await this.jobRepository.findById(job.id);
+      if (
+        !current ||
+        current.status !== job.status ||
+        current.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return null;
       const userMessage = formatUserErrorMessage(error);
 
       await this.jobRepository.createRun({
         jobId: job.id,
         extractedData: null,
         normalizedHash: null,
-        hasChanges: 'NO',
-        status: 'FAILED',
+        hasChanges: ChangeStatus.Unchanged,
+        status: RunStatus.Failed,
+        extractionReport: extractionReport ?? {
+          quality:
+            error instanceof AntiBotBlockedError
+              ? ExtractionQuality.Blocked
+              : ExtractionQuality.Inconclusive,
+          scope: job.extractionPlan.scope,
+          pagesVisited: 0,
+          issues: [userMessage],
+          sourcesUsed: {},
+        },
         errorMessage: userMessage,
         httpStatus,
         durationMs,
@@ -232,24 +283,41 @@ export class ScrapeExecutionService {
       if (error instanceof SelectorMismatchError) {
         const newFailureCount = job.failureCount + 1;
 
-        if (newFailureCount > this.maxHealingRetries) {
+        if (
+          newFailureCount >= this.consecutiveFailuresForHealing &&
+          (job.healingWindowStartedAt &&
+          Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
+            ? (job.healingAttempts ?? 0)
+            : 0) >= this.maxHealingRetries
+        ) {
           // Cap maximum self-healing retries to prevent infinite recompilation loops
           await this.jobRepository.updateJob(job.id, {
-            status: 'FAILED',
+            status: JobStatus.Failed,
             failureCount: newFailureCount,
             lastError: `Self-healing retry limit exceeded (${this.maxHealingRetries}): ${userMessage}`,
           });
+          await this.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
           logger.warn('Job exceeded max self-healing retries and transitioned to FAILED', {
             jobId: job.id,
             failureCount: newFailureCount,
           });
-          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'FAILED');
+          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
           return null;
         }
 
         if (newFailureCount >= this.consecutiveFailuresForHealing) {
           await this.jobRepository.updateJob(job.id, {
-            status: 'HEALING',
+            status: JobStatus.Healing,
+            healingAttempts:
+              (job.healingWindowStartedAt &&
+              Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
+                ? (job.healingAttempts ?? 0)
+                : 0) + 1,
+            healingWindowStartedAt:
+              job.healingWindowStartedAt &&
+              Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
+                ? job.healingWindowStartedAt
+                : new Date(),
             failureCount: newFailureCount,
             lastError: userMessage,
           });
@@ -261,17 +329,17 @@ export class ScrapeExecutionService {
             }
           );
           await this.jobScheduler.enqueueCompilation(job.id, 'healing');
-          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'HEALING');
+          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Healing);
           return null;
         }
 
         // First selector failure: keep ACTIVE, increment failureCount
         await this.jobRepository.updateJob(job.id, {
-          status: 'ACTIVE',
+          status: JobStatus.Active,
           failureCount: newFailureCount,
           lastError: userMessage,
         });
-        await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
+        await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
         return null;
       }
 

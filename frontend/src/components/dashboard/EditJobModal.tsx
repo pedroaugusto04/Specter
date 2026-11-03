@@ -12,10 +12,12 @@ import {
   api,
   type ScrapingJobDto,
   type TriggerOperator,
+  type TriggerMatchMode,
   type TriggerRule,
   type UserDto,
 } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
+import { TRIGGER_MATCH_MODE, TRIGGER_OPERATOR } from '@/lib/extractionPlan';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
 
 export interface EditJobModalProps {
@@ -39,7 +41,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   const [customCron, setCustomCron] = React.useState('0 */6 * * *');
   const [useCustomCron, setUseCustomCron] = React.useState(false);
   const [triggerRules, setTriggerRules] = React.useState<TriggerRule[]>([]);
-  const [triggerMatchMode, setTriggerMatchMode] = React.useState<'any' | 'all'>('all');
+  const [triggerMatchMode, setTriggerMatchMode] = React.useState<TriggerMatchMode>(
+    TRIGGER_MATCH_MODE.All
+  );
   const [showTriggerHelp, setShowTriggerHelp] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -68,10 +72,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
         setUseCustomCron(true);
       }
 
-      setTriggerRules(
-        job.extractorConfig?.triggerRules ? [...job.extractorConfig.triggerRules] : []
-      );
-      setTriggerMatchMode(job.extractorConfig?.triggerMatchMode || 'all');
+      setTriggerRules(job.extractionPlan?.triggerRules ? [...job.extractionPlan.triggerRules] : []);
+      setTriggerMatchMode(job.extractionPlan?.triggerMatchMode ?? TRIGGER_MATCH_MODE.All);
 
       setFieldErrors({});
       setGlobalError(null);
@@ -85,8 +87,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   );
 
   const rulesChanged = React.useMemo(() => {
-    const origRules = job?.extractorConfig?.triggerRules || [];
-    const origMode = job?.extractorConfig?.triggerMatchMode || 'all';
+    const origRules = job?.extractionPlan?.triggerRules || [];
+    const origMode = job?.extractionPlan?.triggerMatchMode ?? TRIGGER_MATCH_MODE.All;
     if (triggerMatchMode !== origMode) return true;
     if (triggerRules.length !== origRules.length) return true;
     return JSON.stringify(triggerRules) !== JSON.stringify(origRules);
@@ -198,7 +200,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     }
   };
 
-  const availableExtractorFields = Object.keys(job?.extractorConfig?.fields || {});
+  const availableExtractorFields = Object.keys(job?.extractionPlan?.fields || {});
 
   return (
     <Dialog
@@ -292,10 +294,16 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                 <span className="text-muted-foreground">Match:</span>
                 <button
                   type="button"
-                  onClick={() => setTriggerMatchMode(triggerMatchMode === 'all' ? 'any' : 'all')}
+                  onClick={() =>
+                    setTriggerMatchMode(
+                      triggerMatchMode === TRIGGER_MATCH_MODE.All
+                        ? TRIGGER_MATCH_MODE.Any
+                        : TRIGGER_MATCH_MODE.All
+                    )
+                  }
                   className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
                 >
-                  {triggerMatchMode === 'all' ? 'ALL conditions' : 'ANY condition'}
+                  {triggerMatchMode === TRIGGER_MATCH_MODE.All ? 'ALL conditions' : 'ANY condition'}
                 </button>
               </div>
             )}
@@ -379,7 +387,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                     const defaultField = availableExtractorFields[0] || 'price';
                     setTriggerRules([
                       ...triggerRules,
-                      { field: defaultField, operator: 'lt', value: '' },
+                      { field: defaultField, operator: TRIGGER_OPERATOR.LessThan, value: '' },
                     ]);
                   }}
                 >
@@ -440,35 +448,52 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                       className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
                     >
                       <optgroup label="Relative Changes (vs Previous Check)">
-                        <option value="percentage_drop">Drops by % or more</option>
-                        <option value="percentage_increase">Increases by % or more</option>
-                        <option value="decreased">Decreased (any drop)</option>
-                        <option value="increased">Increased (any rise)</option>
-                        <option value="changes">Changed (any text or value)</option>
+                        <option value={TRIGGER_OPERATOR.PercentageDrop}>Drops by % or more</option>
+                        <option value={TRIGGER_OPERATOR.PercentageIncrease}>
+                          Increases by % or more
+                        </option>
+                        <option value={TRIGGER_OPERATOR.Decreased}>Decreased (any drop)</option>
+                        <option value={TRIGGER_OPERATOR.Increased}>Increased (any rise)</option>
+                        <option value={TRIGGER_OPERATOR.Changes}>
+                          Changed (any text or value)
+                        </option>
                       </optgroup>
                       <optgroup label="Fixed Thresholds & Matches">
-                        <option value="lt">&lt; Less than</option>
-                        <option value="lte">&le; Less or equal</option>
-                        <option value="gt">&gt; Greater than</option>
-                        <option value="gte">&ge; Greater or equal</option>
-                        <option value="eq">== Equals</option>
-                        <option value="neq">!= Not equals</option>
-                        <option value="contains">Contains text</option>
-                        <option value="not_contains">Does not contain</option>
+                        <option value={TRIGGER_OPERATOR.LessThan}>&lt; Less than</option>
+                        <option value={TRIGGER_OPERATOR.LessThanOrEqual}>&le; Less or equal</option>
+                        <option value={TRIGGER_OPERATOR.GreaterThan}>&gt; Greater than</option>
+                        <option value={TRIGGER_OPERATOR.GreaterThanOrEqual}>
+                          &ge; Greater or equal
+                        </option>
+                        <option value={TRIGGER_OPERATOR.Equal}>== Equals</option>
+                        <option value={TRIGGER_OPERATOR.NotEqual}>!= Not equals</option>
+                        <option value={TRIGGER_OPERATOR.Contains}>Contains text</option>
+                        <option value={TRIGGER_OPERATOR.NotContains}>Does not contain</option>
                       </optgroup>
                     </select>
                   </div>
 
                   {/* Value */}
                   <div className="w-full sm:w-1/3">
-                    {['decreased', 'increased', 'changes'].includes(rule.operator) ? (
+                    {(
+                      [
+                        TRIGGER_OPERATOR.Decreased,
+                        TRIGGER_OPERATOR.Increased,
+                        TRIGGER_OPERATOR.Changes,
+                      ] as TriggerOperator[]
+                    ).includes(rule.operator) ? (
                       <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
                         Any change detected
                       </div>
                     ) : (
                       <Input
                         placeholder={
-                          ['percentage_drop', 'percentage_increase'].includes(rule.operator)
+                          (
+                            [
+                              TRIGGER_OPERATOR.PercentageDrop,
+                              TRIGGER_OPERATOR.PercentageIncrease,
+                            ] as TriggerOperator[]
+                          ).includes(rule.operator)
                             ? 'Percentage (e.g. 10)'
                             : 'Target value (e.g. 150)'
                         }
@@ -512,7 +537,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                     const defaultField = availableExtractorFields[0] || 'price';
                     setTriggerRules([
                       ...triggerRules,
-                      { field: defaultField, operator: 'lt', value: '' },
+                      { field: defaultField, operator: TRIGGER_OPERATOR.LessThan, value: '' },
                     ]);
                   }}
                 >

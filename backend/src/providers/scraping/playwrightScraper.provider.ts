@@ -1,6 +1,15 @@
+import type { ExtractionPlan } from '../../types/extractionPlan.js';
+import type { PlanExecutionResult } from '../../services/planExecutionService.js';
+import type { ExtractedRecord } from '../../types/extractor.js';
+import { extractPlanPage, recordIdentity } from '../../utils/planExtraction.js';
 import { existsSync } from 'fs';
 import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright';
 import { env } from '../../config/env.js';
+import {
+  ExtractionQuality,
+  isAcceptedExtractionQuality,
+  PaginationKind,
+} from '../../types/enums.js';
 import { NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
@@ -51,6 +60,115 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
   constructor(options: { timeoutMs?: number } = {}) {
     this.defaultTimeoutMs = options.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
+  }
+
+  async executePlan(
+    targetUrl: string,
+    plan: ExtractionPlan,
+    options: ScrapeOptions = {}
+  ): Promise<PlanExecutionResult> {
+    const safeUrl = await assertSafeUrl(targetUrl, 'targetUrl');
+    const browser = await launchBrowserWithFallback({ headless: true });
+    let context: BrowserContext | undefined;
+    const started = Date.now();
+    const budgetMs = Math.min(
+      env.EXTRACTION_TIMEOUT_MS,
+      options.timeoutMs ?? env.EXTRACTION_TIMEOUT_MS
+    );
+    const timer = setTimeout(() => void browser.close().catch(() => {}), budgetMs);
+    try {
+      context = await browser.newContext({
+        userAgent: DEFAULT_USER_AGENT,
+        storageState: options.storageState,
+      });
+      const navigation: { origin?: string } = {};
+      await context.route('**/*', async (route) => {
+        try {
+          const url = await assertSafeUrl(route.request().url(), 'requestUrl');
+          if (
+            navigation.origin &&
+            route.request().isNavigationRequest() &&
+            new URL(url).origin !== navigation.origin
+          )
+            return await route.abort();
+          await route.continue();
+        } catch {
+          await route.abort();
+        }
+      });
+      const page = await context.newPage();
+      page.setDefaultTimeout(Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs));
+      const response = await page.goto(safeUrl, { waitUntil: 'domcontentloaded' });
+      navigation.origin = new URL(page.url()).origin;
+      const records = new Map<string, ExtractedRecord>();
+      let result: PlanExecutionResult | undefined;
+      for (let action = 0; action <= env.EXTRACTION_MAX_ACTIONS; action++) {
+        await page.locator(plan.readySelector).first().waitFor({ state: 'attached' });
+        const rawHtml = await page.content();
+        detectAntiBotBlock(page.url(), rawHtml, response?.status() ?? 200);
+        const extracted = extractPlanPage(rawHtml, page.url(), plan);
+        result = {
+          data: extracted.data,
+          report: { ...extracted.report, pagesVisited: action + 1 },
+          scrape: {
+            rawHtml,
+            url: page.url(),
+            httpStatus: response?.status() ?? 200,
+            durationMs: Date.now() - started,
+          },
+        };
+        if (!isAcceptedExtractionQuality(result.report.quality)) return result;
+        const items = (extracted.data as { items: ExtractedRecord[] }).items;
+        for (const item of items) {
+          const key = recordIdentity(item, plan.identityFields);
+          if (records.has(key) && JSON.stringify(records.get(key)) !== JSON.stringify(item)) {
+            result.report.quality = ExtractionQuality.Invalid;
+            result.report.issues.push('Conflicting duplicate collection identity.');
+            return result;
+          }
+          if (!records.has(key) && records.size >= env.EXTRACTION_MAX_ITEMS) {
+            result.report.quality = ExtractionQuality.Partial;
+            result.report.issues.push('The configured item limit was reached before completion.');
+            result.data = { items: [...records.values()], count: records.size };
+            return result;
+          }
+          records.set(key, item);
+        }
+        const ordered = [...records.values()].sort((a, b) =>
+          recordIdentity(a, plan.identityFields).localeCompare(
+            recordIdentity(b, plan.identityFields)
+          )
+        );
+        result.data = { items: ordered, count: ordered.length };
+        if (records.size > env.EXTRACTION_MAX_ITEMS) break;
+        if (extracted.ended) {
+          result.report.quality = records.size
+            ? ExtractionQuality.Complete
+            : ExtractionQuality.Empty;
+          if (options.captureScreenshot)
+            result.scrape.screenshot = await page.screenshot({ type: 'jpeg' });
+          return result;
+        }
+        if (action === env.EXTRACTION_MAX_ACTIONS || action + 1 >= env.EXTRACTION_MAX_PAGES) break;
+        const previousBody = await page.locator('body').innerHTML();
+        if (plan.pagination?.kind === PaginationKind.Scroll)
+          await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+        else await page.locator(plan.pagination!.nextSelector!).first().click();
+        await page
+          .waitForFunction('(previous) => document.body.innerHTML !== previous', previousBody)
+          .catch(() => {});
+      }
+      if (!result) throw new Error('Interactive extraction produced no document.');
+      result.report.quality = ExtractionQuality.Partial;
+      result.report.issues.push(
+        'Collection completion was not verified within the configured limits.'
+      );
+      return result;
+    } finally {
+      clearTimeout(timer);
+      await context?.close().catch(() => {});
+      await browser.close().catch(() => {});
+    }
   }
 
   async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
@@ -121,7 +239,12 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       page.setDefaultTimeout(timeoutMs);
 
       // Abort heavy media downloads to preserve VPS RAM and bandwidth
-      await page.route('**/*', (route) => {
+      await page.route('**/*', async (route) => {
+        try {
+          await assertSafeUrl(route.request().url(), 'requestUrl');
+        } catch {
+          return route.abort();
+        }
         const resourceType = route.request().resourceType();
         if (BLOCKED_RESOURCE_TYPES.has(resourceType)) {
           return route.abort();

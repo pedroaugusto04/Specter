@@ -1,6 +1,9 @@
+import { comparisonPayload } from './planExtraction.js';
 import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
 import type { ScrapingJobEntity } from '../types/domain.js';
-import type { ExtractedPayload, TriggerRule } from '../types/extractor.js';
+import type { TriggerRule } from '../types/extractionPlan.js';
+import type { TriggerMatchMode } from '../types/enums.js';
+import type { ExtractedPayload } from '../types/extractor.js';
 import { buildDiffSummary } from './diffHasher.js';
 import { logger } from './logger.js';
 import { evaluateTriggerRules } from './triggerEvaluator.js';
@@ -10,7 +13,7 @@ export interface DispatchChangeAlertOptions {
   currentData: ExtractedPayload;
   previousData: ExtractedPayload | null;
   triggerRules?: TriggerRule[];
-  triggerMatchMode?: 'any' | 'all';
+  triggerMatchMode?: TriggerMatchMode;
   notificationProvider: INotificationProvider;
   screenshotUrl?: string | null;
   subjectSuffix?: string; // e.g. ' (Self-healing)'
@@ -36,14 +39,19 @@ export async function evaluateAndDispatchChangeAlert(
 
   if (!previousData) return;
 
-  const diffSummary = buildDiffSummary(previousData, currentData);
+  const diffSummary = buildDiffSummary(
+    comparisonPayload(previousData, job.extractionPlan?.identityFields ?? []),
+    comparisonPayload(currentData, job.extractionPlan?.identityFields ?? []),
+    false
+  );
   if (!diffSummary.hasChanges) return;
 
   const triggerResult = evaluateTriggerRules(
     currentData,
     triggerRules,
     triggerMatchMode,
-    previousData
+    previousData,
+    job.extractionPlan?.identityFields ?? []
   );
 
   if (!triggerResult.triggered) {

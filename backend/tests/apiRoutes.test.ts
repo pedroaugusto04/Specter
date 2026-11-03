@@ -225,7 +225,27 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     // Simulate compilation completing and job being ACTIVE with a scheduled repeatable
     await repository.updateJob(job.id, {
       status: 'ACTIVE',
-      extractorConfig: { fields: { title: 'h1', price: '.price' } },
+      extractionPlan: {
+        version: 2,
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+        fields: {
+          title: {
+            sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }],
+            type: 'string',
+            required: true,
+          },
+          price: {
+            sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+            type: 'string',
+            required: true,
+          },
+        },
+      },
       bullmqRepeatableKey: 'repeat:fake-key',
     });
     scheduler.scheduledRepeatables.set(job.id, 'repeat:fake-key');

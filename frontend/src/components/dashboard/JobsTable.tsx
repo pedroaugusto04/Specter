@@ -25,6 +25,7 @@ import {
   useTriggerJobMutation,
 } from '@/hooks/useDashboardQueries';
 import type { JobStatus, ScrapingJobDto } from '@/lib/api';
+import { JOB_STATUS, JOB_STATUS_FILTER } from '@/lib/domainValues';
 import {
   DEFAULT_TIMEZONE,
   formatCompactDate,
@@ -33,7 +34,7 @@ import {
 } from '@/lib/utils';
 
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
-type StatusFilter = 'ALL' | 'ACTIVE' | 'HEALING' | 'PAUSED';
+type StatusFilter = (typeof JOB_STATUS_FILTER)[keyof typeof JOB_STATUS_FILTER];
 
 function formatDisplayUrl(rawUrl: string): string {
   try {
@@ -48,35 +49,35 @@ function formatDisplayUrl(rawUrl: string): string {
 
 function renderStatusPill(status: JobStatus) {
   switch (status) {
-    case 'ACTIVE':
+    case JOB_STATUS.Active:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-900 bg-zinc-900 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           ACTIVE
         </span>
       );
-    case 'PENDING_COMPILATION':
+    case JOB_STATUS.PendingCompilation:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-ping" />
           COMPILING
         </span>
       );
-    case 'HEALING':
+    case JOB_STATUS.Healing:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
           ADAPTING
         </span>
       );
-    case 'FAILED':
+    case JOB_STATUS.Failed:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           FAILED
         </span>
       );
-    case 'PAUSED':
+    case JOB_STATUS.Paused:
     default:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-muted-foreground">
@@ -133,28 +134,39 @@ export function JobsTable({
   };
 
   // Counts for filter tabs
-  const activeCount = React.useMemo(() => jobs.filter((j) => j.status === 'ACTIVE').length, [jobs]);
+  const activeCount = React.useMemo(
+    () => jobs.filter((j) => j.status === JOB_STATUS.Active).length,
+    [jobs]
+  );
   const healingCount = React.useMemo(
-    () => jobs.filter((j) => j.status === 'HEALING' || j.status === 'PENDING_COMPILATION').length,
+    () =>
+      jobs.filter(
+        (j) => j.status === JOB_STATUS.Healing || j.status === JOB_STATUS.PendingCompilation
+      ).length,
     [jobs]
   );
   const pausedOrFailedCount = React.useMemo(
-    () => jobs.filter((j) => j.status === 'PAUSED' || j.status === 'FAILED').length,
+    () =>
+      jobs.filter((j) => j.status === JOB_STATUS.Paused || j.status === JOB_STATUS.Failed).length,
     [jobs]
   );
 
   // Filtered jobs
   const filteredJobs = React.useMemo(() => {
     return jobs.filter((job) => {
-      if (filter === 'ACTIVE' && job.status !== 'ACTIVE') return false;
+      if (filter === JOB_STATUS_FILTER.Active && job.status !== JOB_STATUS.Active) return false;
       if (
-        filter === 'HEALING' &&
-        job.status !== 'HEALING' &&
-        job.status !== 'PENDING_COMPILATION'
+        filter === JOB_STATUS_FILTER.Healing &&
+        job.status !== JOB_STATUS.Healing &&
+        job.status !== JOB_STATUS.PendingCompilation
       ) {
         return false;
       }
-      if (filter === 'PAUSED' && job.status !== 'PAUSED' && job.status !== 'FAILED') {
+      if (
+        filter === JOB_STATUS_FILTER.Paused &&
+        job.status !== JOB_STATUS.Paused &&
+        job.status !== JOB_STATUS.Failed
+      ) {
         return false;
       }
 
@@ -179,7 +191,7 @@ export function JobsTable({
             type="button"
             onClick={() => setFilter('ALL')}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-              filter === 'ALL'
+              filter === JOB_STATUS_FILTER.All
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -188,9 +200,9 @@ export function JobsTable({
           </button>
           <button
             type="button"
-            onClick={() => setFilter('ACTIVE')}
+            onClick={() => setFilter(JOB_STATUS_FILTER.Active)}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-              filter === 'ACTIVE'
+              filter === JOB_STATUS_FILTER.Active
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -199,9 +211,9 @@ export function JobsTable({
           </button>
           <button
             type="button"
-            onClick={() => setFilter('HEALING')}
+            onClick={() => setFilter(JOB_STATUS_FILTER.Healing)}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-              filter === 'HEALING'
+              filter === JOB_STATUS_FILTER.Healing
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -210,9 +222,9 @@ export function JobsTable({
           </button>
           <button
             type="button"
-            onClick={() => setFilter('PAUSED')}
+            onClick={() => setFilter(JOB_STATUS_FILTER.Paused)}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-              filter === 'PAUSED'
+              filter === JOB_STATUS_FILTER.Paused
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -254,14 +266,16 @@ export function JobsTable({
             <Search className="h-5 w-5" />
           </div>
           <h3 className="mt-4 text-base font-semibold text-foreground">
-            {searchQuery || filter !== 'ALL' ? 'No matching monitors' : 'No monitors configured'}
+            {searchQuery || filter !== JOB_STATUS_FILTER.All
+              ? 'No matching monitors'
+              : 'No monitors configured'}
           </h3>
           <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto">
-            {searchQuery || filter !== 'ALL'
+            {searchQuery || filter !== JOB_STATUS_FILTER.All
               ? 'Try clearing the search query or switching the status filter.'
               : 'Create your first monitor to begin scheduled extraction and change detection.'}
           </p>
-          {onCreateClick && !searchQuery && filter === 'ALL' && (
+          {onCreateClick && !searchQuery && filter === JOB_STATUS_FILTER.All && (
             <div className="mt-6">
               <Button onClick={onCreateClick} className="h-9 px-4 text-sm gap-2">
                 <Plus className="h-4 w-4" />
@@ -293,9 +307,9 @@ export function JobsTable({
                 const isDeleting = currentAction === 'delete';
 
                 const isCompilingState =
-                  job.status === 'PENDING_COMPILATION' || job.status === 'HEALING';
+                  job.status === JOB_STATUS.PendingCompilation || job.status === JOB_STATUS.Healing;
                 const isCompiling = isCompilingState || isRecompilingAction;
-                const isPaused = job.status === 'PAUSED';
+                const isPaused = job.status === JOB_STATUS.Paused;
                 const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
 
                 return (

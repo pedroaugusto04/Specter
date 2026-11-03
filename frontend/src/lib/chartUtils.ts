@@ -1,4 +1,6 @@
 import type { JobRunDto } from '@/lib/api';
+import type { ChangeStatus, RunStatus } from './domainValues';
+import { CHANGE_STATUS, RUN_STATUS } from './domainValues';
 import { formatCompactDate, formatDateTime } from '@/lib/utils';
 
 export interface NumericFieldCandidate {
@@ -16,8 +18,8 @@ export interface ChartDataPoint {
   rawValue: unknown;
   numericValue: number | null;
   displayValue: string;
-  hasChanges: 'YES' | 'NO' | 'INITIAL';
-  status: 'SUCCESS' | 'FAILED';
+  hasChanges: ChangeStatus;
+  status: RunStatus;
   durationMs: number | null;
   httpStatus: number | null;
   deltaFromPrev: number | null;
@@ -224,9 +226,9 @@ export function calculateRunMetrics(runs: JobRunDto[]): RunMetricsSummary {
   let lastChangeAt: string | null = null;
 
   for (const run of runs) {
-    if (run.status === 'SUCCESS') successRuns++;
-    if (run.status === 'FAILED') failedRuns++;
-    if (run.hasChanges === 'YES') {
+    if (run.status === RUN_STATUS.Success) successRuns++;
+    if (run.status === RUN_STATUS.Failed) failedRuns++;
+    if (run.hasChanges === CHANGE_STATUS.Changed) {
       changeRuns++;
       if (!lastChangeAt) {
         // Runs are newest-first, so the first change encountered is the most recent

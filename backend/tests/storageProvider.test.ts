@@ -135,9 +135,21 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
 
       await repository.updateJob(job.id, {
         status: 'ACTIVE',
-        extractorConfig: {
-          containerSelector: '.card',
-          fields: [{ name: 'price', selector: '.price', type: 'string' }],
+        extractionPlan: {
+          version: 2,
+          mode: 'single',
+          readySelector: '.card',
+          scope: 'page',
+          identityFields: [],
+          triggerRules: [],
+          triggerMatchMode: 'all',
+          fields: {
+            price: {
+              sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+              type: 'string',
+              required: true,
+            },
+          },
         },
       });
 
@@ -195,9 +207,21 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
 
       await repository.updateJob(job.id, {
         status: 'ACTIVE',
-        extractorConfig: {
-          containerSelector: '.card',
-          fields: [{ name: 'price', selector: '.price', type: 'string' }],
+        extractionPlan: {
+          version: 2,
+          mode: 'single',
+          readySelector: '.card',
+          scope: 'page',
+          identityFields: [],
+          triggerRules: [],
+          triggerMatchMode: 'all',
+          fields: {
+            price: {
+              sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+              type: 'string',
+              required: true,
+            },
+          },
         },
       });
 
@@ -260,9 +284,21 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
 
       await repository.updateJob(job.id, {
         status: 'ACTIVE',
-        extractorConfig: {
-          containerSelector: '.card',
-          fields: [{ name: 'price', selector: '.price', type: 'string' }],
+        extractionPlan: {
+          version: 2,
+          mode: 'single',
+          readySelector: '.card',
+          scope: 'page',
+          identityFields: [],
+          triggerRules: [],
+          triggerMatchMode: 'all',
+          fields: {
+            price: {
+              sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+              type: 'string',
+              required: true,
+            },
+          },
         },
       });
 

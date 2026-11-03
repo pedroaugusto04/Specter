@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type {
   CompilerInput,
-  ExtractorSchema,
+  ExtractionPlan,
   ICompilerProvider,
 } from '../../src/providers/compilers/compiler.interface.js';
 import type {
@@ -104,7 +104,7 @@ export class InMemoryJobRepository implements IJobRepository {
       webhookUrl: input.webhookUrl ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
-      extractorConfig: null,
+      extractionPlan: null,
       status: 'PENDING_COMPILATION',
       lastError: null,
       failureCount: 0,
@@ -160,6 +160,8 @@ export class InMemoryJobRepository implements IJobRepository {
     const entity: JobRunEntity = {
       id: crypto.randomUUID(),
       jobId: input.jobId,
+      extractionReport: input.extractionReport,
+      contractRevision: input.contractRevision,
       extractedData: input.extractedData ?? null,
       normalizedHash: input.normalizedHash ?? null,
       hasChanges: input.hasChanges,
@@ -220,24 +222,45 @@ export class InMemoryJobRepository implements IJobRepository {
 export class MockCompilerProvider implements ICompilerProvider {
   public readonly name = 'mock-compiler';
   public calls: CompilerInput[] = [];
-  private handler: (input: CompilerInput) => Promise<ExtractorSchema>;
+  private handler: (input: CompilerInput) => Promise<ExtractionPlan>;
 
-  constructor(handler?: (input: CompilerInput) => Promise<ExtractorSchema>) {
+  constructor(handler?: (input: CompilerInput) => Promise<ExtractionPlan>) {
     this.handler =
       handler ??
       (async () => ({
+        version: 2,
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
         fields: {
-          title: { selector: '[data-testid="product-title"]', attribute: 'text' },
-          price: { selector: '[data-testid="product-price"]', attribute: 'text' },
+          title: {
+            sources: [
+              { kind: 'dom', selector: '[data-testid="product-title"]', attribute: 'text' },
+            ],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
+          price: {
+            sources: [
+              { kind: 'dom', selector: '[data-testid="product-price"]', attribute: 'text' },
+            ],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
         },
       }));
   }
 
-  setHandler(handler: (input: CompilerInput) => Promise<ExtractorSchema>): void {
+  setHandler(handler: (input: CompilerInput) => Promise<ExtractionPlan>): void {
     this.handler = handler;
   }
 
-  async compile(input: CompilerInput): Promise<ExtractorSchema> {
+  async compile(input: CompilerInput): Promise<ExtractionPlan> {
     this.calls.push(input);
     return this.handler(input);
   }

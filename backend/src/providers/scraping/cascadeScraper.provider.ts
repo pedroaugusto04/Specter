@@ -1,3 +1,6 @@
+import { env } from '../../config/env.js';
+import { NavigationTimeoutError } from '../../errors/domainErrors.js';
+import type { ExtractionPlan } from '../../types/extractionPlan.js';
 import { AntiBotBlockedError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
@@ -14,23 +17,37 @@ export class CascadeScraperEngine implements IScraperEngine {
     this.name = `cascade(${localEngine.name})`;
   }
 
+  async executePlan(url: string, plan: ExtractionPlan, options?: ScrapeOptions) {
+    if (!this.localEngine.executePlan)
+      throw new Error('Interactive extraction is unavailable for the selected scraper.');
+    return this.localEngine.executePlan(url, plan, options);
+  }
+
   getUnblockers(): IUnblockerProvider[] {
     return [...this.unblockers];
   }
 
   async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
+    const startedAt = Date.now();
+    const timeoutMs = Math.min(
+      options?.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS,
+      env.EXTRACTION_TIMEOUT_MS
+    );
+    const remainingMs = () => timeoutMs - (Date.now() - startedAt);
     const enabledUnblockers = this.unblockers.filter((u) => u.isEnabled());
     const unblockerErrors: Array<{ provider: string; error: string }> = [];
 
     // 1. Try configured unblocker providers in cascade priority
     for (const unblocker of enabledUnblockers) {
+      const remaining = remainingMs();
+      if (remaining <= 0) break;
       try {
         logger.debug('Attempting HTML extraction via unblocker', {
           provider: unblocker.name,
           url: targetUrl,
         });
 
-        const result = await unblocker.fetchHtml(targetUrl, options);
+        const result = await unblocker.fetchHtml(targetUrl, { ...options, timeoutMs: remaining });
 
         logger.info('HTML successfully extracted via anti-bot unblocker', {
           provider: unblocker.name,
@@ -66,8 +83,14 @@ export class CascadeScraperEngine implements IScraperEngine {
     }
 
     // 2. Fallback to local scraping engine (Playwright / Cheerio)
+    const localTimeout = remainingMs();
+    if (localTimeout <= 0) {
+      throw new NavigationTimeoutError(
+        `Scraping cascade exceeded its ${timeoutMs}ms total budget.`
+      );
+    }
     try {
-      return await this.localEngine.fetchHtml(targetUrl, options);
+      return await this.localEngine.fetchHtml(targetUrl, { ...options, timeoutMs: localTimeout });
     } catch (err) {
       if (err instanceof AntiBotBlockedError && unblockerErrors.length > 0) {
         const failureSummary = unblockerErrors.map((e) => `${e.provider}: ${e.error}`).join(' | ');

@@ -1,15 +1,12 @@
+import type { ExtractionReport } from '../types/extractionPlan.js';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { jobRuns, scrapingJobs } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
-import type {
-  ChangeStatus,
-  JobRunEntity,
-  JobStatus,
-  RunStatus,
-  ScrapingJobEntity,
-} from '../types/domain.js';
-import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
+import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
+import type { ExtractionPlan } from '../types/extractionPlan.js';
+import type { ExtractedPayload } from '../types/extractor.js';
+import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
 
 export interface CreateJobInput {
   userId?: string;
@@ -28,15 +25,20 @@ export interface UpdateJobPatch {
   webhookUrl?: string | null;
   cronExpression?: string;
   bullmqRepeatableKey?: string | null;
-  extractorConfig?: ExtractorConfig | null;
+  contractRevision?: string | null;
+  extractionPlan?: ExtractionPlan | null;
   status?: JobStatus;
   lastError?: string | null;
+  healingAttempts?: number;
+  healingWindowStartedAt?: Date | null;
   failureCount?: number;
   captureScreenshotOnChange?: boolean;
 }
 
 export interface CreateJobRunInput {
   jobId: string;
+  contractRevision?: string | null;
+  extractionReport?: ExtractionReport | null;
   extractedData?: ExtractedPayload | null;
   normalizedHash?: string | null;
   hasChanges: ChangeStatus;
@@ -89,7 +91,7 @@ export class DrizzleJobRepository implements IJobRepository {
         webhookUrl: input.webhookUrl ?? null,
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
-        status: 'PENDING_COMPILATION',
+        status: JobStatus.PendingCompilation,
         failureCount: 0,
       })
       .returning();
@@ -129,7 +131,10 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async findActiveJobs(): Promise<ScrapingJobEntity[]> {
-    const rows = await this.db.select().from(scrapingJobs).where(eq(scrapingJobs.status, 'ACTIVE'));
+    const rows = await this.db
+      .select()
+      .from(scrapingJobs)
+      .where(eq(scrapingJobs.status, JobStatus.Active));
 
     return rows.map(JobMapper.rowToEntity);
   }
@@ -161,6 +166,8 @@ export class DrizzleJobRepository implements IJobRepository {
       .insert(jobRuns)
       .values({
         jobId: input.jobId,
+        contractRevision: input.contractRevision,
+        extractionReport: input.extractionReport ?? null,
         extractedData: input.extractedData ?? null,
         normalizedHash: input.normalizedHash ?? null,
         hasChanges: input.hasChanges,
@@ -195,7 +202,7 @@ export class DrizzleJobRepository implements IJobRepository {
     const [row] = await this.db
       .select()
       .from(jobRuns)
-      .where(and(eq(jobRuns.jobId, jobId), eq(jobRuns.status, 'SUCCESS')))
+      .where(and(eq(jobRuns.jobId, jobId), eq(jobRuns.status, RunStatus.Success)))
       .orderBy(desc(jobRuns.executedAt))
       .limit(1);
 
@@ -205,7 +212,9 @@ export class DrizzleJobRepository implements IJobRepository {
   async deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number> {
     const deleted = await this.db
       .delete(jobRuns)
-      .where(and(eq(jobRuns.hasChanges, 'NO'), lt(jobRuns.executedAt, cutoffDate)))
+      .where(
+        and(eq(jobRuns.hasChanges, ChangeStatus.Unchanged), lt(jobRuns.executedAt, cutoffDate))
+      )
       .returning({ id: jobRuns.id });
 
     return deleted.length;
@@ -223,7 +232,7 @@ export class DrizzleJobRepository implements IJobRepository {
       ? await this.db
           .select({
             totalRuns: sql<number>`count(*)::int`,
-            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = 'YES')::int`,
+            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
           })
           .from(jobRuns)
           .innerJoin(scrapingJobs, eq(jobRuns.jobId, scrapingJobs.id))
@@ -231,7 +240,7 @@ export class DrizzleJobRepository implements IJobRepository {
       : await this.db
           .select({
             totalRuns: sql<number>`count(*)::int`,
-            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = 'YES')::int`,
+            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
           })
           .from(jobRuns);
 
@@ -240,8 +249,8 @@ export class DrizzleJobRepository implements IJobRepository {
     let failedOrPausedJobs = 0;
 
     for (const j of allJobs) {
-      if (j.status === 'ACTIVE') activeJobs++;
-      else if (j.status === 'HEALING' || j.status === 'PENDING_COMPILATION')
+      if (j.status === JobStatus.Active) activeJobs++;
+      else if (j.status === JobStatus.Healing || j.status === JobStatus.PendingCompilation)
         healingOrCompilingJobs++;
       else failedOrPausedJobs++;
     }

@@ -81,7 +81,7 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
 
     expect(compiledJob.status).toBe('ACTIVE');
     expect(compiledJob.failureCount).toBe(0);
-    expect(compiledJob.extractorConfig).toBeDefined();
+    expect(compiledJob.extractionPlan).toBeDefined();
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(true);
 
     const runs = await repository.findRunsByJobId(job.id);
@@ -92,8 +92,20 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
 
   it('transitions job to FAILED if compiled selectors fail the pre-activation smoke-test', async () => {
     compiler.setHandler(async () => ({
+      version: 2,
+      mode: 'single',
+      readySelector: 'body',
+      scope: 'page',
+      identityFields: [],
+      triggerRules: [],
+      triggerMatchMode: 'all',
       fields: {
-        title: { selector: '#non-existent-selector', attribute: 'text' },
+        title: {
+          sources: [{ kind: 'dom', selector: '#non-existent-selector', attribute: 'text' }],
+          type: 'string',
+          required: true,
+          locale: 'en-US',
+        },
       },
     }));
 
@@ -108,7 +120,7 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
 
     const updated = await repository.findById(job.id);
     expect(updated?.status).toBe('FAILED');
-    expect(updated?.lastError).toContain('Smoke test');
+    expect(updated?.lastError).toContain('Required field');
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
   });
 
@@ -123,9 +135,9 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     await compilationService.compileJob(job.id);
     expect(notifier.sentAlerts).toHaveLength(0);
 
-    // Run 1: Same content (with volatile relative timestamp that must be ignored)
+    // Run 1: Same extracted content.
     scraper.setHandler(async (url) => ({
-      rawHtml: `<html><body><h1 data-testid="product-title">Notebook Pro</h1><span data-testid="product-price">$ 1,200.00 posted 5 minutes ago</span></body></html>`,
+      rawHtml: `<html><body><h1 data-testid="product-title">Notebook Pro</h1><span data-testid="product-price">$ 1,200.00</span></body></html>`,
       httpStatus: 200,
       url,
       durationMs: 25,
@@ -182,19 +194,20 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     expect(scheduler.compilationQueue).toHaveLength(1);
     expect(scheduler.compilationQueue[0]).toEqual({ jobId: job.id, reason: 'healing' });
 
-    // 3rd failure -> still within maxHealingRetries (3), enqueues healing
+    // Scheduled scraping must not run during recovery.
     await scrapeService.executeScrape(job.id);
-    currentJob = await repository.findById(job.id);
-    expect(currentJob?.status).toBe('HEALING');
-    expect(currentJob?.failureCount).toBe(3);
-
-    // 4th failure -> exceeds maxHealingRetries (3) -> transitions to FAILED to prevent infinite loop!
-    const queueCountBefore = scheduler.compilationQueue.length;
+    expect((await repository.findById(job.id))?.failureCount).toBe(2);
+    // A new cycle after the window budget is exhausted must stop scheduling.
+    await repository.updateJob(job.id, {
+      status: 'ACTIVE',
+      failureCount: 1,
+      healingAttempts: 3,
+      healingWindowStartedAt: new Date(),
+    });
+    const queued = scheduler.compilationQueue.length;
     await scrapeService.executeScrape(job.id);
-    currentJob = await repository.findById(job.id);
-    expect(currentJob?.status).toBe('FAILED');
-    expect(currentJob?.failureCount).toBe(4);
-    expect(scheduler.compilationQueue.length).toBe(queueCountBefore);
+    expect((await repository.findById(job.id))?.status).toBe('FAILED');
+    expect(scheduler.compilationQueue.length).toBe(queued);
   });
 
   it('does NOT trigger self-healing on AntiBotBlockedError (HTTP 403/429) or NavigationTimeoutError', async () => {

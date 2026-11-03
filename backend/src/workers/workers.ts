@@ -1,3 +1,4 @@
+import { ExecutionLease } from '../queues/executionLease.js';
 import { Worker, type Job } from 'bullmq';
 import { env } from '../config/env.js';
 import {
@@ -18,6 +19,7 @@ export interface WorkerManagerDeps {
 }
 
 export class WorkerManager {
+  private readonly executionLease = new ExecutionLease();
   private compilationWorker: Worker | null = null;
   private scrapeWorker: Worker | null = null;
   private maintenanceWorker: Worker | null = null;
@@ -34,7 +36,7 @@ export class WorkerManager {
       COMPILATION_QUEUE_NAME,
       async (job: Job<{ jobId: string; reason?: string }>) => {
         const { jobId } = job.data;
-        await this.deps.compilationService.compileJob(jobId);
+        await this.executionLease.run(jobId, () => this.deps.compilationService.compileJob(jobId));
       },
       {
         concurrency: env.COMPILER_CONCURRENCY,
@@ -47,7 +49,9 @@ export class WorkerManager {
       SCRAPE_EXECUTION_QUEUE_NAME,
       async (job: Job<{ jobId: string }>) => {
         const { jobId } = job.data;
-        await this.deps.scrapeExecutionService.executeScrape(jobId);
+        await this.executionLease.run(jobId, () =>
+          this.deps.scrapeExecutionService.executeScrape(jobId)
+        );
       },
       {
         concurrency: env.SCRAPER_CONCURRENCY,
@@ -93,6 +97,7 @@ export class WorkerManager {
       this.scrapeWorker?.close(),
       this.maintenanceWorker?.close(),
     ]);
+    await this.executionLease.close();
     logger.info('BullMQ background workers stopped');
   }
 }

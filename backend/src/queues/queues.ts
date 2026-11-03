@@ -43,7 +43,7 @@ export class BullMqJobScheduler implements IJobScheduler {
     this.compilationQueue = new Queue(COMPILATION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: 2,
+        attempts: 1,
         backoff: {
           type: 'exponential',
           delay: 5000,

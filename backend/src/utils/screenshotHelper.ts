@@ -1,6 +1,7 @@
 import { logger } from './logger.js';
 import { assertSafeUrl } from './ssrfValidator.js';
 import type { ChangeStatus } from '../types/domain.js';
+import { ChangeStatus as ChangeStatusValue } from '../types/enums.js';
 import type { IStorageProvider } from '../providers/storage/storage.interface.js';
 
 /**
@@ -15,9 +16,7 @@ export function decodeBase64Screenshot(input?: string | null): Buffer | undefine
   if (!trimmed) {
     return undefined;
   }
-  const base64Data = trimmed.includes(';base64,')
-    ? trimmed.split(';base64,').pop()!
-    : trimmed;
+  const base64Data = trimmed.includes(';base64,') ? trimmed.split(';base64,').pop()! : trimmed;
 
   try {
     const buffer = Buffer.from(base64Data, 'base64');
@@ -81,7 +80,7 @@ export async function uploadScreenshotIfEligible(
 
   if (
     !captureScreenshotOnChange ||
-    (hasChanges !== 'INITIAL' && hasChanges !== 'YES') ||
+    (hasChanges !== ChangeStatusValue.Initial && hasChanges !== ChangeStatusValue.Changed) ||
     !screenshot ||
     !storageProvider.isEnabled
   ) {

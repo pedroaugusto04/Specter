@@ -1,3 +1,5 @@
+import { comparisonPayload } from '../utils/planExtraction.js';
+import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
 import {
   AntiBotBlockedError,
@@ -14,8 +16,9 @@ import type {
   IJobRepository,
   UpdateJobPatch,
 } from '../repositories/jobRepository.js';
-import type { DiffSummary, JobStatus } from '../types/domain.js';
-import type { TriggerRule } from '../types/extractor.js';
+import type { DiffSummary } from '../types/domain.js';
+import { JobStatus, RunStatus, TriggerMatchMode } from '../types/enums.js';
+import type { TriggerRule } from '../types/extractionPlan.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
@@ -40,7 +43,7 @@ export interface UpdateScrapingJobRequest {
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
   triggerRules?: TriggerRule[];
-  triggerMatchMode?: 'any' | 'all';
+  triggerMatchMode?: TriggerMatchMode;
 }
 
 import type { RealtimeService } from './realtimeService.js';
@@ -220,9 +223,9 @@ export class JobService {
     }
 
     if (request.triggerRules !== undefined || request.triggerMatchMode !== undefined) {
-      if (existing.extractorConfig) {
-        patch.extractorConfig = {
-          ...existing.extractorConfig,
+      if (existing.extractionPlan) {
+        patch.extractionPlan = {
+          ...existing.extractionPlan,
           ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
           ...(request.triggerMatchMode !== undefined
             ? { triggerMatchMode: request.triggerMatchMode }
@@ -240,7 +243,7 @@ export class JobService {
         await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       }
       patch.bullmqRepeatableKey = null;
-    } else if (patch.cronExpression !== undefined && existing.status === 'ACTIVE') {
+    } else if (patch.cronExpression !== undefined && existing.status === JobStatus.Active) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
         existing.id,
@@ -248,6 +251,8 @@ export class JobService {
       );
     }
 
+    if (patch.extractionPlan)
+      patch.extractionPlan = extractionPlanSchema.parse(patch.extractionPlan);
     const updated = await this.jobRepository.updateJob(id, patch);
     if (!updated) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
@@ -255,7 +260,8 @@ export class JobService {
 
     if (needsRecompile) {
       await this.jobRepository.updateJob(id, {
-        status: 'PENDING_COMPILATION',
+        status: JobStatus.PendingCompilation,
+        extractionPlan: null,
         failureCount: 0,
         lastError: null,
       });
@@ -279,7 +285,7 @@ export class JobService {
         await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       }
       const updated = await this.jobRepository.updateJob(id, {
-        status: 'PAUSED',
+        status: JobStatus.Paused,
         bullmqRepeatableKey: null,
       });
       const resultDto = JobMapper.entityToDto(updated ?? existing);
@@ -291,8 +297,10 @@ export class JobService {
       return resultDto;
     }
 
-    if (!existing.extractorConfig) {
-      const updated = await this.jobRepository.updateJob(id, { status: 'PENDING_COMPILATION' });
+    if (!existing.extractionPlan) {
+      const updated = await this.jobRepository.updateJob(id, {
+        status: JobStatus.PendingCompilation,
+      });
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
       const resultDto = JobMapper.entityToDto(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
@@ -308,7 +316,7 @@ export class JobService {
       existing.cronExpression
     );
     const updated = await this.jobRepository.updateJob(id, {
-      status: 'ACTIVE',
+      status: JobStatus.Active,
       bullmqRepeatableKey: repeatableKey,
     });
     const resultDto = JobMapper.entityToDto(updated ?? existing);
@@ -325,7 +333,7 @@ export class JobService {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
-    if (!existing.extractorConfig || existing.status === 'PENDING_COMPILATION') {
+    if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
       await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
       return { queued: true, mode: 'compile' };
@@ -343,7 +351,7 @@ export class JobService {
     }
 
     const updated = await this.jobRepository.updateJob(id, {
-      status: 'HEALING',
+      status: JobStatus.Healing,
       failureCount: 0,
       lastError: null,
     });
@@ -378,13 +386,23 @@ export class JobService {
     const runEntities = await this.jobRepository.findRunsByJobId(jobId, limit);
     const runs = runEntities.map(JobMapper.runEntityToDto);
 
-    const successfulRuns = runEntities.filter((r) => r.status === 'SUCCESS' && r.extractedData);
+    const successfulRuns = runEntities.filter(
+      (r) =>
+        r.status === RunStatus.Success &&
+        r.extractedData &&
+        r.extractionReport &&
+        r.contractRevision === existing.contractRevision
+    );
     let latestDiff: DiffSummary | null = null;
 
     if (successfulRuns.length >= 2) {
       const current = successfulRuns[0]!;
       const previous = successfulRuns[1]!;
-      latestDiff = buildDiffSummary(previous.extractedData, current.extractedData);
+      latestDiff = buildDiffSummary(
+        comparisonPayload(previous.extractedData!, existing.extractionPlan?.identityFields ?? []),
+        comparisonPayload(current.extractedData!, existing.extractionPlan?.identityFields ?? []),
+        false
+      );
     }
 
     return { runs, latestDiff };

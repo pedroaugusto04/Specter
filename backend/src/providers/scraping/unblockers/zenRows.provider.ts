@@ -39,10 +39,6 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('js_render', 'true');
       endpoint.searchParams.set('premium_proxy', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('proxy_country', 'br');
-      }
-
       if (options?.waitForSelector) {
         const cleanWaitSelector = options.waitForSelector.split(',')[0]?.trim();
         if (cleanWaitSelector) {
@@ -109,9 +105,7 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
             rawHtml = parsed.html;
           }
           const base64Str =
-            typeof parsed.screenshot === 'string'
-              ? parsed.screenshot
-              : parsed.screenshot?.data;
+            typeof parsed.screenshot === 'string' ? parsed.screenshot : parsed.screenshot?.data;
           screenshot = decodeBase64Screenshot(base64Str);
         } catch {
           // If JSON parse fails, fallback to rawText as HTML without screenshot

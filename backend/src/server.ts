@@ -24,6 +24,7 @@ import { RetentionService } from './services/retentionService.js';
 import { ScrapeExecutionService } from './services/scrapeExecutionService.js';
 import { SessionService } from './services/sessionService.js';
 import { logger } from './utils/logger.js';
+import { JobStatus } from './types/enums.js';
 import { WorkerManager } from './workers/workers.js';
 
 async function bootstrap(): Promise<void> {
@@ -93,9 +94,10 @@ async function bootstrap(): Promise<void> {
     await migrate(getDb(), { migrationsFolder: 'drizzle/migrations' });
     logger.info('Database migrations applied successfully.');
   } catch (err) {
-    logger.warn('Database migration skipped or failed', {
+    logger.error('Database migration failed', {
       errorMessage: err instanceof Error ? err.message : String(err),
     });
+    throw err;
   }
 
   // Reconcile PostgreSQL active jobs with BullMQ repeatable schedules on startup
@@ -105,6 +107,9 @@ async function bootstrap(): Promise<void> {
       jobScheduler.scrapeQueue,
       activeJobs.map((j) => ({ id: j.id, cronExpression: j.cronExpression }))
     );
+    for (const job of await jobRepository.findAll(JobStatus.PendingCompilation)) {
+      await jobScheduler.enqueueCompilation(job.id, 'initial');
+    }
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {
     logger.warn(

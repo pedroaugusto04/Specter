@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import type { JobRunDto } from '@/lib/api';
+import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { formatCompactDate, formatDateTime } from '@/lib/utils';
 
 interface ExecutionTimelineStripProps {
@@ -30,10 +31,12 @@ export function ExecutionTimelineStrip({
   // Take up to the most recent 40 runs to maintain clean visual density.
   const chronologicalRuns = [...runs].reverse().slice(-40);
 
-  const changeCount = runs.filter((r) => r.hasChanges === 'YES').length;
-  const unchangedCount = runs.filter((r) => r.hasChanges === 'NO' && r.status === 'SUCCESS').length;
-  const failedCount = runs.filter((r) => r.status === 'FAILED').length;
-  const initialCount = runs.filter((r) => r.hasChanges === 'INITIAL').length;
+  const changeCount = runs.filter((r) => r.hasChanges === CHANGE_STATUS.Changed).length;
+  const unchangedCount = runs.filter(
+    (r) => r.hasChanges === CHANGE_STATUS.Unchanged && r.status === RUN_STATUS.Success
+  ).length;
+  const failedCount = runs.filter((r) => r.status === RUN_STATUS.Failed).length;
+  const initialCount = runs.filter((r) => r.hasChanges === CHANGE_STATUS.Initial).length;
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -71,9 +74,9 @@ export function ExecutionTimelineStrip({
       <div className="relative pt-2 pb-1">
         <div className="flex items-center gap-1 h-8 w-full">
           {chronologicalRuns.map((run, index) => {
-            const isChange = run.hasChanges === 'YES';
-            const isInitial = run.hasChanges === 'INITIAL';
-            const isFailed = run.status === 'FAILED';
+            const isChange = run.hasChanges === CHANGE_STATUS.Changed;
+            const isInitial = run.hasChanges === CHANGE_STATUS.Initial;
+            const isFailed = run.status === RUN_STATUS.Failed;
             const isSelected = selectedRunId === run.id;
 
             let barBg = 'bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700';
@@ -141,20 +144,20 @@ export function ExecutionTimelineStrip({
               <span>{formatDateTime(tooltipState.run.executedAt, timeZone)}</span>
               <span
                 className={`text-[10px] uppercase px-1 py-0.2 rounded font-semibold ${
-                  tooltipState.run.status === 'FAILED'
+                  tooltipState.run.status === RUN_STATUS.Failed
                     ? 'bg-red-500/20 text-red-500'
-                    : tooltipState.run.hasChanges === 'YES'
+                    : tooltipState.run.hasChanges === CHANGE_STATUS.Changed
                       ? 'bg-amber-500/20 text-amber-500'
-                      : tooltipState.run.hasChanges === 'INITIAL'
+                      : tooltipState.run.hasChanges === CHANGE_STATUS.Initial
                         ? 'bg-zinc-500/20 text-foreground'
                         : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {tooltipState.run.status === 'FAILED'
-                  ? 'FAILED'
-                  : tooltipState.run.hasChanges === 'YES'
+                {tooltipState.run.status === RUN_STATUS.Failed
+                  ? RUN_STATUS.Failed
+                  : tooltipState.run.hasChanges === CHANGE_STATUS.Changed
                     ? 'CHANGE'
-                    : tooltipState.run.hasChanges === 'INITIAL'
+                    : tooltipState.run.hasChanges === CHANGE_STATUS.Initial
                       ? 'BASELINE'
                       : 'UNCHANGED'}
               </span>

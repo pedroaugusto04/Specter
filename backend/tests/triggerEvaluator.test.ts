@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ScrapeExecutionService } from '../src/services/scrapeExecutionService.js';
-import type { ExtractorConfig, TriggerRule } from '../src/types/extractor.js';
+import type { ExtractionPlan, TriggerRule } from '../src/types/extractionPlan.js';
 import {
   evaluateSingleRule,
   evaluateTriggerRules,
@@ -187,7 +187,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
 
       const result = evaluateTriggerRules(payload, rules, 'all');
       expect(result.triggered).toBe(false);
-      expect(result.matchedRules).toHaveLength(1);
+      expect(result.matchedRules).toHaveLength(0);
     });
 
     it('returns triggered: true in matchMode: any when at least one rule matches', () => {
@@ -214,7 +214,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
         count: 2,
       };
 
-      const result = evaluateTriggerRules(payload, rules);
+      const result = evaluateTriggerRules(payload, rules, 'all', null, ['title']);
       expect(result.triggered).toBe(true);
       expect(result.matchedRules).toHaveLength(1);
       expect(result.reasons[0]).toContain('price (45) < 50');
@@ -243,10 +243,26 @@ describe('Conditional Alert Triggers & Evaluator', () => {
     });
 
     it('suppresses notification if content changed but trigger rule is NOT met', async () => {
-      const extractorConfig: ExtractorConfig = {
+      const extractionPlan: ExtractionPlan = {
+        version: 2,
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerMatchMode: 'all',
         fields: {
-          title: { selector: 'h1', attribute: 'text' },
-          price: { selector: '.price', attribute: 'text' },
+          title: {
+            sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
+          price: {
+            sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
         },
         triggerRules: [{ field: 'price', operator: 'lt', value: 3500 }],
       };
@@ -259,7 +275,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       });
 
       await repository.updateJob(job.id, {
-        extractorConfig,
+        extractionPlan,
         status: 'ACTIVE',
       });
 
@@ -291,10 +307,26 @@ describe('Conditional Alert Triggers & Evaluator', () => {
     });
 
     it('dispatches notification with triggerReasons when content changed and trigger rule IS met', async () => {
-      const extractorConfig: ExtractorConfig = {
+      const extractionPlan: ExtractionPlan = {
+        version: 2,
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerMatchMode: 'all',
         fields: {
-          title: { selector: 'h1', attribute: 'text' },
-          price: { selector: '.price', attribute: 'text' },
+          title: {
+            sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
+          price: {
+            sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
         },
         triggerRules: [{ field: 'price', operator: 'lt', value: 3500 }],
       };
@@ -307,7 +339,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       });
 
       await repository.updateJob(job.id, {
-        extractorConfig,
+        extractionPlan,
         status: 'ACTIVE',
       });
 
@@ -343,10 +375,26 @@ describe('Conditional Alert Triggers & Evaluator', () => {
     });
 
     it('evaluates relative triggers (percentage_drop) in ScrapeExecutionService', async () => {
-      const extractorConfig: ExtractorConfig = {
+      const extractionPlan: ExtractionPlan = {
+        version: 2,
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerMatchMode: 'all',
         fields: {
-          title: { selector: 'h1', attribute: 'text' },
-          price: { selector: '.price', attribute: 'text' },
+          title: {
+            sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
+          price: {
+            sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
         },
         triggerRules: [{ field: 'price', operator: 'percentage_drop', value: 10 }],
       };
@@ -359,7 +407,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       });
 
       await repository.updateJob(job.id, {
-        extractorConfig,
+        extractionPlan,
         status: 'ACTIVE',
       });
 

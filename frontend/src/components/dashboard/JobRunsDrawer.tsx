@@ -21,6 +21,8 @@ import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimeline
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
+import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 export function JobRunsDrawer({
@@ -62,10 +64,11 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('runs')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'runs'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              activeTab === 'runs'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-              }`}
+            }`}
           >
             <Clock className="h-3.5 w-3.5" />
             Runs ({runs.length})
@@ -73,10 +76,11 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('timeline')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'timeline'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              activeTab === 'timeline'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-              }`}
+            }`}
           >
             <TrendingUp className="h-3.5 w-3.5" />
             Timeline & Trends
@@ -84,10 +88,11 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('schema')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'schema'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              activeTab === 'schema'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-              }`}
+            }`}
           >
             <Code2 className="h-3.5 w-3.5" />
             Schema
@@ -243,21 +248,26 @@ export function JobRunsDrawer({
                       <div
                         key={run.id}
                         id={`run-card-${run.id}`}
-                        className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${isSelected
+                        className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${
+                          isSelected
                             ? 'border-primary ring-1 ring-primary/40 bg-muted/10'
                             : 'border-border'
-                          }`}
+                        }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2">
-                            <Badge variant={run.status === 'SUCCESS' ? 'success' : 'destructive'}>
-                              {run.status}
+                            <Badge
+                              variant={
+                                run.status === RUN_STATUS.Success ? 'success' : 'destructive'
+                              }
+                            >
+                              {run.extractionReport?.quality ?? run.status}
                             </Badge>
                             <Badge
                               variant={
-                                run.hasChanges === 'YES'
+                                run.hasChanges === CHANGE_STATUS.Changed
                                   ? 'warning'
-                                  : run.hasChanges === 'INITIAL'
+                                  : run.hasChanges === CHANGE_STATUS.Initial
                                     ? 'default'
                                     : 'secondary'
                               }
@@ -360,18 +370,22 @@ export function JobRunsDrawer({
                 <Code2 className="h-4 w-4" />
                 Compiled Extraction Schema
               </div>
-              <Badge variant={job.extractorConfig ? 'success' : 'secondary'}>
-                {job.extractorConfig ? 'Compiled' : 'Pending'}
+              <Badge variant={job.extractionPlan ? 'success' : 'secondary'}>
+                {job.extractionPlan ? 'Compiled' : 'Pending'}
               </Badge>
             </div>
 
-            {job.extractorConfig ? (
+            {job.extractionPlan ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Autonomous selector engine compiled for this target URL.
+                  Validated extraction plan. Scope:{' '}
+                  {job.extractionPlan.scope === EXTRACTION_SCOPE.Collection
+                    ? 'Complete collection'
+                    : 'Current page'}
+                  . Fields: {Object.keys(job.extractionPlan.fields).join(', ')}.
                 </p>
                 <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted/50 p-3.5 font-mono text-xs text-foreground">
-                  {JSON.stringify(job.extractorConfig, null, 2)}
+                  {JSON.stringify(job.extractionPlan, null, 2)}
                 </pre>
               </div>
             ) : (

@@ -42,6 +42,15 @@ export const envSchema = z.object({
   SCRAPINGBEE_API_KEY: z.string().optional().default(''),
   CRAWLBASE_TOKEN: z.string().optional().default(''),
 
+  EXTRACTION_MAX_PAGES: z.coerce.number().int().positive().default(10),
+  EXTRACTION_MAX_ACTIONS: z.coerce.number().int().positive().default(20),
+  EXTRACTION_MAX_ITEMS: z.coerce.number().int().positive().default(500),
+  EXTRACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(300000),
+  COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  COMPILATION_MAX_EVIDENCE_CHARS: z.coerce.number().int().positive().default(200000),
+  HEALING_WINDOW_MS: z.coerce.number().int().positive().default(86400000),
+
   // Guardrails & Self-Healing
   MIN_CRON_INTERVAL_MINUTES: z.coerce.number().int().min(1).default(15),
   CONSECUTIVE_FAILURES_FOR_HEALING: z.coerce.number().int().min(1).default(2),

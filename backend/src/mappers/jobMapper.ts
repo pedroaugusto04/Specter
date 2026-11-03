@@ -1,12 +1,9 @@
+import type { ExtractionReport } from '../types/extractionPlan.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
-import type {
-  ChangeStatus,
-  JobRunEntity,
-  JobStatus,
-  RunStatus,
-  ScrapingJobEntity,
-} from '../types/domain.js';
-import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
+import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
+import type { ExtractionPlan } from '../types/extractionPlan.js';
+import type { ExtractedPayload } from '../types/extractor.js';
+import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
 
 export interface ScrapingJobDto {
   id: string;
@@ -16,9 +13,11 @@ export interface ScrapingJobDto {
   notificationEmail: string;
   webhookUrl: string | null;
   cronExpression: string;
-  extractorConfig: ExtractorConfig | null;
+  contractRevision?: string | null;
+  extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;
+  healingAttempts?: number;
   failureCount: number;
   captureScreenshotOnChange: boolean;
   createdAt: string;
@@ -28,6 +27,8 @@ export interface ScrapingJobDto {
 export interface JobRunDto {
   id: string;
   jobId: string;
+  contractRevision?: string | null;
+  extractionReport?: ExtractionReport | null;
   extractedData: ExtractedPayload | null;
   normalizedHash: string | null;
   hasChanges: ChangeStatus;
@@ -59,10 +60,13 @@ export const JobMapper = {
       webhookUrl: row.webhookUrl ?? null,
       cronExpression: row.cronExpression,
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
-      extractorConfig: row.extractorConfig ?? null,
-      status: row.status,
+      contractRevision: row.contractRevision,
+      extractionPlan: row.extractionPlan ?? null,
+      status: parseEnumValue(JobStatus, row.status, 'job status'),
       lastError: row.lastError ?? null,
       failureCount: row.failureCount,
+      healingAttempts: row.healingAttempts,
+      healingWindowStartedAt: row.healingWindowStartedAt,
       captureScreenshotOnChange: row.captureScreenshotOnChange ?? false,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -78,10 +82,12 @@ export const JobMapper = {
       notificationEmail: entity.notificationEmail,
       webhookUrl: entity.webhookUrl ?? null,
       cronExpression: entity.cronExpression,
-      extractorConfig: entity.extractorConfig,
+      contractRevision: entity.contractRevision,
+      extractionPlan: entity.extractionPlan,
       status: entity.status,
       lastError: entity.lastError,
       failureCount: entity.failureCount,
+      healingAttempts: entity.healingAttempts,
       captureScreenshotOnChange: entity.captureScreenshotOnChange,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
@@ -96,10 +102,12 @@ export const JobMapper = {
     return {
       id: row.id,
       jobId: row.jobId,
+      contractRevision: row.contractRevision,
+      extractionReport: row.extractionReport,
       extractedData: row.extractedData ?? null,
       normalizedHash: row.normalizedHash ?? null,
-      hasChanges: row.hasChanges,
-      status: row.status,
+      hasChanges: parseEnumValue(ChangeStatus, row.hasChanges, 'change status'),
+      status: parseEnumValue(RunStatus, row.status, 'run status'),
       errorMessage: row.errorMessage ?? null,
       httpStatus: row.httpStatus ?? null,
       durationMs: row.durationMs ?? null,
@@ -112,6 +120,8 @@ export const JobMapper = {
     return {
       id: entity.id,
       jobId: entity.jobId,
+      contractRevision: entity.contractRevision,
+      extractionReport: entity.extractionReport,
       extractedData: entity.extractedData,
       normalizedHash: entity.normalizedHash,
       hasChanges: entity.hasChanges,

@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { JobRunDto } from '@/lib/api';
+import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { Badge } from '@/components/ui/badge';
 import {
   buildChartDataPoints,
@@ -63,7 +64,10 @@ export function ExecutionTimelineChart({
   // Runs that had detected changes or failures
   const changeRuns = React.useMemo(() => {
     return runs.filter(
-      (r) => r.hasChanges === 'YES' || r.hasChanges === 'INITIAL' || r.status === 'FAILED'
+      (r) =>
+        r.hasChanges === CHANGE_STATUS.Changed ||
+        r.hasChanges === CHANGE_STATUS.Initial ||
+        r.status === RUN_STATUS.Failed
     );
   }, [runs]);
 
@@ -340,8 +344,8 @@ export function ExecutionTimelineChart({
               {validPoints.map((point, idx) => {
                 const cx = getX(idx);
                 const cy = getY(point.numericValue!);
-                const isChange = point.hasChanges === 'YES';
-                const isInitial = point.hasChanges === 'INITIAL';
+                const isChange = point.hasChanges === CHANGE_STATUS.Changed;
+                const isInitial = point.hasChanges === CHANGE_STATUS.Initial;
 
                 if (isChange) {
                   return (
@@ -463,16 +467,16 @@ export function ExecutionTimelineChart({
                   <span>{activePoint.formattedTime}</span>
                   <Badge
                     variant={
-                      activePoint.hasChanges === 'YES'
+                      activePoint.hasChanges === CHANGE_STATUS.Changed
                         ? 'warning'
-                        : activePoint.hasChanges === 'INITIAL'
+                        : activePoint.hasChanges === CHANGE_STATUS.Initial
                           ? 'default'
                           : 'secondary'
                     }
                   >
-                    {activePoint.hasChanges === 'YES'
+                    {activePoint.hasChanges === CHANGE_STATUS.Changed
                       ? 'Change'
-                      : activePoint.hasChanges === 'INITIAL'
+                      : activePoint.hasChanges === CHANGE_STATUS.Initial
                         ? 'Initial'
                         : 'Unchanged'}
                   </Badge>
@@ -545,8 +549,8 @@ export function ExecutionTimelineChart({
         ) : (
           <div className="space-y-2.5">
             {changeRuns.map((run) => {
-              const isFailed = run.status === 'FAILED';
-              const isInitial = run.hasChanges === 'INITIAL';
+              const isFailed = run.status === RUN_STATUS.Failed;
+              const isInitial = run.hasChanges === CHANGE_STATUS.Initial;
 
               return (
                 <div
@@ -556,7 +560,7 @@ export function ExecutionTimelineChart({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Badge variant={isFailed ? 'destructive' : isInitial ? 'default' : 'warning'}>
-                        {isFailed ? 'FAILED' : isInitial ? 'BASELINE' : 'CHANGE DETECTED'}
+                        {isFailed ? RUN_STATUS.Failed : isInitial ? 'BASELINE' : 'CHANGE DETECTED'}
                       </Badge>
                       <span className="font-mono text-xs text-muted-foreground">
                         {formatDateTime(run.executedAt, timeZone)}

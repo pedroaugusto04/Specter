@@ -1,3 +1,5 @@
+import type { ExtractionReport, ExtractionPlan } from '../types/extractionPlan.js';
+import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
 import {
   pgTable,
   uuid,
@@ -8,7 +10,7 @@ import {
   index,
   boolean,
 } from 'drizzle-orm/pg-core';
-import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
+import type { ExtractedPayload } from '../types/extractor.js';
 
 export const users = pgTable(
   'users',
@@ -67,16 +69,20 @@ export const scrapingJobs = pgTable(
     bullmqRepeatableKey: text('bullmq_repeatable_key'),
 
     // Compiled AI Extractor Configuration
-    extractorConfig: jsonb('extractor_config').$type<ExtractorConfig>(),
+    contractRevision: text('contract_revision'),
+    extractionPlan: jsonb('extractor_config').$type<ExtractionPlan>(),
 
     status: text('status', {
-      enum: ['PENDING_COMPILATION', 'ACTIVE', 'FAILED', 'HEALING', 'PAUSED'],
+      enum: Object.values(JobStatus) as [string, ...string[]],
     })
-      .default('PENDING_COMPILATION')
+      .default(JobStatus.PendingCompilation)
       .notNull(),
 
     lastError: text('last_error'),
     failureCount: integer('failure_count').default(0).notNull(),
+
+    healingAttempts: integer('healing_attempts').default(0).notNull(),
+    healingWindowStartedAt: timestamp('healing_window_started_at', { withTimezone: true }),
 
     // Visual Diff Screenshot Option (Defaults to false)
     captureScreenshotOnChange: boolean('capture_screenshot_on_change').default(false).notNull(),
@@ -98,11 +104,15 @@ export const jobRuns = pgTable(
       .references(() => scrapingJobs.id, { onDelete: 'cascade' })
       .notNull(),
 
+    contractRevision: text('contract_revision'),
+    extractionReport: jsonb('extraction_report').$type<ExtractionReport>(),
     extractedData: jsonb('extracted_data').$type<ExtractedPayload>(),
     normalizedHash: text('normalized_hash'),
 
-    hasChanges: text('has_changes', { enum: ['YES', 'NO', 'INITIAL'] }).notNull(),
-    status: text('status', { enum: ['SUCCESS', 'FAILED'] }).notNull(),
+    hasChanges: text('has_changes', {
+      enum: Object.values(ChangeStatus) as [string, ...string[]],
+    }).notNull(),
+    status: text('status', { enum: Object.values(RunStatus) as [string, ...string[]] }).notNull(),
     errorMessage: text('error_message'),
     httpStatus: integer('http_status'),
     durationMs: integer('duration_ms'),

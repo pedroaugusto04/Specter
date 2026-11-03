@@ -39,10 +39,6 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('render', 'true');
       endpoint.searchParams.set('premium', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('country_code', 'br');
-      }
-
       if (options?.captureScreenshot) {
         endpoint.searchParams.set('screenshot', 'true');
       }
