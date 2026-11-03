@@ -107,4 +107,51 @@ describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
     expect(sanitized).not.toContain('Row 4');
     expect(sanitized).not.toContain('Row 5');
   });
+
+  it('preserves semantic OpenGraph/Product meta tags and projects JSON-LD Product data into queryable meta tags while stripping scripts', () => {
+    const rawSpaHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="google-site-verification" content="xyz123" />
+          <meta property="og:title" content="Smartphone Samsung Galaxy A07 256GB" />
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "Product",
+              "name": "Smartphone Samsung Galaxy A07 256GB",
+              "sku": "8775733",
+              "brand": { "@type": "Brand", "name": "Samsung" },
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "944.1",
+                  "priceCurrency": "BRL",
+                  "availability": "https://schema.org/InStock"
+                }
+              ]
+            }
+          </script>
+        </head>
+        <body>
+          <div id="__next"></div>
+        </body>
+      </html>
+    `;
+
+    const sanitized = sanitizeHtml(rawSpaHtml);
+
+    expect(sanitized).not.toContain('<script');
+    expect(sanitized).not.toContain('google-site-verification');
+    expect(sanitized).not.toContain('viewport');
+    expect(sanitized).toContain('property="og:title"');
+    expect(sanitized).toContain('content="Smartphone Samsung Galaxy A07 256GB"');
+    expect(sanitized).toContain('property="product:price:amount"');
+    expect(sanitized).toContain('itemprop="price"');
+    expect(sanitized).toContain('content="944.1"');
+    expect(sanitized).toContain('itemprop="sku"');
+    expect(sanitized).toContain('content="8775733"');
+  });
 });

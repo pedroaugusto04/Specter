@@ -184,5 +184,92 @@ describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
 
       expect(result).toEqual({});
     });
+
+    it('extracts clean first numeric value from composite text containing labels, ranges, or currency', () => {
+      const compositeHtml = `
+        <html>
+          <body>
+            <h1 class="job-title">Senior Full Stack Engineer</h1>
+            <div class="salary-badge">Faixa: R$&nbsp;12.500,00 até R$&nbsp;18.000,00 (CLT + benefícios)</div>
+            <div class="openings-count">Total de 14 vagas disponíveis no momento</div>
+          </body>
+        </html>
+      `;
+
+      const result = extractUsingConfig(compositeHtml, {
+        fields: {
+          title: {
+            selector: 'h1.job-title',
+            attribute: 'text',
+            type: 'string',
+          },
+          minSalary: {
+            selector: '.salary-badge',
+            attribute: 'text',
+            type: 'number',
+          },
+          openings: {
+            selector: '.openings-count',
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        title: 'Senior Full Stack Engineer',
+        minSalary: 12500,
+        openings: 14,
+      });
+    });
+
+    it('seamlessly falls back to <meta> and JSON-LD structured metadata when SPA body is unhydrated', () => {
+      const unhydratedSpaHtml = `
+        <html>
+          <head>
+            <meta property="og:title" content="Smartphone Samsung Galaxy A07 256GB 8GB RAM Verde" />
+            <script type="application/ld+json">
+              {
+                "@context": "https://schema.org",
+                "@type": "Product",
+                "name": "Smartphone Samsung Galaxy A07 256GB 8GB RAM Verde",
+                "offers": [
+                  {
+                    "@type": "Offer",
+                    "price": "944.1",
+                    "priceCurrency": "BRL"
+                  }
+                ]
+              }
+            </script>
+          </head>
+          <body>
+            <div id="__next"><header>busque aqui seu produto</header></div>
+          </body>
+        </html>
+      `;
+
+      const result = extractUsingConfig(unhydratedSpaHtml, {
+        fields: {
+          title: {
+            selector: 'h1[class*="ProductInfoCenter_title"]',
+            fallbackSelectors: ['h1', 'meta[property="og:title"]', 'meta[itemprop="name"]'],
+            attribute: 'text',
+            type: 'string',
+          },
+          price: {
+            selector: '[class*="ProductPrice_productPrice"]',
+            fallbackSelectors: ['meta[property="product:price:amount"]', 'meta[itemprop="price"]'],
+            attribute: 'text',
+            type: 'number',
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        title: 'Smartphone Samsung Galaxy A07 256GB 8GB RAM Verde',
+        price: 944.1,
+      });
+    });
   });
 });

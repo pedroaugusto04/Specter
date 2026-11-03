@@ -1,4 +1,5 @@
-import { chromium, type Browser, type BrowserContext } from 'playwright';
+import { existsSync } from 'fs';
+import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright';
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
@@ -8,6 +9,40 @@ const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const BLOCKED_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
+
+const SYSTEM_BROWSER_CANDIDATES = [
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+];
+
+function resolveFallbackBrowserPath(): string | undefined {
+  for (const candidate of SYSTEM_BROWSER_CANDIDATES) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+async function launchBrowserWithFallback(launchOptions: LaunchOptions): Promise<Browser> {
+  try {
+    return await chromium.launch(launchOptions);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Executable doesn't exist")) {
+      const systemExecutable = resolveFallbackBrowserPath();
+      if (systemExecutable) {
+        return await chromium.launch({
+          ...launchOptions,
+          executablePath: systemExecutable,
+        });
+      }
+    }
+    throw err;
+  }
+}
 
 export class PlaywrightScraperEngine implements IScraperEngine {
   public readonly name = 'playwright';
@@ -25,7 +60,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
     let context: BrowserContext | null = null;
 
     try {
-      browser = await chromium.launch({
+      browser = await launchBrowserWithFallback({
         headless: true,
         args: [
           '--no-sandbox',
@@ -128,7 +163,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         })
         .catch(() => {});
 
-      // 4. Target element attachment wait if specified
+      // 4. Target element attachment wait if specified, or wait for primary SPA content landmarks
       if (options?.waitForSelector) {
         await page
           .waitForSelector(options.waitForSelector, {
@@ -136,7 +171,24 @@ export class PlaywrightScraperEngine implements IScraperEngine {
             timeout: Math.min(5000, timeoutMs),
           })
           .catch(() => {});
+      } else {
+        await page
+          .waitForSelector('main, article, h1, [role="main"]', {
+            state: 'attached',
+            timeout: Math.min(4000, timeoutMs),
+          })
+          .catch(() => {});
       }
+
+      // Trigger IntersectionObserver lazy-hydrated components common in SPAs (Next.js/FastStore/Shopify)
+      await page
+        .evaluate(`
+          (() => {
+            window.scrollBy(0, 350);
+            window.scrollTo(0, 0);
+          })()
+        `)
+        .catch(() => {});
 
       // 5. DOM Mutation Quiescence (Universal language- and framework-agnostic stabilization)
       // Monitors active DOM mutations (React/Vue/Angular hydration, client-side fetches)

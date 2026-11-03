@@ -7,6 +7,7 @@ import type {
   ExtractorFieldDefinition,
   FieldExtractor,
 } from '../types/extractor.js';
+import { projectStructuredDataToMeta } from './htmlSanitizer.js';
 
 export function normalizeFieldDefinition(def: ExtractorFieldDefinition): Required<FieldExtractor> {
   if (typeof def === 'string') {
@@ -39,18 +40,30 @@ function coerceValue(
   }
 
   if (targetType === 'number') {
-    // Support formats like "R$ 1.299,90" or "$1,299.90"
-    const cleaned = trimmed.replace(/[^\d,.-]/g, '');
-    if (!cleaned) return null;
+    // Extract the first valid formatted numeric/monetary token (e.g. "R$ 1.299,90", "$1,299.90", "944.1")
+    // without concatenating separate numbers across composite text blocks (like installment descriptions).
+    const match = trimmed.match(/-?\d+(?:[.,]\d{3})*(?:[.,]\d+)?/);
+    if (!match) return null;
 
-    let normalizedNumberStr = cleaned;
-    const lastComma = cleaned.lastIndexOf(',');
-    const lastDot = cleaned.lastIndexOf('.');
+    const token = match[0];
+    let normalizedNumberStr = token;
+    const lastComma = token.lastIndexOf(',');
+    const lastDot = token.lastIndexOf('.');
+    const dotCount = (token.match(/\./g) ?? []).length;
+    const commaCount = (token.match(/,/g) ?? []).length;
 
     if (lastComma > lastDot) {
-      normalizedNumberStr = cleaned.replace(/\./g, '').replace(',', '.');
+      if (commaCount > 1 && lastDot === -1) {
+        normalizedNumberStr = token.replace(/,/g, '');
+      } else {
+        normalizedNumberStr = token.replace(/\./g, '').replace(',', '.');
+      }
     } else if (lastDot > lastComma) {
-      normalizedNumberStr = cleaned.replace(/,/g, '');
+      if (dotCount > 1 && lastComma === -1) {
+        normalizedNumberStr = token.replace(/\./g, '');
+      } else {
+        normalizedNumberStr = token.replace(/,/g, '');
+      }
     }
 
     const parsed = Number(normalizedNumberStr);
@@ -104,8 +117,25 @@ function tryExtractSelector(
   let raw: string | null = null;
   if (!attribute || attribute === 'text') {
     raw = target.text();
+    if (!raw || !raw.trim()) {
+      const tagName = target.prop('tagName')?.toLowerCase();
+      if (tagName === 'meta' || tagName === 'data') {
+        raw = target.attr('content') ?? target.attr('value') ?? null;
+      } else if (tagName === 'time') {
+        raw = target.attr('datetime') ?? null;
+      } else if (tagName === 'input') {
+        raw = target.attr('value') ?? null;
+      } else if (tagName === 'link') {
+        raw = target.attr('href') ?? null;
+      } else if (target.attr('content')) {
+        raw = target.attr('content') ?? null;
+      }
+    }
   } else {
     raw = target.attr(attribute) ?? null;
+    if ((!raw || !raw.trim()) && attribute === 'content') {
+      raw = target.text();
+    }
   }
 
   return coerceValue(raw, type);
@@ -148,6 +178,7 @@ export function extractUsingConfig(
   config: ExtractorConfig
 ): ExtractedPayload {
   const $ = typeof htmlOrCheerio === 'string' ? cheerio.load(htmlOrCheerio) : htmlOrCheerio;
+  projectStructuredDataToMeta($);
   const fieldEntries = Object.entries(config.fields ?? {});
 
   if (fieldEntries.length === 0) {

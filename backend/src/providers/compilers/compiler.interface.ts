@@ -24,12 +24,12 @@ MANDATORY: Save the output strictly in valid JSON format at the path '${outputFi
 Do not output text in the terminal. Do not request interactive confirmation.
 
 Selector Strategy:
-- Primary 'selector': Prefer semantic attributes (id, data-testid, itemprop) or text label anchors (e.g. p:contains("Starting at") + p).
-- 'fallbackSelectors': Provide 1-2 resilient alternative selectors in descending priority order (e.g. readable utility classes like font-mono, text-2xl or structural path).
-- Classes: Use readable, semantic, or utility class names. Avoid only random compiler-generated hashes (e.g. css-1a2b3c, _3kP9x).
-- Clean Target: Never select <title>, <head>, or temporary loading/skeleton placeholders (classes containing 'skeleton', 'loading', or aria-busy="true").
+- Primary 'selector': Prefer semantic <body> elements (h1, [data-testid], [itemprop]) or text label anchors (e.g. p:contains("Starting at") + p). Target the specific leaf element holding the value rather than parent containers that concatenate multiple prices/installments.
+- CSS Modules & Hashed Classes: When elements use CSS Modules with build hashes (e.g. "ProductPrice_productPrice__vpgdo" or "ProductInfoCenter_title__hdTX_"), NEVER hardcode the volatile hash suffix; use attribute substring selectors on the semantic prefix (e.g. '[class*="ProductPrice_productPrice"]', 'h1[class*="ProductInfoCenter_title"]').
+- 'fallbackSelectors': Provide 1-3 resilient alternative selectors in descending priority order, combining alternative <body> selectors (e.g. 'h1', '.font-mono.text-2xl') with semantic <meta> fallbacks when present in <head> (e.g. 'meta[property="product:price:amount"]', 'meta[itemprop="price"]', 'meta[property="og:title"]', 'meta[itemprop="name"]').
+- Clean Target: Never select <title>, and never rely on <head> tags alone if <body> has no matching content. Never select temporary loading/skeleton placeholders (classes containing 'skeleton', 'loading', or aria-busy="true").
 - Security: If the page is a security challenge, captcha, or access denied screen, output an empty fields object {}.
-- Attributes: Use attribute "href" for links, "src" for images, "text" for text content.
+- Attributes: Use attribute "href" for links, "src" for images, "text" for text content (note: <meta> fallback selectors automatically resolve their "content" attribute even when attribute is "text").
 
 Trigger Rule Guidelines:
 - If the user prompt expresses alert conditions, thresholds, or filtering requirements (e.g., "alert only if price is under 3500", "only if in stock", "alert when discount > 20%", "notify if price drops by 10%", "notify if status changes"):
