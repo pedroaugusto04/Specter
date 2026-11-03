@@ -112,7 +112,7 @@ export function ExecutionTimelineStrip({
         {/* Hover Tooltip */}
         {hoveredRun && tooltipPos && (
           <div
-            className="pointer-events-none absolute bottom-11 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs font-mono shadow-md"
+            className="pointer-events-none absolute bottom-12 z-50 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card p-2.5 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border"
             style={{ left: `${tooltipPos.x}px` }}
           >
             <div className="flex items-center gap-2 font-medium text-foreground">

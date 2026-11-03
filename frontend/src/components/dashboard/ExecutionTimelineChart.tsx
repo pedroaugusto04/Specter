@@ -453,7 +453,7 @@ export function ExecutionTimelineChart({
             {/* Hover Floating Tooltip */}
             {activePoint && activePointCoords && (
               <div
-                className="pointer-events-none absolute top-4 z-20 rounded-md border border-border bg-popover/95 p-2.5 text-xs font-mono shadow-xl backdrop-blur-sm"
+                className="pointer-events-none absolute top-4 z-50 rounded-md border border-border bg-card p-3 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border"
                 style={{
                   left: `${Math.min(Math.max((activePointCoords.x / width) * 100, 15), 85)}%`,
                   transform: 'translateX(-50%)',
