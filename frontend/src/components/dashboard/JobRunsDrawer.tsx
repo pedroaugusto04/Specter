@@ -192,12 +192,6 @@ export function JobRunsDrawer({
                       </span>
                     </div>
 
-                    {run.normalizedHash && (
-                      <p className="mt-2 font-mono text-xs text-muted-foreground truncate">
-                        SHA-256: {run.normalizedHash}
-                      </p>
-                    )}
-
                     {parsedError && (
                       <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                         <div className="flex items-start gap-2.5">

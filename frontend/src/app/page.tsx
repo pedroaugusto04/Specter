@@ -184,21 +184,6 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs font-mono">
-            {connectionMode === 'realtime' && (
-              <span className="flex items-center gap-1.5 text-emerald-500 font-medium">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>Live (SSE)</span>
-              </span>
-            )}
-            {connectionMode === 'polling' && (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="inline-block h-2 w-2 rounded-full bg-amber-500/80" />
-                <span>Auto-sync (Fallback)</span>
-              </span>
-            )}
             {connectionMode === 'connecting' && (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" />
