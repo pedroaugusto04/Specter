@@ -318,7 +318,32 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(blockedData.accessible).toBe(false);
     expect(blockedData.reason).toContain('Anti-Bot / CAPTCHA');
 
-    // 3. Creating a job delegates anti-bot resolution to the background compilation queue without blocking the form
+    // 3. SSRF Protection: Probe rejects internal loopback/metadata IP
+    const ssrfProbeRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs/probe',
+      payload: {
+        url: 'http://169.254.169.254/latest/meta-data',
+      },
+    });
+    expect(ssrfProbeRes.statusCode).toBe(200);
+    expect(ssrfProbeRes.json().data.accessible).toBe(false);
+    expect(ssrfProbeRes.json().data.reason).toMatch(/forbidden|SSRF/i);
+
+    // 4. SSRF Protection: Creating a job with internal target URL is rejected with 400
+    const ssrfCreateRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      headers: { cookie: authCookie },
+      payload: {
+        url: 'http://127.0.0.1:6379',
+        userPrompt: 'Extract keys',
+        notificationEmail: 'user@example.com',
+      },
+    });
+    expect(ssrfCreateRes.statusCode).toBe(400);
+
+    // 5. Creating a job delegates anti-bot resolution to the background compilation queue without blocking the form
     const createJobRes = await app.inject({
       method: 'POST',
       url: '/api/jobs',

@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { optionalAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { IntegrationService } from '../services/integrationService.js';
+import { assertSafeUrl } from '../utils/ssrfValidator.js';
 import { testTelegramSchema, testWebhookSchema, updateIntegrationsSchema } from './schemas.js';
 
 export function registerIntegrationRoutes(
@@ -9,18 +10,21 @@ export function registerIntegrationRoutes(
   integrationService: IntegrationService,
   authService: AuthService
 ): void {
-  const withOptionalAuth = optionalAuth(authService);
+  const withAuth = requireAuth(authService);
 
-  app.get('/api/integrations', { preHandler: [withOptionalAuth] }, async (request) => {
-    const userId = request.user?.id ?? 'default-user';
-    const data = await integrationService.getIntegrations(userId);
+  app.get('/api/integrations', { preHandler: [withAuth] }, async (request) => {
+    const user = requireUser(request);
+    const data = await integrationService.getIntegrations(user.id);
     return { data };
   });
 
-  app.put('/api/integrations', { preHandler: [withOptionalAuth] }, async (request) => {
-    const userId = request.user?.id ?? 'default-user';
+  app.put('/api/integrations', { preHandler: [withAuth] }, async (request) => {
+    const user = requireUser(request);
     const input = updateIntegrationsSchema.parse(request.body);
-    const updated = await integrationService.updateIntegrations(userId, {
+    if (input.webhookUrl) {
+      await assertSafeUrl(input.webhookUrl, 'webhookUrl');
+    }
+    const updated = await integrationService.updateIntegrations(user.id, {
       telegramEnabled: input.telegramEnabled,
       telegramChatId: input.telegramChatId || null,
       webhookEnabled: input.webhookEnabled,
@@ -31,7 +35,7 @@ export function registerIntegrationRoutes(
     return { data: updated };
   });
 
-  app.post('/api/integrations/telegram/test', async (request, reply) => {
+  app.post('/api/integrations/telegram/test', { preHandler: [withAuth] }, async (request, reply) => {
     const input = testTelegramSchema.parse(request.body);
     const result = await integrationService.testTelegram(input);
 
@@ -48,8 +52,9 @@ export function registerIntegrationRoutes(
     return { ...payload, data: payload };
   });
 
-  app.post('/api/integrations/webhook/test', async (request, reply) => {
+  app.post('/api/integrations/webhook/test', { preHandler: [withAuth] }, async (request, reply) => {
     const input = testWebhookSchema.parse(request.body);
+    await assertSafeUrl(input.webhookUrl, 'webhookUrl');
     const result = await integrationService.testWebhook(input);
 
     if (!result.ok) {

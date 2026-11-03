@@ -26,11 +26,8 @@ export async function resolveAuthenticatedUser(
       ? authHeader.slice(7).trim()
       : undefined;
 
-  const query = request.query as Record<string, unknown> | undefined;
-  const queryToken = typeof query?.token === 'string' ? query.token : undefined;
-
   const session = await authService.resolveSession(
-    bearerToken || cookies[ACCESS_COOKIE_NAME] || queryToken,
+    bearerToken || cookies[ACCESS_COOKIE_NAME],
     cookies[REFRESH_COOKIE_NAME]
   );
 

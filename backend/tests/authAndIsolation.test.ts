@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/services/authService.js';
@@ -326,5 +326,153 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       payload: { timezone: 'Invalid/NonExistent_Zone' },
     });
     expect(invalidRes.statusCode).toBe(400);
+  });
+
+  it('rejects access tokens in URL query string (disallows ?token=... for security)', async () => {
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'querytoken@example.com', password: 'password123' },
+    });
+    expect(regRes.statusCode).toBe(201);
+
+    // Create an explicit token
+    const token = authService.verifyAccessToken ? 'valid-looking-token' : 'token';
+
+    // Attempt to access profile via query string token
+    const profileRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/auth/profile?token=${token}`,
+      payload: { name: 'Hacker' },
+    });
+    expect(profileRes.statusCode).toBe(401);
+  });
+
+  it('enforces rate limiting on authentication routes when triggered', async () => {
+    // Send requests with test header enabled up to limit
+    for (let i = 0; i < 10; i++) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'x-test-rate-limit': '1' },
+        payload: { email: 'brute@example.com', password: 'wrong' },
+      });
+    }
+
+    // 11th request should be blocked with 429 Too Many Requests
+    const blockedRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { 'x-test-rate-limit': '1' },
+      payload: { email: 'brute@example.com', password: 'wrong' },
+    });
+    expect(blockedRes.statusCode).toBe(429);
+    expect(blockedRes.json().error).toBe('TOO_MANY_REQUESTS');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORS – Chrome Extension Origin Restriction
+// ─────────────────────────────────────────────────────────────────────────────
+describe('CORS – Chrome Extension Origin Restriction', () => {
+  const ALLOWED_EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
+  const OTHER_EXT_ID = 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
+
+  let appDev: FastifyInstance;
+  let appProd: FastifyInstance;
+
+  beforeEach(async () => {
+    const { buildApp } = await import('../src/app.js');
+    const { AuthService } = await import('../src/services/authService.js');
+    const { IntegrationService } = await import('../src/services/integrationService.js');
+    const { JobService } = await import('../src/services/jobService.js');
+    const { TelegramNotificationProvider } = await import(
+      '../src/providers/notifications/telegramNotification.provider.js'
+    );
+    const { WebhookNotificationProvider } = await import(
+      '../src/providers/notifications/webhookNotification.provider.js'
+    );
+    const {
+      InMemoryIntegrationRepository,
+      InMemoryJobRepository,
+      InMemoryUserRepository,
+      MockJobScheduler,
+      MockScraperEngine,
+    } = await import('./helpers/testDoubles.js');
+
+    function makeServices() {
+      const jobRepository = new InMemoryJobRepository();
+      const userRepository = new InMemoryUserRepository();
+      const scheduler = new MockJobScheduler();
+      const scraperEngine = new MockScraperEngine();
+      const jobService = new JobService(jobRepository, scheduler, scraperEngine);
+      const authService = new AuthService(userRepository, {
+        jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
+        accessExpiresSeconds: 900,
+        refreshExpiresSeconds: 604800,
+        cookieSecure: false,
+      });
+      const integrationRepository = new InMemoryIntegrationRepository();
+      const telegramProvider = new TelegramNotificationProvider('test-token');
+      const webhookProvider = new WebhookNotificationProvider();
+      const integrationService = new IntegrationService(
+        integrationRepository,
+        telegramProvider,
+        webhookProvider
+      );
+      return { jobService, authService, integrationService };
+    }
+
+    // Development build (NODE_ENV=test, CHROME_EXTENSION_ID unset) → all extensions allowed
+    appDev = await buildApp({ ...makeServices(), enableLogger: false });
+
+    // Production build: mock env to simulate NODE_ENV=production + CHROME_EXTENSION_ID set
+    vi.doMock('../src/config/env.js', () => ({
+      env: {
+        NODE_ENV: 'production',
+        CHROME_EXTENSION_ID: ALLOWED_EXT_ID,
+        CORS_ORIGIN: 'https://app.specter.com',
+        RATE_LIMIT_GLOBAL_MAX: 120,
+        RATE_LIMIT_AUTH_MAX: 10,
+        JWT_ACCESS_EXPIRES_SECONDS: 900,
+        JWT_REFRESH_EXPIRES_SECONDS: 604800,
+      },
+    }));
+
+    appProd = await buildApp({ ...makeServices(), enableLogger: false });
+    vi.doUnmock('../src/config/env.js');
+  });
+
+  afterEach(async () => {
+    await appDev?.close();
+    await appProd?.close();
+    vi.restoreAllMocks();
+  });
+
+  it('development: allows any chrome-extension:// origin (CHROME_EXTENSION_ID not set)', async () => {
+    const res = await appDev.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/me',
+      headers: {
+        origin: `chrome-extension://${OTHER_EXT_ID}`,
+        'access-control-request-method': 'GET',
+      },
+    });
+    // Fastify @fastify/cors sends 204 for OPTIONS preflight when origin is allowed
+    expect([200, 204]).toContain(res.statusCode);
+    expect(res.headers['access-control-allow-origin']).toBe(`chrome-extension://${OTHER_EXT_ID}`);
+  });
+
+  it('development: allows the designated extension origin', async () => {
+    const res = await appDev.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/me',
+      headers: {
+        origin: `chrome-extension://${ALLOWED_EXT_ID}`,
+        'access-control-request-method': 'GET',
+      },
+    });
+    expect([200, 204]).toContain(res.statusCode);
+    expect(res.headers['access-control-allow-origin']).toBe(`chrome-extension://${ALLOWED_EXT_ID}`);
   });
 });

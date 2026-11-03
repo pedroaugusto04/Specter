@@ -4,8 +4,17 @@ import { userWebSessions, type PlaywrightStorageState } from '../db/schema.js';
 import { SessionMapper } from '../mappers/sessionMapper.js';
 import type { UserWebSessionEntity } from '../types/domain.js';
 import { extractDomainCandidates } from '../utils/urlNormalizer.js';
+import { encryptJson, decryptJson } from '../utils/crypto.js';
 
 export { extractDomainCandidates };
+
+/**
+ * Decrypts a raw DB row's storageState before passing it to the mapper.
+ * Backward-compatible: plaintext jsonb is returned as-is.
+ */
+function decryptStorageState(raw: unknown): PlaywrightStorageState {
+  return decryptJson<PlaywrightStorageState>(raw);
+}
 
 export interface UpsertSessionInput {
   domain: string;
@@ -47,7 +56,7 @@ export class DrizzleSessionRepository implements ISessionRepository {
     const firstCandidate = candidates[0] ?? '';
     const exact = rows.find((r) => r.domain.toLowerCase() === firstCandidate);
     const chosen = exact ?? rows[0];
-    return chosen ? SessionMapper.rowToEntity(chosen) : null;
+    return chosen ? SessionMapper.rowToEntity({ ...chosen, storageState: decryptStorageState(chosen.storageState) }) : null;
   }
 
   async listByUserId(userId: string): Promise<UserWebSessionEntity[]> {
@@ -57,7 +66,7 @@ export class DrizzleSessionRepository implements ISessionRepository {
       .where(eq(userWebSessions.userId, userId))
       .orderBy(desc(userWebSessions.updatedAt));
 
-    return rows.map(SessionMapper.rowToEntity);
+    return rows.map((r) => SessionMapper.rowToEntity({ ...r, storageState: decryptStorageState(r.storageState) }));
   }
 
   async findById(id: string): Promise<UserWebSessionEntity | null> {
@@ -67,13 +76,14 @@ export class DrizzleSessionRepository implements ISessionRepository {
       .where(eq(userWebSessions.id, id))
       .limit(1);
 
-    return row ? SessionMapper.rowToEntity(row) : null;
+    return row ? SessionMapper.rowToEntity({ ...row, storageState: decryptStorageState(row.storageState) }) : null;
   }
 
   async upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity> {
     const candidates = extractDomainCandidates(input.domain);
     const normalizedDomain = candidates[0] ?? input.domain.trim().toLowerCase();
     const cookieCount = input.storageState.cookies?.length ?? 0;
+    const encryptedState = encryptJson(input.storageState);
 
     const existing = await this.findByUserAndDomain(userId, normalizedDomain);
 
@@ -82,14 +92,14 @@ export class DrizzleSessionRepository implements ISessionRepository {
         .update(userWebSessions)
         .set({
           name: input.name || existing.name,
-          storageState: input.storageState,
+          storageState: encryptedState as unknown as PlaywrightStorageState,
           cookieCount,
           updatedAt: new Date(),
         })
         .where(eq(userWebSessions.id, existing.id))
         .returning();
 
-      return SessionMapper.rowToEntity(updated!);
+      return SessionMapper.rowToEntity({ ...updated!, storageState: input.storageState });
     }
 
     const [inserted] = await this.db
@@ -98,12 +108,12 @@ export class DrizzleSessionRepository implements ISessionRepository {
         userId,
         domain: normalizedDomain,
         name: input.name || normalizedDomain,
-        storageState: input.storageState,
+        storageState: encryptedState as unknown as PlaywrightStorageState,
         cookieCount,
       })
       .returning();
 
-    return SessionMapper.rowToEntity(inserted!);
+    return SessionMapper.rowToEntity({ ...inserted!, storageState: input.storageState });
   }
 
   async delete(userId: string, id: string): Promise<boolean> {

@@ -1,6 +1,7 @@
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
+import { assertSafeUrl } from '../../utils/ssrfValidator.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
 const DEFAULT_USER_AGENT =
@@ -23,11 +24,12 @@ export class CheerioScraperEngine implements IScraperEngine {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      const safeTargetUrl = await assertSafeUrl(targetUrl, 'targetUrl');
       const cookieHeader = options?.storageState?.cookies?.length
         ? options.storageState.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
         : undefined;
 
-      const response = await this.fetchFn(targetUrl, {
+      const response = await this.fetchFn(safeTargetUrl, {
         method: 'GET',
         headers: {
           'User-Agent': DEFAULT_USER_AGENT,
@@ -43,9 +45,11 @@ export class CheerioScraperEngine implements IScraperEngine {
         signal: controller.signal,
       });
 
+      const finalUrl = response.url || targetUrl;
+      await assertSafeUrl(finalUrl, 'redirectUrl');
+
       const httpStatus = response.status;
       const rawHtml = await response.text();
-      const finalUrl = response.url || targetUrl;
 
       // Check HTTP status code, URL redirects, and DOM challenge fingerprints
       detectAntiBotBlock(finalUrl, rawHtml, httpStatus);

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",
+    "@fastify/rate-limit": "^11.2.2",
     "@supabase/supabase-js": "^2.118.0",
     "bullmq": "^5.81.5",
     "cheerio": "^1.2.0",

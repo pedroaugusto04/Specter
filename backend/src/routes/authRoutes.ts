@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { env } from '../config/env.js';
 import { UnauthorizedError } from '../errors/domainErrors.js';
 import {
   optionalAuth,
@@ -52,31 +53,64 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
     return reply.status(200).send({ data: updated });
   });
 
-  app.post('/api/auth/register', async (request, reply) => {
-    const input = authRegisterSchema.parse(request.body);
-    const { user, tokens } = await authService.register(input);
-    reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
-    return reply.status(201).send({ data: user });
-  });
-
-  app.post('/api/auth/login', async (request, reply) => {
-    const input = authLoginSchema.parse(request.body);
-    const { user, tokens } = await authService.login(input);
-    reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
-    return reply.status(200).send({ data: user, token: tokens.accessToken });
-  });
-
-  app.post('/api/auth/refresh', async (request, reply) => {
-    const cookies = parseCookies(request.headers.cookie);
-    const refreshToken = cookies[REFRESH_COOKIE_NAME];
-    if (!refreshToken) {
-      throw new UnauthorizedError('No refresh token provided.');
+  app.post(
+    '/api/auth/register',
+    {
+      config: {
+        rateLimit: {
+          max: env.RATE_LIMIT_AUTH_MAX,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = authRegisterSchema.parse(request.body);
+      const { user, tokens } = await authService.register(input);
+      reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
+      return reply.status(201).send({ data: user });
     }
+  );
 
-    const { user, tokens } = await authService.refresh(refreshToken);
-    reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
-    return reply.status(200).send({ data: user });
-  });
+  app.post(
+    '/api/auth/login',
+    {
+      config: {
+        rateLimit: {
+          max: env.RATE_LIMIT_AUTH_MAX,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = authLoginSchema.parse(request.body);
+      const { user, tokens } = await authService.login(input);
+      reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
+      return reply.status(200).send({ data: user, token: tokens.accessToken });
+    }
+  );
+
+  app.post(
+    '/api/auth/refresh',
+    {
+      config: {
+        rateLimit: {
+          max: env.RATE_LIMIT_AUTH_MAX * 2,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      const cookies = parseCookies(request.headers.cookie);
+      const refreshToken = cookies[REFRESH_COOKIE_NAME];
+      if (!refreshToken) {
+        throw new UnauthorizedError('No refresh token provided.');
+      }
+
+      const { user, tokens } = await authService.refresh(refreshToken);
+      reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
+      return reply.status(200).send({ data: user });
+    }
+  );
 
   app.post('/api/auth/logout', async (_request, reply) => {
     reply.header('Set-Cookie', authService.buildClearAuthCookies());

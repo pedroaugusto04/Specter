@@ -20,6 +20,7 @@ import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { normalizeUrl } from '../utils/urlNormalizer.js';
+import { assertSafeUrl } from '../utils/ssrfValidator.js';
 
 export interface CreateScrapingJobRequest {
   userId?: string;
@@ -69,7 +70,17 @@ export class JobService {
     targetUrl: string,
     userId?: string
   ): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
-    const normalizedUrl = normalizeUrl(targetUrl);
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = await assertSafeUrl(targetUrl, 'url');
+    } catch (ssrfErr) {
+      const reason =
+        ssrfErr instanceof ValidationError
+          ? ssrfErr.message
+          : 'Access to private, loopback, or internal network addresses is forbidden.';
+      return { accessible: false, reason };
+    }
+
     if (!this.scraperEngine) {
       return { accessible: true };
     }
@@ -113,7 +124,10 @@ export class JobService {
   }
 
   async createJob(request: CreateScrapingJobRequest): Promise<ScrapingJobDto> {
-    const normalizedUrl = normalizeUrl(request.url);
+    const normalizedUrl = await assertSafeUrl(request.url, 'url');
+    const webhookUrl = request.webhookUrl?.trim()
+      ? await assertSafeUrl(request.webhookUrl.trim(), 'webhookUrl')
+      : null;
     const cronExpression = (request.cronExpression ?? '0 */6 * * *').trim();
 
     const cronCheck = validateCronFrequency(cronExpression);
@@ -129,7 +143,7 @@ export class JobService {
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
       notificationEmail: (request.notificationEmail ?? '').trim(),
-      webhookUrl: request.webhookUrl?.trim() || null,
+      webhookUrl,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
@@ -177,7 +191,7 @@ export class JobService {
     const patch: UpdateJobPatch = {};
 
     if (request.url !== undefined) {
-      patch.url = normalizeUrl(request.url);
+      patch.url = await assertSafeUrl(request.url, 'url');
     }
     if (request.userPrompt !== undefined) {
       patch.userPrompt = request.userPrompt.trim();
@@ -186,7 +200,9 @@ export class JobService {
       patch.notificationEmail = request.notificationEmail.trim();
     }
     if (request.webhookUrl !== undefined) {
-      patch.webhookUrl = request.webhookUrl?.trim() || null;
+      patch.webhookUrl = request.webhookUrl?.trim()
+        ? await assertSafeUrl(request.webhookUrl.trim(), 'webhookUrl')
+        : null;
     }
     if (request.captureScreenshotOnChange !== undefined) {
       patch.captureScreenshotOnChange = request.captureScreenshotOnChange;

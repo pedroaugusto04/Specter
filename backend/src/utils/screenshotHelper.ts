@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { assertSafeUrl } from './ssrfValidator.js';
 import type { ChangeStatus } from '../types/domain.js';
 import type { IStorageProvider } from '../providers/storage/storage.interface.js';
 
@@ -39,7 +40,8 @@ export async function fetchRemoteScreenshot(
   }
 
   try {
-    const res = await fetchFn(imageUrl.trim(), { signal });
+    const safeUrl = await assertSafeUrl(imageUrl.trim(), 'imageUrl');
+    const res = await fetchFn(safeUrl, { signal });
     if (!res.ok) {
       return undefined;
     }

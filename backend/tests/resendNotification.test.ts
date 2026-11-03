@@ -222,6 +222,7 @@ describe('Specter Resend Notifications & Email Template', () => {
         NODE_ENV: 'production',
         NOTIFICATION_PROVIDER: 'resend',
         RESEND_API_KEY: 're_valid_test_key_123',
+        JWT_SECRET: 'super-secure-production-jwt-secret-key-32b',
       });
       expect(parsed.NOTIFICATION_PROVIDER).toBe('resend');
       expect(parsed.RESEND_API_KEY).toBe('re_valid_test_key_123');

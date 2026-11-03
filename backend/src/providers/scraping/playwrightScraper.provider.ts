@@ -3,6 +3,7 @@ import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 
 import { env } from '../../config/env.js';
 import { NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
+import { assertSafeUrl } from '../../utils/ssrfValidator.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
 const DEFAULT_USER_AGENT =
@@ -53,6 +54,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
   }
 
   async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
+    const safeTargetUrl = await assertSafeUrl(targetUrl, 'targetUrl');
     const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
     const startTime = Date.now();
 
@@ -129,7 +131,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
       let response;
       try {
-        response = await page.goto(targetUrl, {
+        response = await page.goto(safeTargetUrl, {
           waitUntil: 'domcontentloaded',
           timeout: timeoutMs,
         });

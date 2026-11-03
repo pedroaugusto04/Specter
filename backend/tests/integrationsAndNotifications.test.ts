@@ -237,19 +237,44 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       enableLogger: false,
     });
 
-    // 1. GET initial (empty) integrations
+    // 0. Unauthenticated access returns 401
+    const unauthGet = await app.inject({
+      method: 'GET',
+      url: '/api/integrations',
+    });
+    expect(unauthGet.statusCode).toBe(401);
+
+    const unauthPut = await app.inject({
+      method: 'PUT',
+      url: '/api/integrations',
+      payload: { telegramEnabled: true },
+    });
+    expect(unauthPut.statusCode).toBe(401);
+
+    // Register User A
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'integration-owner@example.com', password: 'password123' },
+    });
+    const setCookie = regRes.headers['set-cookie'] as string[];
+    const authCookie = setCookie.map((c) => c.split(';')[0]).join('; ');
+
+    // 1. GET initial (empty) integrations for User A
     const getRes1 = await app.inject({
       method: 'GET',
       url: '/api/integrations',
+      headers: { cookie: authCookie },
     });
     expect(getRes1.statusCode).toBe(200);
     const getBody1 = JSON.parse(getRes1.body);
     expect(getBody1.data.telegramEnabled).toBe(false);
 
-    // 2. PUT update integrations
+    // 2. PUT update integrations for User A
     const putRes = await app.inject({
       method: 'PUT',
       url: '/api/integrations',
+      headers: { cookie: authCookie },
       payload: {
         telegramEnabled: true,
         telegramChatId: '12345678',
@@ -264,17 +289,18 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(putBody.data.telegramChatId).toBe('12345678');
     expect(putBody.data.webhookUrl).toBe('https://webhook.site/demo');
 
-    // 3. GET after update
+    // 3. GET after update for User A
     const getRes2 = await app.inject({
       method: 'GET',
       url: '/api/integrations',
+      headers: { cookie: authCookie },
     });
     expect(getRes2.statusCode).toBe(200);
     const getBody2 = JSON.parse(getRes2.body);
     expect(getBody2.data.telegramEnabled).toBe(true);
     expect(getBody2.data.webhookUrl).toBe('https://webhook.site/demo');
 
-    // 4. Test Telegram endpoint returns success and data payload
+    // 4. Test Telegram endpoint returns success and data payload (requires auth)
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -284,6 +310,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const testTelRes = await app.inject({
       method: 'POST',
       url: '/api/integrations/telegram/test',
+      headers: { cookie: authCookie },
       payload: { chatId: '12345678' },
     });
     expect(testTelRes.statusCode).toBe(200);
@@ -291,6 +318,25 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(testTelBody.success).toBe(true);
     expect(testTelBody.message).toBeDefined();
     expect(testTelBody.data.message).toBeDefined();
+
+    // 5. Multi-tenant isolation: Register User B and verify they do not see User A's integrations
+    const regResB = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'user-b@example.com', password: 'password123' },
+    });
+    const setCookieB = regResB.headers['set-cookie'] as string[];
+    const authCookieB = setCookieB.map((c) => c.split(';')[0]).join('; ');
+
+    const getResB = await app.inject({
+      method: 'GET',
+      url: '/api/integrations',
+      headers: { cookie: authCookieB },
+    });
+    expect(getResB.statusCode).toBe(200);
+    const getBodyB = JSON.parse(getResB.body);
+    expect(getBodyB.data.telegramEnabled).toBe(false);
+    expect(getBodyB.data.webhookUrl).toBeNull();
 
     await app.close();
   });

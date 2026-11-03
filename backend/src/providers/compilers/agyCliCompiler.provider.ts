@@ -34,7 +34,8 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
       ((promptFile: string) => [
         '--print',
         `Evaluate prompt file at "${promptFile}" and execute its instructions.`,
-        '--dangerously-skip-permissions',
+        '--sandbox',
+        '--disable-slash-commands',
       ]);
     this.tempBaseDir = options.tempBaseDir ?? env.COMPILER_TEMP_DIR;
     this.timeoutMs = options.timeoutMs ?? env.COMPILER_TIMEOUT_MS;
@@ -63,6 +64,7 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
 
       const args = this.cliArgsBuilder(promptFile, outputFile);
       const spawnOpts: SpawnOptions = {
+        cwd: tempDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
       };

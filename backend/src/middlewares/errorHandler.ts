@@ -51,6 +51,17 @@ export function centralErrorHandler(
     });
   }
 
+  // Rate-limit error (HTTP 429)
+  if ((error as any).statusCode === 429 || (error as any).code === 'FST_ERR_RATE_LIMIT_EXCEEDED') {
+    return reply.status(429).send({
+      error: (error as any).error || 'TOO_MANY_REQUESTS',
+      message: error.message || 'Rate limit exceeded. Please try again later.',
+      ...((error as any).retryAfterSeconds
+        ? { retryAfterSeconds: (error as any).retryAfterSeconds }
+        : {}),
+    });
+  }
+
   logger.error('Unhandled API route error', {
     path: request.url,
     method: request.method,

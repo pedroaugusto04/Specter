@@ -55,6 +55,18 @@ export const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
   TELEGRAM_BOT_USERNAME: z.string().optional().default(''),
 
+  // Encryption at Rest (AES-256-GCM)
+  ENCRYPTION_KEY: z.string().optional().default(''),
+
+  // Chrome Extension CORS Allow-list
+  // Production: set to the exact extension ID (e.g. "abcdefghijklmnopabcdefghijklmnop")
+  // Development/empty: all chrome-extension:// origins are allowed
+  CHROME_EXTENSION_ID: z.string().optional().default(''),
+
+  // Rate Limiting
+  RATE_LIMIT_GLOBAL_MAX: z.coerce.number().int().positive().default(120),
+  RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(10),
+
   // Authentication & Stateless JWT Cookies
   JWT_SECRET: z
     .string()
@@ -95,6 +107,15 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   ) {
     throw new Error(
       'Invalid environment configuration:\n  - RESEND_API_KEY: Required when NOTIFICATION_PROVIDER is set to "resend"'
+    );
+  }
+
+  if (
+    parsed.NODE_ENV === 'production' &&
+    parsed.JWT_SECRET === 'specter-dev-jwt-secret-change-in-production'
+  ) {
+    throw new Error(
+      'Invalid environment configuration:\n  - JWT_SECRET: In production, you must set a secure, unique JWT_SECRET (the default development secret cannot be used).'
     );
   }
 

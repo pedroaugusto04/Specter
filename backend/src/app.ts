@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
 import { centralErrorHandler } from './middlewares/errorHandler.js';
@@ -37,12 +38,38 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const realtimeService =
     options.realtimeService ?? new RealtimeService(new InMemoryRealtimeEventBus());
 
+  await app.register(rateLimit, {
+    global: true,
+    max: env.RATE_LIMIT_GLOBAL_MAX,
+    timeWindow: '1 minute',
+    allowList: (req) => {
+      // In test environment, bypass rate limit unless testing it
+      if (env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']) {
+        return true;
+      }
+      return false;
+    },
+    errorResponseBuilder: (_req, context) => ({
+      statusCode: 429,
+      error: 'TOO_MANY_REQUESTS',
+      message: `Rate limit exceeded. Try again in ${Math.ceil(context.ttl / 1000)} seconds.`,
+      retryAfterSeconds: Math.ceil(context.ttl / 1000),
+    }),
+  });
+
   await app.register(cors, {
     origin: (origin, cb) => {
       // Allow requests with no origin (like mobile apps, curl, or server-to-server)
       if (!origin) return cb(null, true);
-      // Allow all Chrome/Chromium extensions
-      if (origin.startsWith('chrome-extension://')) return cb(null, true);
+      // Chrome extension origin restriction:
+      // - In production with CHROME_EXTENSION_ID set, only the specific extension is allowed.
+      // - In development or when CHROME_EXTENSION_ID is unset, any chrome-extension:// origin is allowed.
+      if (origin.startsWith('chrome-extension://')) {
+        const allowedExtId = env.CHROME_EXTENSION_ID;
+        if (!allowedExtId || env.NODE_ENV !== 'production') return cb(null, true);
+        if (origin === `chrome-extension://${allowedExtId}`) return cb(null, true);
+        return cb(null, false);
+      }
       // Check configured CORS origins
       const allowed =
         env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',').map((s) => s.trim());

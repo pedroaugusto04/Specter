@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
+import { assertSafeUrl } from '../../utils/ssrfValidator.js';
 import type {
   AlertPayload,
   IWebhookNotificationProvider,
@@ -46,7 +47,9 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
       headers['X-Specter-Signature-256'] = `sha256=${signature}`;
     }
 
-    const response = await fetch(options.webhookUrl.trim(), {
+    const safeUrl = await assertSafeUrl(options.webhookUrl.trim(), 'webhookUrl');
+
+    const response = await fetch(safeUrl, {
       method: 'POST',
       headers,
       body: rawBody,
@@ -97,7 +100,9 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
         headers['X-Specter-Signature-256'] = `sha256=${signature}`;
       }
 
-      const response = await fetch(options.webhookUrl.trim(), {
+      const safeUrl = await assertSafeUrl(options.webhookUrl.trim(), 'webhookUrl');
+
+      const response = await fetch(safeUrl, {
         method: 'POST',
         headers,
         body: rawBody,
