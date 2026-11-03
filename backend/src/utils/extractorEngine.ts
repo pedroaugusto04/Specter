@@ -72,10 +72,10 @@ function coerceValue(
 
   if (targetType === 'boolean') {
     const lower = trimmed.toLowerCase();
-    if (['true', '1', 'yes', 'sim', 'ativo', 'in stock', 'disponível'].includes(lower)) {
+    if (['true', '1', 'yes', 'sim'].includes(lower)) {
       return true;
     }
-    if (['false', '0', 'no', 'não', 'inativo', 'out of stock', 'indisponível'].includes(lower)) {
+    if (['false', '0', 'no', 'não'].includes(lower)) {
       return false;
     }
     return Boolean(trimmed);
