@@ -15,7 +15,11 @@ import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ChangeStatus, JobRunEntity } from '../types/domain.js';
 import { computeNormalizedHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorEngine.js';
+import {
+  extractUsingConfig,
+  isExtractedPayloadEmpty,
+  resolveTargetWaitSelector,
+} from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
@@ -89,8 +93,10 @@ export class ScrapeExecutionService {
         }
       );
 
+      const waitSelector = resolveTargetWaitSelector(job.extractorConfig);
+
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
-        waitForSelector: job.extractorConfig.containerSelector,
+        waitForSelector: waitSelector,
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });

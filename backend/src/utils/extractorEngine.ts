@@ -257,6 +257,57 @@ function isDisallowedHeadSelector(selector: string): boolean {
   );
 }
 
+function isDomWaitCandidate(selector: string): boolean {
+  const s = selector.trim().toLowerCase();
+  if (!s) return false;
+  if (
+    s.startsWith('meta') ||
+    s.startsWith('head') ||
+    s.startsWith('title') ||
+    s.startsWith('script') ||
+    s.startsWith('style') ||
+    s.startsWith('link')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Resolves a resilient target wait selector for headless browser navigation.
+ * Prioritizes containerSelector for repeated item collections, or aggregates primary DOM body
+ * selectors across configured fields so Playwright waits for SPA hydration without blind delays.
+ */
+export function resolveTargetWaitSelector(config?: ExtractorConfig | null): string | undefined {
+  if (!config) return undefined;
+  if (config.containerSelector?.trim()) {
+    return config.containerSelector.trim();
+  }
+
+  if (!config.fields || typeof config.fields !== 'object') {
+    return undefined;
+  }
+
+  const domCandidates: string[] = [];
+
+  for (const def of Object.values(config.fields)) {
+    const norm = normalizeFieldDefinition(def);
+    if (isDomWaitCandidate(norm.selector)) {
+      domCandidates.push(norm.selector.trim());
+    }
+    for (const fb of norm.fallbackSelectors) {
+      if (isDomWaitCandidate(fb)) {
+        domCandidates.push(fb.trim());
+      }
+    }
+  }
+
+  if (domCandidates.length === 0) return undefined;
+
+  const unique = Array.from(new Set(domCandidates));
+  return unique.slice(0, 5).join(', ');
+}
+
 /**
  * Runs a pre-activation smoke test of the compiled ExtractorConfig against the sanitized DOM.
  */

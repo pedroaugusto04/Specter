@@ -166,7 +166,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         await page
           .waitForSelector(options.waitForSelector, {
             state: 'attached',
-            timeout: Math.min(5000, timeoutMs),
+            timeout: Math.min(8000, timeoutMs),
           })
           .catch(() => {});
       } else {

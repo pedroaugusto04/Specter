@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractUsingConfig, validateExtractionSmokeTest } from '../src/utils/extractorEngine.js';
+import {
+  extractUsingConfig,
+  resolveTargetWaitSelector,
+  validateExtractionSmokeTest,
+} from '../src/utils/extractorEngine.js';
 
 describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
   const sampleHtml = `
@@ -267,6 +271,46 @@ describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
         title: 'Smartphone Samsung Galaxy A07 256GB 8GB RAM Verde',
         price: 944.1,
       });
+    });
+
+    it('resolves resilient target wait selectors from containerSelector or schema fields', () => {
+      // 1. Prioritizes containerSelector for repeated items
+      expect(
+        resolveTargetWaitSelector({
+          containerSelector: '.product-card',
+          fields: { title: 'h3' },
+        })
+      ).toBe('.product-card');
+
+      // 2. Extracts body selectors and skips head/meta tags for single item jobs
+      expect(
+        resolveTargetWaitSelector({
+          fields: {
+            price: {
+              selector: 'meta[property="product:price:amount"]',
+              fallbackSelectors: ['meta[itemprop="price"]', '[class*="ProductPrice_productPrice"]'],
+            },
+            title: {
+              selector: '[class*="Breadcrumb_breadcrumbItem"]:last-child a',
+              fallbackSelectors: ['h1', 'meta[property="og:title"]'],
+            },
+          },
+        })
+      ).toBe(
+        '[class*="ProductPrice_productPrice"], [class*="Breadcrumb_breadcrumbItem"]:last-child a, h1'
+      );
+
+      // 3. Returns undefined when config has no DOM selectors
+      expect(
+        resolveTargetWaitSelector({
+          fields: {
+            price: 'meta[itemprop="price"]',
+            title: 'meta[property="og:title"]',
+          },
+        })
+      ).toBeUndefined();
+
+      expect(resolveTargetWaitSelector(null)).toBeUndefined();
     });
   });
 });
