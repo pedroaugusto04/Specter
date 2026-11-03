@@ -2,7 +2,6 @@ import { AntiBotBlockedError } from '../errors/domainErrors.js';
 
 const SUSPICIOUS_URL_PATTERNS = [
   /\/account-verification/i,
-  /\/gz\/account-verification/i,
   /\/checkpoint/i,
   /\/challenge/i,
   /\/recaptcha/i,
@@ -17,7 +16,6 @@ const SUSPICIOUS_URL_PATTERNS = [
 
 const SUSPICIOUS_HTML_PATTERNS = [
   /action=["'][^"']*account-verification/i,
-  /<title[^>]*id=["']root-title["'][^>]*>Mercado Libre<\/title>/i,
   /<title[^>]*>Just a moment\.\.\.<\/title>/i,
   /<title[^>]*>Attention Required! \| Cloudflare<\/title>/i,
   /<title[^>]*>Access Denied<\/title>/i,
@@ -25,11 +23,6 @@ const SUSPICIOUS_HTML_PATTERNS = [
   /cf-chl-widget/i,
   /g-recaptcha/i,
   /h-captcha/i,
-  /Verifique que você é humano/i,
-  /Confirme que você é um ser humano/i,
-  /Para continuar navegando, digite o código/i,
-  /Please complete the security check to access/i,
-  /Por favor, verifique se você é humano/i,
 ];
 
 /**

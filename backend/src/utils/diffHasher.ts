@@ -14,8 +14,6 @@ const RELATIVE_TIME_PATTERNS: RegExp[] = [
   /\b(?:just\s+now|right\s+now|moments?\s+ago|agora\s+mesmo|h[aá]\s+poucos?\s+instantes?)\b/gi,
 ];
 
-const SITE_BRANDING_SUFFIX_PATTERN = /\s+\|\s+[^|]{2,60}$/;
-
 const VOLATILE_QUERY_PARAM_PATTERN =
   /([?&])(?:utm_[a-z_]+|session_?id|sid|phpsessid|jsessionid|__cf_chl_[a-z0-9_]*|_t|timestamp|cb|cachebuster)=[^&#\s]*/gi;
 
@@ -28,9 +26,6 @@ export function sanitizeVolatileString(input: string): string {
   for (const pattern of RELATIVE_TIME_PATTERNS) {
     cleaned = cleaned.replace(pattern, '');
   }
-
-  // Strip volatile SEO site branding suffixes commonly appended by <meta og:title> or <title>
-  cleaned = cleaned.replace(SITE_BRANDING_SUFFIX_PATTERN, '');
 
   // Strip volatile query params from URLs while preserving clean URL structure
   cleaned = cleaned.replace(VOLATILE_QUERY_PARAM_PATTERN, '$1');
@@ -49,12 +44,7 @@ export function normalizeForDiff(payload: unknown): unknown {
   }
 
   if (typeof payload === 'string') {
-    const sanitized = sanitizeVolatileString(payload);
-    // Preserve casing for absolute URLs; normalize text strings to lowercase to prevent presentation jitter
-    if (/^https?:\/\//i.test(sanitized)) {
-      return sanitized;
-    }
-    return sanitized.toLowerCase();
+    return sanitizeVolatileString(payload);
   }
 
   if (typeof payload === 'number' || typeof payload === 'boolean') {

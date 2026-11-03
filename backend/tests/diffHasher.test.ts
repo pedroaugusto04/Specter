@@ -49,25 +49,6 @@ describe('Normalized Diff Hashing & Diff Summary', () => {
     expect(computeNormalizedHash(snapshot1)).toBe(computeNormalizedHash(snapshot2));
   });
 
-  it('normalizes SEO site branding suffixes and text casing to prevent false positive diffs', () => {
-    const runA = {
-      price: 944.1,
-      title: 'smartphone samsung galaxy a07 256gb 8gb ram verde',
-    };
-
-    const runB = {
-      price: 944.1,
-      title: 'Smartphone Samsung Galaxy A07 256GB 8GB RAM Verde | Americanas',
-    };
-
-    expect(computeNormalizedHash(runA)).toBe(computeNormalizedHash(runB));
-
-    const diff = buildDiffSummary(runA, runB);
-    expect(diff.hasChanges).toBe(false);
-    expect(diff.totalChanges).toBe(0);
-    expect(diff.modified).toHaveLength(0);
-  });
-
   it('produces a different hash when genuine business content changes', () => {
     const before = { title: 'PlayStation 5', price: '$ 499.00' };
     const after = { title: 'PlayStation 5', price: '$ 449.00' };
