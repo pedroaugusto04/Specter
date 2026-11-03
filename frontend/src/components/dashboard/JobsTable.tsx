@@ -411,11 +411,20 @@ export function JobsTable({
                           }
                           aria-label="Run immediate extraction"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
-                          onClick={() =>
-                            handleAction(job.id, 'run', () =>
-                              triggerJobMutation.mutateAsync(job.id)
-                            )
-                          }
+                          onClick={async () => {
+                            const confirmed = await modal.confirm({
+                              title: 'Run Immediate Extraction',
+                              message: `Are you sure you want to run an immediate extraction for this monitor?\n${job.url}`,
+                              confirmLabel: 'Run Extraction',
+                              cancelLabel: 'Cancel',
+                              variant: 'default',
+                            });
+                            if (confirmed) {
+                              void handleAction(job.id, 'run', () =>
+                                triggerJobMutation.mutateAsync(job.id)
+                              );
+                            }
+                          }}
                         >
                           {isRunning ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
@@ -451,11 +460,20 @@ export function JobsTable({
                           }
                           aria-label="Recompile selectors"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
-                          onClick={() =>
-                            handleAction(job.id, 'recompile', () =>
-                              recompileJobMutation.mutateAsync(job.id)
-                            )
-                          }
+                          onClick={async () => {
+                            const confirmed = await modal.confirm({
+                              title: 'Recompile Selectors',
+                              message: `Are you sure you want to recompile the AI extraction selectors for this monitor?\n${job.url}`,
+                              confirmLabel: 'Recompile',
+                              cancelLabel: 'Cancel',
+                              variant: 'default',
+                            });
+                            if (confirmed) {
+                              void handleAction(job.id, 'recompile', () =>
+                                recompileJobMutation.mutateAsync(job.id)
+                              );
+                            }
+                          }}
                         >
                           {isCompiling ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
@@ -480,11 +498,22 @@ export function JobsTable({
                           }
                           aria-label={isPaused ? 'Resume schedule' : 'Pause schedule'}
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
-                          onClick={() =>
-                            handleAction(job.id, 'pause', () =>
-                              togglePauseMutation.mutateAsync({ jobId: job.id, paused: !isPaused })
-                            )
-                          }
+                          onClick={async () => {
+                            const actionTitle = isPaused ? 'Resume Schedule' : 'Pause Schedule';
+                            const actionVerb = isPaused ? 'resume' : 'pause';
+                            const confirmed = await modal.confirm({
+                              title: actionTitle,
+                              message: `Are you sure you want to ${actionVerb} the extraction schedule for this monitor?\n${job.url}`,
+                              confirmLabel: actionTitle,
+                              cancelLabel: 'Cancel',
+                              variant: 'default',
+                            });
+                            if (confirmed) {
+                              void handleAction(job.id, 'pause', () =>
+                                togglePauseMutation.mutateAsync({ jobId: job.id, paused: !isPaused })
+                              );
+                            }
+                          }}
                         >
                           {isPausing ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
