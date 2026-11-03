@@ -62,11 +62,10 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('runs')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'runs'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'runs'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             <Clock className="h-3.5 w-3.5" />
             Runs ({runs.length})
@@ -74,11 +73,10 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('timeline')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'timeline'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'timeline'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             <TrendingUp className="h-3.5 w-3.5" />
             Timeline & Trends
@@ -86,11 +84,10 @@ export function JobRunsDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('schema')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'schema'
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${activeTab === 'schema'
                 ? 'bg-card text-foreground shadow-2xs border border-border'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             <Code2 className="h-3.5 w-3.5" />
             Schema
@@ -246,11 +243,10 @@ export function JobRunsDrawer({
                       <div
                         key={run.id}
                         id={`run-card-${run.id}`}
-                        className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${
-                          isSelected
+                        className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${isSelected
                             ? 'border-primary ring-1 ring-primary/40 bg-muted/10'
                             : 'border-border'
-                        }`}
+                          }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2">
@@ -372,8 +368,7 @@ export function JobRunsDrawer({
             {job.extractorConfig ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Autonomous selector engine compiled for this target URL. Routine polling runs with
-                  deterministic Cheerio/Playwright execution.
+                  Autonomous selector engine compiled for this target URL.
                 </p>
                 <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted/50 p-3.5 font-mono text-xs text-foreground">
                   {JSON.stringify(job.extractorConfig, null, 2)}

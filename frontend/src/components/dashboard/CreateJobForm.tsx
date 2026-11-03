@@ -547,39 +547,6 @@ export function CreateJobForm({
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={showCustomWebhook}
-            onChange={(e) => {
-              setShowCustomWebhook(e.target.checked);
-              if (!e.target.checked) {
-                setWebhookUrl('');
-              }
-            }}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
-          />
-          <span className="text-sm font-medium text-foreground">
-            Send notifications to a custom webhook URL
-          </span>
-        </label>
-
-        {showCustomWebhook && (
-          <FormField
-            label="Custom Webhook URL"
-            htmlFor="job-webhook"
-            hint="Optional. Destination endpoint URL for this specific monitor."
-          >
-            <Input
-              id="job-webhook"
-              type="url"
-              placeholder="https://your-domain.com/webhook (optional)"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-          </FormField>
-        )}
-
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
             id="send-email-alerts"
             checked={sendEmailAlerts}
             onChange={(e) => {
@@ -617,6 +584,39 @@ export function CreateJobForm({
                 setNotificationEmail(e.target.value);
                 clearFieldError('notificationEmail');
               }}
+            />
+          </FormField>
+        )}
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showCustomWebhook}
+            onChange={(e) => {
+              setShowCustomWebhook(e.target.checked);
+              if (!e.target.checked) {
+                setWebhookUrl('');
+              }
+            }}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+          />
+          <span className="text-sm font-medium text-foreground">
+            Send notifications to a custom webhook URL
+          </span>
+        </label>
+
+        {showCustomWebhook && (
+          <FormField
+            label="Custom Webhook URL"
+            htmlFor="job-webhook"
+            hint="Optional. Destination endpoint URL for this specific monitor."
+          >
+            <Input
+              id="job-webhook"
+              type="url"
+              placeholder="https://your-domain.com/webhook (optional)"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
             />
           </FormField>
         )}
