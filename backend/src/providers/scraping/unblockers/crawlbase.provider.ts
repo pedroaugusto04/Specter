@@ -44,7 +44,6 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
 
       if (options?.captureScreenshot) {
         endpoint.searchParams.set('screenshot', 'true');
-        endpoint.searchParams.set('mode', 'viewport');
       }
 
       const response = await this.fetchFn(endpoint.toString(), {
