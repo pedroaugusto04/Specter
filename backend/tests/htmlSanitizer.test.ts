@@ -154,4 +154,40 @@ describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
     expect(sanitized).toContain('itemprop="sku"');
     expect(sanitized).toContain('content="8775733"');
   });
+
+  it('projects generic non-product Schema.org entities (e.g. JobPosting, Hotel) while ignoring structural Organization metadata', () => {
+    const rawHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <script type="application/ld+json">
+            [
+              {
+                "@context": "https://schema.org",
+                "@type": "Organization",
+                "name": "Big Corp Tech"
+              },
+              {
+                "@context": "https://schema.org",
+                "@type": "JobPosting",
+                "name": "Senior AI Platform Engineer",
+                "description": "Build agentic automation platforms."
+              }
+            ]
+          </script>
+        </head>
+        <body><div>Job Board</div></body>
+      </html>
+    `;
+
+    const sanitized = sanitizeHtml(rawHtml);
+
+    // Organization should not be projected as the primary entity title
+    expect(sanitized).not.toContain('content="Big Corp Tech"');
+    // Generic entity should be projected into standard queryable meta
+    expect(sanitized).toContain('property="og:title"');
+    expect(sanitized).toContain('content="Senior AI Platform Engineer"');
+    expect(sanitized).toContain('itemprop="description"');
+    expect(sanitized).toContain('content="Build agentic automation platforms."');
+  });
 });

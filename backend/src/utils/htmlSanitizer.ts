@@ -191,23 +191,22 @@ export function projectStructuredDataToMeta($: cheerio.CheerioAPI): void {
             ? [String(rawType).toLowerCase()]
             : [];
 
-        const isProductOrCreative =
-          types.some((t) =>
-            [
-              'product',
-              'offer',
-              'aggregateoffer',
-              'article',
-              'newsarticle',
-              'blogposting',
-              'softwareapplication',
-              'book',
-              'course',
-              'event',
-            ].includes(t)
-          ) || Boolean(node.offers);
+        // Skip structural site metadata nodes (e.g. site branding, search bar, breadcrumb navigation)
+        // that do not represent the primary content or transactional entity
+        const isInfrastructureNode = types.some((t) =>
+          [
+            'website',
+            'organization',
+            'breadcrumblist',
+            'searchaction',
+            'webpage',
+            'sitefeed',
+            'entrypoint',
+            'itemlist',
+          ].includes(t)
+        );
 
-        if (!isProductOrCreative) continue;
+        if (isInfrastructureNode && !node.offers && !node.price) continue;
 
         const name = (node.name ?? node.headline) as string | undefined;
         if (typeof name === 'string' && name.trim()) {
