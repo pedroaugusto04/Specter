@@ -13,6 +13,7 @@ import { sanitizeHtml } from '../utils/htmlSanitizer.js';
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
+import type { RealtimeService } from './realtimeService.js';
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
@@ -21,6 +22,7 @@ export interface CompilationServiceDeps {
   notificationProvider: INotificationProvider;
   jobScheduler: IJobScheduler;
   sessionRepository?: ISessionRepository;
+  realtimeService?: RealtimeService;
 }
 
 export class CompilationService {
@@ -30,6 +32,7 @@ export class CompilationService {
   private readonly notificationProvider: INotificationProvider;
   private readonly jobScheduler: IJobScheduler;
   private readonly sessionRepository?: ISessionRepository;
+  private readonly realtimeService?: RealtimeService;
 
   constructor(deps: CompilationServiceDeps) {
     this.jobRepository = deps.jobRepository;
@@ -38,6 +41,7 @@ export class CompilationService {
     this.notificationProvider = deps.notificationProvider;
     this.jobScheduler = deps.jobScheduler;
     this.sessionRepository = deps.sessionRepository;
+    this.realtimeService = deps.realtimeService;
   }
 
   async compileJob(jobId: string): Promise<ScrapingJobEntity> {
@@ -141,6 +145,8 @@ export class CompilationService {
         provider: this.compilerProvider.name,
       });
 
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
+
       return updatedJob ?? job;
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -174,6 +180,8 @@ export class CompilationService {
         status: 'FAILED',
         lastError: userMessage,
       });
+
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'FAILED');
 
       throw error;
     }

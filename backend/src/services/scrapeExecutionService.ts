@@ -19,6 +19,7 @@ import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorE
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
+import type { RealtimeService } from './realtimeService.js';
 
 export interface ScrapeExecutionServiceDeps {
   jobRepository: IJobRepository;
@@ -27,6 +28,7 @@ export interface ScrapeExecutionServiceDeps {
   jobScheduler: IJobScheduler;
   storageProvider?: IStorageProvider;
   sessionRepository?: ISessionRepository;
+  realtimeService?: RealtimeService;
   consecutiveFailuresForHealing?: number;
   maxHealingRetries?: number;
 }
@@ -38,6 +40,7 @@ export class ScrapeExecutionService {
   private readonly jobScheduler: IJobScheduler;
   private readonly storageProvider: IStorageProvider;
   private readonly sessionRepository?: ISessionRepository;
+  private readonly realtimeService?: RealtimeService;
   private readonly consecutiveFailuresForHealing: number;
   private readonly maxHealingRetries: number;
 
@@ -48,6 +51,7 @@ export class ScrapeExecutionService {
     this.jobScheduler = deps.jobScheduler;
     this.storageProvider = deps.storageProvider ?? createStorageProvider();
     this.sessionRepository = deps.sessionRepository;
+    this.realtimeService = deps.realtimeService;
     this.consecutiveFailuresForHealing =
       deps.consecutiveFailuresForHealing ?? env.CONSECUTIVE_FAILURES_FOR_HEALING;
     this.maxHealingRetries = deps.maxHealingRetries ?? env.MAX_HEALING_RETRIES;
@@ -169,6 +173,14 @@ export class ScrapeExecutionService {
         hasChanges,
       });
 
+      await this.realtimeService?.notifyJobRunCompleted(
+        job.userId,
+        job.id,
+        runRecord.id,
+        hasChanges
+      );
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
+
       return runRecord;
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -206,6 +218,7 @@ export class ScrapeExecutionService {
         await this.jobRepository.updateJob(job.id, {
           lastError: userMessage,
         });
+        await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
         return null;
       }
 
@@ -214,6 +227,7 @@ export class ScrapeExecutionService {
         await this.jobRepository.updateJob(job.id, {
           lastError: userMessage,
         });
+        await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
         throw error;
       }
 
@@ -232,6 +246,7 @@ export class ScrapeExecutionService {
             jobId: job.id,
             failureCount: newFailureCount,
           });
+          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'FAILED');
           return null;
         }
 
@@ -246,6 +261,7 @@ export class ScrapeExecutionService {
             failureCount: newFailureCount,
           });
           await this.jobScheduler.enqueueCompilation(job.id, 'healing');
+          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'HEALING');
           return null;
         }
 
@@ -255,6 +271,7 @@ export class ScrapeExecutionService {
           failureCount: newFailureCount,
           lastError: userMessage,
         });
+        await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'ACTIVE');
         return null;
       }
 
@@ -262,6 +279,7 @@ export class ScrapeExecutionService {
       await this.jobRepository.updateJob(job.id, {
         lastError: userMessage,
       });
+      await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
       throw error;
     }
   }

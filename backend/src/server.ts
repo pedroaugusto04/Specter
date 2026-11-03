@@ -8,6 +8,7 @@ import { TelegramNotificationProvider } from './providers/notifications/telegram
 import { WebhookNotificationProvider } from './providers/notifications/webhookNotification.provider.js';
 import { createScraperEngine } from './providers/scraping/scraper.factory.js';
 import { createStorageProvider } from './providers/storage/index.js';
+import { createRealtimeEventBus } from './providers/realtime/realtime.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
@@ -18,6 +19,7 @@ import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
 import { IntegrationService } from './services/integrationService.js';
 import { JobService } from './services/jobService.js';
+import { RealtimeService } from './services/realtimeService.js';
 import { RetentionService } from './services/retentionService.js';
 import { ScrapeExecutionService } from './services/scrapeExecutionService.js';
 import { SessionService } from './services/sessionService.js';
@@ -33,6 +35,8 @@ async function bootstrap(): Promise<void> {
   const compilerProvider = createCompilerProvider();
   const scraperEngine = createScraperEngine();
   const storageProvider = createStorageProvider();
+  const realtimeEventBus = createRealtimeEventBus();
+  const realtimeService = new RealtimeService(realtimeEventBus);
 
   const emailNotificationProvider = createNotificationProvider();
   const telegramProvider = new TelegramNotificationProvider();
@@ -52,6 +56,7 @@ async function bootstrap(): Promise<void> {
     notificationProvider: notificationDispatcher,
     jobScheduler,
     sessionRepository,
+    realtimeService,
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
@@ -61,10 +66,17 @@ async function bootstrap(): Promise<void> {
     jobScheduler,
     storageProvider,
     sessionRepository,
+    realtimeService,
   });
 
   const retentionService = new RetentionService(jobRepository);
-  const jobService = new JobService(jobRepository, jobScheduler, scraperEngine, sessionRepository);
+  const jobService = new JobService(
+    jobRepository,
+    jobScheduler,
+    scraperEngine,
+    sessionRepository,
+    realtimeService
+  );
   const authService = new AuthService(userRepository);
   const integrationService = new IntegrationService(
     integrationRepository,
@@ -106,13 +118,20 @@ async function bootstrap(): Promise<void> {
   });
   workerManager.start();
 
-  const app = await buildApp({ jobService, authService, integrationService, sessionService });
+  const app = await buildApp({
+    jobService,
+    authService,
+    integrationService,
+    sessionService,
+    realtimeService,
+  });
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);
     await app.close();
     await workerManager.stop();
     await jobScheduler.close();
+    await realtimeService.close();
     await closeDb();
     process.exit(0);
   };

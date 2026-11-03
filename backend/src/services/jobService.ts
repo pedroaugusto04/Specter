@@ -39,22 +39,27 @@ export interface UpdateScrapingJobRequest {
   triggerMatchMode?: 'any' | 'all';
 }
 
+import type { RealtimeService } from './realtimeService.js';
+
 export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
   private readonly scraperEngine?: IScraperEngine;
   private readonly sessionRepository?: ISessionRepository;
+  private readonly realtimeService?: RealtimeService;
 
   constructor(
     jobRepository: IJobRepository,
     jobScheduler: IJobScheduler,
     scraperEngine?: IScraperEngine,
-    sessionRepository?: ISessionRepository
+    sessionRepository?: ISessionRepository,
+    realtimeService?: RealtimeService
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
     this.scraperEngine = scraperEngine;
     this.sessionRepository = sessionRepository;
+    this.realtimeService = realtimeService;
   }
 
   async probeUrl(targetUrl: string, userId?: string): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
@@ -124,6 +129,12 @@ export class JobService {
     });
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, 'initial');
+
+    await this.realtimeService?.notifyJobCreated(
+      createdEntity.userId,
+      createdEntity.id,
+      createdEntity.status
+    );
 
     logger.info('Created new scraping job and enqueued initial compilation', {
       jobId: createdEntity.id,
@@ -228,7 +239,13 @@ export class JobService {
     }
 
     const finalEntity = await this.jobRepository.findById(id);
-    return JobMapper.entityToDto(finalEntity ?? updated);
+    const resultDto = JobMapper.entityToDto(finalEntity ?? updated);
+    await this.realtimeService?.notifyJobUpdated(
+      resultDto.userId,
+      resultDto.id,
+      resultDto.status
+    );
+    return resultDto;
   }
 
   async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
@@ -245,13 +262,25 @@ export class JobService {
         status: 'PAUSED',
         bullmqRepeatableKey: null,
       });
-      return JobMapper.entityToDto(updated ?? existing);
+      const resultDto = JobMapper.entityToDto(updated ?? existing);
+      await this.realtimeService?.notifyJobUpdated(
+        resultDto.userId,
+        resultDto.id,
+        resultDto.status
+      );
+      return resultDto;
     }
 
     if (!existing.extractorConfig) {
       const updated = await this.jobRepository.updateJob(id, { status: 'PENDING_COMPILATION' });
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
-      return JobMapper.entityToDto(updated ?? existing);
+      const resultDto = JobMapper.entityToDto(updated ?? existing);
+      await this.realtimeService?.notifyJobUpdated(
+        resultDto.userId,
+        resultDto.id,
+        resultDto.status
+      );
+      return resultDto;
     }
 
     const repeatableKey = await this.jobScheduler.scheduleRepeatableJob(
@@ -262,7 +291,13 @@ export class JobService {
       status: 'ACTIVE',
       bullmqRepeatableKey: repeatableKey,
     });
-    return JobMapper.entityToDto(updated ?? existing);
+    const resultDto = JobMapper.entityToDto(updated ?? existing);
+    await this.realtimeService?.notifyJobUpdated(
+      resultDto.userId,
+      resultDto.id,
+      resultDto.status
+    );
+    return resultDto;
   }
 
   async triggerManualScrape(
@@ -276,10 +311,20 @@ export class JobService {
 
     if (!existing.extractorConfig || existing.status === 'PENDING_COMPILATION') {
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
+      await this.realtimeService?.notifyJobUpdated(
+        existing.userId,
+        existing.id,
+        existing.status
+      );
       return { queued: true, mode: 'compile' };
     }
 
     await this.jobScheduler.enqueueImmediateScrape(existing.id);
+    await this.realtimeService?.notifyJobUpdated(
+      existing.userId,
+      existing.id,
+      existing.status
+    );
     return { queued: true, mode: 'scrape' };
   }
 
@@ -296,7 +341,13 @@ export class JobService {
     });
 
     await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
-    return JobMapper.entityToDto(updated ?? existing);
+    const resultDto = JobMapper.entityToDto(updated ?? existing);
+    await this.realtimeService?.notifyJobUpdated(
+      resultDto.userId,
+      resultDto.id,
+      resultDto.status
+    );
+    return resultDto;
   }
 
   async deleteJob(id: string, userId?: string): Promise<void> {
@@ -307,6 +358,7 @@ export class JobService {
 
     await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
     await this.jobRepository.deleteJob(id);
+    await this.realtimeService?.notifyJobDeleted(existing.userId, existing.id);
   }
 
   async getJobRuns(

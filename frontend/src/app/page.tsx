@@ -16,6 +16,7 @@ import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import { api, type DashboardStats, type ScrapingJobDto, type UserDto } from '@/lib/api';
 
 export default function DashboardPage() {
@@ -30,6 +31,25 @@ export default function DashboardPage() {
   const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = React.useState(false);
   const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const refreshJobsAndStats = React.useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const [jobsData, statsData] = await Promise.all([
+        api.listJobs(),
+        api.getStats(),
+      ]);
+      setJobs(jobsData);
+      setStats(statsData);
+      setConnectionWarning(null);
+    } catch {
+      setConnectionWarning(
+        'Unable to connect to the backend service. Please verify that the API is running.'
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
 
   const loadDashboard = React.useCallback(async () => {
     setIsRefreshing(true);
@@ -61,12 +81,7 @@ export default function DashboardPage() {
               notificationEmail: draft.notificationEmail || meData.email,
               cronExpression: draft.cronExpression,
             });
-            const [updatedJobs, updatedStats] = await Promise.all([
-              api.listJobs(),
-              api.getStats(),
-            ]);
-            setJobs(updatedJobs);
-            setStats(updatedStats);
+            await refreshJobsAndStats();
           } catch {
             // ignore malformed pending draft
           }
@@ -79,14 +94,21 @@ export default function DashboardPage() {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [refreshJobsAndStats]);
+
+  // Connect to SSE stream for zero-latency push invalidations with smart polling fallback
+  const { connectionMode } = useRealtimeEvents({
+    enabled: true,
+    onJobEvent: React.useCallback(() => {
+      void refreshJobsAndStats();
+    }, [refreshJobsAndStats]),
+    onReconnect: React.useCallback(() => {
+      void refreshJobsAndStats();
+    }, [refreshJobsAndStats]),
+  });
 
   React.useEffect(() => {
     void loadDashboard();
-    const timer = setInterval(() => {
-      void loadDashboard();
-    }, 10000);
-    return () => clearInterval(timer);
   }, [loadDashboard]);
 
   const handleLogout = async () => {
@@ -161,8 +183,34 @@ export default function DashboardPage() {
               Scheduled web extraction and structured diff tracking.
             </p>
           </div>
-          <div className="text-xs font-mono text-muted-foreground">
-            Auto-sync: 10s interval
+          <div className="flex items-center gap-2 text-xs font-mono">
+            {connectionMode === 'realtime' && (
+              <span className="flex items-center gap-1.5 text-emerald-500 font-medium">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Live (SSE)</span>
+              </span>
+            )}
+            {connectionMode === 'polling' && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="inline-block h-2 w-2 rounded-full bg-amber-500/80" />
+                <span>Auto-sync (Fallback)</span>
+              </span>
+            )}
+            {connectionMode === 'connecting' && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" />
+                <span>Connecting...</span>
+              </span>
+            )}
+            {connectionMode === 'disconnected' && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/30" />
+                <span>Offline</span>
+              </span>
+            )}
           </div>
         </div>
 
