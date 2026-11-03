@@ -6,6 +6,7 @@ export interface CompilerInput {
   jobId: string;
   sanitizedHtml: string;
   userPrompt: string;
+  existingFieldKeys?: string[];
 }
 
 export interface ICompilerProvider {
@@ -16,13 +17,22 @@ export interface ICompilerProvider {
 export function buildCompilerPrompt(
   domFilePath: string,
   outputFilePath: string,
-  userPrompt: string
+  userPrompt: string,
+  existingFieldKeys?: string[]
 ): string {
+  const preservationRule =
+    existingFieldKeys && existingFieldKeys.length > 0
+      ? `\n- Schema Preservation: This is an existing job being re-compiled/healed. You MUST preserve the exact existing field keys: [${existingFieldKeys.join(', ')}]. Update their selectors to match the new DOM, but DO NOT rename, translate, or remove any of these keys.\n`
+      : '';
+
   return `You are a web selector compiler.
 Analyze the file '${domFilePath}' and satisfy the user's request: "${userPrompt}".
 MANDATORY: Save the output strictly in valid JSON format at the path '${outputFilePath}'.
 Do not output text in the terminal. Do not request interactive confirmation.
 
+Field Naming Strategy:
+- Always use standard canonical English lower_snake_case identifiers for keys in "fields" (e.g. 'title', 'price', 'original_price', 'discount', 'stock_status', 'description', 'rating', 'author', 'url', 'image').
+- Even if the user prompt is in Portuguese, Spanish, or another language (e.g. "preço e título"), ALWAYS name the field keys in standard canonical English ('price', 'title') so the JSON schema remains deterministic across compilations.${preservationRule}
 Selector Strategy:
 - Primary 'selector': Prefer canonical entity elements (e.g., 'h1', '[itemprop="name"]', primary product/article heading) over navigation elements. Never use breadcrumbs, navigation menus, or category tags as the primary title/name selector; reserve navigation elements strictly as a last-resort fallback. Target the specific leaf element holding the value rather than parent containers that concatenate multiple prices/installments.
 - CSS Modules & Hashed Classes: When elements use CSS Modules with build hashes (e.g. "ProductPrice_productPrice__vpgdo" or "ProductInfoCenter_title__hdTX_"), NEVER hardcode the volatile hash suffix; use attribute substring selectors on the semantic prefix (e.g. '[class*="ProductPrice_productPrice"]', 'h1[class*="ProductInfoCenter_title"]').

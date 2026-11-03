@@ -85,10 +85,15 @@ export class CompilationService {
       const sanitizedHtml = sanitizeHtml(scrapeResult.rawHtml);
 
       // 3. Compile extractor schema via pluggable AI Compiler Provider
+      const existingFieldKeys = job.extractorConfig?.fields
+        ? Object.keys(job.extractorConfig.fields)
+        : undefined;
+
       const compiledSchema = await this.compilerProvider.compile({
         jobId: job.id,
         sanitizedHtml,
         userPrompt: job.userPrompt,
+        existingFieldKeys,
       });
 
       // 4. Pre-activation smoke test against sanitized DOM
