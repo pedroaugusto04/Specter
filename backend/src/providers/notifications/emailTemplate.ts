@@ -107,27 +107,15 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
           
           <!-- SPECTER BRAND HEADER -->
           <tr>
-            <td style="background-color:#09090b;padding:24px 32px;border-bottom:1px solid #27272a;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <td style="background-color:#09090b;padding:24px 32px;border-bottom:1px solid #27272a;text-align:center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
                 <tr>
-                  <td align="left" style="vertical-align:middle;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td style="vertical-align:middle;padding-right:12px;">
-                          <!-- Specter Viewfinder Logo with CID attachment reference -->
-                          <img src="cid:specter-logo" width="36" height="36" alt="Specter" style="display:block;border-radius:8px;border:0;outline:none;" />
-                        </td>
-                        <td style="vertical-align:middle;">
-                          <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;line-height:1;">SPECTER</div>
-                          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;color:#a1a1aa;text-transform:uppercase;margin-top:4px;">Intelligent Extraction Monitor</div>
-                        </td>
-                      </tr>
-                    </table>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <!-- Specter Viewfinder Logo with CID attachment reference -->
+                    <img src="cid:specter-logo" width="36" height="36" alt="Specter" style="display:block;border-radius:8px;border:0;outline:none;" />
                   </td>
-                  <td align="right" style="vertical-align:middle;">
-                    <span style="display:inline-block;background-color:#18181b;border:1px solid #f59e0b;color:#fbbf24;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:6px 12px;border-radius:20px;">
-                      &#x26A1; ${escapeHtml(changeNoun)}
-                    </span>
+                  <td style="vertical-align:middle;">
+                    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;line-height:1;">SPECTER</div>
                   </td>
                 </tr>
               </table>
@@ -153,7 +141,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                         <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Monitored Target:</td>
                         <td style="padding:6px 0;font-size:13px;word-break:break-all;">
                           <a href="${escapeHtml(payload.targetUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:none;">
-                            ${escapeHtml(payload.targetUrl)} &#x2197;
+                            ${escapeHtml(payload.targetUrl)}
                           </a>
                         </td>
                       </tr>
@@ -161,10 +149,6 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                       <tr>
                         <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Detected At:</td>
                         <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${formattedDate}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Job ID:</td>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${escapeHtml(payload.jobId)}</td>
                       </tr>
                     </table>
                   </td>
@@ -197,7 +181,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
               <!-- FULL SNAPSHOT (JSON ACCORDION) -->
               <details style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
                 <summary style="font-size:13px;font-weight:600;color:#3f3f46;cursor:pointer;user-select:none;">
-                  &#x1F4CB; View full extracted data snapshot (JSON)
+                  View full extracted data snapshot (JSON)
                 </summary>
                 <div style="margin-top:12px;">
                   <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;background-color:#09090b;color:#fafafa;padding:14px;border-radius:6px;overflow-x:auto;line-height:1.5;">${escapeHtml(JSON.stringify(payload.data, null, 2))}</pre>
@@ -213,14 +197,13 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                 <tr>
                   <td align="center">
                     <div style="font-size:13px;font-weight:700;color:#f4f4f5;margin-bottom:6px;">
-                      SPECTER &bull; Autonomous Web Monitoring System
+                      SPECTER
                     </div>
                     <div style="font-size:12px;color:#a1a1aa;line-height:1.6;margin-bottom:12px;">
-                      You received this notification because this email was configured to receive alerts for this monitor.<br>
-                      Delivered reliably via Resend.
+                      You received this notification because this email was configured to receive alerts for this monitor.
                     </div>
                     <div style="font-size:11px;color:#71717a;">
-                      Job ID: <code style="color:#a1a1aa;">${escapeHtml(payload.jobId)}</code> &bull; ${formattedDate}
+                      ${formattedDate}
                     </div>
                   </td>
                 </tr>
@@ -252,7 +235,6 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     `Target: ${payload.targetUrl}`,
     payload.userPrompt ? `Instruction: ${payload.userPrompt}` : null,
     `Date: ${formattedDate}`,
-    `Job ID: ${payload.jobId}`,
     ``,
     payload.triggerReasons && payload.triggerReasons.length > 0
       ? `TRIGGER CONDITIONS MET:\n${payload.triggerReasons.map((r) => `- ${r}`).join('\n')}\n`
@@ -262,8 +244,8 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     payload.diffSummary.summaryText,
     ``,
     `------------------------------------------------------------`,
-    `Specter - Intelligent Extraction Monitor`,
-    `Automated transactional notification via Resend`,
+    `Specter`,
+    `Automated transactional notification`,
   ]
     .filter(Boolean)
     .join('\n');

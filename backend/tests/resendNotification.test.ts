@@ -59,14 +59,14 @@ describe('Specter Resend Notifications & Email Template', () => {
 
       // Specter Brand Header & Logo
       expect(html).toContain('SPECTER');
-      expect(html).toContain('Intelligent Extraction Monitor');
+      expect(html).not.toContain('Intelligent Extraction Monitor');
       expect(html).toContain('cid:specter-logo');
       expect(html).toContain('alt="Specter"');
 
       // Target Metadata
       expect(html).toContain('https://store.example.com/product/123');
       expect(html).toContain('Extract title, promotional price and stock availability');
-      expect(html).toContain('01923456-789a-bcde-f012-3456789abcde');
+      expect(html).not.toContain('01923456-789a-bcde-f012-3456789abcde');
 
       // Change Badges & Values
       expect(html).toContain('Modified');
@@ -80,15 +80,17 @@ describe('Specter Resend Notifications & Email Template', () => {
       // JSON Snapshot Accordion
       expect(html).toContain('Headphone Bluetooth ANC Pro');
       expect(html).toContain('<details');
+      expect(html).not.toContain('&#x1F4CB;');
 
       // Specter Footer
-      expect(html).toContain('Autonomous Web Monitoring System');
-      expect(html).toContain('Resend');
+      expect(html).not.toContain('Autonomous Web Monitoring System');
+      expect(html).not.toContain('Delivered reliably via Resend');
 
       // Plain Text version
       expect(text).toContain('[SPECTER]');
       expect(text).toContain('https://store.example.com/product/123');
       expect(text).toContain('price: "$ 499.00" → "$ 399.00"');
+      expect(text).not.toContain('Job ID:');
     });
 
     it('escapes unsafe HTML to prevent injection vulnerabilities', () => {
