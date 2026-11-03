@@ -94,7 +94,9 @@ export class ScrapeExecutionService {
         }
       );
 
-      const waitSelector = resolveTargetWaitSelector(job.extractorConfig);
+      const waitSelector =
+        resolveTargetWaitSelector(job.extractorConfig) ??
+        'main, article, [role="main"], h1';
 
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
         waitForSelector: waitSelector,

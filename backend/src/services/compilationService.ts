@@ -78,6 +78,7 @@ export class CompilationService {
       // 1. Fetch raw HTML from target URL
       const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
         storageState,
+        waitForSelector: 'main, article, [role="main"], h1',
         captureScreenshot: job.captureScreenshotOnChange,
       });
       httpStatus = scrapeResult.httpStatus;

@@ -44,7 +44,10 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       }
 
       if (options?.waitForSelector) {
-        endpoint.searchParams.set('wait_for', options.waitForSelector);
+        const cleanWaitSelector = options.waitForSelector.split(',')[0]?.trim();
+        if (cleanWaitSelector) {
+          endpoint.searchParams.set('wait_for', cleanWaitSelector);
+        }
       }
 
       if (options?.captureScreenshot) {
@@ -52,7 +55,10 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('screenshot_format', 'jpeg');
         endpoint.searchParams.set('screenshot_quality', '80');
         endpoint.searchParams.set('json_response', 'true');
-        if (options.waitForSelector) {
+        endpoint.searchParams.set('wait', '3500');
+        endpoint.searchParams.set('window_width', '1366');
+        endpoint.searchParams.set('window_height', '768');
+        if (options.waitForSelector && !options.waitForSelector.includes(',')) {
           endpoint.searchParams.set('screenshot_selector', options.waitForSelector);
         }
       }

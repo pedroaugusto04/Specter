@@ -75,7 +75,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
       context = await browser.newContext({
         userAgent: DEFAULT_USER_AGENT,
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: 1366, height: 768 },
         locale: 'pt-BR',
         ...(options?.storageState ? { storageState: options.storageState } : {}),
         extraHTTPHeaders: {
@@ -239,7 +239,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         try {
           if (options.waitForSelector) {
             const targetLocator = page.locator(options.waitForSelector).first();
-            const isVisible = await targetLocator.isVisible({ timeout: 1500 }).catch(() => false);
+            const isVisible = await targetLocator.isVisible({ timeout: 2500 }).catch(() => false);
 
             if (isVisible) {
               await targetLocator
@@ -248,8 +248,8 @@ export class PlaywrightScraperEngine implements IScraperEngine {
                 })
                 .catch(() => {});
 
-              // Brief wait for any lazy-loaded images or styles to paint
-              await page.waitForTimeout(200);
+              // Wait for any lazy-loaded images, fonts, or styles to paint
+              await page.waitForTimeout(300);
             }
           }
 
