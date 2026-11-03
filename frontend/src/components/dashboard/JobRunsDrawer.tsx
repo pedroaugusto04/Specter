@@ -31,6 +31,7 @@ export function JobRunsDrawer({
   const runs = data?.runs || [];
   const latestDiff = data?.latestDiff || null;
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
+  const [zoomFitMode, setZoomFitMode] = React.useState<'contain' | 'actual'>('contain');
 
   if (!job) return null;
 
@@ -147,15 +148,20 @@ export function JobRunsDrawer({
                         />
                       ) : (
                         <div
-                          className="relative group cursor-pointer overflow-hidden rounded-lg max-h-60"
+                          className="relative group cursor-pointer overflow-hidden rounded-lg aspect-video max-h-72 w-full border border-border bg-black/5 dark:bg-black/30"
                           onClick={() => setSelectedScreenshot(currentScreenshot)}
                         >
                           <img
                             src={currentScreenshot}
                             alt="Latest visual diff snapshot"
-                            className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.01]"
+                            className="w-full h-full object-contain select-none"
                             loading="lazy"
                           />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 dark:group-hover:bg-white/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <span className="rounded bg-background/90 px-2 py-1 text-[11px] font-mono font-medium text-foreground shadow-sm flex items-center gap-1 border border-border">
+                              <ZoomIn className="h-3 w-3" /> Click to enlarge
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -237,7 +243,7 @@ export function JobRunsDrawer({
                     {run.screenshotUrl && (
                       <div className="mt-3 overflow-hidden rounded-md border border-border bg-muted/20">
                         <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 font-mono">
                             <Camera className="h-3.5 w-3.5 text-primary" />
                             Visual Diff Screenshot
                           </span>
@@ -251,15 +257,20 @@ export function JobRunsDrawer({
                           </button>
                         </div>
                         <div
-                          className="relative group cursor-pointer overflow-hidden max-h-48"
+                          className="relative group cursor-pointer overflow-hidden aspect-video max-h-56 w-full bg-black/5 dark:bg-black/30"
                           onClick={() => setSelectedScreenshot(run.screenshotUrl)}
                         >
                           <img
                             src={run.screenshotUrl}
                             alt="Visual snapshot"
-                            className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
+                            className="w-full h-full object-contain select-none"
                             loading="lazy"
                           />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 dark:group-hover:bg-white/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <span className="rounded bg-background/90 px-2 py-1 text-[11px] font-mono font-medium text-foreground shadow-sm flex items-center gap-1 border border-border">
+                              <ZoomIn className="h-3 w-3" /> Click to enlarge
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -279,24 +290,50 @@ export function JobRunsDrawer({
         {/* Screenshot Modal / Lightbox */}
         {selectedScreenshot && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-5 backdrop-blur-sm"
             onClick={() => setSelectedScreenshot(null)}
           >
             <div
-              className="relative max-h-[90vh] max-w-4xl w-full overflow-hidden rounded-xl border border-border bg-card p-2 shadow-2xl"
+              className="relative flex flex-col max-h-[92vh] max-w-5xl w-full overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-border pb-2 px-2 text-xs font-mono">
-                <span className="flex items-center gap-1.5 text-foreground font-semibold">
+              <div className="flex items-center justify-between border-b border-border py-2.5 px-3 sm:px-4 text-xs font-mono bg-muted/30">
+                <span className="flex items-center gap-2 text-foreground font-semibold">
                   <Camera className="h-4 w-4 text-primary" />
                   Visual Proof Snapshot
                 </span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* View Mode Toggle: Fit to Window vs Original 1:1 */}
+                  <div className="flex items-center rounded-md border border-border bg-background p-0.5 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setZoomFitMode('contain')}
+                      className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                        zoomFitMode === 'contain'
+                          ? 'bg-primary text-primary-foreground font-semibold'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Fit Window
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomFitMode('actual')}
+                      className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                        zoomFitMode === 'actual'
+                          ? 'bg-primary text-primary-foreground font-semibold'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      100% Size
+                    </button>
+                  </div>
+
                   <a
                     href={selectedScreenshot}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors font-mono"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     Open full size
@@ -304,17 +341,23 @@ export function JobRunsDrawer({
                   <button
                     type="button"
                     onClick={() => setSelectedScreenshot(null)}
-                    className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                    className="rounded border border-border px-2.5 py-1 text-xs font-mono text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
                   >
                     Close
                   </button>
                 </div>
               </div>
-              <div className="max-h-[80vh] overflow-auto p-2">
+
+              {/* Viewport content */}
+              <div className="flex-1 flex items-center justify-center overflow-auto p-3 sm:p-4 bg-black/10 dark:bg-black/40 min-h-[250px] max-h-[82vh]">
                 <img
                   src={selectedScreenshot}
                   alt="Visual Proof Snapshot Full"
-                  className="w-full rounded-lg object-contain shadow-sm"
+                  className={
+                    zoomFitMode === 'contain'
+                      ? 'max-h-[76vh] max-w-full w-auto h-auto object-contain rounded-lg shadow-md mx-auto select-none'
+                      : 'w-auto h-auto max-w-none rounded-lg shadow-md mx-auto select-none'
+                  }
                 />
               </div>
             </div>

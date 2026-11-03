@@ -59,7 +59,16 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('wait', '3500');
         endpoint.searchParams.set('window_width', '1366');
         endpoint.searchParams.set('window_height', '768');
-        if (options.waitForSelector && !options.waitForSelector.includes(',')) {
+        const isGenericContainer =
+          options.waitForSelector &&
+          /^(body|main|article|html|\[role=["']?main["']?\])/i.test(
+            options.waitForSelector.trim()
+          );
+        if (
+          options.waitForSelector &&
+          !options.waitForSelector.includes(',') &&
+          !isGenericContainer
+        ) {
           endpoint.searchParams.set('screenshot_selector', options.waitForSelector);
         }
       }

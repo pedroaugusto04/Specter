@@ -54,11 +54,21 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('screenshot', 'true');
         endpoint.searchParams.set('screenshot_format', 'jpeg');
         endpoint.searchParams.set('screenshot_quality', '80');
+        endpoint.searchParams.set('screenshot_full_page', 'false');
         endpoint.searchParams.set('json_response', 'true');
         endpoint.searchParams.set('wait', '3500');
         endpoint.searchParams.set('window_width', '1366');
         endpoint.searchParams.set('window_height', '768');
-        if (options.waitForSelector && !options.waitForSelector.includes(',')) {
+        const isGenericContainer =
+          options.waitForSelector &&
+          /^(body|main|article|html|\[role=["']?main["']?\])/i.test(
+            options.waitForSelector.trim()
+          );
+        if (
+          options.waitForSelector &&
+          !options.waitForSelector.includes(',') &&
+          !isGenericContainer
+        ) {
           endpoint.searchParams.set('screenshot_selector', options.waitForSelector);
         }
       }

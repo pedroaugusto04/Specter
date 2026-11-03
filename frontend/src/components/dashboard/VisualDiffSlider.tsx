@@ -58,34 +58,27 @@ export function VisualDiffSlider({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="relative select-none overflow-hidden rounded-lg border border-border bg-muted/30 shadow-inner group cursor-ew-resize h-64 sm:h-80"
+        className="relative select-none overflow-hidden rounded-lg border border-border bg-black/5 dark:bg-black/30 shadow-inner cursor-ew-resize aspect-video max-h-80 w-full"
       >
         {/* Current Image (Background / Right) */}
         <img
           src={currentUrl}
           alt="Current visual capture"
-          className="absolute inset-0 h-full w-full object-cover object-top pointer-events-none"
+          className="absolute inset-0 h-full w-full object-contain select-none pointer-events-none"
           loading="lazy"
         />
 
-        {/* Previous Image (Clipped / Left) */}
+        {/* Previous Image (Clipped with CSS clipPath / Left) */}
         <div
-          className="absolute inset-y-0 left-0 overflow-hidden border-r-2 border-primary shadow-[0_0_12px_rgba(0,0,0,0.5)]"
-          style={{ width: `${sliderPosition}%` }}
+          className="absolute inset-0 pointer-events-none"
+          style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
         >
-          <div
-            className="absolute inset-0 h-full pointer-events-none"
-            style={{
-              width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100%',
-            }}
-          >
-            <img
-              src={previousUrl}
-              alt="Previous visual capture"
-              className="h-full w-full object-cover object-top"
-              loading="lazy"
-            />
-          </div>
+          <img
+            src={previousUrl}
+            alt="Previous visual capture"
+            className="h-full w-full object-contain select-none"
+            loading="lazy"
+          />
         </div>
 
         {/* Floating Badges */}
@@ -101,7 +94,8 @@ export function VisualDiffSlider({
           className="absolute inset-y-0 z-20 flex items-center justify-center -translate-x-1/2 pointer-events-none"
           style={{ left: `${sliderPosition}%` }}
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-primary bg-background shadow-lg text-primary transition-transform group-hover:scale-110">
+          <div className="h-full w-0.5 bg-primary shadow-[0_0_8px_rgba(0,0,0,0.6)]" />
+          <div className="absolute flex h-7 w-7 items-center justify-center rounded-full border-2 border-primary bg-background shadow-lg text-primary">
             <ChevronsLeftRight className="h-4 w-4" />
           </div>
         </div>
