@@ -1,11 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { AlertCircle, Camera, Code2, ExternalLink, GitCompare, ShieldAlert, SlidersHorizontal, ZoomIn } from 'lucide-react';
+import {
+  AlertCircle,
+  Camera,
+  Code2,
+  ExternalLink,
+  GitCompare,
+  ShieldAlert,
+  SlidersHorizontal,
+  ZoomIn,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
-import { api, type DiffSummary, type JobRunDto, type ScrapingJobDto } from '@/lib/api';
+import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
+import type { ScrapingJobDto } from '@/lib/api';
 import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 export function JobRunsDrawer({
@@ -15,36 +25,15 @@ export function JobRunsDrawer({
   job: ScrapingJobDto | null;
   onClose: () => void;
 }) {
-  const [runs, setRuns] = React.useState<JobRunDto[]>([]);
-  const [latestDiff, setLatestDiff] = React.useState<DiffSummary | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const { data, isLoading: loading } = useJobRunsQuery(job?.id);
+  const runs = data?.runs || [];
+  const latestDiff = data?.latestDiff || null;
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!job) return;
-    setLoading(true);
-    api
-      .getJobRuns(job.id)
-      .then((res) => {
-        setRuns(res.runs);
-        setLatestDiff(res.latestDiff);
-      })
-      .catch(() => {
-        setRuns([]);
-        setLatestDiff(null);
-      })
-      .finally(() => setLoading(false));
-  }, [job]);
 
   if (!job) return null;
 
   return (
-    <Drawer
-      isOpen={Boolean(job)}
-      onClose={onClose}
-      title={job.url}
-      description={job.userPrompt}
-    >
+    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.url} description={job.userPrompt}>
       <div className="space-y-6">
         {/* Compiled Extractor Schema */}
         <section className="space-y-2.5">
@@ -84,7 +73,9 @@ export function JobRunsDrawer({
                   {[...latestDiff.modified, ...latestDiff.added, ...latestDiff.removed].map(
                     (item) => (
                       <tr key={item.field}>
-                        <td className="px-3.5 py-2.5 font-mono font-medium text-foreground">{item.field}</td>
+                        <td className="px-3.5 py-2.5 font-mono font-medium text-foreground">
+                          {item.field}
+                        </td>
                         <td className="px-3.5 py-2.5">
                           <Badge
                             variant={
@@ -111,63 +102,64 @@ export function JobRunsDrawer({
               </table>
             </div>
 
-            {runs[0]?.screenshotUrl && (() => {
-              const currentScreenshot = runs[0].screenshotUrl;
-              // Find the closest prior run that has a screenshot
-              const priorScreenshotRun = runs.slice(1).find((r) => Boolean(r.screenshotUrl));
-              const previousScreenshot = priorScreenshotRun?.screenshotUrl;
+            {runs[0]?.screenshotUrl &&
+              (() => {
+                const currentScreenshot = runs[0].screenshotUrl;
+                // Find the closest prior run that has a screenshot
+                const priorScreenshotRun = runs.slice(1).find((r) => Boolean(r.screenshotUrl));
+                const previousScreenshot = priorScreenshotRun?.screenshotUrl;
 
-              return (
-                <div className="overflow-hidden rounded-lg border border-border bg-muted/20">
-                  <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                    <span className="flex items-center gap-1.5 font-mono">
-                      {previousScreenshot ? (
-                        <>
-                          <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
-                          Visual Diff (Before vs After)
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="h-3.5 w-3.5 text-primary" />
-                          Visual Snapshot Proof
-                        </>
-                      )}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedScreenshot(currentScreenshot)}
-                      className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
-                    >
-                      <ZoomIn className="h-3 w-3" />
-                      Zoom Full Size
-                    </button>
-                  </div>
-                  <div className="p-3">
-                    {previousScreenshot ? (
-                      <VisualDiffSlider
-                        previousUrl={previousScreenshot}
-                        currentUrl={currentScreenshot}
-                        previousLabel="Previous"
-                        currentLabel="Current"
-                        onOpenZoom={(url) => setSelectedScreenshot(url)}
-                      />
-                    ) : (
-                      <div
-                        className="relative group cursor-pointer overflow-hidden rounded-lg max-h-60"
+                return (
+                  <div className="overflow-hidden rounded-lg border border-border bg-muted/20">
+                    <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1.5 font-mono">
+                        {previousScreenshot ? (
+                          <>
+                            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                            Visual Diff (Before vs After)
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-3.5 w-3.5 text-primary" />
+                            Visual Snapshot Proof
+                          </>
+                        )}
+                      </span>
+                      <button
+                        type="button"
                         onClick={() => setSelectedScreenshot(currentScreenshot)}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
                       >
-                        <img
-                          src={currentScreenshot}
-                          alt="Latest visual diff snapshot"
-                          className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.01]"
-                          loading="lazy"
+                        <ZoomIn className="h-3 w-3" />
+                        Zoom Full Size
+                      </button>
+                    </div>
+                    <div className="p-3">
+                      {previousScreenshot ? (
+                        <VisualDiffSlider
+                          previousUrl={previousScreenshot}
+                          currentUrl={currentScreenshot}
+                          previousLabel="Previous"
+                          currentLabel="Current"
+                          onOpenZoom={(url) => setSelectedScreenshot(url)}
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <div
+                          className="relative group cursor-pointer overflow-hidden rounded-lg max-h-60"
+                          onClick={() => setSelectedScreenshot(currentScreenshot)}
+                        >
+                          <img
+                            src={currentScreenshot}
+                            alt="Latest visual diff snapshot"
+                            className="w-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.01]"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
           </section>
         )}
 
@@ -189,10 +181,7 @@ export function JobRunsDrawer({
                 const parsedError = run.errorMessage ? parseErrorMessage(run.errorMessage) : null;
 
                 return (
-                  <div
-                    key={run.id}
-                    className="rounded-lg border border-border bg-card p-4 sm:p-5"
-                  >
+                  <div key={run.id} className="rounded-lg border border-border bg-card p-4 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2">
                         <Badge variant={run.status === 'SUCCESS' ? 'success' : 'destructive'}>
@@ -210,10 +199,14 @@ export function JobRunsDrawer({
                           Change: {run.hasChanges}
                         </Badge>
                         {run.httpStatus && (
-                          <span className="font-mono text-xs text-muted-foreground">HTTP {run.httpStatus}</span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            HTTP {run.httpStatus}
+                          </span>
                         )}
                         {run.durationMs !== null && (
-                          <span className="font-mono text-xs text-muted-foreground">{run.durationMs}ms</span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {run.durationMs}ms
+                          </span>
                         )}
                       </div>
                       <span className="font-mono text-xs text-muted-foreground">
@@ -230,9 +223,7 @@ export function JobRunsDrawer({
                             <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold">
-                              {parsedError.title}
-                            </p>
+                            <p className="font-semibold">{parsedError.title}</p>
                             <p className="mt-0.5 leading-relaxed opacity-90">
                               {parsedError.description}
                             </p>

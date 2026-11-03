@@ -87,8 +87,24 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     const rawSetCookie = res.headers['set-cookie'];
     expect(Array.isArray(rawSetCookie)).toBe(true);
     const cookiesList = rawSetCookie as string[];
-    expect(cookiesList.some((c) => c.startsWith('specter_access=') && c.includes('HttpOnly') && c.includes('SameSite=Lax') && c.includes('Secure'))).toBe(true);
-    expect(cookiesList.some((c) => c.startsWith('specter_refresh=') && c.includes('HttpOnly') && c.includes('SameSite=Lax') && c.includes('Secure'))).toBe(true);
+    expect(
+      cookiesList.some(
+        (c) =>
+          c.startsWith('specter_access=') &&
+          c.includes('HttpOnly') &&
+          c.includes('SameSite=Lax') &&
+          c.includes('Secure')
+      )
+    ).toBe(true);
+    expect(
+      cookiesList.some(
+        (c) =>
+          c.startsWith('specter_refresh=') &&
+          c.includes('HttpOnly') &&
+          c.includes('SameSite=Lax') &&
+          c.includes('Secure')
+      )
+    ).toBe(true);
 
     const cookieHeader = extractCookieHeader(rawSetCookie);
 
@@ -272,7 +288,11 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     });
     expect(logoutRes.statusCode).toBe(204);
     const clearedCookies = logoutRes.headers['set-cookie'] as string[];
-    expect(clearedCookies.some((c) => c.startsWith('specter_access=;') && c.includes('Max-Age=0'))).toBe(true);
-    expect(clearedCookies.some((c) => c.startsWith('specter_refresh=;') && c.includes('Max-Age=0'))).toBe(true);
+    expect(
+      clearedCookies.some((c) => c.startsWith('specter_access=;') && c.includes('Max-Age=0'))
+    ).toBe(true);
+    expect(
+      clearedCookies.some((c) => c.startsWith('specter_refresh=;') && c.includes('Max-Age=0'))
+    ).toBe(true);
   });
 });

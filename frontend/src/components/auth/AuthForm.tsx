@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { useLoginMutation, useRegisterMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, api, type UserDto } from '@/lib/api';
 
 export interface AuthFormProps {
@@ -27,8 +28,14 @@ export function AuthForm({
   const [email, setEmail] = React.useState(initialEmail);
   const [password, setPassword] = React.useState('');
   const [termsAccepted, setTermsAccepted] = React.useState(false);
+  const loginMutation = useLoginMutation();
+  const registerMutation = useRegisterMutation();
   const [loading, setLoading] = React.useState(false);
-  const [fieldErrors, setFieldErrors] = React.useState<{ email?: string; password?: string; terms?: string }>({});
+  const [fieldErrors, setFieldErrors] = React.useState<{
+    email?: string;
+    password?: string;
+    terms?: string;
+  }>({});
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -79,8 +86,8 @@ export function AuthForm({
     try {
       const user =
         mode === 'register'
-          ? await api.register({ email: trimmedEmail, password })
-          : await api.login({ email: trimmedEmail, password });
+          ? await registerMutation.mutateAsync({ email: trimmedEmail, password })
+          : await loginMutation.mutateAsync({ email: trimmedEmail, password });
       await onSuccess(user);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -205,7 +212,8 @@ export function AuthForm({
             hasError={Boolean(fieldErrors.password)}
             onChange={(e) => {
               setPassword(e.target.value);
-              if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              if (fieldErrors.password)
+                setFieldErrors((prev) => ({ ...prev, password: undefined }));
             }}
           />
         </FormField>

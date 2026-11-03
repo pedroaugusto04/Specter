@@ -21,7 +21,8 @@ export function validateCronFrequency(
   if (parts.length !== 5) {
     return {
       valid: false,
-      error: 'Cron expression must contain exactly 5 fields (minute hour day-of-month month day-of-week).',
+      error:
+        'Cron expression must contain exactly 5 fields (minute hour day-of-month month day-of-week).',
     };
   }
 

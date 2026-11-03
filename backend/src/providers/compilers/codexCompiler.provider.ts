@@ -31,7 +31,8 @@ export class CodexCompilerProvider implements ICompilerProvider {
       ...options,
       cliCommand: options.cliCommand ?? env.CODEX_CLI_PATH,
       cliArgsBuilder:
-        options.cliArgsBuilder ?? ((promptFile: string) => ['--quiet', '--prompt-file', promptFile]),
+        options.cliArgsBuilder ??
+        ((promptFile: string) => ['--quiet', '--prompt-file', promptFile]),
     });
   }
 
@@ -71,9 +72,7 @@ export class CodexCompilerProvider implements ICompilerProvider {
       });
 
       if (!response.ok) {
-        throw new CompilerValidationError(
-          `Codex/OpenAI API returned HTTP ${response.status}`
-        );
+        throw new CompilerValidationError(`Codex/OpenAI API returned HTTP ${response.status}`);
       }
 
       const body = (await response.json()) as {

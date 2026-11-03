@@ -54,7 +54,9 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
     });
 
     if (!response.ok) {
-      throw new Error(`Webhook delivery failed with HTTP status ${response.status} (${response.statusText})`);
+      throw new Error(
+        `Webhook delivery failed with HTTP status ${response.status} (${response.statusText})`
+      );
     }
 
     logger.info('Webhook alert dispatched successfully', {
@@ -106,7 +108,8 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
         return {
           ok: false,
           status: response.status,
-          error: 'Webhook endpoint returned an error or could not be reached. Please check the URL.',
+          error:
+            'Webhook endpoint returned an error or could not be reached. Please check the URL.',
         };
       }
 

@@ -53,7 +53,10 @@ export class SessionService {
     return entity ? SessionMapper.entityToDto(entity) : null;
   }
 
-  async getSessionStorageState(userId: string, hostOrUrl: string): Promise<PlaywrightStorageState | null> {
+  async getSessionStorageState(
+    userId: string,
+    hostOrUrl: string
+  ): Promise<PlaywrightStorageState | null> {
     const domain = normalizeDomain(hostOrUrl);
     const entity = await this.sessionRepository.findByUserAndDomain(userId, domain);
     return entity ? entity.storageState : null;

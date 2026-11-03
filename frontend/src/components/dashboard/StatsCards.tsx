@@ -36,10 +36,7 @@ export function StatsCards({ stats }: { stats: DashboardStats | null }) {
       {items.map((item) => {
         const Icon = item.icon;
         return (
-          <div
-            key={item.label}
-            className="bg-card p-5 sm:p-6 transition-colors hover:bg-muted/20"
-          >
+          <div key={item.label} className="bg-card p-5 sm:p-6 transition-colors hover:bg-muted/20">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground">
                 {item.label}

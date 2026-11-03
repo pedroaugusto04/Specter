@@ -8,10 +8,7 @@ import type {
   TelegramTestResult,
   WebhookTestResult,
 } from '../providers/notifications/notification.interface.js';
-import {
-  IntegrationMapper,
-  type UserIntegrationsDto,
-} from '../mappers/integrationMapper.js';
+import { IntegrationMapper, type UserIntegrationsDto } from '../mappers/integrationMapper.js';
 
 export class IntegrationService {
   private readonly integrationRepository: IIntegrationRepository;
@@ -63,9 +60,7 @@ export class IntegrationService {
     return { ...dto, botUsername };
   }
 
-  async testTelegram(input: {
-    chatId: string;
-  }): Promise<TelegramTestResult> {
+  async testTelegram(input: { chatId: string }): Promise<TelegramTestResult> {
     return this.telegramProvider.sendTestMessage(input);
   }
 

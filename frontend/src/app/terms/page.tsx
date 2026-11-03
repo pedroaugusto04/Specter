@@ -22,7 +22,11 @@ export default function TermsPage() {
           <div className="flex items-center gap-2.5">
             <ThemeToggle />
             <Link href="/">
-              <Button variant="outline" size="sm" className="h-9 px-3 text-xs sm:text-sm font-medium gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-3 text-xs sm:text-sm font-medium gap-1.5"
+              >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Dashboard</span>
               </Button>
@@ -52,7 +56,11 @@ export default function TermsPage() {
               Acceptance of Terms
             </h2>
             <p>
-              By accessing or using Specter (including our web platform at <code className="text-foreground font-mono">specterdev.online</code> and the <strong>Specter Companion</strong> browser extension), you agree to be bound by these Terms of Service. If you do not agree to these terms, you must not use or access our software and services.
+              By accessing or using Specter (including our web platform at{' '}
+              <code className="text-foreground font-mono">specterdev.online</code> and the{' '}
+              <strong>Specter Companion</strong> browser extension), you agree to be bound by these
+              Terms of Service. If you do not agree to these terms, you must not use or access our
+              software and services.
             </p>
           </section>
 
@@ -63,7 +71,10 @@ export default function TermsPage() {
               Description of Service
             </h2>
             <p>
-              Specter is a developer automation and data extraction platform. It provides tools to schedule, configure, and execute automated browser tasks and API workflows. The companion browser extension enables registered users to securely export active session state (cookies) to their private Specter account for automated workflow execution.
+              Specter is a developer automation and data extraction platform. It provides tools to
+              schedule, configure, and execute automated browser tasks and API workflows. The
+              companion browser extension enables registered users to securely export active session
+              state (cookies) to their private Specter account for automated workflow execution.
             </p>
           </section>
 
@@ -74,13 +85,25 @@ export default function TermsPage() {
               Acceptable Use Policy &amp; User Responsibility
             </h2>
             <p>
-              You agree to use Specter responsibly and ethically. When synchronizing sessions or configuring data extraction tasks, you expressly agree:
+              You agree to use Specter responsibly and ethically. When synchronizing sessions or
+              configuring data extraction tasks, you expressly agree:
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-2 text-xs">
-              <li>You will only scrape and extract data from websites and services you have lawful permission, authorization, or legal right to access.</li>
-              <li>You will not use Specter to perform Denial of Service (DoS) attacks, brute-force logins, credential stuffing, or overwhelm remote servers.</li>
-              <li>You will not synchronize sessions belonging to third parties without authorization.</li>
-              <li>You will respect robots.txt standards, terms of service of third-party domains, and applicable rate limits.</li>
+              <li>
+                You will only scrape and extract data from websites and services you have lawful
+                permission, authorization, or legal right to access.
+              </li>
+              <li>
+                You will not use Specter to perform Denial of Service (DoS) attacks, brute-force
+                logins, credential stuffing, or overwhelm remote servers.
+              </li>
+              <li>
+                You will not synchronize sessions belonging to third parties without authorization.
+              </li>
+              <li>
+                You will respect robots.txt standards, terms of service of third-party domains, and
+                applicable rate limits.
+              </li>
             </ul>
           </section>
 
@@ -91,7 +114,10 @@ export default function TermsPage() {
               Account Security &amp; Credentials
             </h2>
             <p>
-              You are responsible for maintaining the confidentiality of your account credentials and any synchronized cookies. You agree to notify us immediately of any unauthorized access to your account. Specter implements industry-standard encryption for stored data, but you remain responsible for the security of your local browser environment.
+              You are responsible for maintaining the confidentiality of your account credentials
+              and any synchronized cookies. You agree to notify us immediately of any unauthorized
+              access to your account. Specter implements industry-standard encryption for stored
+              data, but you remain responsible for the security of your local browser environment.
             </p>
           </section>
 
@@ -102,7 +128,10 @@ export default function TermsPage() {
               Disclaimer of Warranties
             </h2>
             <p className="text-xs">
-              Specter is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis without warranties of any kind, whether express or implied. We do not guarantee uninterrupted uptime, error-free operation, or that target websites will not change their structure, anti-bot mechanisms, or invalidate sessions.
+              Specter is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis without
+              warranties of any kind, whether express or implied. We do not guarantee uninterrupted
+              uptime, error-free operation, or that target websites will not change their structure,
+              anti-bot mechanisms, or invalidate sessions.
             </p>
           </section>
 
@@ -113,7 +142,10 @@ export default function TermsPage() {
               Limitation of Liability
             </h2>
             <p className="text-xs">
-              Under no circumstances shall Specter or its operators be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your access to or inability to use the service, or actions taken by third-party websites against accounts used in automated jobs.
+              Under no circumstances shall Specter or its operators be liable for any indirect,
+              incidental, special, consequential, or punitive damages resulting from your access to
+              or inability to use the service, or actions taken by third-party websites against
+              accounts used in automated jobs.
             </p>
           </section>
 
@@ -124,7 +156,8 @@ export default function TermsPage() {
               Contact &amp; Inquiries
             </h2>
             <p className="text-xs">
-              For any questions, concerns, or legal inquiries regarding these Terms of Service, please reach out to:
+              For any questions, concerns, or legal inquiries regarding these Terms of Service,
+              please reach out to:
             </p>
             <p className="text-xs text-foreground font-medium pt-1">
               Email:{' '}

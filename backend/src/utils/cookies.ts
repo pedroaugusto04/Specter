@@ -30,11 +30,7 @@ export function parseCookies(cookieHeader?: string): Record<string, string> {
   return result;
 }
 
-export function serializeCookie(
-  name: string,
-  value: string,
-  options: CookieOptions = {}
-): string {
+export function serializeCookie(name: string, value: string, options: CookieOptions = {}): string {
   const segments = [`${name}=${encodeURIComponent(value)}`];
 
   segments.push(`Path=${options.path ?? '/'}`);

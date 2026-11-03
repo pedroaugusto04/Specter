@@ -107,9 +107,12 @@ async function bootstrap(): Promise<void> {
     );
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {
-    logger.warn('Startup job reconciliation skipped or failed (database/redis may still be starting)', {
-      errorMessage: err instanceof Error ? err.message : String(err),
-    });
+    logger.warn(
+      'Startup job reconciliation skipped or failed (database/redis may still be starting)',
+      {
+        errorMessage: err instanceof Error ? err.message : String(err),
+      }
+    );
   }
 
   const workerManager = new WorkerManager({

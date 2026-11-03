@@ -185,7 +185,11 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
         previousValue: flatPrev[key],
         currentValue: null,
       });
-    } else if (hasPrev && hasCurr && JSON.stringify(flatPrev[key]) !== JSON.stringify(flatCurr[key])) {
+    } else if (
+      hasPrev &&
+      hasCurr &&
+      JSON.stringify(flatPrev[key]) !== JSON.stringify(flatCurr[key])
+    ) {
       modified.push({
         field: key,
         changeType: 'MODIFIED',
@@ -201,7 +205,9 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
   const lines: string[] = [];
   for (const change of allChanges) {
     if (change.changeType === 'MODIFIED') {
-      lines.push(`• [Modified] ${change.field}: "${change.previousValue}" → "${change.currentValue}"`);
+      lines.push(
+        `• [Modified] ${change.field}: "${change.previousValue}" → "${change.currentValue}"`
+      );
     } else if (change.changeType === 'ADDED') {
       lines.push(`• [Added] ${change.field}: "${change.currentValue}"`);
     } else {
@@ -219,14 +225,14 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
         change.changeType === 'MODIFIED'
           ? '#d97706'
           : change.changeType === 'ADDED'
-          ? '#16a34a'
-          : '#dc2626';
+            ? '#16a34a'
+            : '#dc2626';
       const badgeLabel =
         change.changeType === 'MODIFIED'
           ? 'Modified'
           : change.changeType === 'ADDED'
-          ? 'New'
-          : 'Removed';
+            ? 'New'
+            : 'Removed';
       return `<tr>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:13px;">${escapeHtml(change.field)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;"><span style="background:${badgeColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${badgeLabel}</span></td>

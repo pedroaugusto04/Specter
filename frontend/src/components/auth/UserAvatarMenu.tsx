@@ -11,7 +11,12 @@ export interface UserAvatarMenuProps {
   onLogout: () => void | Promise<void>;
 }
 
-export function UserAvatarMenu({ user, onOpenProfile, onOpenIntegrations, onLogout }: UserAvatarMenuProps) {
+export function UserAvatarMenu({
+  user,
+  onOpenProfile,
+  onOpenIntegrations,
+  onLogout,
+}: UserAvatarMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -82,7 +87,10 @@ export function UserAvatarMenu({ user, onOpenProfile, onOpenIntegrations, onLogo
                   </span>
                   <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-500" />
                 </div>
-                <p className="truncate text-[11px] font-mono text-muted-foreground" title={user.email}>
+                <p
+                  className="truncate text-[11px] font-mono text-muted-foreground"
+                  title={user.email}
+                >
                   {user.email}
                 </p>
               </div>

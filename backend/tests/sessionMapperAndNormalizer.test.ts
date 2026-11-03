@@ -81,11 +81,15 @@ describe('SessionMapper & Domain Utilities', () => {
         },
         listByUserId: async () => [],
         findById: async () => null,
-        upsert: async () => ({} as UserWebSessionEntity),
+        upsert: async () => ({}) as UserWebSessionEntity,
         delete: async () => true,
       };
 
-      const resolved = await resolveSessionStorageState(mockRepo, 'user-1', 'https://example.com/products');
+      const resolved = await resolveSessionStorageState(
+        mockRepo,
+        'user-1',
+        'https://example.com/products'
+      );
       expect(resolved).toEqual(mockStorageState);
 
       const notFound = await resolveSessionStorageState(mockRepo, 'user-1', 'https://another.com');

@@ -275,7 +275,10 @@ async function setupActiveTab(tab) {
     // Check if Specter already has this session saved
     const existing = await checkExistingSession(currentApiUrl, currentToken, urlObj.hostname);
     if (existing) {
-      showAlert(`✅ Active session saved (${existing.cookieCount} cookies). Click below to update.`, 'success');
+      showAlert(
+        `✅ Active session saved (${existing.cookieCount} cookies). Click below to update.`,
+        'success'
+      );
       btnSync.innerHTML = '<span> Update Session in Specter</span>';
     } else {
       hideAlert();
@@ -469,7 +472,10 @@ btnSync.addEventListener('click', async () => {
     if (!res.ok) {
       showAlert(json.message || 'Error syncing session.', 'error');
     } else {
-      showAlert(` Session synced successfully! (${activeCookies.length} cookies). Specter will now browse authenticated on this site.`, 'success');
+      showAlert(
+        ` Session synced successfully! (${activeCookies.length} cookies). Specter will now browse authenticated on this site.`,
+        'success'
+      );
       btnSync.innerHTML = '<span> Update Session in Specter</span>';
     }
   } catch (err) {
@@ -482,7 +488,9 @@ btnSync.addEventListener('click', async () => {
 // Dashboard link handler
 linkDashboard.addEventListener('click', (e) => {
   e.preventDefault();
-  const dashboardUrl = currentApiUrl.includes('localhost') ? 'http://localhost:3000' : 'https://specterdev.online';
+  const dashboardUrl = currentApiUrl.includes('localhost')
+    ? 'http://localhost:3000'
+    : 'https://specterdev.online';
   chrome.tabs.create({ url: dashboardUrl });
 });
 

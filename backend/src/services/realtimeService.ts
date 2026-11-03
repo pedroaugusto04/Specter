@@ -2,7 +2,6 @@ import type {
   IRealtimeEventBus,
   RealtimeEvent,
   RealtimeEventHandler,
-  RealtimeEventType,
 } from '../providers/realtime/realtime.interface.js';
 import { logger } from '../utils/logger.js';
 

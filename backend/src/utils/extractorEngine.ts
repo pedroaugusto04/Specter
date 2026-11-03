@@ -114,7 +114,7 @@ function tryExtractSelector(
     return null;
   }
 
-  let raw: string | null = null;
+  let raw: string | null;
   if (!attribute || attribute === 'text') {
     raw = target.text();
     if (!raw || !raw.trim()) {
@@ -264,7 +264,12 @@ export function validateExtractionSmokeTest(
   sanitizedHtml: string,
   config: ExtractorConfig
 ): { valid: boolean; extractedData: ExtractedPayload; reason?: string } {
-  if (!config || typeof config !== 'object' || !config.fields || Object.keys(config.fields).length === 0) {
+  if (
+    !config ||
+    typeof config !== 'object' ||
+    !config.fields ||
+    Object.keys(config.fields).length === 0
+  ) {
     return {
       valid: false,
       extractedData: {},

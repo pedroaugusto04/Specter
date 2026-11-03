@@ -32,9 +32,14 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
   });
 
   it('SupabaseStorageProvider uploads buffer and returns publicUrl on success', async () => {
-    const mockUpload = vi.fn().mockResolvedValue({ data: { path: 'jobs/job-1/img.jpg' }, error: null });
+    const mockUpload = vi
+      .fn()
+      .mockResolvedValue({ data: { path: 'jobs/job-1/img.jpg' }, error: null });
     const mockGetPublicUrl = vi.fn().mockReturnValue({
-      data: { publicUrl: 'https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg' },
+      data: {
+        publicUrl:
+          'https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg',
+      },
     });
 
     const mockClient = {
@@ -98,7 +103,9 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
 
     await expect(
       provider.upload('jobs/job-1/img.jpg', Buffer.from('data'), 'image/jpeg')
-    ).rejects.toThrow('Failed to upload to Supabase Storage: Bucket not found or permission denied');
+    ).rejects.toThrow(
+      'Failed to upload to Supabase Storage: Bucket not found or permission denied'
+    );
   });
 
   it('createStorageProvider factory creates NoopStorageProvider when env is not configured', () => {
@@ -168,9 +175,14 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
         isEnabled: true,
         upload: vi.fn().mockResolvedValue({
           key: 'jobs/job-1/img.jpg',
-          publicUrl: 'https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg',
+          publicUrl:
+            'https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg',
         }),
-        getPublicUrl: vi.fn().mockReturnValue('https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg'),
+        getPublicUrl: vi
+          .fn()
+          .mockReturnValue(
+            'https://xyz.supabase.co/storage/v1/object/public/specter-screenshots/jobs/job-1/img.jpg'
+          ),
       };
 
       const job = await repository.createJob({

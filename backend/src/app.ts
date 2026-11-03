@@ -45,9 +45,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       if (origin.startsWith('chrome-extension://')) return cb(null, true);
       // Check configured CORS origins
       const allowed =
-        env.CORS_ORIGIN === '*'
-          ? true
-          : env.CORS_ORIGIN.split(',').map((s) => s.trim());
+        env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',').map((s) => s.trim());
       if (allowed === true || allowed.includes(origin)) return cb(null, true);
       return cb(null, false);
     },

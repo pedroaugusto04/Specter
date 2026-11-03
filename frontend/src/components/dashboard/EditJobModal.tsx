@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
-import { ApiError, api, type ScrapingJobDto, type TriggerOperator, type TriggerRule } from '@/lib/api';
+import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
+import {
+  ApiError,
+  api,
+  type ScrapingJobDto,
+  type TriggerOperator,
+  type TriggerRule,
+} from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
 
@@ -18,6 +25,7 @@ export interface EditJobModalProps {
 }
 
 export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalProps) {
+  const updateJobMutation = useUpdateJobMutation();
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [notificationEmail, setNotificationEmail] = React.useState('');
@@ -81,13 +89,13 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
   const isDirty = Boolean(
     job &&
-      (url.trim() !== job.url ||
-        userPrompt.trim() !== job.userPrompt ||
-        notificationEmail.trim() !== job.notificationEmail ||
-        (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
-        captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
-        effectiveCron.trim() !== job.cronExpression ||
-        rulesChanged)
+    (url.trim() !== job.url ||
+      userPrompt.trim() !== job.userPrompt ||
+      notificationEmail.trim() !== job.notificationEmail ||
+      (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
+      captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
+      effectiveCron.trim() !== job.cronExpression ||
+      rulesChanged)
   );
 
   const clearFieldError = (field: JobFormField) => {
@@ -138,15 +146,18 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
     setLoading(true);
     try {
-      await api.updateJob(job.id, {
-        url: url.trim(),
-        userPrompt: userPrompt.trim(),
-        notificationEmail: notificationEmail.trim() || undefined,
-        webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
-        cronExpression: effectiveCron.trim(),
-        captureScreenshotOnChange,
-        triggerRules,
-        triggerMatchMode,
+      await updateJobMutation.mutateAsync({
+        id: job.id,
+        payload: {
+          url: url.trim(),
+          userPrompt: userPrompt.trim(),
+          notificationEmail: notificationEmail.trim() || undefined,
+          webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
+          cronExpression: effectiveCron.trim(),
+          captureScreenshotOnChange,
+          triggerRules,
+          triggerMatchMode,
+        },
       });
 
       onUpdated();
@@ -229,7 +240,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               placeholder="alerts@company.com (optional)"
               value={notificationEmail}
               hasError={Boolean(fieldErrors.notificationEmail)}
-              aria-describedby={fieldErrors.notificationEmail ? 'edit-notify-email-error' : undefined}
+              aria-describedby={
+                fieldErrors.notificationEmail ? 'edit-notify-email-error' : undefined
+              }
               onChange={(e) => {
                 setNotificationEmail(e.target.value);
                 clearFieldError('notificationEmail');
@@ -312,27 +325,47 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               </div>
 
               <p className="leading-relaxed">
-                By default, you receive an alert whenever any tracked content changes on the page. 
-                Conditional triggers let you filter notifications so you only get alerted <strong>when specific events occur</strong>.
+                By default, you receive an alert whenever any tracked content changes on the page.
+                Conditional triggers let you filter notifications so you only get alerted{' '}
+                <strong>when specific events occur</strong>.
               </p>
 
               <div className="space-y-1.5 pt-1 text-[11px]">
                 <div className="font-semibold text-foreground">What you can monitor:</div>
                 <ul className="list-disc list-inside space-y-1 pl-1">
-                  <li><strong className="text-foreground">Relative variations (numbers & text):</strong> Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any text/status changes compared to the prior check.</li>
-                  <li><strong className="text-foreground">Fixed target thresholds:</strong> Alert only if a value passes a specific limit (e.g. less than 100 or greater than 50).</li>
-                  <li><strong className="text-foreground">Specific text & keyword matches:</strong> Alert when a field contains or equals specific words (e.g. &quot;Available&quot;, &quot;Approved&quot;, &quot;Open&quot;).</li>
+                  <li>
+                    <strong className="text-foreground">
+                      Relative variations (numbers & text):
+                    </strong>{' '}
+                    Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any
+                    text/status changes compared to the prior check.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Fixed target thresholds:</strong> Alert only
+                    if a value passes a specific limit (e.g. less than 100 or greater than 50).
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Specific text & keyword matches:</strong>{' '}
+                    Alert when a field contains or equals specific words (e.g.
+                    &quot;Available&quot;, &quot;Approved&quot;, &quot;Open&quot;).
+                  </li>
                 </ul>
               </div>
 
               <div className="rounded border border-primary/25 bg-background/70 p-2.5 text-[11px] text-foreground space-y-1.5">
-                <div className="font-semibold text-primary">💡 Two ways to configure conditions:</div>
+                <div className="font-semibold text-primary">
+                  💡 Two ways to configure conditions:
+                </div>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-0.5">
                   <li>
-                    <strong className="text-foreground">1. In the extraction prompt:</strong> Add your condition in plain text in the extraction instructions (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em>).
+                    <strong className="text-foreground">1. In the extraction prompt:</strong> Add
+                    your condition in plain text in the extraction instructions (e.g.{' '}
+                    <em>&quot;Notify only if price drops by 10%&quot;</em>).
                   </li>
                   <li>
-                    <strong className="text-foreground">2. Here via dropdown rules:</strong> Use the conditions list below to pick detected variables, operators, and target thresholds with visual controls.
+                    <strong className="text-foreground">2. Here via dropdown rules:</strong> Use the
+                    conditions list below to pick detected variables, operators, and target
+                    thresholds with visual controls.
                   </li>
                 </ul>
               </div>
@@ -350,7 +383,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
                   className="h-7 text-xs"
                   onClick={() => {
                     const defaultField = availableExtractorFields[0] || 'price';
-                    setTriggerRules([...triggerRules, { field: defaultField, operator: 'lt', value: '' }]);
+                    setTriggerRules([
+                      ...triggerRules,
+                      { field: defaultField, operator: 'lt', value: '' },
+                    ]);
                   }}
                 >
                   <Plus className="h-3 w-3 mr-1" />
@@ -480,7 +516,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
                   className="h-7 text-xs"
                   onClick={() => {
                     const defaultField = availableExtractorFields[0] || 'price';
-                    setTriggerRules([...triggerRules, { field: defaultField, operator: 'lt', value: '' }]);
+                    setTriggerRules([
+                      ...triggerRules,
+                      { field: defaultField, operator: 'lt', value: '' },
+                    ]);
                   }}
                 >
                   <Plus className="h-3 w-3 mr-1" />
@@ -501,7 +540,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
             <select
               id="edit-cron-preset"
               aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
-              aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined}
+              aria-describedby={
+                !useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined
+              }
               className={cn(
                 'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
                 !useCustomCron && fieldErrors.cronExpression
@@ -521,11 +562,17 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
               }}
             >
               {CRON_PRESETS.map((preset) => (
-                <option key={preset.value} value={preset.value} className="bg-background text-foreground">
+                <option
+                  key={preset.value}
+                  value={preset.value}
+                  className="bg-background text-foreground"
+                >
                   {preset.label} ({preset.value})
                 </option>
               ))}
-              <option value="custom" className="bg-background text-foreground">Custom Cron Expression...</option>
+              <option value="custom" className="bg-background text-foreground">
+                Custom Cron Expression...
+              </option>
             </select>
           </FormField>
 
@@ -610,7 +657,13 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
         )}
 
         <div className="flex justify-end gap-2.5 pt-2">
-          <Button type="button" variant="outline" className="h-10 px-4 text-sm" onClick={onClose} disabled={loading}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 px-4 text-sm"
+            onClick={onClose}
+            disabled={loading}
+          >
             Cancel
           </Button>
           <Button type="submit" className="h-10 px-5 text-sm" disabled={loading || !isDirty}>

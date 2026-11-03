@@ -38,7 +38,9 @@ describe('Centralized Error Handler Middleware', () => {
     app.setErrorHandler(centralErrorHandler);
 
     app.get('/test-validation', async () => {
-      throw new ValidationError('Validation failed', [{ field: 'name', message: 'Name is required' }]);
+      throw new ValidationError('Validation failed', [
+        { field: 'name', message: 'Name is required' },
+      ]);
     });
 
     const res = await app.inject({

@@ -24,52 +24,40 @@ export function registerJobRoutes(
     timestamp: new Date().toISOString(),
   }));
 
-  app.get(
-    '/api/stats',
-    { preHandler: [withOptionalAuth] },
-    async (request) => {
-      const user = request.user;
-      if (!user) {
-        return {
-          data: {
-            totalJobs: 0,
-            activeJobs: 0,
-            healingOrCompilingJobs: 0,
-            failedOrPausedJobs: 0,
-            totalRuns: 0,
-            DetectedChangesCount: 0,
-          },
-        };
-      }
-      const stats = await jobService.getDashboardStats(user.id);
-      return { data: stats };
+  app.get('/api/stats', { preHandler: [withOptionalAuth] }, async (request) => {
+    const user = request.user;
+    if (!user) {
+      return {
+        data: {
+          totalJobs: 0,
+          activeJobs: 0,
+          healingOrCompilingJobs: 0,
+          failedOrPausedJobs: 0,
+          totalRuns: 0,
+          DetectedChangesCount: 0,
+        },
+      };
     }
-  );
+    const stats = await jobService.getDashboardStats(user.id);
+    return { data: stats };
+  });
 
-  app.get(
-    '/api/jobs',
-    { preHandler: [withOptionalAuth] },
-    async (request) => {
-      const query = jobStatusQuerySchema.parse(request.query);
-      const user = request.user;
-      if (!user) {
-        return { data: [] };
-      }
-      const jobs = await jobService.listJobs(query.status, user.id);
-      return { data: jobs };
+  app.get('/api/jobs', { preHandler: [withOptionalAuth] }, async (request) => {
+    const query = jobStatusQuerySchema.parse(request.query);
+    const user = request.user;
+    if (!user) {
+      return { data: [] };
     }
-  );
+    const jobs = await jobService.listJobs(query.status, user.id);
+    return { data: jobs };
+  });
 
-  app.post(
-    '/api/jobs/probe',
-    { preHandler: [withOptionalAuth] },
-    async (request, reply) => {
-      const user = request.user;
-      const { url } = jobProbeSchema.parse(request.body);
-      const result = await jobService.probeUrl(url, user?.id);
-      return reply.status(200).send({ data: result });
-    }
-  );
+  app.post('/api/jobs/probe', { preHandler: [withOptionalAuth] }, async (request, reply) => {
+    const user = request.user;
+    const { url } = jobProbeSchema.parse(request.body);
+    const result = await jobService.probeUrl(url, user?.id);
+    return reply.status(200).send({ data: result });
+  });
 
   app.get<{ Params: { id: string } }>(
     '/api/jobs/:id',
@@ -81,19 +69,15 @@ export function registerJobRoutes(
     }
   );
 
-  app.post(
-    '/api/jobs',
-    { preHandler: [withAuth] },
-    async (request, reply) => {
-      const user = requireUser(request);
-      const input = jobInputSchema.parse(request.body);
-      const created = await jobService.createJob({
-        ...input,
-        userId: user.id,
-      });
-      return reply.status(201).send({ data: created });
-    }
-  );
+  app.post('/api/jobs', { preHandler: [withAuth] }, async (request, reply) => {
+    const user = requireUser(request);
+    const input = jobInputSchema.parse(request.body);
+    const created = await jobService.createJob({
+      ...input,
+      userId: user.id,
+    });
+    return reply.status(201).send({ data: created });
+  });
 
   app.patch<{ Params: { id: string } }>(
     '/api/jobs/:id',

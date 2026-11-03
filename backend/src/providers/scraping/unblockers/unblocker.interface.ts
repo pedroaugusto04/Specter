@@ -17,7 +17,12 @@ export class UnblockerError extends Error {
  * Signals to CascadeScraperEngine that it should immediately try the next provider.
  */
 export class UnblockerQuotaExhaustedError extends UnblockerError {
-  constructor(providerName: string, message = 'Credit limit exhausted or rate-limited', httpStatus = 429, cause?: unknown) {
+  constructor(
+    providerName: string,
+    message = 'Credit limit exhausted or rate-limited',
+    httpStatus = 429,
+    cause?: unknown
+  ) {
     super(providerName, message, httpStatus, cause);
     this.name = 'UnblockerQuotaExhaustedError';
   }

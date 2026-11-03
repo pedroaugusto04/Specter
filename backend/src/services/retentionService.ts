@@ -6,10 +6,7 @@ export class RetentionService {
   private readonly jobRepository: IJobRepository;
   private readonly retentionDays: number;
 
-  constructor(
-    jobRepository: IJobRepository,
-    retentionDays: number = env.RETENTION_DAYS_UNCHANGED
-  ) {
+  constructor(jobRepository: IJobRepository, retentionDays: number = env.RETENTION_DAYS_UNCHANGED) {
     this.jobRepository = jobRepository;
     this.retentionDays = retentionDays;
   }
@@ -18,7 +15,9 @@ export class RetentionService {
    * Expunges unchanged snapshots (`hasChanges = 'NO'`) older than `retentionDays`.
    * Preserves all snapshots with `hasChanges = 'YES'` or `'INITIAL'`.
    */
-  async pruneUnchangedSnapshots(now: Date = new Date()): Promise<{ deletedCount: number; cutoffDate: Date }> {
+  async pruneUnchangedSnapshots(
+    now: Date = new Date()
+  ): Promise<{ deletedCount: number; cutoffDate: Date }> {
     const cutoffMs = now.getTime() - this.retentionDays * 24 * 60 * 60 * 1000;
     const cutoffDate = new Date(cutoffMs);
 

@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
 import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright';
 import { env } from '../../config/env.js';
-import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
+import { NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
@@ -147,9 +147,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       const httpStatus = response?.status() ?? 200;
 
       // 1. Ensure load event completes if possible (stylesheets, scripts)
-      await page
-        .waitForLoadState('load', { timeout: Math.min(6000, timeoutMs) })
-        .catch(() => {});
+      await page.waitForLoadState('load', { timeout: Math.min(6000, timeoutMs) }).catch(() => {});
 
       // 2. Network stabilization wait for SPA hydration
       await page
@@ -182,19 +180,22 @@ export class PlaywrightScraperEngine implements IScraperEngine {
 
       // Trigger IntersectionObserver lazy-hydrated components common in SPAs (Next.js/FastStore/Shopify)
       await page
-        .evaluate(`
+        .evaluate(
+          `
           (() => {
             window.scrollBy(0, 350);
             window.scrollTo(0, 0);
           })()
-        `)
+        `
+        )
         .catch(() => {});
 
       // 5. DOM Mutation Quiescence (Universal language- and framework-agnostic stabilization)
       // Monitors active DOM mutations (React/Vue/Angular hydration, client-side fetches)
       // and resolves as soon as the DOM remains completely quiet for 500ms.
       await page
-        .evaluate(`
+        .evaluate(
+          `
           new Promise((resolve) => {
             let timeoutId;
             const quietWindowMs = 500;
@@ -225,7 +226,8 @@ export class PlaywrightScraperEngine implements IScraperEngine {
               resolve();
             }, maxWaitMs);
           })
-        `)
+        `
+        )
         .catch(() => {});
 
       const rawHtml = await page.content();

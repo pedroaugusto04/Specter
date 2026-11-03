@@ -7,11 +7,7 @@ export interface SpecterLogoProps {
   className?: string;
 }
 
-export function SpecterLogo({
-  size = 'md',
-  showWordmark = true,
-  className,
-}: SpecterLogoProps) {
+export function SpecterLogo({ size = 'md', showWordmark = true, className }: SpecterLogoProps) {
   const sizeMap = {
     sm: { icon: 'h-6 w-6 rounded-md', text: 'text-sm' },
     md: { icon: 'h-8 w-8 rounded-lg', text: 'text-base' },
@@ -69,12 +65,7 @@ export function SpecterLogo({
 
       {/* Brand Name */}
       {showWordmark && (
-        <span
-          className={cn(
-            'font-semibold tracking-tight text-foreground',
-            currentSize.text
-          )}
-        >
+        <span className={cn('font-semibold tracking-tight text-foreground', currentSize.text)}>
           Specter
         </span>
       )}

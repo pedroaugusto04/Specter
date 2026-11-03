@@ -3,11 +3,7 @@
 import * as React from 'react';
 import { getApiBaseUrl } from '@/lib/api';
 
-export type RealtimeEventType =
-  | 'JOB_CREATED'
-  | 'JOB_UPDATED'
-  | 'JOB_DELETED'
-  | 'JOB_RUN_COMPLETED';
+export type RealtimeEventType = 'JOB_CREATED' | 'JOB_UPDATED' | 'JOB_DELETED' | 'JOB_RUN_COMPLETED';
 
 export interface RealtimeEventPayload {
   type: RealtimeEventType;

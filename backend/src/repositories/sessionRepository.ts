@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
-import { userWebSessions, type PlaywrightStorageState, type UserWebSessionRow } from '../db/schema.js';
+import { userWebSessions, type PlaywrightStorageState } from '../db/schema.js';
 import { SessionMapper } from '../mappers/sessionMapper.js';
 import type { UserWebSessionEntity } from '../types/domain.js';
 import { extractDomainCandidates } from '../utils/urlNormalizer.js';
@@ -28,19 +28,17 @@ export class DrizzleSessionRepository implements ISessionRepository {
     this.db = db ?? getDb();
   }
 
-  async findByUserAndDomain(userId: string, hostOrDomain: string): Promise<UserWebSessionEntity | null> {
+  async findByUserAndDomain(
+    userId: string,
+    hostOrDomain: string
+  ): Promise<UserWebSessionEntity | null> {
     const candidates = extractDomainCandidates(hostOrDomain);
     if (candidates.length === 0) return null;
 
     const rows = await this.db
       .select()
       .from(userWebSessions)
-      .where(
-        and(
-          eq(userWebSessions.userId, userId),
-          inArray(userWebSessions.domain, candidates)
-        )
-      )
+      .where(and(eq(userWebSessions.userId, userId), inArray(userWebSessions.domain, candidates)))
       .orderBy(desc(userWebSessions.updatedAt));
 
     if (rows.length === 0) return null;

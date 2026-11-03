@@ -97,7 +97,7 @@ export class InMemoryJobRepository implements IJobRepository {
     const now = new Date();
     const entity: ScrapingJobEntity = {
       id: crypto.randomUUID(),
-      userId: input.userId ?? 'default-user',
+      userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
       url: input.url,
       userPrompt: input.userPrompt,
       notificationEmail: input.notificationEmail,
@@ -283,10 +283,7 @@ export class MockJobScheduler implements IJobScheduler {
   public immediateScrapeQueue: string[] = [];
   public scheduledRepeatables = new Map<string, string>();
 
-  async enqueueCompilation(
-    jobId: string,
-    reason: 'initial' | 'healing' | 'manual'
-  ): Promise<void> {
+  async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
     this.compilationQueue.push({ jobId, reason });
   }
 
@@ -305,7 +302,6 @@ export class MockJobScheduler implements IJobScheduler {
   }
 }
 
-
 export class InMemoryIntegrationRepository {
   public integrations = new Map<string, any>();
 
@@ -321,11 +317,19 @@ export class InMemoryIntegrationRepository {
       id: existing?.id ?? crypto.randomUUID(),
       userId,
       telegramEnabled: input.telegramEnabled ?? existing?.telegramEnabled ?? false,
-      telegramBotToken: input.telegramBotToken !== undefined ? input.telegramBotToken : (existing?.telegramBotToken ?? null),
-      telegramChatId: input.telegramChatId !== undefined ? input.telegramChatId : (existing?.telegramChatId ?? null),
+      telegramBotToken:
+        input.telegramBotToken !== undefined
+          ? input.telegramBotToken
+          : (existing?.telegramBotToken ?? null),
+      telegramChatId:
+        input.telegramChatId !== undefined
+          ? input.telegramChatId
+          : (existing?.telegramChatId ?? null),
       webhookEnabled: input.webhookEnabled ?? existing?.webhookEnabled ?? false,
-      webhookUrl: input.webhookUrl !== undefined ? input.webhookUrl : (existing?.webhookUrl ?? null),
-      webhookSecret: input.webhookSecret !== undefined ? input.webhookSecret : (existing?.webhookSecret ?? null),
+      webhookUrl:
+        input.webhookUrl !== undefined ? input.webhookUrl : (existing?.webhookUrl ?? null),
+      webhookSecret:
+        input.webhookSecret !== undefined ? input.webhookSecret : (existing?.webhookSecret ?? null),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };

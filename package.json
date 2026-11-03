@@ -7,7 +7,15 @@
     "dev:down": "docker compose -f docker-compose.dev.yml down",
     "prod": "docker compose up -d",
     "prod:build": "docker compose up -d --build",
-    "prod:down": "docker compose down"
+    "prod:down": "docker compose down",
+    "typecheck": "npm run --prefix backend typecheck && npm run --prefix frontend typecheck",
+    "test": "npm run --prefix backend test",
+    "lint": "npm run --prefix backend lint",
+    "lint:fix": "npm run --prefix backend lint:fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.5.1"
   }
 }
-

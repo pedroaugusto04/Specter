@@ -63,12 +63,15 @@ export class NotificationDispatcher implements INotificationProvider {
     }
 
     // 4. Webhook Channel (Job-specific URL takes precedence, otherwise fallback to user-level webhook)
-    const targetWebhookUrl = payload.webhookUrl?.trim() || (integrations?.webhookEnabled ? integrations.webhookUrl?.trim() : null);
+    const targetWebhookUrl =
+      payload.webhookUrl?.trim() ||
+      (integrations?.webhookEnabled ? integrations.webhookUrl?.trim() : null);
     if (targetWebhookUrl) {
       const secret = integrations?.webhookSecret;
       tasks.push({
         channel: 'webhook',
-        run: () => this.webhookProvider.sendAlert(payload, { webhookUrl: targetWebhookUrl, secret }),
+        run: () =>
+          this.webhookProvider.sendAlert(payload, { webhookUrl: targetWebhookUrl, secret }),
       });
     }
 

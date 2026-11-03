@@ -193,7 +193,7 @@ export class AuthService {
 
   async updateProfile(userId: string, input: { name?: string | null }): Promise<UserDto> {
     const updated = await this.userRepository.updateUser(userId, {
-      name: input.name !== undefined ? (input.name?.trim() || null) : undefined,
+      name: input.name !== undefined ? input.name?.trim() || null : undefined,
     });
     if (!updated) {
       throw new NotFoundError('User account not found.');
@@ -272,7 +272,11 @@ export class AuthService {
       throw new ValidationError('Google Sign-In is not configured on this server.');
     }
 
-    if (!params.state || !params.expectedStateCookie || params.state !== params.expectedStateCookie) {
+    if (
+      !params.state ||
+      !params.expectedStateCookie ||
+      params.state !== params.expectedStateCookie
+    ) {
       throw new UnauthorizedError('Invalid OAuth state parameter.');
     }
 

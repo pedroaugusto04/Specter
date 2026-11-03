@@ -75,10 +75,7 @@ export class BullMqJobScheduler implements IJobScheduler {
     });
   }
 
-  async enqueueCompilation(
-    jobId: string,
-    reason: 'initial' | 'healing' | 'manual'
-  ): Promise<void> {
+  async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
     await this.compilationQueue.add(
       'compile-job',
       { jobId, reason },

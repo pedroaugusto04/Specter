@@ -1,8 +1,8 @@
 x-default-logging: &default-logging
-  driver: "json-file"
+  driver: 'json-file'
   options:
-    max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
-    max-file: "${DOCKER_LOG_MAX_FILE:-5}"
+    max-size: '${DOCKER_LOG_MAX_SIZE:-10m}'
+    max-file: '${DOCKER_LOG_MAX_FILE:-5}'
 
 services:
   postgres:
@@ -16,7 +16,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,11 +28,11 @@ services:
     image: redis:7-alpine
     container_name: specter-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,7 +57,7 @@ services:
       AGY_CLI_PATH: /usr/local/bin/agy
       CODEX_CLI_PATH: /usr/local/bin/codex
     ports:
-      - "${PORT:-3001}:3001"
+      - '${PORT:-3001}:3001'
     volumes:
       - /home/ubuntu/.local/bin/agy:/usr/local/bin/agy:ro
       - /home/ubuntu/.gemini:/root/.gemini
@@ -79,4 +79,3 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-

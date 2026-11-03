@@ -26,7 +26,10 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         text: () => Promise.resolve('<html><body><h1>Product Title</h1></body></html>'),
       } as unknown as Response);
 
-      const provider = new ZenRowsUnblockerProvider({ apiKey: 'test-zenrows-key', fetchFn: mockFetch });
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
       expect(provider.isEnabled()).toBe(true);
 
       const result = await provider.fetchHtml('https://example.com/product');
@@ -48,8 +51,13 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         text: () => Promise.resolve('Too Many Requests'),
       } as unknown as Response);
 
-      const provider = new ZenRowsUnblockerProvider({ apiKey: 'test-zenrows-key', fetchFn: mockFetch });
-      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(UnblockerQuotaExhaustedError);
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
+      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
+        UnblockerQuotaExhaustedError
+      );
     });
   });
 
@@ -58,11 +66,19 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 403,
         ok: false,
-        text: () => Promise.resolve('Your request failed due to exceeding account concurrency or monthly quota.'),
+        text: () =>
+          Promise.resolve(
+            'Your request failed due to exceeding account concurrency or monthly quota.'
+          ),
       } as unknown as Response);
 
-      const provider = new ScraperApiUnblockerProvider({ apiKey: 'test-scraperapi-key', fetchFn: mockFetch });
-      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(UnblockerQuotaExhaustedError);
+      const provider = new ScraperApiUnblockerProvider({
+        apiKey: 'test-scraperapi-key',
+        fetchFn: mockFetch,
+      });
+      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
+        UnblockerQuotaExhaustedError
+      );
     });
   });
 
@@ -74,8 +90,13 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         text: () => Promise.resolve('{"message": "API credit limit reached"}'),
       } as unknown as Response);
 
-      const provider = new ScrapingBeeUnblockerProvider({ apiKey: 'test-bee-key', fetchFn: mockFetch });
-      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(UnblockerQuotaExhaustedError);
+      const provider = new ScrapingBeeUnblockerProvider({
+        apiKey: 'test-bee-key',
+        fetchFn: mockFetch,
+      });
+      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
+        UnblockerQuotaExhaustedError
+      );
     });
   });
 
@@ -87,8 +108,13 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         text: () => Promise.resolve('Service overloaded / rate limited'),
       } as unknown as Response);
 
-      const provider = new CrawlbaseUnblockerProvider({ token: 'test-crawlbase-token', fetchFn: mockFetch });
-      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(UnblockerQuotaExhaustedError);
+      const provider = new CrawlbaseUnblockerProvider({
+        token: 'test-crawlbase-token',
+        fetchFn: mockFetch,
+      });
+      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
+        UnblockerQuotaExhaustedError
+      );
     });
   });
 
@@ -131,7 +157,9 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       const unblocker1: IUnblockerProvider = {
         name: 'zenrows',
         isEnabled: () => true,
-        fetchHtml: vi.fn().mockRejectedValue(new UnblockerQuotaExhaustedError('zenrows', 'Out of free credits')),
+        fetchHtml: vi
+          .fn()
+          .mockRejectedValue(new UnblockerQuotaExhaustedError('zenrows', 'Out of free credits')),
       };
 
       const unblocker2: IUnblockerProvider = {
@@ -204,12 +232,16 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       const unblocker1: IUnblockerProvider = {
         name: 'zenrows',
         isEnabled: () => true,
-        fetchHtml: vi.fn().mockRejectedValue(new UnblockerQuotaExhaustedError('zenrows', 'Credit limit reached')),
+        fetchHtml: vi
+          .fn()
+          .mockRejectedValue(new UnblockerQuotaExhaustedError('zenrows', 'Credit limit reached')),
       };
 
       const localEngine: IScraperEngine = {
         name: 'playwright',
-        fetchHtml: vi.fn().mockRejectedValue(new AntiBotBlockedError('Cloudflare 403 Forbidden', 403)),
+        fetchHtml: vi
+          .fn()
+          .mockRejectedValue(new AntiBotBlockedError('Cloudflare 403 Forbidden', 403)),
       };
 
       const cascade = new CascadeScraperEngine(localEngine, [unblocker1]);

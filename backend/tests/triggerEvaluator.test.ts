@@ -100,17 +100,27 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       expect(evaluateSingleRule('In Stock', ruleEqStatus).satisfied).toBe(true);
       expect(evaluateSingleRule('Out of Stock', ruleEqStatus).satisfied).toBe(false);
 
-      const ruleNeqStatus: TriggerRule = { field: 'in_stock', operator: 'neq', value: 'Out of Stock' };
+      const ruleNeqStatus: TriggerRule = {
+        field: 'in_stock',
+        operator: 'neq',
+        value: 'Out of Stock',
+      };
       expect(evaluateSingleRule('In Stock', ruleNeqStatus).satisfied).toBe(true);
       expect(evaluateSingleRule('out of stock', ruleNeqStatus).satisfied).toBe(false);
     });
 
     it('evaluates contains and not_contains string checks', () => {
       const ruleContains: TriggerRule = { field: 'title', operator: 'contains', value: 'Pro Max' };
-      expect(evaluateSingleRule('Apple iPhone 16 Pro Max 256GB', ruleContains).satisfied).toBe(true);
+      expect(evaluateSingleRule('Apple iPhone 16 Pro Max 256GB', ruleContains).satisfied).toBe(
+        true
+      );
       expect(evaluateSingleRule('Apple iPhone 16 Plus', ruleContains).satisfied).toBe(false);
 
-      const ruleNotContains: TriggerRule = { field: 'title', operator: 'not_contains', value: 'Refurbished' };
+      const ruleNotContains: TriggerRule = {
+        field: 'title',
+        operator: 'not_contains',
+        value: 'Refurbished',
+      };
       expect(evaluateSingleRule('Brand New PS5 Slim', ruleNotContains).satisfied).toBe(true);
       expect(evaluateSingleRule('Refurbished PS5 Slim', ruleNotContains).satisfied).toBe(false);
     });

@@ -18,7 +18,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
-import { api, type JobStatus, type ScrapingJobDto } from '@/lib/api';
+import {
+  useDeleteJobMutation,
+  useRecompileJobMutation,
+  useTogglePauseMutation,
+  useTriggerJobMutation,
+} from '@/hooks/useDashboardQueries';
+import type { JobStatus, ScrapingJobDto } from '@/lib/api';
 import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
@@ -110,12 +116,12 @@ export function JobsTable({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filter, setFilter] = React.useState<StatusFilter>('ALL');
   const modal = useModal();
+  const triggerJobMutation = useTriggerJobMutation();
+  const recompileJobMutation = useRecompileJobMutation();
+  const togglePauseMutation = useTogglePauseMutation();
+  const deleteJobMutation = useDeleteJobMutation();
 
-  const handleAction = async (
-    jobId: string,
-    action: RowActionType,
-    fn: () => Promise<unknown>
-  ) => {
+  const handleAction = async (jobId: string, action: RowActionType, fn: () => Promise<unknown>) => {
     setActiveActions((prev) => ({ ...prev, [jobId]: action }));
     try {
       await fn();
@@ -149,7 +155,11 @@ export function JobsTable({
   const filteredJobs = React.useMemo(() => {
     return jobs.filter((job) => {
       if (filter === 'ACTIVE' && job.status !== 'ACTIVE') return false;
-      if (filter === 'HEALING' && job.status !== 'HEALING' && job.status !== 'PENDING_COMPILATION') {
+      if (
+        filter === 'HEALING' &&
+        job.status !== 'HEALING' &&
+        job.status !== 'PENDING_COMPILATION'
+      ) {
         return false;
       }
       if (filter === 'PAUSED' && job.status !== 'PAUSED' && job.status !== 'FAILED') {
@@ -215,7 +225,8 @@ export function JobsTable({
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Paused / Failed <span className="ml-1.5 font-mono text-xs opacity-60">{pausedOrFailedCount}</span>
+            Paused / Failed{' '}
+            <span className="ml-1.5 font-mono text-xs opacity-60">{pausedOrFailedCount}</span>
           </button>
         </div>
 
@@ -251,9 +262,7 @@ export function JobsTable({
             <Search className="h-5 w-5" />
           </div>
           <h3 className="mt-4 text-base font-semibold text-foreground">
-            {searchQuery || filter !== 'ALL'
-              ? 'No matching monitors'
-              : 'No monitors configured'}
+            {searchQuery || filter !== 'ALL' ? 'No matching monitors' : 'No monitors configured'}
           </h3>
           <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto">
             {searchQuery || filter !== 'ALL'
@@ -298,10 +307,7 @@ export function JobsTable({
                 const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
 
                 return (
-                  <tr
-                    key={job.id}
-                    className="group hover:bg-muted/30 transition-colors"
-                  >
+                  <tr key={job.id} className="group hover:bg-muted/30 transition-colors">
                     {/* Target & Prompt */}
                     <td className="py-3 px-3 sm:px-4 min-w-0">
                       <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
@@ -328,9 +334,7 @@ export function JobsTable({
                           title={`${parsedError.title}: ${parsedError.description}`}
                         >
                           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate block">
-                            {parsedError.title}
-                          </span>
+                          <span className="truncate block">{parsedError.title}</span>
                         </div>
                       )}
                     </td>
@@ -408,7 +412,9 @@ export function JobsTable({
                           aria-label="Run immediate extraction"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
-                            handleAction(job.id, 'run', () => api.triggerNow(job.id))
+                            handleAction(job.id, 'run', () =>
+                              triggerJobMutation.mutateAsync(job.id)
+                            )
                           }
                         >
                           {isRunning ? (
@@ -447,7 +453,7 @@ export function JobsTable({
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
                             handleAction(job.id, 'recompile', () =>
-                              api.triggerRecompile(job.id)
+                              recompileJobMutation.mutateAsync(job.id)
                             )
                           }
                         >
@@ -476,7 +482,7 @@ export function JobsTable({
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() =>
                             handleAction(job.id, 'pause', () =>
-                              api.togglePause(job.id, !isPaused)
+                              togglePauseMutation.mutateAsync({ jobId: job.id, paused: !isPaused })
                             )
                           }
                         >
@@ -512,7 +518,9 @@ export function JobsTable({
                               variant: 'destructive',
                             });
                             if (confirmed) {
-                              void handleAction(job.id, 'delete', () => api.deleteJob(job.id));
+                              void handleAction(job.id, 'delete', () =>
+                                deleteJobMutation.mutateAsync(job.id)
+                              );
                             }
                           }}
                         >

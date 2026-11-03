@@ -8,11 +8,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-specter}
     ports:
-      - "${POSTGRES_PORT:-5445}:5432"
+      - '${POSTGRES_PORT:-5445}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}" ]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,13 +21,13 @@ services:
     image: redis:7-alpine
     container_name: specter-redis
     restart: unless-stopped
-    command: [ "redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction" ]
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      - '${REDIS_PORT:-6380}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,7 +42,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       HOST: 0.0.0.0
-      CORS_ORIGIN: "http://localhost:3000,http://localhost:3005"
+      CORS_ORIGIN: 'http://localhost:3000,http://localhost:3005'
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-specter}
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
@@ -59,7 +59,7 @@ services:
       CRAWLBASE_TOKEN: ${CRAWLBASE_TOKEN:-}
       HTTP_PROXY: ${HTTP_PROXY:-}
     ports:
-      - "3001:3001"
+      - '3001:3001'
     volumes:
       - /home/pedroduarte/.local/bin/agy:/usr/local/bin/agy:ro
       - agy_profile:/root/.gemini
@@ -79,7 +79,7 @@ services:
     container_name: specter-frontend
     restart: unless-stopped
     ports:
-      - "3005:3000"
+      - '3005:3000'
     depends_on:
       - backend
 
@@ -87,5 +87,3 @@ volumes:
   postgres_data:
   redis_data:
   agy_profile:
-
-

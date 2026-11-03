@@ -164,9 +164,7 @@ export const authLoginSchema = z.object({
     .trim()
     .min(1, 'Email is required')
     .email('Please enter a valid email address'),
-  password: z
-    .string({ required_error: 'Password is required' })
-    .min(1, 'Password is required'),
+  password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
 });
 
 export const updateIntegrationsSchema = z.object({

@@ -13,7 +13,7 @@ import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ChangeStatus, JobRunEntity } from '../types/domain.js';
-import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
+import { computeNormalizedHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { extractUsingConfig, isExtractedPayloadEmpty } from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
@@ -99,9 +99,7 @@ export class ScrapeExecutionService {
       const extractedData = extractUsingConfig(scrapeResult.rawHtml, job.extractorConfig);
 
       if (isExtractedPayloadEmpty(extractedData)) {
-        throw new SelectorMismatchError(
-          'No data could be extracted with the current selectors.'
-        );
+        throw new SelectorMismatchError('No data could be extracted with the current selectors.');
       }
 
       const currentHash = computeNormalizedHash(extractedData);
@@ -261,10 +259,13 @@ export class ScrapeExecutionService {
             failureCount: newFailureCount,
             lastError: userMessage,
           });
-          logger.info('Consecutive selector mismatches reached threshold; transitioning to HEALING', {
-            jobId: job.id,
-            failureCount: newFailureCount,
-          });
+          logger.info(
+            'Consecutive selector mismatches reached threshold; transitioning to HEALING',
+            {
+              jobId: job.id,
+              failureCount: newFailureCount,
+            }
+          );
           await this.jobScheduler.enqueueCompilation(job.id, 'healing');
           await this.realtimeService?.notifyJobUpdated(job.userId, job.id, 'HEALING');
           return null;

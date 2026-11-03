@@ -7,7 +7,7 @@ import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ChangeStatus, ScrapingJobEntity } from '../types/domain.js';
-import { buildDiffSummary, computeNormalizedHash } from '../utils/diffHasher.js';
+import { computeNormalizedHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { validateExtractionSmokeTest } from '../utils/extractorEngine.js';
 import { sanitizeHtml } from '../utils/htmlSanitizer.js';
@@ -125,10 +125,13 @@ export class CompilationService {
           );
           screenshotUrl = uploadRes.publicUrl;
         } catch (uploadErr) {
-          logger.error('Failed to upload baseline/change screenshot to Supabase Storage during compilation', {
-            jobId: job.id,
-            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
-          });
+          logger.error(
+            'Failed to upload baseline/change screenshot to Supabase Storage during compilation',
+            {
+              jobId: job.id,
+              error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+            }
+          );
         }
       }
 

@@ -1,8 +1,4 @@
-export type RealtimeEventType =
-  | 'JOB_CREATED'
-  | 'JOB_UPDATED'
-  | 'JOB_DELETED'
-  | 'JOB_RUN_COMPLETED';
+export type RealtimeEventType = 'JOB_CREATED' | 'JOB_UPDATED' | 'JOB_DELETED' | 'JOB_RUN_COMPLETED';
 
 export interface RealtimeEvent {
   type: RealtimeEventType;

@@ -23,6 +23,14 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import {
+  useDeleteSessionMutation,
+  useIntegrationsQuery,
+  useSessionsQuery,
+  useTestTelegramMutation,
+  useTestWebhookMutation,
+  useUpdateIntegrationsMutation,
+} from '@/hooks/useDashboardQueries';
 import { api, type SessionDto, type UserIntegrationsDto } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +74,12 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
 
   // Initial pristine snapshot for isDirty check
   const [initialData, setInitialData] = React.useState<UserIntegrationsDto | null>(null);
+  const integrationsQuery = useIntegrationsQuery(isOpen);
+  const sessionsQuery = useSessionsQuery(isOpen);
+  const updateIntegrationsMutation = useUpdateIntegrationsMutation();
+  const deleteSessionMutation = useDeleteSessionMutation();
+  const testTelegramMutation = useTestTelegramMutation();
+  const testWebhookMutation = useTestWebhookMutation();
 
   const fetchIntegrations = React.useCallback(async () => {
     setIsLoading(true);
@@ -75,7 +89,8 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
     setWebhookTestStatus(null);
 
     try {
-      const data = await api.getIntegrations();
+      const res = await integrationsQuery.refetch();
+      const data = res.data || integrationsQuery.data!;
       setInitialData(data);
       setTelegramEnabled(Boolean(data.telegramEnabled));
       setTelegramChatId(data.telegramChatId || '');
@@ -95,7 +110,8 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
   const fetchSessions = React.useCallback(async () => {
     setIsLoadingSessions(true);
     try {
-      const data = await api.getSessions();
+      const res = await sessionsQuery.refetch();
+      const data = res.data || [];
       setSessions(data || []);
     } catch {
       // ignore
@@ -107,7 +123,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
   const handleDeleteSession = async (id: string) => {
     setDeletingSessionId(id);
     try {
-      await api.deleteSession(id);
+      await deleteSessionMutation.mutateAsync(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Falha ao revogar sessão.');
@@ -132,14 +148,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
       webhookUrl !== (initialData.webhookUrl || '') ||
       webhookSecret !== (initialData.webhookSecret || '')
     );
-  }, [
-    initialData,
-    telegramEnabled,
-    telegramChatId,
-    webhookEnabled,
-    webhookUrl,
-    webhookSecret,
-  ]);
+  }, [initialData, telegramEnabled, telegramChatId, webhookEnabled, webhookUrl, webhookSecret]);
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -156,7 +165,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
         webhookSecret: webhookSecret.trim() || null,
       };
 
-      const updated = await api.updateIntegrations(payload as any);
+      const updated = await updateIntegrationsMutation.mutateAsync(payload as any);
       setInitialData(updated);
       setSaveSuccess(true);
       onSaved?.(updated);
@@ -179,7 +188,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
     setIsTestingTelegram(true);
     setTelegramTestStatus(null);
     try {
-      const res = await api.testTelegram({
+      const res = await testTelegramMutation.mutateAsync({
         chatId: telegramChatId.trim(),
       });
       setTelegramTestStatus({ ok: true, msg: res?.message || 'Test message sent successfully!' });
@@ -202,7 +211,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
     setIsTestingWebhook(true);
     setWebhookTestStatus(null);
     try {
-      const res = await api.testWebhook({
+      const res = await testWebhookMutation.mutateAsync({
         webhookUrl: webhookUrl.trim(),
         secret: webhookSecret.trim() || null,
       });
@@ -376,16 +385,22 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                           >
                             @{telegramBotUsername}
                           </a>{' '}
-                          and click <strong className="text-foreground">Start (/start)</strong>. Telegram requires you to start the chat before it allows the bot to send you messages.
+                          and click <strong className="text-foreground">Start (/start)</strong>.
+                          Telegram requires you to start the chat before it allows the bot to send
+                          you messages.
                         </span>
                       ) : (
                         <span>
-                          Open the Specter bot on Telegram and send <strong className="text-foreground">/start</strong>. Telegram prohibits bots from sending messages to users who haven&apos;t started a conversation first.
+                          Open the Specter bot on Telegram and send{' '}
+                          <strong className="text-foreground">/start</strong>. Telegram prohibits
+                          bots from sending messages to users who haven&apos;t started a
+                          conversation first.
                         </span>
                       )}
                     </li>
                     <li>
-                      Discover your <strong className="text-foreground">Chat ID</strong> (you can check your ID by sending a message to{' '}
+                      Discover your <strong className="text-foreground">Chat ID</strong> (you can
+                      check your ID by sending a message to{' '}
                       <a
                         href="https://t.me/userinfobot"
                         target="_blank"
@@ -398,7 +413,8 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                       ).
                     </li>
                     <li>
-                      Paste your Chat ID in the field below and click <strong className="text-foreground">Send Test Message</strong>.
+                      Paste your Chat ID in the field below and click{' '}
+                      <strong className="text-foreground">Send Test Message</strong>.
                     </li>
                   </ol>
 
@@ -461,11 +477,13 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                           className="font-mono text-foreground hover:underline"
                         >
                           @userinfobot
-                        </a>.
+                        </a>
+                        .
                       </>
                     ) : (
                       <>
-                        Tip: Send <span className="font-mono text-foreground">/start</span> to the bot and find your Chat ID with{' '}
+                        Tip: Send <span className="font-mono text-foreground">/start</span> to the
+                        bot and find your Chat ID with{' '}
                         <a
                           href="https://t.me/userinfobot"
                           target="_blank"
@@ -473,7 +491,8 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                           className="font-mono text-foreground hover:underline"
                         >
                           @userinfobot
-                        </a>.
+                        </a>
+                        .
                       </>
                     )}
                   </p>
@@ -636,8 +655,9 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                         Authenticated Web Sessions
                       </h4>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Allows Specter to access websites requiring login, 2FA, or password protection.
-                        The extension captures your active authenticated browser session with 1 click, without exposing your raw passwords.
+                        Allows Specter to access websites requiring login, 2FA, or password
+                        protection. The extension captures your active authenticated browser session
+                        with 1 click, without exposing your raw passwords.
                       </p>
                     </div>
                   </div>
@@ -648,9 +668,22 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                       How to use the Companion extension:
                     </div>
                     <ol className="list-decimal list-inside text-muted-foreground space-y-1 pl-1">
-                      <li>Load the <code className="text-foreground bg-muted px-1 py-0.5 rounded">extension/</code> folder in Chrome (<code className="text-foreground">chrome://extensions</code> in Developer Mode) or install from the Chrome Web Store.</li>
-                      <li>Visit and log in to the desired target website in your normal browser.</li>
-                      <li>Click the Specter extension icon and select <strong>&quot;Sync Session with Specter&quot;</strong>.</li>
+                      <li>
+                        Load the{' '}
+                        <code className="text-foreground bg-muted px-1 py-0.5 rounded">
+                          extension/
+                        </code>{' '}
+                        folder in Chrome (
+                        <code className="text-foreground">chrome://extensions</code> in Developer
+                        Mode) or install from the Chrome Web Store.
+                      </li>
+                      <li>
+                        Visit and log in to the desired target website in your normal browser.
+                      </li>
+                      <li>
+                        Click the Specter extension icon and select{' '}
+                        <strong>&quot;Sync Session with Specter&quot;</strong>.
+                      </li>
                     </ol>
                   </div>
 
@@ -659,8 +692,11 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                       <Lock className="h-3.5 w-3.5 text-foreground" />
                       Privacy & Data Security
                     </div>
-                    The extension strictly collects session cookies for the active domain in your tab to allow scraping bots to navigate authenticated portals on your behalf.
-                    No passwords, form data, credit card numbers, or browsing history of other sites are ever collected or transferred. You can revoke any synced session at any time with 1 click below.
+                    The extension strictly collects session cookies for the active domain in your
+                    tab to allow scraping bots to navigate authenticated portals on your behalf. No
+                    passwords, form data, credit card numbers, or browsing history of other sites
+                    are ever collected or transferred. You can revoke any synced session at any time
+                    with 1 click below.
                   </div>
                 </div>
 
@@ -683,21 +719,32 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                     </div>
                   ) : sessions.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
-                      No web sessions synced yet. Install the Specter Companion extension and sync your logged-in sites with 1 click.
+                      No web sessions synced yet. Install the Specter Companion extension and sync
+                      your logged-in sites with 1 click.
                     </div>
                   ) : (
                     <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
                       {sessions.map((sess) => (
-                        <div key={sess.id} className="flex items-center justify-between p-3 text-xs hover:bg-muted/30 transition-colors">
+                        <div
+                          key={sess.id}
+                          className="flex items-center justify-between p-3 text-xs hover:bg-muted/30 transition-colors"
+                        >
                           <div className="space-y-0.5">
                             <div className="font-semibold text-foreground flex items-center gap-1.5">
                               <span>{sess.domain}</span>
                               {sess.name && sess.name !== sess.domain && (
-                                <span className="text-[11px] font-normal text-muted-foreground">({sess.name})</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  ({sess.name})
+                                </span>
                               )}
                             </div>
                             <div className="text-[11px] text-muted-foreground">
-                              {sess.cookieCount} cookies • Synced on {new Date(sess.updatedAt).toLocaleDateString('en-US')} at {new Date(sess.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              {sess.cookieCount} cookies • Synced on{' '}
+                              {new Date(sess.updatedAt).toLocaleDateString('en-US')} at{' '}
+                              {new Date(sess.updatedAt).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </div>
                           </div>
                           <Button

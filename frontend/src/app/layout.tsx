@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ModalProvider } from '@/components/ui/modal-dialog';
 import './globals.css';
@@ -43,9 +44,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-foreground selection:text-background">
-        <ThemeProvider>
-          <ModalProvider>{children}</ModalProvider>
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider>
+            <ModalProvider>{children}</ModalProvider>
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

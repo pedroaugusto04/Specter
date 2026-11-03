@@ -82,7 +82,12 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new UnblockerError(this.name, `Request timed out after ${timeoutMs}ms`, 504, err);
       }
-      throw new UnblockerError(this.name, err instanceof Error ? err.message : String(err), 500, err);
+      throw new UnblockerError(
+        this.name,
+        err instanceof Error ? err.message : String(err),
+        500,
+        err
+      );
     } finally {
       clearTimeout(timer);
     }

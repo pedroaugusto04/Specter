@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  extractUsingConfig,
-  validateExtractionSmokeTest,
-} from '../src/utils/extractorEngine.js';
+import { extractUsingConfig, validateExtractionSmokeTest } from '../src/utils/extractorEngine.js';
 
 describe('Deterministic Extractor Engine & Pre-Activation Smoke-Test', () => {
   const sampleHtml = `

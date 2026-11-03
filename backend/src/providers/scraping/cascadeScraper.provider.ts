@@ -43,20 +43,26 @@ export class CascadeScraperEngine implements IScraperEngine {
         const errorMsg = err instanceof Error ? err.message : String(err);
         unblockerErrors.push({ provider: unblocker.name, error: errorMsg });
 
-        logger.warn('Anti-bot unblocker provider failed or quota exhausted; cascading to next provider', {
-          provider: unblocker.name,
-          url: targetUrl,
-          errorMessage: errorMsg,
-        });
+        logger.warn(
+          'Anti-bot unblocker provider failed or quota exhausted; cascading to next provider',
+          {
+            provider: unblocker.name,
+            url: targetUrl,
+            errorMessage: errorMsg,
+          }
+        );
       }
     }
 
     if (enabledUnblockers.length > 0) {
-      logger.warn('All configured anti-bot unblockers failed or exhausted; falling back to local scraper engine', {
-        localEngine: this.localEngine.name,
-        url: targetUrl,
-        attemptedProviders: enabledUnblockers.map((u) => u.name),
-      });
+      logger.warn(
+        'All configured anti-bot unblockers failed or exhausted; falling back to local scraper engine',
+        {
+          localEngine: this.localEngine.name,
+          url: targetUrl,
+          attemptedProviders: enabledUnblockers.map((u) => u.name),
+        }
+      );
     }
 
     // 2. Fallback to local scraping engine (Playwright / Cheerio)
@@ -64,9 +70,7 @@ export class CascadeScraperEngine implements IScraperEngine {
       return await this.localEngine.fetchHtml(targetUrl, options);
     } catch (err) {
       if (err instanceof AntiBotBlockedError && unblockerErrors.length > 0) {
-        const failureSummary = unblockerErrors
-          .map((e) => `${e.provider}: ${e.error}`)
-          .join(' | ');
+        const failureSummary = unblockerErrors.map((e) => `${e.provider}: ${e.error}`).join(' | ');
 
         throw new AntiBotBlockedError(
           `Target site blocked automated requests. All configured unblockers were exhausted or failed (${failureSummary}). Local engine was also blocked.`,

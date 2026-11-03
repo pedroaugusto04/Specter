@@ -1,21 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Calendar,
-  Check,
-  Layers,
-  LogOut,
-  Mail,
-  Save,
-  Shield,
-  User,
-} from 'lucide-react';
+import { Calendar, Check, Layers, LogOut, Mail, Save, Shield, User } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
-import { api, type UserDto } from '@/lib/api';
+import { useUpdateProfileMutation } from '@/hooks/useDashboardQueries';
+import type { UserDto } from '@/lib/api';
 
 export interface ProfileModalProps {
   isOpen: boolean;
@@ -34,6 +26,7 @@ export function ProfileModal({
   onLogout,
   monitorsCount = 0,
 }: ProfileModalProps) {
+  const updateProfileMutation = useUpdateProfileMutation();
   const [name, setName] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
@@ -56,7 +49,7 @@ export function ProfileModal({
     setSaveSuccess(false);
 
     try {
-      const updated = await api.updateProfile({ name: name.trim() || null });
+      const updated = await updateProfileMutation.mutateAsync({ name: name.trim() || null });
       onUserUpdated(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -109,9 +102,7 @@ export function ProfileModal({
                 Active
               </span>
             </div>
-            <p className="truncate text-xs font-mono text-muted-foreground mt-0.5">
-              {user.email}
-            </p>
+            <p className="truncate text-xs font-mono text-muted-foreground mt-0.5">{user.email}</p>
           </div>
         </div>
 

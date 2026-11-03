@@ -13,12 +13,7 @@ export interface AuthModalProps {
 
 export function AuthModal({ isOpen, onClose, onAuthenticated }: AuthModalProps) {
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Account"
-      maxWidthClass="max-w-md"
-    >
+    <Dialog isOpen={isOpen} onClose={onClose} title="Account" maxWidthClass="max-w-md">
       <AuthForm
         onSuccess={(user) => {
           onAuthenticated(user);

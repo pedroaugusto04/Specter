@@ -1,4 +1,3 @@
-import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import {
   AntiBotBlockedError,
@@ -10,7 +9,11 @@ import { JobMapper, type JobRunDto, type ScrapingJobDto } from '../mappers/jobMa
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type { DashboardStats, IJobRepository, UpdateJobPatch } from '../repositories/jobRepository.js';
+import type {
+  DashboardStats,
+  IJobRepository,
+  UpdateJobPatch,
+} from '../repositories/jobRepository.js';
 import type { DiffSummary, JobStatus } from '../types/domain.js';
 import type { TriggerRule } from '../types/extractor.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
@@ -62,7 +65,10 @@ export class JobService {
     this.realtimeService = realtimeService;
   }
 
-  async probeUrl(targetUrl: string, userId?: string): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
+  async probeUrl(
+    targetUrl: string,
+    userId?: string
+  ): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
     const normalizedUrl = normalizeUrl(targetUrl);
     if (!this.scraperEngine) {
       return { accessible: true };
@@ -202,7 +208,9 @@ export class JobService {
         patch.extractorConfig = {
           ...existing.extractorConfig,
           ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
-          ...(request.triggerMatchMode !== undefined ? { triggerMatchMode: request.triggerMatchMode } : {}),
+          ...(request.triggerMatchMode !== undefined
+            ? { triggerMatchMode: request.triggerMatchMode }
+            : {}),
         };
       }
     }
@@ -240,11 +248,7 @@ export class JobService {
 
     const finalEntity = await this.jobRepository.findById(id);
     const resultDto = JobMapper.entityToDto(finalEntity ?? updated);
-    await this.realtimeService?.notifyJobUpdated(
-      resultDto.userId,
-      resultDto.id,
-      resultDto.status
-    );
+    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -292,11 +296,7 @@ export class JobService {
       bullmqRepeatableKey: repeatableKey,
     });
     const resultDto = JobMapper.entityToDto(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(
-      resultDto.userId,
-      resultDto.id,
-      resultDto.status
-    );
+    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -311,20 +311,12 @@ export class JobService {
 
     if (!existing.extractorConfig || existing.status === 'PENDING_COMPILATION') {
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
-      await this.realtimeService?.notifyJobUpdated(
-        existing.userId,
-        existing.id,
-        existing.status
-      );
+      await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
       return { queued: true, mode: 'compile' };
     }
 
     await this.jobScheduler.enqueueImmediateScrape(existing.id);
-    await this.realtimeService?.notifyJobUpdated(
-      existing.userId,
-      existing.id,
-      existing.status
-    );
+    await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
     return { queued: true, mode: 'scrape' };
   }
 
@@ -342,11 +334,7 @@ export class JobService {
 
     await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
     const resultDto = JobMapper.entityToDto(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(
-      resultDto.userId,
-      resultDto.id,
-      resultDto.status
-    );
+    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 

@@ -19,20 +19,26 @@ describe('Anti-Bot Detection & Verification Interstitial Defense', () => {
       'https://www.mercadolivre.com.br/gz/account-verification?go=https%3A%2F%2Fwww.mercadolivre.com.br%2Fnotebook-dell&tid=xyz';
 
     expect(() =>
-      detectAntiBotBlock(mlVerificationUrl, '<html><title id="root-title">Mercado Libre</title></html>', 200)
+      detectAntiBotBlock(
+        mlVerificationUrl,
+        '<html><title id="root-title">Mercado Libre</title></html>',
+        200
+      )
     ).toThrowError(AntiBotBlockedError);
   });
 
   it('detects Cloudflare and CAPTCHA challenge screens in page content', () => {
-    const cloudflareHtml = '<html><head><title>Attention Required! | Cloudflare</title></head><body><div class="cf-chl-widget"></div></body></html>';
+    const cloudflareHtml =
+      '<html><head><title>Attention Required! | Cloudflare</title></head><body><div class="cf-chl-widget"></div></body></html>';
 
-    expect(() =>
-      detectAntiBotBlock('https://example.com/store', cloudflareHtml, 200)
-    ).toThrowError(AntiBotBlockedError);
+    expect(() => detectAntiBotBlock('https://example.com/store', cloudflareHtml, 200)).toThrowError(
+      AntiBotBlockedError
+    );
   });
 
   it('passes silently for legitimate, unblocked product pages', () => {
-    const legitimateHtml = '<html><body><h1>Notebook Dell Inspiron</h1><span class="price">R$ 3.500</span></body></html>';
+    const legitimateHtml =
+      '<html><body><h1>Notebook Dell Inspiron</h1><span class="price">R$ 3.500</span></body></html>';
 
     expect(() =>
       detectAntiBotBlock('https://www.mercadolivre.com.br/p/MLB12345', legitimateHtml, 200)

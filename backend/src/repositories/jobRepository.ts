@@ -82,7 +82,7 @@ export class DrizzleJobRepository implements IJobRepository {
     const [row] = await this.db
       .insert(scrapingJobs)
       .values({
-        userId: input.userId ?? 'default-user',
+        userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
         url: input.url,
         userPrompt: input.userPrompt,
         notificationEmail: input.notificationEmail,
@@ -102,11 +102,7 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async findById(id: string): Promise<ScrapingJobEntity | null> {
-    const [row] = await this.db
-      .select()
-      .from(scrapingJobs)
-      .where(eq(scrapingJobs.id, id))
-      .limit(1);
+    const [row] = await this.db.select().from(scrapingJobs).where(eq(scrapingJobs.id, id)).limit(1);
 
     return row ? JobMapper.rowToEntity(row) : null;
   }
@@ -133,10 +129,7 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async findActiveJobs(): Promise<ScrapingJobEntity[]> {
-    const rows = await this.db
-      .select()
-      .from(scrapingJobs)
-      .where(eq(scrapingJobs.status, 'ACTIVE'));
+    const rows = await this.db.select().from(scrapingJobs).where(eq(scrapingJobs.status, 'ACTIVE'));
 
     return rows.map(JobMapper.rowToEntity);
   }

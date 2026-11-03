@@ -102,7 +102,10 @@ function appendMetaIfMissing(
   }
 }
 
-function collectJsonLdNodes(data: unknown, results: Record<string, unknown>[] = []): Record<string, unknown>[] {
+function collectJsonLdNodes(
+  data: unknown,
+  results: Record<string, unknown>[] = []
+): Record<string, unknown>[] {
   if (!data || typeof data !== 'object') return results;
 
   if (Array.isArray(data)) {
@@ -190,7 +193,18 @@ export function projectStructuredDataToMeta($: cheerio.CheerioAPI): void {
 
         const isProductOrCreative =
           types.some((t) =>
-            ['product', 'offer', 'aggregateoffer', 'article', 'newsarticle', 'blogposting', 'softwareapplication', 'book', 'course', 'event'].includes(t)
+            [
+              'product',
+              'offer',
+              'aggregateoffer',
+              'article',
+              'newsarticle',
+              'blogposting',
+              'softwareapplication',
+              'book',
+              'course',
+              'event',
+            ].includes(t)
           ) || Boolean(node.offers);
 
         if (!isProductOrCreative) continue;
@@ -210,8 +224,16 @@ export function projectStructuredDataToMeta($: cheerio.CheerioAPI): void {
 
         const brand = node.brand;
         if (typeof brand === 'string') {
-          appendMetaIfMissing($, head, { property: 'product:brand', itemprop: 'brand', content: brand });
-        } else if (brand && typeof brand === 'object' && typeof (brand as Record<string, unknown>).name === 'string') {
+          appendMetaIfMissing($, head, {
+            property: 'product:brand',
+            itemprop: 'brand',
+            content: brand,
+          });
+        } else if (
+          brand &&
+          typeof brand === 'object' &&
+          typeof (brand as Record<string, unknown>).name === 'string'
+        ) {
           appendMetaIfMissing($, head, {
             property: 'product:brand',
             itemprop: 'brand',
@@ -331,4 +353,3 @@ export function sanitizeHtml(rawHtml: string, maxRepetitiveSamples = 3): string 
 
   return $.html().trim();
 }
-

@@ -2,11 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { optionalAuth } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { IntegrationService } from '../services/integrationService.js';
-import {
-  testTelegramSchema,
-  testWebhookSchema,
-  updateIntegrationsSchema,
-} from './schemas.js';
+import { testTelegramSchema, testWebhookSchema, updateIntegrationsSchema } from './schemas.js';
 
 export function registerIntegrationRoutes(
   app: FastifyInstance,

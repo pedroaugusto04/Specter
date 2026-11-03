@@ -4,14 +4,14 @@ import * as React from 'react';
 import { Camera, CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
+import {
+  useCheckSessionMutation,
+  useCreateJobMutation,
+  useProbeUrlMutation,
+} from '@/hooks/useDashboardQueries';
 import { ApiError, api, type SessionDto, type UserDto } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
@@ -50,6 +50,9 @@ export function CreateJobForm({
   const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
+  const createJobMutation = useCreateJobMutation();
+  const probeUrlMutation = useProbeUrlMutation();
+  const checkSessionMutation = useCheckSessionMutation();
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
@@ -120,8 +123,10 @@ export function CreateJobForm({
     setProbeState({ status: 'probing', urlChecked: trimmedUrl });
     try {
       const [probe, sessionCheck] = await Promise.all([
-        api.probeUrl(trimmedUrl),
-        api.checkSession(trimmedUrl).catch(() => ({ hasSession: false, session: null })),
+        probeUrlMutation.mutateAsync(trimmedUrl),
+        checkSessionMutation
+          .mutateAsync(trimmedUrl)
+          .catch(() => ({ hasSession: false, session: null })),
       ]);
 
       setDetectedSession(sessionCheck.hasSession ? sessionCheck.session : null);
@@ -144,7 +149,7 @@ export function CreateJobForm({
     setLoading(true);
     setGlobalError(null);
     try {
-      await api.createJob({
+      await createJobMutation.mutateAsync({
         url: url.trim(),
         userPrompt: userPrompt.trim(),
         notificationEmail: notificationEmail.trim() || activeUser?.email || '',
@@ -295,7 +300,8 @@ export function CreateJobForm({
               </span>
             ) : probeState.status === 'blocked' ? (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                Protected by anti-bot checks. Background residential unblockers will handle extraction.
+                Protected by anti-bot checks. Background residential unblockers will handle
+                extraction.
               </span>
             ) : (
               'Website URL to monitor for dynamic updates.'
@@ -322,7 +328,10 @@ export function CreateJobForm({
           {detectedSession && (
             <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-md">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-              <span>Sessão autenticada ativa detectada ({detectedSession.domain}) via Extensão Specter. O robô navegará logado!</span>
+              <span>
+                Sessão autenticada ativa detectada ({detectedSession.domain}) via Extensão Specter.
+                O robô navegará logado!
+              </span>
             </div>
           )}
         </FormField>
@@ -411,24 +420,43 @@ export function CreateJobForm({
           </div>
           <p className="leading-relaxed">
             By default, you receive an alert whenever any tracked content changes on the page.
-            Conditional triggers let you filter notifications so you only get alerted <strong>when specific events occur</strong>.
+            Conditional triggers let you filter notifications so you only get alerted{' '}
+            <strong>when specific events occur</strong>.
           </p>
           <div className="space-y-1.5 pt-1 text-[11px]">
             <div className="font-semibold text-foreground">What you can monitor:</div>
             <ul className="list-disc list-inside space-y-1 pl-1">
-              <li><strong className="text-foreground">Relative variations (numbers & text):</strong> Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any text/status changes compared to the prior check.</li>
-              <li><strong className="text-foreground">Fixed target thresholds:</strong> Alert only if a value passes a specific limit (e.g. less than 100 or greater than 50).</li>
-              <li><strong className="text-foreground">Specific text & keyword matches:</strong> Alert when a field contains or equals specific words (e.g. &quot;Available&quot;, &quot;Approved&quot;, &quot;Open&quot;).</li>
+              <li>
+                <strong className="text-foreground">Relative variations (numbers & text):</strong>{' '}
+                Get alerted if a value drops (e.g. drops by 10%, or any decrease) or if any
+                text/status changes compared to the prior check.
+              </li>
+              <li>
+                <strong className="text-foreground">Fixed target thresholds:</strong> Alert only if
+                a value passes a specific limit (e.g. less than 100 or greater than 50).
+              </li>
+              <li>
+                <strong className="text-foreground">Specific text & keyword matches:</strong> Alert
+                when a field contains or equals specific words (e.g. &quot;Available&quot;,
+                &quot;Approved&quot;, &quot;Open&quot;).
+              </li>
             </ul>
           </div>
           <div className="rounded border border-primary/25 bg-background/70 p-2.5 text-[11px] text-foreground space-y-1.5">
             <div className="font-semibold text-primary">💡 Two ways to configure conditions:</div>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-0.5">
               <li>
-                <strong className="text-foreground">1. Right now in the prompt:</strong> Simply add your condition in plain text above (e.g. <em>&quot;Notify only if price drops by 10%&quot;</em> or <em>&quot;Alert when status changes&quot;</em>). Specter configures it automatically during compilation.
+                <strong className="text-foreground">1. Right now in the prompt:</strong> Simply add
+                your condition in plain text above (e.g.{' '}
+                <em>&quot;Notify only if price drops by 10%&quot;</em> or{' '}
+                <em>&quot;Alert when status changes&quot;</em>). Specter configures it automatically
+                during compilation.
               </li>
               <li>
-                <strong className="text-foreground">2. Later via Edit Monitor:</strong> Once your monitor completes its initial check and detects the fields, click <strong>Edit</strong> anytime on the dashboard to pick variables and adjust rules with visual dropdowns.
+                <strong className="text-foreground">2. Later via Edit Monitor:</strong> Once your
+                monitor completes its initial check and detects the fields, click{' '}
+                <strong>Edit</strong> anytime on the dashboard to pick variables and adjust rules
+                with visual dropdowns.
               </li>
             </ul>
           </div>
@@ -445,7 +473,9 @@ export function CreateJobForm({
           <select
             id="cron-preset"
             aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
-            aria-describedby={!useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined}
+            aria-describedby={
+              !useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined
+            }
             className={cn(
               'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
               !useCustomCron && fieldErrors.cronExpression
@@ -465,11 +495,17 @@ export function CreateJobForm({
             }}
           >
             {CRON_PRESETS.map((preset) => (
-              <option key={preset.value} value={preset.value} className="bg-background text-foreground">
+              <option
+                key={preset.value}
+                value={preset.value}
+                className="bg-background text-foreground"
+              >
                 {preset.label} ({preset.value})
               </option>
             ))}
-            <option value="custom" className="bg-background text-foreground">Custom Cron Expression...</option>
+            <option value="custom" className="bg-background text-foreground">
+              Custom Cron Expression...
+            </option>
           </select>
         </FormField>
 
@@ -506,9 +542,7 @@ export function CreateJobForm({
             onChange={(e) => setCaptureScreenshotOnChange(e.target.checked)}
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
           />
-          <span className="text-sm font-medium text-foreground">
-            Capture screenshot on change
-          </span>
+          <span className="text-sm font-medium text-foreground">Capture screenshot on change</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -556,7 +590,13 @@ export function CreateJobForm({
 
       <div className="flex justify-end gap-2.5 pt-2">
         {onCancel && (
-          <Button type="button" variant="outline" className="h-10 px-4 text-sm" onClick={onCancel} disabled={loading}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 px-4 text-sm"
+            onClick={onCancel}
+            disabled={loading}
+          >
             Cancel
           </Button>
         )}

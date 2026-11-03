@@ -360,6 +360,3 @@ jobs:
             else
               echo "Nginx nao instalado; pulando reload."
             fi
-
-
-

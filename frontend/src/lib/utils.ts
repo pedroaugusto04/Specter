@@ -116,13 +116,21 @@ export function parseErrorMessage(rawError: string | null | undefined): ParsedEr
     lower.includes('cloudflare') ||
     lower.includes('botblocked')
   ) {
-    let description = 'The target website identified automated access and required a security check.';
-    if (lower.includes('redirect') || lower.includes('redirecionamento') || lower.includes('account-verification')) {
-      description = 'The target website redirected to a human verification screen (CAPTCHA / checkpoint).';
+    let description =
+      'The target website identified automated access and required a security check.';
+    if (
+      lower.includes('redirect') ||
+      lower.includes('redirecionamento') ||
+      lower.includes('account-verification')
+    ) {
+      description =
+        'The target website redirected to a human verification screen (CAPTCHA / checkpoint).';
     } else if (lower.includes('403') || lower.includes('429')) {
-      description = 'The target website blocked automated access (HTTP 403/429 - WAF / Cloudflare protection).';
+      description =
+        'The target website blocked automated access (HTTP 403/429 - WAF / Cloudflare protection).';
     } else if (lower.includes('challenge') || lower.includes('desafio')) {
-      description = 'The target page presented an interactive security challenge (Cloudflare / CAPTCHA).';
+      description =
+        'The target page presented an interactive security challenge (Cloudflare / CAPTCHA).';
     }
 
     return {

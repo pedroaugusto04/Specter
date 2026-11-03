@@ -14,11 +14,13 @@ function escapeHtml(value: unknown): string {
 function formatDate(date: Date | string | undefined): string {
   const d = date ? new Date(date) : new Date();
   try {
-    return new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'long',
-      timeStyle: 'medium',
-      timeZone: 'UTC',
-    }).format(d) + ' (UTC)';
+    return (
+      new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'medium',
+        timeZone: 'UTC',
+      }).format(d) + ' (UTC)'
+    );
   } catch {
     return d.toISOString();
   }
@@ -41,9 +43,9 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
 
   const diffRowsHtml = allChanges
     .map((change) => {
-      let badgeHtml = '';
-      let prevValueHtml = '';
-      let currValueHtml = '';
+      let badgeHtml: string;
+      let prevValueHtml: string;
+      let currValueHtml: string;
 
       if (change.changeType === 'MODIFIED') {
         badgeHtml = `<span style="display:inline-block;background-color:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Modified</span>`;

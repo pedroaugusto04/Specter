@@ -16,111 +16,98 @@ import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import {
+  dashboardKeys,
+  useCurrentUserQuery,
+  useInvalidateDashboard,
+  useJobsQuery,
+  useLogoutMutation,
+  useStatsQuery,
+} from '@/hooks/useDashboardQueries';
+import { useDashboardModals } from '@/hooks/useDashboardModals';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
-import { api, type DashboardStats, type ScrapingJobDto, type UserDto } from '@/lib/api';
+import { api, type UserDto } from '@/lib/api';
 
 export default function DashboardPage() {
-  const [user, setUser] = React.useState<UserDto | null>(null);
-  const [jobs, setJobs] = React.useState<ScrapingJobDto[]>([]);
-  const [stats, setStats] = React.useState<DashboardStats | null>(null);
-  const [selectedJob, setSelectedJob] = React.useState<ScrapingJobDto | null>(null);
-  const [editingJob, setEditingJob] = React.useState<ScrapingJobDto | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
-  const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = React.useState(false);
-  const [connectionWarning, setConnectionWarning] = React.useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const { data: user = null } = useCurrentUserQuery();
+  const {
+    data: jobs = [],
+    isLoading: isJobsLoading,
+    isFetching: isJobsFetching,
+    error: jobsError,
+    refetch: refetchJobs,
+  } = useJobsQuery();
+  const {
+    data: stats = null,
+    isFetching: isStatsFetching,
+    error: statsError,
+    refetch: refetchStats,
+  } = useStatsQuery();
 
-  const refreshJobsAndStats = React.useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const [jobsData, statsData] = await Promise.all([
-        api.listJobs(),
-        api.getStats(),
-      ]);
-      setJobs(jobsData);
-      setStats(statsData);
-      setConnectionWarning(null);
-    } catch {
-      setConnectionWarning(
-        'Unable to connect to the backend service. Please verify that the API is running.'
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
+  const { queryClient, invalidateJobsAndStats, invalidateAll } = useInvalidateDashboard();
+  const logoutMutation = useLogoutMutation();
 
-  const loadDashboard = React.useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const [meData, jobsData, statsData] = await Promise.all([
-        api.getMe(),
-        api.listJobs(),
-        api.getStats(),
-      ]);
-      setUser(meData);
-      setJobs(jobsData);
-      setStats(statsData);
-      setConnectionWarning(null);
+  const modals = useDashboardModals();
 
-      if (meData && typeof window !== 'undefined') {
-        const rawPending = sessionStorage.getItem(PENDING_JOB_STORAGE_KEY);
-        if (rawPending) {
-          sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
-          try {
-            const draft = JSON.parse(rawPending) as {
-              url: string;
-              userPrompt: string;
-              notificationEmail?: string;
-              cronExpression: string;
-            };
-            await api.createJob({
-              url: draft.url,
-              userPrompt: draft.userPrompt,
-              notificationEmail: draft.notificationEmail || meData.email,
-              cronExpression: draft.cronExpression,
-            });
-            await refreshJobsAndStats();
-          } catch {
-            // ignore malformed pending draft
-          }
-        }
-      }
-    } catch {
-      setConnectionWarning(
-        'Unable to connect to the backend service. Please verify that the API is running.'
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshJobsAndStats]);
+  const isRefreshing = isJobsLoading || isJobsFetching || isStatsFetching;
+  const connectionError = jobsError || statsError;
 
-  // Connect to SSE stream for zero-latency push invalidations with smart polling fallback
+  // Real-time server-sent events with auto-invalidation
   const { connectionMode } = useRealtimeEvents({
     enabled: true,
     onJobEvent: React.useCallback(() => {
-      void refreshJobsAndStats();
-    }, [refreshJobsAndStats]),
+      void invalidateJobsAndStats();
+    }, [invalidateJobsAndStats]),
     onReconnect: React.useCallback(() => {
-      void refreshJobsAndStats();
-    }, [refreshJobsAndStats]),
+      void invalidateJobsAndStats();
+    }, [invalidateJobsAndStats]),
   });
 
+  // Automatically submit pending draft if user just signed in
   React.useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+    if (user && typeof window !== 'undefined') {
+      const rawPending = sessionStorage.getItem(PENDING_JOB_STORAGE_KEY);
+      if (rawPending) {
+        sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
+        try {
+          const draft = JSON.parse(rawPending) as {
+            url: string;
+            userPrompt: string;
+            notificationEmail?: string;
+            cronExpression: string;
+          };
+          void (async () => {
+            await api.createJob({
+              url: draft.url,
+              userPrompt: draft.userPrompt,
+              notificationEmail: draft.notificationEmail || user.email,
+              cronExpression: draft.cronExpression,
+            });
+            await invalidateJobsAndStats();
+          })();
+        } catch {
+          // Ignore malformed pending draft
+        }
+      }
+    }
+  }, [user, invalidateJobsAndStats]);
+
+  const handleRefresh = React.useCallback(async () => {
+    await Promise.all([refetchJobs(), refetchStats()]);
+  }, [refetchJobs, refetchStats]);
 
   const handleLogout = async () => {
     try {
-      await api.logout();
-      setUser(null);
-      setSelectedJob(null);
-      setEditingJob(null);
-      await loadDashboard();
+      await logoutMutation.mutateAsync();
+      modals.closeAll();
     } catch {
-      // ignore logout error
+      // Ignore logout error
     }
+  };
+
+  const handleUserAuthenticated = (loggedUser: UserDto) => {
+    queryClient.setQueryData(dashboardKeys.user, loggedUser);
+    void invalidateAll();
   };
 
   return (
@@ -137,7 +124,7 @@ export default function DashboardPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsIntegrationsModalOpen(true)}
+              onClick={modals.openIntegrationsModal}
               className="h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-medium"
               title="Configure Telegram and Webhook integrations"
             >
@@ -145,7 +132,7 @@ export default function DashboardPage() {
               <span className="hidden sm:inline">Integrations</span>
             </Button>
             <Button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={modals.openCreateModal}
               className="h-9 px-3.5 sm:px-4 text-xs sm:text-sm font-medium"
             >
               <Plus className="h-4 w-4" />
@@ -154,14 +141,14 @@ export default function DashboardPage() {
             {user ? (
               <UserAvatarMenu
                 user={user}
-                onOpenProfile={() => setIsProfileModalOpen(true)}
-                onOpenIntegrations={() => setIsIntegrationsModalOpen(true)}
+                onOpenProfile={modals.openProfileModal}
+                onOpenIntegrations={modals.openIntegrationsModal}
                 onLogout={handleLogout}
               />
             ) : (
               <Button
                 variant="outline"
-                onClick={() => setIsAuthModalOpen(true)}
+                onClick={modals.openAuthModal}
                 className="h-9 px-3.5 text-xs sm:text-sm font-medium"
               >
                 Sign In
@@ -199,9 +186,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {connectionWarning && (
+        {connectionError && (
           <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs sm:text-sm text-foreground flex items-center justify-between">
-            <span>{connectionWarning}</span>
+            <span>
+              Unable to connect to the backend service. Please verify that the API is running.
+            </span>
             <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Offline
             </span>
@@ -214,11 +203,11 @@ export default function DashboardPage() {
         {/* Central Monitoring Table */}
         <JobsTable
           jobs={jobs}
-          onRefresh={loadDashboard}
+          onRefresh={handleRefresh}
           isRefreshing={isRefreshing}
-          onSelectJobForHistory={(job) => setSelectedJob(job)}
-          onEditJob={(job) => setEditingJob(job)}
-          onCreateClick={() => setIsCreateModalOpen(true)}
+          onSelectJobForHistory={modals.openJobHistory}
+          onEditJob={modals.openEditJob}
+          onCreateClick={modals.openCreateModal}
         />
       </main>
 
@@ -240,46 +229,44 @@ export default function DashboardPage() {
 
       {/* Creation Modal */}
       <CreateJobModal
-        isOpen={isCreateModalOpen}
+        isOpen={modals.isCreateModalOpen}
         user={user}
-        onAuthenticated={(loggedUser) => setUser(loggedUser)}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreated={loadDashboard}
+        onAuthenticated={handleUserAuthenticated}
+        onClose={modals.closeCreateModal}
+        onCreated={() => void invalidateJobsAndStats()}
       />
 
       {/* Standalone Auth Modal */}
       <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthenticated={(loggedUser) => {
-          setUser(loggedUser);
-          void loadDashboard();
-        }}
+        isOpen={modals.isAuthModalOpen}
+        onClose={modals.closeAuthModal}
+        onAuthenticated={handleUserAuthenticated}
       />
 
       {/* User Profile Modal */}
       <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
+        isOpen={modals.isProfileModalOpen}
+        onClose={modals.closeProfileModal}
         user={user}
-        onUserUpdated={(updated) => setUser(updated)}
+        onUserUpdated={handleUserAuthenticated}
         onLogout={handleLogout}
         monitorsCount={jobs.length}
       />
 
       {/* Edit Modal */}
       <EditJobModal
-        job={editingJob}
-        isOpen={Boolean(editingJob)}
-        onClose={() => setEditingJob(null)}
-        onUpdated={loadDashboard}
+        job={modals.editingJob}
+        isOpen={Boolean(modals.editingJob)}
+        onClose={modals.closeEditJob}
+        onUpdated={() => void invalidateJobsAndStats()}
       />
 
       {/* Snapshot and Diff Drawer */}
-      <JobRunsDrawer job={selectedJob} onClose={() => setSelectedJob(null)} />
+      <JobRunsDrawer job={modals.selectedJob} onClose={modals.closeJobHistory} />
+
       <IntegrationsModal
-        isOpen={isIntegrationsModalOpen}
-        onClose={() => setIsIntegrationsModalOpen(false)}
+        isOpen={modals.isIntegrationsModalOpen}
+        onClose={modals.closeIntegrationsModal}
       />
     </div>
   );

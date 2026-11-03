@@ -5,7 +5,10 @@ import { AuthService } from '../src/services/authService.js';
 import { JobService } from '../src/services/jobService.js';
 import { IntegrationService } from '../src/services/integrationService.js';
 import { SessionService } from '../src/services/sessionService.js';
-import type { ISessionRepository, UpsertSessionInput } from '../src/repositories/sessionRepository.js';
+import type {
+  ISessionRepository,
+  UpsertSessionInput,
+} from '../src/repositories/sessionRepository.js';
 import type { IUserRepository, UserEntity } from '../src/repositories/userRepository.js';
 import type { IJobRepository } from '../src/repositories/jobRepository.js';
 import type { IIntegrationRepository } from '../src/repositories/integrationRepository.js';
@@ -28,7 +31,11 @@ class InMemoryUserRepository implements IUserRepository {
   async findByGoogleId(_googleId: string): Promise<UserEntity | null> {
     return null;
   }
-  async createUser(data: { email: string; name: string | null; passwordHash: string | null }): Promise<UserEntity> {
+  async createUser(data: {
+    email: string;
+    name: string | null;
+    passwordHash: string | null;
+  }): Promise<UserEntity> {
     const user: UserEntity = {
       id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       email: data.email,
@@ -60,7 +67,10 @@ class InMemoryUserRepository implements IUserRepository {
 class InMemorySessionRepository implements ISessionRepository {
   private sessions: Map<string, UserWebSessionRow> = new Map();
 
-  async findByUserAndDomain(userId: string, hostOrDomain: string): Promise<UserWebSessionRow | null> {
+  async findByUserAndDomain(
+    userId: string,
+    hostOrDomain: string
+  ): Promise<UserWebSessionRow | null> {
     const clean = hostOrDomain.trim().toLowerCase();
     for (const s of this.sessions.values()) {
       if (s.userId === userId && (s.domain === clean || clean.endsWith(`.${s.domain}`))) {
@@ -147,7 +157,7 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
     const jobService = new JobService(dummyJobRepo, dummyScheduler, undefined, sessionRepo);
     const dummyIntegrationRepo = {
       findByUserId: async () => null,
-      upsert: async () => ({} as any),
+      upsert: async () => ({}) as any,
     } as unknown as IIntegrationRepository;
     const integrationService = new IntegrationService(dummyIntegrationRepo, {} as any, {} as any);
 

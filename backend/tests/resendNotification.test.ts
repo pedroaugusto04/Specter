@@ -42,7 +42,8 @@ describe('Specter Resend Notifications & Email Template', () => {
           currentValue: null,
         },
       ],
-      summaryText: '• [Modified] price: "$ 499.00" → "$ 399.00"\n• [Added] shipping: "Free Worldwide Shipping"\n• [Removed] oldPromoTag: (previously "Coupon 10%")',
+      summaryText:
+        '• [Modified] price: "$ 499.00" → "$ 399.00"\n• [Added] shipping: "Free Worldwide Shipping"\n• [Removed] oldPromoTag: (previously "Coupon 10%")',
       summaryHtml: '<table>...</table>',
     },
     data: {

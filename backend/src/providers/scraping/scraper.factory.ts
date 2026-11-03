@@ -14,9 +14,7 @@ export function createScraperEngine(
   engineName: 'playwright' | 'cheerio' = env.SCRAPER_ENGINE
 ): IScraperEngine {
   const localEngine =
-    engineName === 'cheerio'
-      ? new CheerioScraperEngine()
-      : new PlaywrightScraperEngine();
+    engineName === 'cheerio' ? new CheerioScraperEngine() : new PlaywrightScraperEngine();
 
   const unblockers = [
     new ZenRowsUnblockerProvider(),

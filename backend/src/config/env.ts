@@ -13,7 +13,10 @@ export const envSchema = z.object({
     .string()
     .url('DATABASE_URL must be a valid connection URL')
     .default('postgresql://postgres:postgres@localhost:5432/specter'),
-  REDIS_URL: z.string().url('REDIS_URL must be a valid Redis URL').default('redis://localhost:6379'),
+  REDIS_URL: z
+    .string()
+    .url('REDIS_URL must be a valid Redis URL')
+    .default('redis://localhost:6379'),
   REDIS_HOST: z.string().min(1).default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
@@ -99,4 +102,3 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 }
 
 export const env: AppEnv = parseEnv(process.env);
-

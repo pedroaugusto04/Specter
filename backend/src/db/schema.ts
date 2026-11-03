@@ -1,4 +1,13 @@
-import { pgTable, uuid, text, timestamp, jsonb, integer, index, boolean } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  integer,
+  index,
+  boolean,
+} from 'drizzle-orm/pg-core';
 import type { ExtractedPayload, ExtractorConfig } from '../types/extractor.js';
 
 export const users = pgTable(
@@ -19,7 +28,10 @@ export const userIntegrations = pgTable(
   'user_integrations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    userId: text('user_id').notNull().unique(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull()
+      .unique(),
 
     // Telegram Integration
     telegramEnabled: boolean('telegram_enabled').default(false).notNull(),
@@ -41,7 +53,9 @@ export const scrapingJobs = pgTable(
   'scraping_jobs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    userId: text('user_id').notNull().default('default-user'),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
     url: text('url').notNull(),
     userPrompt: text('user_prompt').notNull(),
     notificationEmail: text('notification_email').notNull(),
@@ -126,7 +140,9 @@ export const userWebSessions = pgTable(
   'user_web_sessions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    userId: text('user_id').notNull(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
     domain: text('domain').notNull(),
     name: text('name').notNull(),
     storageState: jsonb('storage_state').$type<PlaywrightStorageState>().notNull(),

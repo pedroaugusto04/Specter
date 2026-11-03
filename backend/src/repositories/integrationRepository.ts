@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
-import { userIntegrations, type UserIntegrationRow } from '../db/schema.js';
+import { userIntegrations } from '../db/schema.js';
 import { IntegrationMapper } from '../mappers/integrationMapper.js';
 import type { UserIntegrationEntity } from '../types/domain.js';
 

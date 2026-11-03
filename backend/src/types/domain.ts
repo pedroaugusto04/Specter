@@ -1,12 +1,7 @@
 import type { ExtractedPayload, ExtractorConfig } from './extractor.js';
 import type { PlaywrightStorageState } from '../db/schema.js';
 
-export type JobStatus =
-  | 'PENDING_COMPILATION'
-  | 'ACTIVE'
-  | 'FAILED'
-  | 'HEALING'
-  | 'PAUSED';
+export type JobStatus = 'PENDING_COMPILATION' | 'ACTIVE' | 'FAILED' | 'HEALING' | 'PAUSED';
 
 export type RunStatus = 'SUCCESS' | 'FAILED';
 

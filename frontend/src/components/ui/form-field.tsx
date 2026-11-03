@@ -30,7 +30,11 @@ export function FormField({
         >
           <span>{label}</span>
           {required && (
-            <span className="text-muted-foreground font-mono text-xs" title="Required field" aria-hidden="true">
+            <span
+              className="text-muted-foreground font-mono text-xs"
+              title="Required field"
+              aria-hidden="true"
+            >
               *
             </span>
           )}
@@ -50,10 +54,7 @@ export function FormField({
           <span>{error}</span>
         </p>
       ) : hint ? (
-        <div
-          id={htmlFor ? `${htmlFor}-hint` : undefined}
-          className="text-xs text-muted-foreground"
-        >
+        <div id={htmlFor ? `${htmlFor}-hint` : undefined} className="text-xs text-muted-foreground">
           {hint}
         </div>
       ) : null}

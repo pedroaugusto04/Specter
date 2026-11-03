@@ -64,7 +64,9 @@ export function Drawer({
           <div className="flex items-start justify-between border-b border-border px-5 py-4 sm:px-6 sm:py-4.5">
             <div className="min-w-0 pr-4">
               {title && (
-                <div className="text-base sm:text-lg font-semibold text-foreground font-mono truncate">{title}</div>
+                <div className="text-base sm:text-lg font-semibold text-foreground font-mono truncate">
+                  {title}
+                </div>
               )}
               {description && (
                 <div className="mt-1 text-xs sm:text-sm text-muted-foreground">{description}</div>
@@ -85,7 +87,9 @@ export function Drawer({
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">{children}</div>
 
         {footer && (
-          <div className="border-t border-border bg-muted/30 px-5 py-3.5 sm:px-6 sm:py-4">{footer}</div>
+          <div className="border-t border-border bg-muted/30 px-5 py-3.5 sm:px-6 sm:py-4">
+            {footer}
+          </div>
         )}
       </div>
     </div>

@@ -1,9 +1,4 @@
-export type JobStatus =
-  | 'PENDING_COMPILATION'
-  | 'ACTIVE'
-  | 'FAILED'
-  | 'HEALING'
-  | 'PAUSED';
+export type JobStatus = 'PENDING_COMPILATION' | 'ACTIVE' | 'FAILED' | 'HEALING' | 'PAUSED';
 
 export type RunStatus = 'SUCCESS' | 'FAILED';
 export type ChangeStatus = 'YES' | 'NO' | 'INITIAL';
@@ -359,9 +354,7 @@ export const api = {
     });
   },
 
-  testTelegram(input: {
-    chatId: string;
-  }): Promise<{ success: boolean; message: string }> {
+  testTelegram(input: { chatId: string }): Promise<{ success: boolean; message: string }> {
     return request<{ success: boolean; message: string }>('/api/integrations/telegram/test', {
       method: 'POST',
       body: JSON.stringify(input),

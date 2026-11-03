@@ -10,10 +10,7 @@ import type {
 export type { TelegramSendOptions, TelegramTestResult };
 
 function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function formatValue(val: unknown): string {
@@ -82,9 +79,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
   formatAlertMessage(payload: AlertPayload): string {
     const diff = payload.diffSummary;
     const changeNoun =
-      diff.totalChanges === 1
-        ? '1 change detected'
-        : `${diff.totalChanges} changes detected`;
+      diff.totalChanges === 1 ? '1 change detected' : `${diff.totalChanges} changes detected`;
 
     const lines: string[] = [
       `🔔 <b>[Specter] ${escapeHtml(changeNoun)}</b>`,
@@ -112,9 +107,16 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
     lines.push('<b>Detected Changes:</b>');
 
     const allChanges = [
-      ...diff.modified.map((c) => `• <b>${escapeHtml(c.field)}</b>: <s>${formatValue(c.previousValue)}</s> ➔ <b>${formatValue(c.currentValue)}</b>`),
-      ...diff.added.map((c) => `• <b>${escapeHtml(c.field)}</b> (added): <b>${formatValue(c.currentValue)}</b>`),
-      ...diff.removed.map((c) => `• <b>${escapeHtml(c.field)}</b> (removed): <s>${formatValue(c.previousValue)}</s>`),
+      ...diff.modified.map(
+        (c) =>
+          `• <b>${escapeHtml(c.field)}</b>: <s>${formatValue(c.previousValue)}</s> ➔ <b>${formatValue(c.currentValue)}</b>`
+      ),
+      ...diff.added.map(
+        (c) => `• <b>${escapeHtml(c.field)}</b> (added): <b>${formatValue(c.currentValue)}</b>`
+      ),
+      ...diff.removed.map(
+        (c) => `• <b>${escapeHtml(c.field)}</b> (removed): <s>${formatValue(c.previousValue)}</s>`
+      ),
     ];
 
     if (allChanges.length > 0) {

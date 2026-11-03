@@ -11,8 +11,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
       default:
         'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm disabled:opacity-50',
-      secondary:
-        'bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50',
+      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50',
       outline:
         'border border-border bg-card hover:bg-muted text-foreground hover:text-foreground disabled:bg-muted/40 disabled:text-muted-foreground disabled:border-border',
       destructive:

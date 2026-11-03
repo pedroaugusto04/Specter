@@ -1,4 +1,4 @@
-import type { ExtractedPayload, ExtractedRecord, TriggerOperator, TriggerRule } from '../types/extractor.js';
+import type { ExtractedPayload, ExtractedRecord, TriggerRule } from '../types/extractor.js';
 
 export interface TriggerEvaluationResult {
   triggered: boolean;
@@ -60,8 +60,30 @@ export function parseBooleanValue(val: unknown): boolean | null {
   }
 
   const lower = val.trim().toLowerCase();
-  const truthy = ['true', '1', 'yes', 'sim', 'in stock', 'disponível', 'available', 'ativo', 'active', 'in_stock'];
-  const falsy = ['false', '0', 'no', 'não', 'out of stock', 'esgotado', 'indisponível', 'unavailable', 'inativo', 'out_of_stock'];
+  const truthy = [
+    'true',
+    '1',
+    'yes',
+    'sim',
+    'in stock',
+    'disponível',
+    'available',
+    'ativo',
+    'active',
+    'in_stock',
+  ];
+  const falsy = [
+    'false',
+    '0',
+    'no',
+    'não',
+    'out of stock',
+    'esgotado',
+    'indisponível',
+    'unavailable',
+    'inativo',
+    'out_of_stock',
+  ];
 
   if (truthy.includes(lower)) return true;
   if (falsy.includes(lower)) return false;
@@ -259,8 +281,12 @@ export function evaluateSingleRule(
     }
 
     // Fallback to case-insensitive string equality
-    const actualStr = String(actualValue ?? '').trim().toLowerCase();
-    const targetStr = String(targetValue ?? '').trim().toLowerCase();
+    const actualStr = String(actualValue ?? '')
+      .trim()
+      .toLowerCase();
+    const targetStr = String(targetValue ?? '')
+      .trim()
+      .toLowerCase();
     const isEq = actualStr === targetStr;
     const satisfied = operator === 'eq' ? isEq : !isEq;
     const symbol = operator === 'eq' ? '==' : '!=';
@@ -321,7 +347,9 @@ function isRuleSatisfiedInPayload(
 
   const record = payload as ExtractedRecord;
   const prevRecord =
-    previousPayload && !('items' in previousPayload) ? (previousPayload as ExtractedRecord) : undefined;
+    previousPayload && !('items' in previousPayload)
+      ? (previousPayload as ExtractedRecord)
+      : undefined;
   const actual = record[rule.field];
   const prev = prevRecord?.[rule.field];
   return evaluateSingleRule(actual, rule, prev);
