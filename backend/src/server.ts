@@ -55,6 +55,7 @@ async function bootstrap(): Promise<void> {
     compilerProvider,
     notificationProvider: notificationDispatcher,
     jobScheduler,
+    storageProvider,
     sessionRepository,
     realtimeService,
   });

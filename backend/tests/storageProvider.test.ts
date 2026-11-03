@@ -227,14 +227,14 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
       );
     });
 
-    it('does NOT upload screenshot when captureScreenshotOnChange is true but data has NOT changed', async () => {
+    it('captures baseline screenshot on INITIAL run when captureScreenshotOnChange is true, and does NOT upload when data has NOT changed on subsequent run', async () => {
       const repository = new InMemoryJobRepository();
       const scraper = new MockScraperEngine();
       const notifier = new MockNotificationProvider();
       const scheduler = new MockJobScheduler();
       const mockStorage = {
         isEnabled: true,
-        upload: vi.fn(),
+        upload: vi.fn().mockResolvedValue({ publicUrl: 'https://cdn.example.com/baseline.jpg' }),
         getPublicUrl: vi.fn(),
       };
 
@@ -271,9 +271,15 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
         storageProvider: mockStorage,
       });
 
-      // Initial run
-      await service.executeScrape(job.id);
-      // Run 2: same content (hasChanges = NO)
+      // Initial run (baseline screenshot captured)
+      const initialRun = await service.executeScrape(job.id);
+      expect(initialRun?.hasChanges).toBe('INITIAL');
+      expect(mockStorage.upload).toHaveBeenCalledTimes(1);
+      expect(initialRun?.screenshotUrl).toBe('https://cdn.example.com/baseline.jpg');
+
+      mockStorage.upload.mockClear();
+
+      // Run 2: same content (hasChanges = NO, no upload)
       const secondRun = await service.executeScrape(job.id);
 
       expect(secondRun?.hasChanges).toBe('NO');

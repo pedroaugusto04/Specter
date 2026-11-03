@@ -2,6 +2,7 @@ import { CompilerValidationError, DomainError, NotFoundError } from '../errors/d
 import type { ICompilerProvider } from '../providers/compilers/compiler.interface.js';
 import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
+import { createStorageProvider, type IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
@@ -21,6 +22,7 @@ export interface CompilationServiceDeps {
   compilerProvider: ICompilerProvider;
   notificationProvider: INotificationProvider;
   jobScheduler: IJobScheduler;
+  storageProvider?: IStorageProvider;
   sessionRepository?: ISessionRepository;
   realtimeService?: RealtimeService;
 }
@@ -31,6 +33,7 @@ export class CompilationService {
   private readonly compilerProvider: ICompilerProvider;
   private readonly notificationProvider: INotificationProvider;
   private readonly jobScheduler: IJobScheduler;
+  private readonly storageProvider: IStorageProvider;
   private readonly sessionRepository?: ISessionRepository;
   private readonly realtimeService?: RealtimeService;
 
@@ -40,6 +43,7 @@ export class CompilationService {
     this.compilerProvider = deps.compilerProvider;
     this.notificationProvider = deps.notificationProvider;
     this.jobScheduler = deps.jobScheduler;
+    this.storageProvider = deps.storageProvider ?? createStorageProvider();
     this.sessionRepository = deps.sessionRepository;
     this.realtimeService = deps.realtimeService;
   }
@@ -71,7 +75,10 @@ export class CompilationService {
       );
 
       // 1. Fetch raw HTML from target URL
-      const scrapeResult = await this.scraperEngine.fetchHtml(job.url, { storageState });
+      const scrapeResult = await this.scraperEngine.fetchHtml(job.url, {
+        storageState,
+        captureScreenshot: job.captureScreenshotOnChange,
+      });
       httpStatus = scrapeResult.httpStatus;
 
       // 2. Sanitize DOM and prune repeated sibling nodes before forwarding to AI
@@ -101,6 +108,30 @@ export class CompilationService {
         hasChanges = previousRun.normalizedHash === normalizedHash ? 'NO' : 'YES';
       }
 
+      let screenshotUrl: string | null = null;
+      if (
+        job.captureScreenshotOnChange &&
+        (hasChanges === 'INITIAL' || hasChanges === 'YES') &&
+        scrapeResult.screenshot &&
+        this.storageProvider.isEnabled
+      ) {
+        try {
+          const runTimestamp = Date.now();
+          const storageKey = `jobs/${job.id}/${runTimestamp}.jpg`;
+          const uploadRes = await this.storageProvider.upload(
+            storageKey,
+            scrapeResult.screenshot,
+            'image/jpeg'
+          );
+          screenshotUrl = uploadRes.publicUrl;
+        } catch (uploadErr) {
+          logger.error('Failed to upload baseline/change screenshot to Supabase Storage during compilation', {
+            jobId: job.id,
+            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+          });
+        }
+      }
+
       const durationMs = Date.now() - startTime;
 
       await this.jobRepository.createRun({
@@ -111,6 +142,7 @@ export class CompilationService {
         status: 'SUCCESS',
         httpStatus,
         durationMs,
+        screenshotUrl,
       });
 
       if (hasChanges === 'YES' && previousRun) {

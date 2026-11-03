@@ -113,7 +113,12 @@ export class ScrapeExecutionService {
       }
 
       let screenshotUrl: string | null = null;
-      if (hasChanges === 'YES' && scrapeResult.screenshot && this.storageProvider.isEnabled) {
+      if (
+        job.captureScreenshotOnChange &&
+        (hasChanges === 'INITIAL' || hasChanges === 'YES') &&
+        scrapeResult.screenshot &&
+        this.storageProvider.isEnabled
+      ) {
         try {
           const runTimestamp = Date.now();
           const storageKey = `jobs/${job.id}/${runTimestamp}.jpg`;
