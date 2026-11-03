@@ -13,6 +13,7 @@ import {
   type ScrapingJobDto,
   type TriggerOperator,
   type TriggerRule,
+  type UserDto,
 } from '@/lib/api';
 import { cn, CRON_PRESETS } from '@/lib/utils';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
@@ -22,12 +23,14 @@ export interface EditJobModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdated: () => void;
+  user?: UserDto | null;
 }
 
-export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalProps) {
+export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobModalProps) {
   const updateJobMutation = useUpdateJobMutation();
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
+  const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
   const [notificationEmail, setNotificationEmail] = React.useState('');
   const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
@@ -47,7 +50,9 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
     if (job && isOpen) {
       setUrl(job.url);
       setUserPrompt(job.userPrompt);
-      setNotificationEmail(job.notificationEmail);
+      const hasEmail = Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0);
+      setSendEmailAlerts(hasEmail);
+      setNotificationEmail(job.notificationEmail || (user?.email ?? ''));
       setShowCustomWebhook(Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0));
       setWebhookUrl(job.webhookUrl || '');
       setCaptureScreenshotOnChange(Boolean(job.captureScreenshotOnChange));
@@ -91,8 +96,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
     job &&
     (url.trim() !== job.url ||
       userPrompt.trim() !== job.userPrompt ||
-      notificationEmail.trim() !== job.notificationEmail ||
+      (sendEmailAlerts ? notificationEmail.trim() : '') !== job.notificationEmail ||
+      sendEmailAlerts !==
+        Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
       (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
+      showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
       captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
       effectiveCron.trim() !== job.cronExpression ||
       rulesChanged)
@@ -131,10 +139,18 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
     setGlobalError(null);
 
+    if (sendEmailAlerts && !notificationEmail.trim() && !user?.email) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        notificationEmail: 'Please enter an alert email address.',
+      }));
+      return;
+    }
+
     const validation = validateJobForm({
       url,
       userPrompt,
-      notificationEmail,
+      notificationEmail: sendEmailAlerts ? notificationEmail : '',
       cronExpression: effectiveCron,
     });
 
@@ -146,12 +162,14 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
 
     setLoading(true);
     try {
+      const emailToSend = sendEmailAlerts ? notificationEmail.trim() : '';
+
       await updateJobMutation.mutateAsync({
         id: job.id,
         payload: {
           url: url.trim(),
           userPrompt: userPrompt.trim(),
-          notificationEmail: notificationEmail.trim() || undefined,
+          notificationEmail: emailToSend,
           webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
           cronExpression: effectiveCron.trim(),
           captureScreenshotOnChange,
@@ -206,50 +224,26 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FormField
-            label="Target Website URL"
-            htmlFor="edit-target-url"
-            required
-            error={fieldErrors.url}
-            hint="URL of the page to monitor."
-          >
-            <Input
-              id="edit-target-url"
-              type="url"
-              placeholder="https://example.com/products/item"
-              value={url}
-              hasError={Boolean(fieldErrors.url)}
-              aria-describedby={fieldErrors.url ? 'edit-target-url-error' : undefined}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                clearFieldError('url');
-              }}
-            />
-          </FormField>
-
-          <FormField
-            label="Alert Email"
-            htmlFor="edit-notify-email"
-            error={fieldErrors.notificationEmail}
-            hint="Optional. Recipient for diff alert notifications."
-          >
-            <Input
-              id="edit-notify-email"
-              type="email"
-              placeholder="alerts@company.com (optional)"
-              value={notificationEmail}
-              hasError={Boolean(fieldErrors.notificationEmail)}
-              aria-describedby={
-                fieldErrors.notificationEmail ? 'edit-notify-email-error' : undefined
-              }
-              onChange={(e) => {
-                setNotificationEmail(e.target.value);
-                clearFieldError('notificationEmail');
-              }}
-            />
-          </FormField>
-        </div>
+        <FormField
+          label="Target Website URL"
+          htmlFor="edit-target-url"
+          required
+          error={fieldErrors.url}
+          hint="URL of the page to monitor."
+        >
+          <Input
+            id="edit-target-url"
+            type="url"
+            placeholder="https://example.com/products/item"
+            value={url}
+            hasError={Boolean(fieldErrors.url)}
+            aria-describedby={fieldErrors.url ? 'edit-target-url-error' : undefined}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              clearFieldError('url');
+            }}
+          />
+        </FormField>
 
         <FormField
           label="Extraction Instructions"
@@ -642,6 +636,54 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated }: EditJobModalPr
                 placeholder="https://your-domain.com/webhook (optional)"
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
+              />
+            </FormField>
+          )}
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              id="edit-send-email-alerts"
+              checked={sendEmailAlerts}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setSendEmailAlerts(checked);
+                if (checked) {
+                  if (!notificationEmail && user?.email) {
+                    setNotificationEmail(user.email);
+                  }
+                } else {
+                  clearFieldError('notificationEmail');
+                }
+              }}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+            />
+            <span className="text-sm font-medium text-foreground">
+              Send notifications via email
+            </span>
+          </label>
+
+          {sendEmailAlerts && (
+            <FormField
+              label="Alert Email Address"
+              htmlFor="edit-notify-email"
+              required
+              error={fieldErrors.notificationEmail}
+              hint="Destination email address for detected change notifications."
+            >
+              <Input
+                id="edit-notify-email"
+                type="email"
+                placeholder={user?.email || 'alerts@company.com'}
+                value={notificationEmail}
+                hasError={Boolean(fieldErrors.notificationEmail)}
+                aria-describedby={
+                  fieldErrors.notificationEmail ? 'edit-notify-email-error' : undefined
+                }
+                onChange={(e) => {
+                  setNotificationEmail(e.target.value);
+                  clearFieldError('notificationEmail');
+                }}
               />
             </FormField>
           )}

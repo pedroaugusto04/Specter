@@ -54,11 +54,7 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
     const outputFile = path.join(tempDir, 'extractor.json');
 
     await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
-    await fs.writeFile(
-      promptFile,
-      buildCompilerPrompt(domFile, outputFile, userPrompt),
-      'utf-8'
-    );
+    await fs.writeFile(promptFile, buildCompilerPrompt(domFile, outputFile, userPrompt), 'utf-8');
 
     return new Promise<ExtractorSchema>((resolve, reject) => {
       let settled = false;

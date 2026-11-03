@@ -43,6 +43,13 @@
       "when": 1793688533042,
       "tag": "0005_normal_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793706197662,
+      "tag": "0006_tough_talon",
+      "breakpoints": true
     }
   ]
 }

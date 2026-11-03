@@ -16,14 +16,16 @@ import { Drawer } from '@/components/ui/drawer';
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { ScrapingJobDto } from '@/lib/api';
-import { formatDateTime, parseErrorMessage } from '@/lib/utils';
+import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 export function JobRunsDrawer({
   job,
   onClose,
+  timeZone = DEFAULT_TIMEZONE,
 }: {
   job: ScrapingJobDto | null;
   onClose: () => void;
+  timeZone?: string;
 }) {
   const { data, isLoading: loading } = useJobRunsQuery(job?.id);
   const runs = data?.runs || [];
@@ -210,7 +212,7 @@ export function JobRunsDrawer({
                         )}
                       </div>
                       <span className="font-mono text-xs text-muted-foreground">
-                        {formatDateTime(run.executedAt)}
+                        {formatDateTime(run.executedAt, timeZone)}
                       </span>
                     </div>
 

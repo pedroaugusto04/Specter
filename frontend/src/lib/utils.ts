@@ -64,16 +64,73 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
   return { valid: true };
 }
 
-export function formatDateTime(isoString: string): string {
+export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
+
+export const COMMON_TIMEZONES = [
+  { value: 'America/Sao_Paulo', label: 'America/Sao Paulo (BRT / UTC-3)' },
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  { value: 'America/New_York', label: 'America/New York (EST/EDT)' },
+  { value: 'America/Chicago', label: 'America/Chicago (CST/CDT)' },
+  { value: 'America/Denver', label: 'America/Denver (MST/MDT)' },
+  { value: 'America/Los_Angeles', label: 'America/Los Angeles (PST/PDT)' },
+  { value: 'America/Buenos_Aires', label: 'America/Buenos Aires (ART)' },
+  { value: 'Europe/London', label: 'Europe/London (GMT/BST)' },
+  { value: 'Europe/Lisbon', label: 'Europe/Lisbon (WET/WEST)' },
+  { value: 'Europe/Paris', label: 'Europe/Paris (CET/CEST)' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET/CEST)' },
+  { value: 'Europe/Madrid', label: 'Europe/Madrid (CET/CEST)' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai (GST)' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST)' },
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai (CST)' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT)' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST/AEDT)' },
+] as const;
+
+export function formatDateTime(isoString: string, timeZone: string = DEFAULT_TIMEZONE): string {
   try {
     const d = new Date(isoString);
     if (Number.isNaN(d.getTime())) return isoString;
-    return new Intl.DateTimeFormat('pt-BR', {
-      dateStyle: 'short',
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
       timeStyle: 'medium',
+      timeZone,
     }).format(d);
   } catch {
-    return isoString;
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      }).format(new Date(isoString));
+    } catch {
+      return isoString;
+    }
+  }
+}
+
+export function formatCompactDate(isoString: string, timeZone: string = DEFAULT_TIMEZONE): string {
+  try {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    }).format(d);
+  } catch {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date(isoString));
+    } catch {
+      return isoString;
+    }
   }
 }
 

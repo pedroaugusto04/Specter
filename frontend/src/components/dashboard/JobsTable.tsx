@@ -25,7 +25,12 @@ import {
   useTriggerJobMutation,
 } from '@/hooks/useDashboardQueries';
 import type { JobStatus, ScrapingJobDto } from '@/lib/api';
-import { formatDateTime, parseErrorMessage } from '@/lib/utils';
+import {
+  DEFAULT_TIMEZONE,
+  formatCompactDate,
+  formatDateTime,
+  parseErrorMessage,
+} from '@/lib/utils';
 
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
 type StatusFilter = 'ALL' | 'ACTIVE' | 'HEALING' | 'PAUSED';
@@ -38,21 +43,6 @@ function formatDisplayUrl(rawUrl: string): string {
     return `${host}${pathname}`;
   } catch {
     return rawUrl.replace(/^https?:\/\/(www\.)?/, '');
-  }
-}
-
-function formatCompactDate(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    if (Number.isNaN(d.getTime())) return isoString;
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(d);
-  } catch {
-    return isoString;
   }
 }
 
@@ -104,6 +94,7 @@ export function JobsTable({
   onSelectJobForHistory,
   onEditJob,
   onCreateClick,
+  timeZone = DEFAULT_TIMEZONE,
 }: {
   jobs: ScrapingJobDto[];
   onRefresh: () => void;
@@ -111,6 +102,7 @@ export function JobsTable({
   onSelectJobForHistory: (job: ScrapingJobDto) => void;
   onEditJob: (job: ScrapingJobDto) => void;
   onCreateClick?: () => void;
+  timeZone?: string;
 }) {
   const [activeActions, setActiveActions] = React.useState<Record<string, RowActionType>>({});
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -368,9 +360,9 @@ export function JobsTable({
                     {/* Updated At */}
                     <td
                       className="whitespace-nowrap px-2.5 py-3 text-xs text-muted-foreground font-mono"
-                      title={formatDateTime(job.updatedAt)}
+                      title={formatDateTime(job.updatedAt, timeZone)}
                     >
-                      {formatCompactDate(job.updatedAt)}
+                      {formatCompactDate(job.updatedAt, timeZone)}
                     </td>
 
                     {/* Action Buttons */}
@@ -510,7 +502,10 @@ export function JobsTable({
                             });
                             if (confirmed) {
                               void handleAction(job.id, 'pause', () =>
-                                togglePauseMutation.mutateAsync({ jobId: job.id, paused: !isPaused })
+                                togglePauseMutation.mutateAsync({
+                                  jobId: job.id,
+                                  paused: !isPaused,
+                                })
                               );
                             }
                           }}

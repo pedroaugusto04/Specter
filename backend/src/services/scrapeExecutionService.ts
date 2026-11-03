@@ -22,6 +22,7 @@ import {
 } from '../utils/extractorEngine.js';
 import { logger } from '../utils/logger.js';
 import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
+import { uploadScreenshotIfEligible } from '../utils/screenshotHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
 
@@ -116,29 +117,14 @@ export class ScrapeExecutionService {
         hasChanges = previousRun.normalizedHash === currentHash ? 'NO' : 'YES';
       }
 
-      let screenshotUrl: string | null = null;
-      if (
-        job.captureScreenshotOnChange &&
-        (hasChanges === 'INITIAL' || hasChanges === 'YES') &&
-        scrapeResult.screenshot &&
-        this.storageProvider.isEnabled
-      ) {
-        try {
-          const runTimestamp = Date.now();
-          const storageKey = `jobs/${job.id}/${runTimestamp}.jpg`;
-          const uploadRes = await this.storageProvider.upload(
-            storageKey,
-            scrapeResult.screenshot,
-            'image/jpeg'
-          );
-          screenshotUrl = uploadRes.publicUrl;
-        } catch (uploadErr) {
-          logger.error('Failed to upload screenshot to Supabase Storage', {
-            jobId: job.id,
-            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
-          });
-        }
-      }
+      const screenshotUrl = await uploadScreenshotIfEligible({
+        jobId: job.id,
+        captureScreenshotOnChange: job.captureScreenshotOnChange,
+        hasChanges,
+        screenshot: scrapeResult.screenshot,
+        storageProvider: this.storageProvider,
+        logContext: 'routine scraping',
+      });
 
       const durationMs = Date.now() - startTime;
 

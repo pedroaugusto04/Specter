@@ -1,5 +1,6 @@
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
+import { decodeBase64Screenshot } from '../../../utils/screenshotHelper.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
 import {
   UnblockerError,
@@ -48,13 +49,21 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('wait_for', options.waitForSelector);
       }
 
+      if (options?.captureScreenshot) {
+        endpoint.searchParams.set('screenshot', 'true');
+        endpoint.searchParams.set('json_response', 'true');
+        if (options.waitForSelector) {
+          endpoint.searchParams.set('screenshot_selector', options.waitForSelector);
+        }
+      }
+
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
         signal: controller.signal,
       });
 
       const httpStatus = response.status;
-      const rawHtml = await response.text();
+      const rawText = await response.text();
 
       // ScrapingBee returns 429 when concurrency/rate limits hit, 401/403/402 when credits depleted
       if (httpStatus === 429 || httpStatus === 402) {
@@ -67,14 +76,14 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
 
       if (
         (httpStatus === 401 || httpStatus === 403) &&
-        (rawHtml.toLowerCase().includes('credit') ||
-          rawHtml.toLowerCase().includes('limit') ||
-          rawHtml.toLowerCase().includes('quota') ||
-          rawHtml.toLowerCase().includes('usage'))
+        (rawText.toLowerCase().includes('credit') ||
+          rawText.toLowerCase().includes('limit') ||
+          rawText.toLowerCase().includes('quota') ||
+          rawText.toLowerCase().includes('usage'))
       ) {
         throw new UnblockerQuotaExhaustedError(
           this.name,
-          `ScrapingBee quota depleted: ${rawHtml.slice(0, 150)}`,
+          `ScrapingBee quota depleted: ${rawText.slice(0, 150)}`,
           httpStatus
         );
       }
@@ -82,9 +91,27 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
       if (!response.ok) {
         throw new UnblockerError(
           this.name,
-          `Request failed with HTTP ${httpStatus}: ${rawHtml.slice(0, 200)}`,
+          `Request failed with HTTP ${httpStatus}: ${rawText.slice(0, 200)}`,
           httpStatus
         );
+      }
+
+      let rawHtml = rawText;
+      let screenshot: Buffer | undefined;
+
+      if (options?.captureScreenshot) {
+        try {
+          const parsed = JSON.parse(rawText) as {
+            body?: string;
+            screenshot?: string;
+          };
+          if (parsed.body) {
+            rawHtml = parsed.body;
+          }
+          screenshot = decodeBase64Screenshot(parsed.screenshot);
+        } catch {
+          rawHtml = rawText;
+        }
       }
 
       // Verify that the destination page itself did not return an unhandled challenge
@@ -95,6 +122,7 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
         httpStatus,
         url: targetUrl,
         durationMs: Date.now() - startTime,
+        screenshot,
       };
     } catch (err) {
       if (err instanceof UnblockerError) {

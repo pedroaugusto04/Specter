@@ -32,15 +32,21 @@ import {
   useUpdateIntegrationsMutation,
 } from '@/hooks/useDashboardQueries';
 import { api, type SessionDto, type UserIntegrationsDto } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, DEFAULT_TIMEZONE, formatDateTime } from '@/lib/utils';
 
 export interface IntegrationsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved?: (integrations: UserIntegrationsDto) => void;
+  timeZone?: string;
 }
 
-export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModalProps) {
+export function IntegrationsModal({
+  isOpen,
+  onClose,
+  onSaved,
+  timeZone = DEFAULT_TIMEZONE,
+}: IntegrationsModalProps) {
   const [activeTab, setActiveTab] = React.useState<'telegram' | 'webhook' | 'sessions'>('telegram');
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -740,11 +746,7 @@ export function IntegrationsModal({ isOpen, onClose, onSaved }: IntegrationsModa
                             </div>
                             <div className="text-[11px] text-muted-foreground">
                               {sess.cookieCount} cookies • Synced on{' '}
-                              {new Date(sess.updatedAt).toLocaleDateString('en-US')} at{' '}
-                              {new Date(sess.updatedAt).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatDateTime(sess.updatedAt, timeZone)}
                             </div>
                           </div>
                           <Button

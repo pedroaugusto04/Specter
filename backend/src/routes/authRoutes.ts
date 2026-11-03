@@ -13,7 +13,7 @@ import {
   REFRESH_COOKIE_NAME,
   serializeCookie,
 } from '../utils/cookies.js';
-import { authLoginSchema, authRegisterSchema } from './schemas.js';
+import { authLoginSchema, authProfileUpdateSchema, authRegisterSchema } from './schemas.js';
 
 export { resolveAuthenticatedUser };
 
@@ -44,9 +44,10 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
 
   app.patch('/api/auth/profile', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
-    const body = (request.body as { name?: string | null }) ?? {};
+    const body = authProfileUpdateSchema.parse(request.body);
     const updated = await authService.updateProfile(user.id, {
-      name: typeof body.name === 'string' ? body.name : body.name === null ? null : undefined,
+      name: body.name !== undefined ? body.name : undefined,
+      timezone: body.timezone,
     });
     return reply.status(200).send({ data: updated });
   });

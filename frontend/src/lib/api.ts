@@ -42,6 +42,7 @@ export interface UserDto {
   id: string;
   email: string;
   name: string | null;
+  timezone: string;
   createdAt: string;
 }
 
@@ -244,7 +245,7 @@ export const api = {
     });
   },
 
-  updateProfile(input: { name?: string | null }): Promise<UserDto> {
+  updateProfile(input: { name?: string | null; timezone?: string }): Promise<UserDto> {
     return request<UserDto>('/api/auth/profile', {
       method: 'PATCH',
       body: JSON.stringify(input),

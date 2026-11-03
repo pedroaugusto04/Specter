@@ -5,6 +5,7 @@ export interface UserDto {
   id: string;
   email: string;
   name: string | null;
+  timezone: string;
   createdAt: string;
 }
 
@@ -16,6 +17,7 @@ export const UserMapper = {
       name: row.name ?? null,
       passwordHash: row.passwordHash ?? null,
       googleId: row.googleId ?? null,
+      timezone: row.timezone ?? 'America/Sao_Paulo',
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -26,6 +28,7 @@ export const UserMapper = {
       id: entity.id,
       email: entity.email,
       name: entity.name,
+      timezone: entity.timezone || 'America/Sao_Paulo',
       createdAt: entity.createdAt.toISOString(),
     };
   },

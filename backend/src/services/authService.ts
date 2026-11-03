@@ -191,10 +191,18 @@ export class AuthService {
     return { user: userDto, tokens };
   }
 
-  async updateProfile(userId: string, input: { name?: string | null }): Promise<UserDto> {
-    const updated = await this.userRepository.updateUser(userId, {
-      name: input.name !== undefined ? input.name?.trim() || null : undefined,
-    });
+  async updateProfile(
+    userId: string,
+    input: { name?: string | null; timezone?: string }
+  ): Promise<UserDto> {
+    const patch: { name?: string | null; timezone?: string } = {};
+    if (input.name !== undefined) {
+      patch.name = input.name?.trim() || null;
+    }
+    if (input.timezone !== undefined) {
+      patch.timezone = input.timezone.trim() || 'America/Sao_Paulo';
+    }
+    const updated = await this.userRepository.updateUser(userId, patch);
     if (!updated) {
       throw new NotFoundError('User account not found.');
     }

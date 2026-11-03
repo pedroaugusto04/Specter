@@ -208,6 +208,7 @@ export default function DashboardPage() {
           onSelectJobForHistory={modals.openJobHistory}
           onEditJob={modals.openEditJob}
           onCreateClick={modals.openCreateModal}
+          timeZone={user?.timezone || 'America/Sao_Paulo'}
         />
       </main>
 
@@ -257,16 +258,22 @@ export default function DashboardPage() {
       <EditJobModal
         job={modals.editingJob}
         isOpen={Boolean(modals.editingJob)}
+        user={user}
         onClose={modals.closeEditJob}
         onUpdated={() => void invalidateJobsAndStats()}
       />
 
       {/* Snapshot and Diff Drawer */}
-      <JobRunsDrawer job={modals.selectedJob} onClose={modals.closeJobHistory} />
+      <JobRunsDrawer
+        job={modals.selectedJob}
+        onClose={modals.closeJobHistory}
+        timeZone={user?.timezone || 'America/Sao_Paulo'}
+      />
 
       <IntegrationsModal
         isOpen={modals.isIntegrationsModalOpen}
         onClose={modals.closeIntegrationsModal}
+        timeZone={user?.timezone || 'America/Sao_Paulo'}
       />
     </div>
   );

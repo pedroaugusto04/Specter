@@ -1,5 +1,6 @@
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
+import { decodeBase64Screenshot } from '../../../utils/screenshotHelper.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
 import {
   UnblockerError,
@@ -46,13 +47,23 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('wait_for', options.waitForSelector);
       }
 
+      if (options?.captureScreenshot) {
+        endpoint.searchParams.set('screenshot', 'true');
+        endpoint.searchParams.set('screenshot_format', 'jpeg');
+        endpoint.searchParams.set('screenshot_quality', '80');
+        endpoint.searchParams.set('json_response', 'true');
+        if (options.waitForSelector) {
+          endpoint.searchParams.set('screenshot_selector', options.waitForSelector);
+        }
+      }
+
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
         signal: controller.signal,
       });
 
       const httpStatus = response.status;
-      const rawHtml = await response.text();
+      const rawText = await response.text();
 
       // Check for rate limit or exhausted quota
       if (httpStatus === 429 || httpStatus === 402) {
@@ -63,7 +74,7 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         );
       }
 
-      if (rawHtml.includes('PAYMENT_REQUIRED') || rawHtml.includes('QUOTA_EXCEEDED')) {
+      if (rawText.includes('PAYMENT_REQUIRED') || rawText.includes('QUOTA_EXCEEDED')) {
         throw new UnblockerQuotaExhaustedError(
           this.name,
           'ZenRows response indicated quota exceeded or payment required',
@@ -74,9 +85,32 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       if (!response.ok) {
         throw new UnblockerError(
           this.name,
-          `Request failed with HTTP ${httpStatus}: ${rawHtml.slice(0, 200)}`,
+          `Request failed with HTTP ${httpStatus}: ${rawText.slice(0, 200)}`,
           httpStatus
         );
+      }
+
+      let rawHtml = rawText;
+      let screenshot: Buffer | undefined;
+
+      if (options?.captureScreenshot) {
+        try {
+          const parsed = JSON.parse(rawText) as {
+            html?: string;
+            screenshot?: { data?: string } | string;
+          };
+          if (parsed.html) {
+            rawHtml = parsed.html;
+          }
+          const base64Str =
+            typeof parsed.screenshot === 'string'
+              ? parsed.screenshot
+              : parsed.screenshot?.data;
+          screenshot = decodeBase64Screenshot(base64Str);
+        } catch {
+          // If JSON parse fails, fallback to rawText as HTML without screenshot
+          rawHtml = rawText;
+        }
       }
 
       // Verify that the destination page itself did not return an unhandled challenge
@@ -87,6 +121,7 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         httpStatus,
         url: targetUrl,
         durationMs: Date.now() - startTime,
+        screenshot,
       };
     } catch (err) {
       if (err instanceof UnblockerError) {

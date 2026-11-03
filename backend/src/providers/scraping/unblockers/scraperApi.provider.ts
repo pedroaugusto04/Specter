@@ -1,5 +1,6 @@
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
+import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
 import {
   UnblockerError,
@@ -42,6 +43,10 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         endpoint.searchParams.set('country_code', 'br');
       }
 
+      if (options?.captureScreenshot) {
+        endpoint.searchParams.set('screenshot', 'true');
+      }
+
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
         signal: controller.signal,
@@ -81,6 +86,12 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         );
       }
 
+      let screenshot: Buffer | undefined;
+      const screenshotUrl = response.headers.get('sa-screenshot');
+      if (options?.captureScreenshot && screenshotUrl) {
+        screenshot = await fetchRemoteScreenshot(screenshotUrl, this.fetchFn, controller.signal);
+      }
+
       // Verify that the destination page itself did not return an unhandled challenge
       detectAntiBotBlock(targetUrl, rawHtml, httpStatus);
 
@@ -89,6 +100,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         httpStatus,
         url: targetUrl,
         durationMs: Date.now() - startTime,
+        screenshot,
       };
     } catch (err) {
       if (err instanceof UnblockerError) {

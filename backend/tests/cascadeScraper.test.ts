@@ -44,6 +44,40 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(calledUrl.searchParams.get('js_render')).toBe('true');
     });
 
+    it('captures screenshot when captureScreenshot is enabled in ZenRows', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              html: '<html><body><h1>Product Page</h1></body></html>',
+              screenshot: { data: Buffer.from('fake-screenshot-data').toString('base64') },
+            })
+          ),
+      } as unknown as Response);
+
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product', {
+        captureScreenshot: true,
+        waitForSelector: '.price-tag',
+      });
+
+      expect(result.rawHtml).toBe('<html><body><h1>Product Page</h1></body></html>');
+      expect(result.screenshot).toBeDefined();
+      expect(result.screenshot?.toString()).toBe('fake-screenshot-data');
+
+      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      expect(calledUrl.searchParams.get('screenshot')).toBe('true');
+      expect(calledUrl.searchParams.get('json_response')).toBe('true');
+      expect(calledUrl.searchParams.get('screenshot_format')).toBe('jpeg');
+      expect(calledUrl.searchParams.get('screenshot_selector')).toBe('.price-tag');
+    });
+
     it('throws UnblockerQuotaExhaustedError when HTTP 429 rate-limited', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 429,
@@ -62,6 +96,40 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
   });
 
   describe('ScraperApiUnblockerProvider', () => {
+    it('captures screenshot when captureScreenshot is enabled in ScraperAPI', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () => Promise.resolve('<html><body><h1>ScraperApi Product</h1></body></html>'),
+          headers: new Headers({
+            'sa-screenshot': 'https://api.scraperapi.com/screenshots/fake-id.png',
+          }),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          arrayBuffer: () => Promise.resolve(Buffer.from('scraperapi-screenshot-data')),
+        } as unknown as Response);
+
+      const provider = new ScraperApiUnblockerProvider({
+        apiKey: 'test-scraperapi-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product', {
+        captureScreenshot: true,
+      });
+
+      expect(result.rawHtml).toBe('<html><body><h1>ScraperApi Product</h1></body></html>');
+      expect(result.screenshot).toBeDefined();
+      expect(result.screenshot?.toString()).toBe('scraperapi-screenshot-data');
+
+      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      expect(calledUrl.searchParams.get('screenshot')).toBe('true');
+    });
+
     it('detects quota depletion on HTTP 403 with quota response message', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 403,
@@ -83,6 +151,39 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
   });
 
   describe('ScrapingBeeUnblockerProvider', () => {
+    it('captures screenshot when captureScreenshot is enabled in ScrapingBee', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              body: '<html><body><h1>ScrapingBee Product</h1></body></html>',
+              screenshot: Buffer.from('scrapingbee-screenshot-data').toString('base64'),
+            })
+          ),
+      } as unknown as Response);
+
+      const provider = new ScrapingBeeUnblockerProvider({
+        apiKey: 'test-bee-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product', {
+        captureScreenshot: true,
+        waitForSelector: '#price',
+      });
+
+      expect(result.rawHtml).toBe('<html><body><h1>ScrapingBee Product</h1></body></html>');
+      expect(result.screenshot).toBeDefined();
+      expect(result.screenshot?.toString()).toBe('scrapingbee-screenshot-data');
+
+      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      expect(calledUrl.searchParams.get('screenshot')).toBe('true');
+      expect(calledUrl.searchParams.get('json_response')).toBe('true');
+      expect(calledUrl.searchParams.get('screenshot_selector')).toBe('#price');
+    });
+
     it('throws UnblockerQuotaExhaustedError on 401 quota limit', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 401,
@@ -101,6 +202,40 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
   });
 
   describe('CrawlbaseUnblockerProvider', () => {
+    it('captures screenshot when captureScreenshot is enabled in Crawlbase', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () => Promise.resolve('<html><body><h1>Crawlbase Product</h1></body></html>'),
+          headers: new Headers({
+            screenshot_url: 'https://api.crawlbase.com/screenshots/fake-id.jpg',
+          }),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          arrayBuffer: () => Promise.resolve(Buffer.from('crawlbase-screenshot-data')),
+        } as unknown as Response);
+
+      const provider = new CrawlbaseUnblockerProvider({
+        token: 'test-crawlbase-token',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product', {
+        captureScreenshot: true,
+      });
+
+      expect(result.rawHtml).toBe('<html><body><h1>Crawlbase Product</h1></body></html>');
+      expect(result.screenshot).toBeDefined();
+      expect(result.screenshot?.toString()).toBe('crawlbase-screenshot-data');
+
+      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      expect(calledUrl.searchParams.get('screenshot')).toBe('true');
+    });
+
     it('throws UnblockerQuotaExhaustedError on 503 or 429', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 503,

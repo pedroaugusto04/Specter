@@ -9,12 +9,14 @@ export interface CreateUserInput {
   name?: string | null;
   passwordHash?: string | null;
   googleId?: string | null;
+  timezone?: string;
 }
 
 export interface UpdateUserPatch {
   name?: string | null;
   passwordHash?: string | null;
   googleId?: string | null;
+  timezone?: string;
 }
 
 export interface IUserRepository {
@@ -56,6 +58,7 @@ export class DrizzleUserRepository implements IUserRepository {
         name: input.name ?? null,
         passwordHash: input.passwordHash ?? null,
         googleId: input.googleId ?? null,
+        ...(input.timezone ? { timezone: input.timezone } : {}),
       })
       .returning();
 

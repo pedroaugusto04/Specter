@@ -167,6 +167,28 @@ export const authLoginSchema = z.object({
   password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
 });
 
+export const authProfileUpdateSchema = z.object({
+  name: z.string().trim().nullable().optional(),
+  timezone: z
+    .string()
+    .trim()
+    .refine(
+      (tz) => {
+        try {
+          Intl.DateTimeFormat(undefined, { timeZone: tz });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      {
+        message:
+          'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
+      }
+    )
+    .optional(),
+});
+
 export const updateIntegrationsSchema = z.object({
   telegramEnabled: z.boolean().default(false),
   telegramChatId: z.string().trim().optional().nullable(),

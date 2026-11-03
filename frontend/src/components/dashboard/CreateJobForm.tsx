@@ -40,6 +40,7 @@ export function CreateJobForm({
   const [step, setStep] = React.useState<'form' | 'auth'>('form');
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
+  const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
   const [notificationEmail, setNotificationEmail] = React.useState('');
   const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
@@ -49,6 +50,13 @@ export function CreateJobForm({
   const [useCustomCron, setUseCustomCron] = React.useState(false);
   const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+
+  // If email alert is toggled and user is logged in, auto pre-fill with their email
+  React.useEffect(() => {
+    if (sendEmailAlerts && user?.email && !notificationEmail) {
+      setNotificationEmail(user.email);
+    }
+  }, [user, sendEmailAlerts, notificationEmail]);
 
   const createJobMutation = useCreateJobMutation();
   const probeUrlMutation = useProbeUrlMutation();
@@ -68,7 +76,7 @@ export function CreateJobForm({
   const isDirty = Boolean(
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
-    notificationEmail.trim().length > 0 ||
+    (sendEmailAlerts && notificationEmail.trim().length > 0) ||
     (showCustomWebhook && webhookUrl.trim().length > 0) ||
     captureScreenshotOnChange ||
     (useCustomCron && customCron !== '0 */6 * * *')
@@ -149,10 +157,14 @@ export function CreateJobForm({
     setLoading(true);
     setGlobalError(null);
     try {
+      const emailToSend = sendEmailAlerts
+        ? notificationEmail.trim() || activeUser?.email || ''
+        : '';
+
       await createJobMutation.mutateAsync({
         url: url.trim(),
         userPrompt: userPrompt.trim(),
-        notificationEmail: notificationEmail.trim() || activeUser?.email || '',
+        notificationEmail: emailToSend,
         webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
         cronExpression: effectiveCron.trim(),
         captureScreenshotOnChange,
@@ -160,6 +172,7 @@ export function CreateJobForm({
 
       setUrl('');
       setUserPrompt('');
+      setSendEmailAlerts(false);
       setNotificationEmail('');
       setShowCustomWebhook(false);
       setWebhookUrl('');
@@ -201,10 +214,18 @@ export function CreateJobForm({
     e.preventDefault();
     setGlobalError(null);
 
+    if (sendEmailAlerts && !notificationEmail.trim() && !user?.email) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        notificationEmail: 'Please enter an alert email address.',
+      }));
+      return;
+    }
+
     const validation = validateJobForm({
       url,
       userPrompt,
-      notificationEmail,
+      notificationEmail: sendEmailAlerts ? notificationEmail : '',
       cronExpression: effectiveCron,
     });
 
@@ -235,7 +256,7 @@ export function CreateJobForm({
           </div>
         )}
         <AuthForm
-          initialEmail={notificationEmail.trim()}
+          initialEmail={sendEmailAlerts ? notificationEmail.trim() : ''}
           defaultMode="register"
           onBack={() => {
             setStep('form');
@@ -248,7 +269,7 @@ export function CreateJobForm({
                 JSON.stringify({
                   url: url.trim(),
                   userPrompt: userPrompt.trim(),
-                  notificationEmail: notificationEmail.trim(),
+                  notificationEmail: sendEmailAlerts ? notificationEmail.trim() : '',
                   webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
                   cronExpression: effectiveCron.trim(),
                 })
@@ -281,81 +302,59 @@ export function CreateJobForm({
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
-          label="Target Website URL"
-          htmlFor="target-url"
-          required
-          error={fieldErrors.url}
-          hint={
-            probeState.status === 'probing' ? (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                Checking website accessibility...
-              </span>
-            ) : probeState.status === 'accessible' && !fieldErrors.url ? (
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <CheckCircle2 className="h-3 w-3 text-foreground" />
-                Website verified and accessible for automated monitoring.
-              </span>
-            ) : probeState.status === 'blocked' ? (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                Protected by anti-bot checks. Background residential unblockers will handle
-                extraction.
-              </span>
-            ) : (
-              'Website URL to monitor for dynamic updates.'
-            )
-          }
-        >
-          <Input
-            id="target-url"
-            type="url"
-            placeholder="https://example.com/products/item"
-            value={url}
-            hasError={Boolean(fieldErrors.url)}
-            aria-describedby={fieldErrors.url ? 'target-url-error' : undefined}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              clearFieldError('url');
-              setDetectedSession(null);
-              if (probeState.status !== 'idle') {
-                setProbeState({ status: 'idle' });
-              }
-            }}
-            onBlur={handleUrlBlur}
-          />
-          {detectedSession && (
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-md">
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                Sessão autenticada ativa detectada ({detectedSession.domain}) via Extensão Specter.
-                O robô navegará logado!
-              </span>
-            </div>
-          )}
-        </FormField>
-
-        <FormField
-          label="Alert Email"
-          htmlFor="notify-email"
-          error={fieldErrors.notificationEmail}
-          hint="Optional. Destination email for detected change reports."
-        >
-          <Input
-            id="notify-email"
-            type="email"
-            placeholder="alerts@company.com (optional)"
-            value={notificationEmail}
-            hasError={Boolean(fieldErrors.notificationEmail)}
-            aria-describedby={fieldErrors.notificationEmail ? 'notify-email-error' : undefined}
-            onChange={(e) => {
-              setNotificationEmail(e.target.value);
-              clearFieldError('notificationEmail');
-            }}
-          />
-        </FormField>
-      </div>
+      <FormField
+        label="Target Website URL"
+        htmlFor="target-url"
+        required
+        error={fieldErrors.url}
+        hint={
+          probeState.status === 'probing' ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              Checking website accessibility...
+            </span>
+          ) : probeState.status === 'accessible' && !fieldErrors.url ? (
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <CheckCircle2 className="h-3 w-3 text-foreground" />
+              Website verified and accessible for automated monitoring.
+            </span>
+          ) : probeState.status === 'blocked' ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              Protected by anti-bot checks. Background residential unblockers will handle
+              extraction.
+            </span>
+          ) : (
+            'Website URL to monitor for dynamic updates.'
+          )
+        }
+      >
+        <Input
+          id="target-url"
+          type="url"
+          placeholder="https://example.com/products/item"
+          value={url}
+          hasError={Boolean(fieldErrors.url)}
+          aria-describedby={fieldErrors.url ? 'target-url-error' : undefined}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            clearFieldError('url');
+            setDetectedSession(null);
+            if (probeState.status !== 'idle') {
+              setProbeState({ status: 'idle' });
+            }
+          }}
+          onBlur={handleUrlBlur}
+        />
+        {detectedSession && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-md">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Active authenticated session detected ({detectedSession.domain}) via Specter
+              Extension. Scraper will run authenticated!
+            </span>
+          </div>
+        )}
+      </FormField>
 
       <FormField
         label={
@@ -574,6 +573,50 @@ export function CreateJobForm({
               placeholder="https://your-domain.com/webhook (optional)"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+          </FormField>
+        )}
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            id="send-email-alerts"
+            checked={sendEmailAlerts}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setSendEmailAlerts(checked);
+              if (checked) {
+                if (!notificationEmail && user?.email) {
+                  setNotificationEmail(user.email);
+                }
+              } else {
+                clearFieldError('notificationEmail');
+              }
+            }}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+          />
+          <span className="text-sm font-medium text-foreground">Send notifications via email</span>
+        </label>
+
+        {sendEmailAlerts && (
+          <FormField
+            label="Alert Email Address"
+            htmlFor="notify-email"
+            required
+            error={fieldErrors.notificationEmail}
+            hint="Destination email address for detected change notifications."
+          >
+            <Input
+              id="notify-email"
+              type="email"
+              placeholder={user?.email || 'alerts@company.com'}
+              value={notificationEmail}
+              hasError={Boolean(fieldErrors.notificationEmail)}
+              aria-describedby={fieldErrors.notificationEmail ? 'notify-email-error' : undefined}
+              onChange={(e) => {
+                setNotificationEmail(e.target.value);
+                clearFieldError('notificationEmail');
+              }}
             />
           </FormField>
         )}

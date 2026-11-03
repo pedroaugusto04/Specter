@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Calendar, Check, Layers, LogOut, Mail, Save, Shield, User } from 'lucide-react';
+import { Calendar, Check, Globe, Layers, LogOut, Mail, Save, Shield, User } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { useUpdateProfileMutation } from '@/hooks/useDashboardQueries';
+import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from '@/lib/utils';
 import type { UserDto } from '@/lib/api';
 
 export interface ProfileModalProps {
@@ -28,6 +29,7 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const updateProfileMutation = useUpdateProfileMutation();
   const [name, setName] = React.useState('');
+  const [timezone, setTimezone] = React.useState(DEFAULT_TIMEZONE);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -35,6 +37,7 @@ export function ProfileModal({
   React.useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setTimezone(user.timezone || DEFAULT_TIMEZONE);
       setErrorMessage(null);
       setSaveSuccess(false);
     }
@@ -49,7 +52,10 @@ export function ProfileModal({
     setSaveSuccess(false);
 
     try {
-      const updated = await updateProfileMutation.mutateAsync({ name: name.trim() || null });
+      const updated = await updateProfileMutation.mutateAsync({
+        name: name.trim() || null,
+        timezone,
+      });
       onUserUpdated(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -67,13 +73,15 @@ export function ProfileModal({
       return new Intl.DateTimeFormat('en-US', {
         dateStyle: 'medium',
         timeStyle: 'short',
+        timeZone: user.timezone || DEFAULT_TIMEZONE,
       }).format(d);
     } catch {
       return user.createdAt;
     }
   })();
 
-  const isDirty = (user.name || '') !== name.trim();
+  const isDirty =
+    (user.name || '') !== name.trim() || (user.timezone || DEFAULT_TIMEZONE) !== timezone;
 
   return (
     <Dialog
@@ -115,7 +123,7 @@ export function ProfileModal({
         {saveSuccess && (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-600 dark:text-emerald-400">
             <Check className="h-3.5 w-3.5" />
-            <span>Profile name updated successfully.</span>
+            <span>Profile updated successfully.</span>
           </div>
         )}
 
@@ -126,26 +134,46 @@ export function ProfileModal({
             htmlFor="profile-name"
             hint="Your public or team display name."
           >
-            <div className="flex items-center gap-2">
-              <Input
-                id="profile-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. John Doe"
-                className="flex-1"
-                disabled={isSaving}
-              />
-              <Button
-                type="submit"
-                disabled={!isDirty || isSaving}
-                className="h-9 px-3.5 text-xs shrink-0"
-              >
-                <Save className="h-3.5 w-3.5 mr-1" />
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
+            <Input
+              id="profile-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Doe"
+              disabled={isSaving}
+            />
           </FormField>
+
+          <FormField
+            label="Preferred Timezone"
+            htmlFor="profile-timezone"
+            hint="All dates, check timestamps, and change histories will render in this timezone."
+          >
+            <select
+              id="profile-timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              disabled={isSaving}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value} className="bg-background text-foreground">
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <div className="flex justify-end pt-1">
+            <Button
+              type="submit"
+              disabled={!isDirty || isSaving}
+              className="h-9 px-4 text-xs font-medium"
+            >
+              <Save className="h-3.5 w-3.5 mr-1.5" />
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
         </form>
 
         {/* Account Details Overview */}
@@ -164,6 +192,15 @@ export function ProfileModal({
               <span className="font-mono text-foreground truncate max-w-[200px]" title={user.email}>
                 {user.email}
               </span>
+            </div>
+
+            {/* Timezone */}
+            <div className="flex items-center justify-between py-1 border-b border-border/40">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Globe className="h-3.5 w-3.5" />
+                <span>Active Timezone</span>
+              </div>
+              <span className="font-mono text-foreground">{user.timezone || DEFAULT_TIMEZONE}</span>
             </div>
 
             {/* Monitors count */}

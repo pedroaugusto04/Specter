@@ -175,7 +175,7 @@ export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name: string | null }) => api.updateProfile(data),
+    mutationFn: (data: { name?: string | null; timezone?: string }) => api.updateProfile(data),
     onSuccess: (updated) => {
       queryClient.setQueryData(dashboardKeys.user, updated);
     },

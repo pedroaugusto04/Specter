@@ -295,4 +295,36 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       clearedCookies.some((c) => c.startsWith('specter_refresh=;') && c.includes('Max-Age=0'))
     ).toBe(true);
   });
+
+  it('updates user profile timezone and defaults to America/Sao_Paulo', async () => {
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'tz@example.com', password: 'password123' },
+    });
+    expect(regRes.statusCode).toBe(201);
+    const regBody = regRes.json();
+    expect(regBody.data.timezone).toBe('America/Sao_Paulo');
+
+    const cookie = regRes.headers['set-cookie'] as string[];
+
+    // Update timezone to America/New_York
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/profile',
+      headers: { cookie },
+      payload: { timezone: 'America/New_York' },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().data.timezone).toBe('America/New_York');
+
+    // Reject invalid timezone
+    const invalidRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/profile',
+      headers: { cookie },
+      payload: { timezone: 'Invalid/NonExistent_Zone' },
+    });
+    expect(invalidRes.statusCode).toBe(400);
+  });
 });
