@@ -56,7 +56,7 @@ export class AgyCliCompilerProvider implements ICompilerProvider {
     await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
     await fs.writeFile(
       promptFile,
-      buildCompilerPrompt(domFile, outputFile, userPrompt, input.existingFieldKeys),
+      buildCompilerPrompt(domFile, outputFile, userPrompt),
       'utf-8'
     );
 
