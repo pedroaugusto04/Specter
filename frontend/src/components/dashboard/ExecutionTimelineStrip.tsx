@@ -17,8 +17,12 @@ export function ExecutionTimelineStrip({
   selectedRunId,
   onSelectRun,
 }: ExecutionTimelineStripProps) {
-  const [hoveredRun, setHoveredRun] = React.useState<JobRunDto | null>(null);
-  const [tooltipPos, setTooltipPos] = React.useState<{ x: number } | null>(null);
+  const [tooltipState, setTooltipState] = React.useState<{
+    run: JobRunDto;
+    x: number;
+    y: number;
+    align: 'left' | 'center' | 'right';
+  } | null>(null);
 
   if (runs.length === 0) return null;
 
@@ -66,7 +70,7 @@ export function ExecutionTimelineStrip({
       {/* Timeline Strip */}
       <div className="relative pt-2 pb-1">
         <div className="flex items-center gap-1 h-8 w-full">
-          {chronologicalRuns.map((run) => {
+          {chronologicalRuns.map((run, index) => {
             const isChange = run.hasChanges === 'YES';
             const isInitial = run.hasChanges === 'INITIAL';
             const isFailed = run.status === 'FAILED';
@@ -87,16 +91,25 @@ export function ExecutionTimelineStrip({
                 type="button"
                 onClick={() => onSelectRun?.(run)}
                 onMouseEnter={(e) => {
-                  const rect = e.currentTarget.parentElement?.getBoundingClientRect();
                   const targetRect = e.currentTarget.getBoundingClientRect();
-                  if (rect) {
-                    setTooltipPos({ x: targetRect.left - rect.left + targetRect.width / 2 });
-                  }
-                  setHoveredRun(run);
+                  const total = chronologicalRuns.length;
+                  const align: 'left' | 'center' | 'right' =
+                    index <= 4 ? 'left' : index >= total - 5 ? 'right' : 'center';
+
+                  setTooltipState({
+                    run,
+                    x:
+                      align === 'left'
+                        ? targetRect.left
+                        : align === 'right'
+                          ? targetRect.right
+                          : targetRect.left + targetRect.width / 2,
+                    y: targetRect.top - 8,
+                    align,
+                  });
                 }}
                 onMouseLeave={() => {
-                  setHoveredRun(null);
-                  setTooltipPos(null);
+                  setTooltipState(null);
                 }}
                 className={`relative flex-1 h-full rounded-xs transition-all cursor-pointer ${barBg} ${
                   isSelected
@@ -109,37 +122,46 @@ export function ExecutionTimelineStrip({
           })}
         </div>
 
-        {/* Hover Tooltip */}
-        {hoveredRun && tooltipPos && (
+        {/* Viewport Fixed Tooltip (Escapes all drawer & overflow bounds) */}
+        {tooltipState && (
           <div
-            className="pointer-events-none absolute bottom-12 z-50 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card p-2.5 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border"
-            style={{ left: `${tooltipPos.x}px` }}
+            className={`pointer-events-none fixed z-100 whitespace-nowrap rounded-md border border-border bg-card p-2.5 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border ${
+              tooltipState.align === 'left'
+                ? '-translate-y-full'
+                : tooltipState.align === 'right'
+                  ? '-translate-x-full -translate-y-full'
+                  : '-translate-x-1/2 -translate-y-full'
+            }`}
+            style={{
+              left: `${tooltipState.x}px`,
+              top: `${tooltipState.y}px`,
+            }}
           >
             <div className="flex items-center gap-2 font-medium text-foreground">
-              <span>{formatDateTime(hoveredRun.executedAt, timeZone)}</span>
+              <span>{formatDateTime(tooltipState.run.executedAt, timeZone)}</span>
               <span
                 className={`text-[10px] uppercase px-1 py-0.2 rounded font-semibold ${
-                  hoveredRun.status === 'FAILED'
+                  tooltipState.run.status === 'FAILED'
                     ? 'bg-red-500/20 text-red-500'
-                    : hoveredRun.hasChanges === 'YES'
+                    : tooltipState.run.hasChanges === 'YES'
                       ? 'bg-amber-500/20 text-amber-500'
-                      : hoveredRun.hasChanges === 'INITIAL'
+                      : tooltipState.run.hasChanges === 'INITIAL'
                         ? 'bg-zinc-500/20 text-foreground'
                         : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {hoveredRun.status === 'FAILED'
+                {tooltipState.run.status === 'FAILED'
                   ? 'FAILED'
-                  : hoveredRun.hasChanges === 'YES'
+                  : tooltipState.run.hasChanges === 'YES'
                     ? 'CHANGE'
-                    : hoveredRun.hasChanges === 'INITIAL'
+                    : tooltipState.run.hasChanges === 'INITIAL'
                       ? 'BASELINE'
                       : 'UNCHANGED'}
               </span>
             </div>
             <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
-              {hoveredRun.durationMs !== null && <span>{hoveredRun.durationMs}ms</span>}
-              {hoveredRun.httpStatus && <span>HTTP {hoveredRun.httpStatus}</span>}
+              {tooltipState.run.durationMs !== null && <span>{tooltipState.run.durationMs}ms</span>}
+              {tooltipState.run.httpStatus && <span>HTTP {tooltipState.run.httpStatus}</span>}
               <span className="text-primary underline">Click to inspect</span>
             </div>
           </div>
