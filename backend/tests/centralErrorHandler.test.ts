@@ -71,14 +71,14 @@ describe('Centralized Error Handler Middleware', () => {
     expect(res404.statusCode).toBe(404);
     expect(res404.json()).toEqual({
       error: 'NOT_FOUND',
-      message: 'Item not found',
+      message: 'We could not complete this request. Please try again later.',
     });
 
     const res401 = await app.inject({ method: 'GET', url: '/test-401' });
     expect(res401.statusCode).toBe(401);
     expect(res401.json()).toEqual({
       error: 'UNAUTHORIZED',
-      message: 'Unauthorized access',
+      message: 'We could not complete this request. Please try again later.',
     });
   });
 
@@ -94,7 +94,7 @@ describe('Centralized Error Handler Middleware', () => {
     expect(res.statusCode).toBe(500);
     expect(res.json()).toEqual({
       error: 'INTERNAL_SERVER_ERROR',
-      message: 'Internal server error.',
+      message: 'We could not complete this request. Please try again later.',
     });
   });
 });

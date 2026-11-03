@@ -56,12 +56,13 @@ services:
       REDIS_PORT: 6379
       AGY_CLI_PATH: /usr/local/bin/agy
       CODEX_CLI_PATH: /usr/local/bin/codex
+      CODEX_HOME: /root/.codex
     ports:
       - '${PORT:-3001}:3001'
     volumes:
       - /home/ubuntu/.local/bin/agy:/usr/local/bin/agy:ro
       - /home/ubuntu/.gemini:/root/.gemini
-      - /home/ubuntu/.codex:/root/.codex:ro
+      - /home/ubuntu/.codex:/root/.codex
       - /tmp/scraper_jobs:/tmp/scraper_jobs
     depends_on:
       postgres:

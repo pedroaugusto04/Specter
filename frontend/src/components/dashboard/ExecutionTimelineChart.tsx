@@ -22,7 +22,7 @@ import {
   formatNumericValue,
   type ChartDataPoint,
 } from '@/lib/chartUtils';
-import { formatCompactDate, formatDateTime } from '@/lib/utils';
+import { formatCompactDate, formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 interface ExecutionTimelineChartProps {
   runs: JobRunDto[];
@@ -596,7 +596,7 @@ export function ExecutionTimelineChart({
 
                   {run.errorMessage && (
                     <div className="mt-2 text-xs font-mono text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
-                      {run.errorMessage}
+                      {parseErrorMessage(run.errorMessage)?.description}
                     </div>
                   )}
                 </div>

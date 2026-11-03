@@ -120,7 +120,9 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
 
     const updated = await repository.findById(job.id);
     expect(updated?.status).toBe('FAILED');
-    expect(updated?.lastError).toContain('Required field');
+    expect(updated?.lastError).toBe(
+      'The requested information could not be verified on the page. Check the instructions and try again.'
+    );
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
   });
 

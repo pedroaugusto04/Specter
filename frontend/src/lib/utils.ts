@@ -146,24 +146,7 @@ export interface ParsedErrorMessage {
  */
 export function parseErrorMessage(rawError: string | null | undefined): ParsedErrorMessage | null {
   if (!rawError) return null;
-  const raw = String(rawError).trim();
-  if (!raw) return null;
-
-  // Discard any line that looks like a stack trace or code location
-  const cleanLines = raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(
-      (l) =>
-        Boolean(l) &&
-        !l.startsWith('at ') &&
-        !l.includes('file:///') &&
-        !l.includes('/app/') &&
-        !l.includes('node_modules')
-    );
-
-  const firstLine = cleanLines[0] ?? '';
-  const lower = (firstLine || raw).toLowerCase();
+  const lower = String(rawError).toLowerCase();
 
   if (
     lower.includes('anti-bot') ||
@@ -173,35 +156,19 @@ export function parseErrorMessage(rawError: string | null | undefined): ParsedEr
     lower.includes('cloudflare') ||
     lower.includes('botblocked')
   ) {
-    let description =
-      'The target website identified automated access and required a security check.';
-    if (
-      lower.includes('redirect') ||
-      lower.includes('redirecionamento') ||
-      lower.includes('account-verification')
-    ) {
-      description =
-        'The target website redirected to a human verification screen (CAPTCHA / checkpoint).';
-    } else if (lower.includes('403') || lower.includes('429')) {
-      description =
-        'The target website blocked automated access (HTTP 403/429 - WAF / Cloudflare protection).';
-    } else if (lower.includes('challenge') || lower.includes('desafio')) {
-      description =
-        'The target page presented an interactive security challenge (Cloudflare / CAPTCHA).';
-    }
-
     return {
       category: 'anti-bot',
-      title: 'Anti-Bot Block Detected',
-      description,
+      title: 'Website Access Blocked',
+      description:
+        'The website is blocking access right now. Try again later or connect an authenticated session.',
     };
   }
 
   if (lower.includes('timeout') || lower.includes('tempo limite')) {
     return {
       category: 'timeout',
-      title: 'Navigation Timeout',
-      description: 'The target website took too long to respond and navigation timed out.',
+      title: 'Website Took Too Long to Respond',
+      description: 'The website took too long to respond. Please try again later.',
     };
   }
 
@@ -213,38 +180,15 @@ export function parseErrorMessage(rawError: string | null | undefined): ParsedEr
   ) {
     return {
       category: 'selector',
-      title: 'Selector Mismatch',
-      description: 'Requested data was not found on the page. The site layout may have changed.',
-    };
-  }
-
-  // Strip error class names (e.g. "Error: ", "TypeError: ") and file paths
-  const cleaned = firstLine
-    .replace(/^[A-Za-z0-9_]+Error:\s*/, '')
-    .replace(/\(?file:\/\/\/[^)]*\)?/g, '')
-    .replace(/\/app\/[^\s)]*/g, '')
-    .replace(/[A-Za-z]:\\[^\s)]*/g, '')
-    .trim();
-
-  // If the error message was pure technical noise, show a user-friendly generic message
-  const isTechnicalNoise =
-    !cleaned ||
-    cleaned.includes('Cannot read properties') ||
-    cleaned.includes('is not a function') ||
-    cleaned.includes('ECONNREFUSED') ||
-    cleaned.includes('ETIMEDOUT');
-
-  if (isTechnicalNoise) {
-    return {
-      category: 'generic',
-      title: 'Execution Failure',
-      description: 'An unexpected instability occurred while processing this request.',
+      title: 'Requested Information Not Found',
+      description:
+        'The requested information could not be verified on the page. Check the instructions and try again.',
     };
   }
 
   return {
     category: 'generic',
-    title: cleaned,
-    description: cleaned,
+    title: 'Request Could Not Be Completed',
+    description: 'We could not complete this request. Please try again later.',
   };
 }

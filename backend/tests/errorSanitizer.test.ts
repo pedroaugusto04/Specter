@@ -18,7 +18,7 @@ describe('formatUserErrorMessage (Transparent & User-Friendly Errors)', () => {
     const userFriendly = formatUserErrorMessage(rawError);
 
     expect(userFriendly).toBe(
-      'Anti-bot block detected: target website redirected to a security checkpoint or CAPTCHA verification screen.'
+      'The website is blocking access right now. Try again later or connect an authenticated session.'
     );
     expect(userFriendly).not.toContain('file:///');
     expect(userFriendly).not.toContain('at detectAntiBotBlock');
@@ -28,27 +28,27 @@ describe('formatUserErrorMessage (Transparent & User-Friendly Errors)', () => {
   it('formats HTTP 403/429 anti-bot blocks clearly', () => {
     const err403 = new AntiBotBlockedError('Forbidden', 403);
     expect(formatUserErrorMessage(err403)).toBe(
-      'Anti-bot block detected: target website refused access (HTTP 403).'
+      'The website is blocking access right now. Try again later or connect an authenticated session.'
     );
 
     const err429 = new AntiBotBlockedError('Too Many Requests', 429);
     expect(formatUserErrorMessage(err429)).toBe(
-      'Anti-bot block detected: target website refused access (HTTP 429).'
+      'The website is blocking access right now. Try again later or connect an authenticated session.'
     );
   });
 
   it('formats navigation timeouts, selector mismatches, and compiler errors in clear language', () => {
-    expect(formatUserErrorMessage(new NavigationTimeoutError('timeout 30000ms'))).toContain(
-      'Navigation timeout'
+    expect(formatUserErrorMessage(new NavigationTimeoutError('timeout 30000ms'))).toBe(
+      'The website took too long to respond. Please try again later.'
     );
-    expect(formatUserErrorMessage(new SelectorMismatchError('empty'))).toContain(
-      'Selector mismatch'
+    expect(formatUserErrorMessage(new SelectorMismatchError('selector .price missing'))).toBe(
+      'The requested information could not be verified on the page. Check the instructions and try again.'
     );
-    expect(formatUserErrorMessage(new CompilerTimeoutError('cli dead-man'))).toContain(
-      'Compilation timeout'
+    expect(formatUserErrorMessage(new CompilerTimeoutError('CLI dead-man switch'))).toBe(
+      'Monitor setup took too long to complete. Please try again.'
     );
-    expect(formatUserErrorMessage(new CompilerValidationError('smoke fail'))).toContain(
-      'Extractor validation failed'
+    expect(formatUserErrorMessage(new CompilerValidationError('Expected selector .price'))).toBe(
+      'The requested information could not be verified on the page. Check the instructions and try again.'
     );
   });
 
@@ -59,7 +59,7 @@ describe('formatUserErrorMessage (Transparent & User-Friendly Errors)', () => {
 
     const cleaned = formatUserErrorMessage(genericErr);
 
-    expect(cleaned).toBe('Failed to connect to host');
+    expect(cleaned).toBe('We could not complete this request. Please try again later.');
     expect(cleaned).not.toContain('node:net');
     expect(cleaned).not.toContain('file:///');
   });

@@ -2,6 +2,7 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { DomainError, ValidationError } from '../errors/domainErrors.js';
 import { logger } from '../utils/logger.js';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 
 export function centralErrorHandler(
   error: FastifyError | Error,
@@ -39,7 +40,7 @@ export function centralErrorHandler(
   if (error instanceof DomainError) {
     return reply.status(error.statusCode).send({
       error: error.code,
-      message: error.message,
+      message: formatUserErrorMessage(error),
     });
   }
 
@@ -55,7 +56,7 @@ export function centralErrorHandler(
   if ((error as any).statusCode === 429 || (error as any).code === 'FST_ERR_RATE_LIMIT_EXCEEDED') {
     return reply.status(429).send({
       error: (error as any).error || 'TOO_MANY_REQUESTS',
-      message: error.message || 'Rate limit exceeded. Please try again later.',
+      message: 'Too many requests. Please wait a moment and try again.',
       ...((error as any).retryAfterSeconds
         ? { retryAfterSeconds: (error as any).retryAfterSeconds }
         : {}),
@@ -72,6 +73,6 @@ export function centralErrorHandler(
   const statusCode = (error as FastifyError).statusCode ?? 500;
   return reply.status(statusCode).send({
     error: 'INTERNAL_SERVER_ERROR',
-    message: statusCode === 500 ? 'Internal server error.' : error.message,
+    message: 'We could not complete this request. Please try again later.',
   });
 }

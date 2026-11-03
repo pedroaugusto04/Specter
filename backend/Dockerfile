@@ -28,6 +28,9 @@ RUN apt-get update && \
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
+# Keep the local Codex provider available inside the backend container.
+RUN npm install --global @openai/codex@0.163.0
+
 # Install Playwright browser binaries with system dependencies
 RUN npx playwright install --with-deps chromium
 

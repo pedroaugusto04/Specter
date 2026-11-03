@@ -24,8 +24,6 @@ export const envSchema = z.object({
   COMPILER_PROVIDER: z.enum(['agy', 'codex']).default('agy'),
   AGY_CLI_PATH: z.string().min(1).default('agy'),
   CODEX_CLI_PATH: z.string().min(1).default('codex'),
-  OPENAI_API_KEY: z.string().optional().default(''),
-  OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
   COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(600000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),
