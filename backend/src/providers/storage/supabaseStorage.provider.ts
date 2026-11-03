@@ -18,20 +18,13 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
   constructor(
     config?: Partial<SupabaseStorageConfig>,
-    clientFactory: SupabaseClientFactory = (url, key) => {
-      // In Node.js < 22 environments where native WebSocket is absent,
-      // @supabase/supabase-js v2.118+ will throw during RealtimeClient initialization.
-      // We provide a dummy WebSocket fallback to avoid crash since storage does not require WebSockets.
-      if (typeof globalThis.WebSocket === 'undefined') {
-        globalThis.WebSocket = class WebSocket {} as unknown as typeof WebSocket;
-      }
-      return createClient(url, key, {
+    clientFactory: SupabaseClientFactory = (url, key) =>
+      createClient(url, key, {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
         },
-      });
-    }
+      })
   ) {
     const url = (config?.url ?? env.SUPABASE_URL ?? '').trim().replace(/\/$/, '');
     const serviceRoleKey = (config?.serviceRoleKey ?? env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
