@@ -49,6 +49,7 @@ env:
   NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || 'console' }}
   NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || 'onboarding@resend.dev' }}
   MIN_CRON_INTERVAL_MINUTES: ${{ vars.MIN_CRON_INTERVAL_MINUTES || '15' }}
+  SUPABASE_STORAGE_BUCKET: ${{ vars.SUPABASE_STORAGE_BUCKET || 'specter-screenshots' }}
   DOCKER_LOG_MAX_SIZE: ${{ vars.DOCKER_LOG_MAX_SIZE || '10m' }}
   DOCKER_LOG_MAX_FILE: ${{ vars.DOCKER_LOG_MAX_FILE || '5' }}
 
@@ -210,6 +211,9 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: ${{ vars.GOOGLE_CALLBACK_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_STORAGE_BUCKET: ${{ vars.SUPABASE_STORAGE_BUCKET || env.SUPABASE_STORAGE_BUCKET }}
         run: |
           bash scripts/deploy/generate-backend-env.sh .deploy/backend.env 3001
 
