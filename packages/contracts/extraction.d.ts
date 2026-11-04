@@ -23,6 +23,10 @@ export interface TriggerRule {
 }
 
 export interface IntentField {
+  /** Stable semantic identifier is the key in ExtractionIntent.fields. */
+  displayName?: string;
+  /** Closest observed label for this field on the source page, in its language. */
+  observedLabel?: string;
   description: string;
   type: FieldType;
   required: boolean;

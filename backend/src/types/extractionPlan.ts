@@ -80,6 +80,8 @@ export const extractionIntentSchema = z
       z.string().regex(/^[a-z][a-z0-9_]*$/),
       z
         .object({
+          displayName: text.optional(),
+          observedLabel: text.optional(),
           description: text,
           type: z.nativeEnum(FieldType),
           required: z.boolean(),

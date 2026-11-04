@@ -10,6 +10,7 @@ import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
 import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
+import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
 import {
   AlertCircle,
   Camera,
@@ -37,6 +38,8 @@ export function JobRunsDrawer({
   const { data, isLoading: loading } = useJobRunsQuery(job?.id);
   const runs = data?.runs || [];
   const latestDiff = data?.latestDiff || null;
+  const extractionFields = job?.extractionPlan?.intent.fields ?? {};
+  const fieldLabels = getExtractionFieldLabels(extractionFields);
 
   const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
@@ -134,7 +137,7 @@ export function JobRunsDrawer({
                         (item) => (
                           <tr key={item.field}>
                             <td className="px-3.5 py-2.5 font-mono font-medium text-foreground">
-                              {item.field}
+                              {fieldLabels[item.field] ?? item.field}
                             </td>
                             <td className="px-3.5 py-2.5">
                               <Badge
@@ -340,7 +343,11 @@ export function JobRunsDrawer({
 
                         {run.extractedData && (
                           <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
-                            {JSON.stringify(run.extractedData, null, 2)}
+                            {JSON.stringify(
+                              localizeExtractedPayload(run.extractedData, extractionFields),
+                              null,
+                              2
+                            )}
                           </pre>
                         )}
                       </div>
@@ -356,6 +363,7 @@ export function JobRunsDrawer({
         {activeTab === 'timeline' && (
           <ExecutionTimelineChart
             runs={runs}
+            fields={extractionFields}
             timeZone={timeZone}
             onSelectRun={handleSelectRun}
             onOpenScreenshot={(url) => setSelectedScreenshot(url)}
@@ -382,9 +390,10 @@ export function JobRunsDrawer({
                   {job.extractionPlan.intent.scope === EXTRACTION_SCOPE.Collection
                     ? 'Complete collection'
                     : 'Current page'}
-                  . Fields: {Object.keys(job.extractionPlan.intent.fields).join(', ')}.
+                  . Fields: {Object.values(fieldLabels).join(', ')}.
                 </p>
                 <ExtractionEvidence
+                  fields={extractionFields}
                   report={
                     (runs.find((run) => run.id === selectedRunId) ?? runs[0])?.extractionReport
                   }

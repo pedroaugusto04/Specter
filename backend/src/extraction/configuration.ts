@@ -170,12 +170,23 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         const strategy = await run('plan', () =>
           this.stages.generator.generate(input(), fixedIntent, feedback)
         );
-        const parsedPlan = extractionPlanSchema.safeParse({ version: 3, intent: fixedIntent, strategy });
+        const parsedPlan = extractionPlanSchema.safeParse({
+          version: 3,
+          intent: fixedIntent,
+          strategy,
+        });
         if (!parsedPlan.success) {
           const expectedFields = Object.keys(fixedIntent.fields).sort();
-          const actualFields = strategy && typeof strategy === 'object' && 'fields' in strategy && strategy.fields && typeof strategy.fields === 'object'
-            ? Object.keys(strategy.fields).sort()
-            : [];
+          const actualFields =
+            strategy &&
+            typeof strategy === 'object' &&
+            'fields' in strategy &&
+            strategy.fields &&
+            typeof strategy.fields === 'object'
+              ? Object.keys(strategy.fields).sort()
+              : [];
+          const missingFields = expectedFields.filter((field) => !actualFields.includes(field));
+          const unexpectedFields = actualFields.filter((field) => !expectedFields.includes(field));
           logger.warn('Generated extraction strategy failed schema validation', {
             jobId: request.jobId,
             stage: 'plan-validation',
@@ -184,10 +195,16 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             issueMessages: parsedPlan.error.issues.map((issue) => issue.message),
             expectedFields,
             actualFields,
-            missingFields: expectedFields.filter((field) => !actualFields.includes(field)),
-            unexpectedFields: actualFields.filter((field) => !expectedFields.includes(field)),
+            missingFields,
+            unexpectedFields,
           });
-          throw parsedPlan.error;
+          const fieldFeedback =
+            missingFields.length || unexpectedFields.length
+              ? ` Field keys must exactly match the fixed intent. Expected keys: ${JSON.stringify(expectedFields)}. Actual keys: ${JSON.stringify(actualFields)}. Keep the expected keys unchanged; map them to matching page content regardless of page language.`
+              : '';
+          throw new Error(
+            parsedPlan.error.issues.map((issue) => issue.message).join(' ') + fieldFeedback
+          );
         }
         const plan = parsedPlan.data;
         const execution = await run('validation', () =>

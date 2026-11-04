@@ -119,7 +119,10 @@ export function formatNumericValue(value: number): string {
 /**
  * Scans run payloads to identify object fields containing numeric values suitable for plotting.
  */
-export function detectNumericFields(runs: JobRunDto[]): NumericFieldCandidate[] {
+export function detectNumericFields(
+  runs: JobRunDto[],
+  fieldLabels: Record<string, string> = {}
+): NumericFieldCandidate[] {
   const counts = new Map<string, { count: number; sample: string | number }>();
 
   for (const run of runs) {
@@ -139,10 +142,12 @@ export function detectNumericFields(runs: JobRunDto[]): NumericFieldCandidate[] 
   return Array.from(counts.entries())
     .map(([key, data]) => ({
       key,
-      label: key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/[_-]/g, ' ')
-        .trim(),
+      label:
+        fieldLabels[key] ||
+        key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/[_-]/g, ' ')
+          .trim(),
       sampleValue: data.sample,
       validCount: data.count,
     }))

@@ -1,7 +1,16 @@
 'use client';
 import type { JobRunDto } from '@/lib/api';
-export function ExtractionEvidence({ report }: { report: JobRunDto['extractionReport'] }) {
+import { getExtractionFieldLabels } from '@/lib/extractionDisplay';
+import type { ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
+export function ExtractionEvidence({
+  report,
+  fields = {},
+}: {
+  report: JobRunDto['extractionReport'];
+  fields?: ExtractionFieldDefinitions;
+}) {
   if (!report) return null;
+  const fieldLabels = getExtractionFieldLabels(fields);
   const review = report.semanticReview;
   return (
     <div className="space-y-3 text-xs">
@@ -37,7 +46,7 @@ export function ExtractionEvidence({ report }: { report: JobRunDto['extractionRe
               <tbody>
                 {report.evidence.map((entry, index) => (
                   <tr key={index}>
-                    <td className="p-1">{entry.field}</td>
+                    <td className="p-1">{fieldLabels[entry.field] ?? entry.field}</td>
                     <td className="p-1 font-mono">
                       {entry.source.kind}:{' '}
                       {'selector' in entry.source

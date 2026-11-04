@@ -2,6 +2,8 @@
 
 import { Badge } from '@/components/ui/badge';
 import type { JobRunDto } from '@/lib/api';
+import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
+import type { ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
 import {
   buildChartDataPoints,
   calculateRunMetrics,
@@ -23,6 +25,7 @@ import * as React from 'react';
 
 interface ExecutionTimelineChartProps {
   runs: JobRunDto[];
+  fields?: ExtractionFieldDefinitions;
   timeZone?: string;
   onSelectRun?: (run: JobRunDto) => void;
   onOpenScreenshot?: (url: string) => void;
@@ -30,12 +33,17 @@ interface ExecutionTimelineChartProps {
 
 export function ExecutionTimelineChart({
   runs,
+  fields = {},
   timeZone = 'UTC',
   onSelectRun,
   onOpenScreenshot,
 }: ExecutionTimelineChartProps) {
   const metrics = React.useMemo(() => calculateRunMetrics(runs), [runs]);
-  const numericFields = React.useMemo(() => detectNumericFields(runs), [runs]);
+  const fieldLabels = React.useMemo(() => getExtractionFieldLabels(fields), [fields]);
+  const numericFields = React.useMemo(
+    () => detectNumericFields(runs, fieldLabels),
+    [runs, fieldLabels]
+  );
 
   const [selectedField, setSelectedField] = React.useState<string>(() => {
     return numericFields[0]?.key || '';
@@ -587,7 +595,13 @@ export function ExecutionTimelineChart({
 
                   {run.extractedData && typeof run.extractedData === 'object' && (
                     <div className="mt-2 rounded border border-border/70 bg-muted/30 p-2 font-mono text-xs text-foreground max-h-36 overflow-auto">
-                      <pre>{JSON.stringify(run.extractedData, null, 2)}</pre>
+                      <pre>
+                        {JSON.stringify(
+                          localizeExtractedPayload(run.extractedData, fields),
+                          null,
+                          2
+                        )}
+                      </pre>
                     </div>
                   )}
 
