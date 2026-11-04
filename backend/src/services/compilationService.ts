@@ -103,7 +103,6 @@ export class CompilationService {
         ? (job.contractRevision ?? randomUUID())
         : randomUUID();
       const planRevision = randomUUID();
-      execution.report.planRevision = planRevision;
       const prepared = await new SuccessfulRunService(this.deps).prepare({
         job,
         plan: compiledSchema,

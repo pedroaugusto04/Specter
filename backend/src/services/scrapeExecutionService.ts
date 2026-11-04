@@ -103,7 +103,6 @@ export class ScrapeExecutionService {
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });
-      execution.report.planRevision = job.planRevision ?? undefined;
       extractionReport = execution.report;
       const scrapeResult = execution.scrape;
       const extractedData = execution.data;

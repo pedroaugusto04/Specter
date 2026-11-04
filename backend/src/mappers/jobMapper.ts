@@ -42,8 +42,6 @@ export const JobMapper = {
       notificationEmail: entity.notificationEmail,
       webhookUrl: entity.webhookUrl ?? null,
       cronExpression: entity.cronExpression,
-      contractRevision: entity.contractRevision,
-      planRevision: entity.planRevision,
       extractionPlan: entity.extractionPlan,
       status: entity.status,
       accessState: context.accessState,
@@ -78,7 +76,6 @@ export const JobMapper = {
     return {
       id: entity.id,
       jobId: entity.jobId,
-      contractRevision: entity.contractRevision,
       extractionReport: entity.extractionReport
         ? presentExtractionReport(entity.extractionReport)
         : entity.extractionReport,

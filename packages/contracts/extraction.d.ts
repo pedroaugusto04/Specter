@@ -179,7 +179,6 @@ export type DiscoveryAction =
   | { kind: 'wait'; condition: Condition };
 
 export interface ExtractionReport {
-  planRevision?: string;
   validatedSourceRecords?: number;
   quality: PageExtraction['quality'];
   scope: ExtractionScope;

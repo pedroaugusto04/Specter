@@ -176,6 +176,8 @@ describe('HTTP DTO boundaries', () => {
       expect(dto).not.toHaveProperty('effectiveSemanticPolicy');
       expect(dto).not.toHaveProperty('bullmqRepeatableKey');
       expect(dto).not.toHaveProperty('internalOnly');
+      expect(dto).not.toHaveProperty('contractRevision');
+      expect(dto).not.toHaveProperty('planRevision');
     }
     const listed = (await app.inject({ method: 'GET', url: '/api/jobs', headers })).json().data;
     expect(listed[0]).not.toHaveProperty('internalOnly');

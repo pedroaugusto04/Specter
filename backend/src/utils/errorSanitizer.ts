@@ -41,7 +41,6 @@ export function formatUserErrorMessage(error: unknown): string {
 
 export function presentExtractionReport(report: ExtractionReport): ExtractionReport {
   return {
-    planRevision: report.planRevision,
     validatedSourceRecords: report.validatedSourceRecords,
     quality: report.quality,
     scope: report.scope,

@@ -103,18 +103,18 @@ Only COMPLETE and EMPTY results become baselines. Integrity, coverage and
 semantic review are recorded separately. PARTIAL, INVALID, BLOCKED and
 INCONCLUSIVE results do not replace a valid baseline.
 
-Semantic review is configurable globally and per monitor:
+Semantic review is configured globally through `SEMANTIC_REVIEW_ENABLED` and
+`SEMANTIC_REVIEW_THRESHOLD`:
 
-- Global defaults: enabled, minimum score 4.
-- A monitor may inherit defaults or override `enabled` and `threshold`.
+- Defaults: enabled, minimum score 4.
 - Disabled means SKIPPED: no reviewer call, score or activation gate.
 - Scores below the threshold reject the candidate; scores 4-6 at the default
   threshold are accepted with WARNING; higher scores receive PASSED.
 - An unavailable reviewer or invalid reviewer output yields ERROR and a warning,
   without blocking deterministic acceptance.
 - The score is a rubric-based opinion, not a probability or proof of correctness.
-- Policy changes apply on the next configuration/recovery, not through periodic
-  model calls. Deterministic checks cannot be disabled.
+- Configuration changes apply on the next setup or recovery, not through
+  periodic model calls. Deterministic checks cannot be disabled.
 
 Provenance records field, source, original/converted value and entity identity.
 Persisted evidence is capped and redacted. Session state and request headers are

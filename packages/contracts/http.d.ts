@@ -44,8 +44,6 @@ export interface ScrapingJobDto {
   notificationEmail: string;
   webhookUrl: string | null;
   cronExpression: string;
-  contractRevision?: string | null;
-  planRevision?: string | null;
   extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   accessState?: AccessState | null;
@@ -60,7 +58,6 @@ export interface ScrapingJobDto {
 export interface JobRunDto {
   id: string;
   jobId: string;
-  contractRevision?: string | null;
   extractionReport?: ExtractionReport | null;
   extractedData: ExtractedPayload | null;
   normalizedHash: string | null;
