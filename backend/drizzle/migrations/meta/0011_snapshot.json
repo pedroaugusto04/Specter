@@ -153,8 +153,12 @@
           "name": "alert_deliveries_job_id_scraping_jobs_id_fk",
           "tableFrom": "alert_deliveries",
           "tableTo": "scraping_jobs",
-          "columnsFrom": ["job_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "job_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -162,8 +166,12 @@
           "name": "alert_deliveries_run_id_job_runs_id_fk",
           "tableFrom": "alert_deliveries",
           "tableTo": "job_runs",
-          "columnsFrom": ["run_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -308,8 +316,12 @@
           "name": "job_runs_job_id_scraping_jobs_id_fk",
           "tableFrom": "job_runs",
           "tableTo": "scraping_jobs",
-          "columnsFrom": ["job_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "job_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -440,12 +452,6 @@
           "notNull": true,
           "default": "now()"
         },
-        "webhook_secret": {
-          "name": "webhook_secret",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "extraction_plan": {
           "name": "extraction_plan",
           "type": "jsonb",
@@ -490,8 +496,12 @@
           "name": "scraping_jobs_user_id_users_id_fk",
           "tableFrom": "scraping_jobs",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -594,8 +604,12 @@
           "name": "user_integrations_user_id_users_id_fk",
           "tableFrom": "user_integrations",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -605,7 +619,9 @@
         "user_integrations_user_id_unique": {
           "name": "user_integrations_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["user_id"]
+          "columns": [
+            "user_id"
+          ]
         }
       },
       "policies": {},
@@ -712,8 +728,12 @@
           "name": "user_web_sessions_user_id_users_id_fk",
           "tableFrom": "user_web_sessions",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -804,12 +824,16 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         },
         "users_google_id_unique": {
           "name": "users_google_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["google_id"]
+          "columns": [
+            "google_id"
+          ]
         }
       },
       "policies": {},

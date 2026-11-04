@@ -188,9 +188,13 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(webhookSent).toBe(true);
   });
 
-  it('NotificationDispatcher respects job-specific webhookUrl override and signs with job webhookSecret', async () => {
+  it('NotificationDispatcher respects job-specific webhookUrl override and signs with user integration secret', async () => {
     const emailProvider = new MockNotificationProvider();
     const integrationRepo = new InMemoryIntegrationRepository();
+    await integrationRepo.upsert('user-123', {
+      webhookEnabled: true,
+      webhookSecret: 'my-integration-secret',
+    });
 
     let deliveredUrl = '';
     let deliveredSignature = '';
@@ -212,7 +216,6 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       ...sampleAlert,
       to: '',
       webhookUrl: 'https://custom-job-webhook.org/endpoint',
-      webhookSecret: 'job-specific-secret-123',
     });
     for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
 

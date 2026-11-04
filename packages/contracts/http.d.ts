@@ -42,7 +42,6 @@ export interface ScrapingJobDto {
   userPrompt: string;
   notificationEmail: string;
   webhookUrl: string | null;
-  hasWebhookSecret?: boolean;
   cronExpression: string;
   extractionPlan: ExtractionPlan | null;
   status: JobStatus;
@@ -82,7 +81,6 @@ export interface CreateJobRequest {
   userPrompt: string;
   notificationEmail?: string | null;
   webhookUrl?: string | null;
-  webhookSecret?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
 }

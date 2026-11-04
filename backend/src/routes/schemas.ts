@@ -70,12 +70,6 @@ export const jobInputSchema = z.object({
     .optional()
     .or(z.literal(''))
     .nullable(),
-  webhookSecret: z
-    .string()
-    .trim()
-    .max(256, 'Webhook secret must not exceed 256 characters')
-    .optional()
-    .nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
   captureScreenshotOnChange: z.boolean().default(false),
 });
@@ -111,12 +105,6 @@ export const jobUpdateSchema = z.object({
     })
     .optional()
     .or(z.literal(''))
-    .nullable(),
-  webhookSecret: z
-    .string()
-    .trim()
-    .max(256, 'Webhook secret must not exceed 256 characters')
-    .optional()
     .nullable(),
   cronExpression: cronExpressionSchema.optional(),
   captureScreenshotOnChange: z.boolean().optional(),

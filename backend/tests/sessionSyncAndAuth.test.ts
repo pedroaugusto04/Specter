@@ -42,6 +42,7 @@ class InMemoryUserRepository implements IUserRepository {
       name: data.name,
       passwordHash: data.passwordHash,
       googleId: null,
+      timezone: 'America/Sao_Paulo',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

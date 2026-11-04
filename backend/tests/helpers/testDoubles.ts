@@ -70,6 +70,7 @@ export class InMemoryUserRepository implements IUserRepository {
       name: input.name ?? null,
       passwordHash: input.passwordHash ?? null,
       googleId: input.googleId ?? null,
+      timezone: input.timezone ?? 'America/Sao_Paulo',
       createdAt: now,
       updatedAt: now,
     };
@@ -120,7 +121,6 @@ export class InMemoryJobRepository implements IJobRepository {
       userPrompt: input.userPrompt,
       notificationEmail: input.notificationEmail ?? null,
       webhookUrl: input.webhookUrl ?? null,
-      webhookSecret: input.webhookSecret ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
       extractionPlan: null,
@@ -160,8 +160,6 @@ export class InMemoryJobRepository implements IJobRepository {
         patch.notificationEmail !== undefined
           ? (patch.notificationEmail ?? null)
           : existing.notificationEmail,
-      webhookSecret:
-        patch.webhookSecret !== undefined ? (patch.webhookSecret ?? null) : existing.webhookSecret,
       updatedAt: new Date(),
     };
     this.jobs.set(id, updated);

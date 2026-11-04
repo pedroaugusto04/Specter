@@ -120,7 +120,6 @@ export class JobService {
       userPrompt: request.userPrompt.trim(),
       notificationEmail: request.notificationEmail?.trim() || null,
       webhookUrl,
-      webhookSecret: request.webhookSecret?.trim() || null,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
@@ -175,9 +174,6 @@ export class JobService {
     }
     if (request.notificationEmail !== undefined) {
       patch.notificationEmail = request.notificationEmail?.trim() || null;
-    }
-    if (request.webhookSecret !== undefined) {
-      patch.webhookSecret = request.webhookSecret?.trim() || null;
     }
     if (request.webhookUrl !== undefined) {
       patch.webhookUrl = request.webhookUrl?.trim()

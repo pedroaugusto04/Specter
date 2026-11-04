@@ -88,7 +88,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(scheduler.compilationQueue[0]?.reason).toBe('initial');
   });
 
-  it('creates a scraping job with webhookUrl, webhookSecret and empty notificationEmail without leaking the secret', async () => {
+  it('creates a scraping job with custom webhookUrl and empty notificationEmail', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/jobs',
@@ -98,15 +98,12 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         userPrompt: 'Extract main headline and article link',
         notificationEmail: '',
         webhookUrl: 'https://webhooks.example.com/alerts',
-        webhookSecret: 'my-super-secret-key-12345',
         cronExpression: '*/30 * * * *',
       },
     });
     expect(response.statusCode).toBe(201);
     const body = response.json();
     expect(body.data.webhookUrl).toBe('https://webhooks.example.com/alerts');
-    expect(body.data.hasWebhookSecret).toBe(true);
-    expect(body.data.webhookSecret).toBeUndefined();
     expect(body.data.notificationEmail).toBe('');
   });
   it('returns HTTP 400 when cron frequency violates the 15-minute minimum floor', async () => {

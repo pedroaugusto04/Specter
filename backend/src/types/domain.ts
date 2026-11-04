@@ -47,7 +47,6 @@ export interface ScrapingJobEntity {
   userPrompt: string;
   notificationEmail: string | null;
   webhookUrl?: string | null;
-  webhookSecret?: string | null;
   cronExpression: string;
   bullmqRepeatableKey: string | null;
   contractRevision?: string | null;
