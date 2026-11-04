@@ -3,6 +3,7 @@ import type { ScrapeOptions, ScrapeResult } from '../providers/scraping/scraper.
 import type { ExtractionPlan, ExtractionReport } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
 import type { IExtractionExecutor } from '../extraction/executor.js';
+import { snapshotToScrapeResult } from '../extraction/scrapeResultMapper.js';
 export interface PlanExecutionResult {
   data: ExtractedPayload;
   report: ExtractionReport;
@@ -23,15 +24,7 @@ export class PlanExecutionService implements IPlanExecutor {
     return {
       data: result.data,
       report: result.report,
-      scrape: {
-        rawHtml: result.snapshot.html,
-        url: result.snapshot.url,
-        httpStatus: result.snapshot.httpStatus,
-        durationMs: result.report.trace?.reduce((sum, trace) => sum + trace.durationMs, 0) ?? 0,
-        screenshot: result.snapshot.screenshot
-          ? Buffer.from(result.snapshot.screenshot)
-          : undefined,
-      },
+      scrape: snapshotToScrapeResult(result.snapshot, result.durationMs),
     };
   }
 }

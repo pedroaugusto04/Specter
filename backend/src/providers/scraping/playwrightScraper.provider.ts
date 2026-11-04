@@ -5,6 +5,7 @@ import type {
 } from '../../extraction/contracts.js';
 import { createExecutionContext, waitForPoll } from '../../extraction/context.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
+import { snapshotToScrapeResult } from '../../extraction/scrapeResultMapper.js';
 /** Passive browser acquisition uses the same browser session implementation as extraction. */
 export class PlaywrightScraperEngine implements IScraperEngine {
   readonly name = 'playwright';
@@ -53,13 +54,10 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       const screenshot = options.captureScreenshot
         ? await session.screenshot().catch(() => undefined)
         : undefined;
-      return {
-        rawHtml: snapshot.html,
-        url: snapshot.url,
-        httpStatus: snapshot.httpStatus,
-        durationMs: Date.now() - started,
-        screenshot: screenshot ? Buffer.from(screenshot) : undefined,
-      };
+      return snapshotToScrapeResult(
+        { ...snapshot, screenshot: screenshot ?? undefined },
+        Date.now() - started
+      );
     } finally {
       await session.close();
     }

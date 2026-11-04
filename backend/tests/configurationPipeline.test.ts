@@ -47,6 +47,7 @@ function setup(review: unknown, enabled = true) {
       evidence: [],
     },
     snapshot,
+    durationMs: 0,
   };
   const execute = vi.fn(async () => structuredClone(execution));
   const pipeline = new ConfigurationPipeline(

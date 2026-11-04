@@ -25,6 +25,7 @@ export interface ExecutionResult {
   data: ExtractedPayload;
   report: ExtractionReport;
   snapshot: DocumentSnapshot;
+  durationMs: number;
 }
 
 export interface ExecutionOptions {
@@ -95,6 +96,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
             },
       report,
       snapshot,
+      durationMs: Date.now() - started,
     });
     const observe = async (): Promise<PageExtraction> => {
       context.check();
