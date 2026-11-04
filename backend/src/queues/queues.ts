@@ -6,7 +6,6 @@ import { CompilationReason, type IJobScheduler } from './scheduler.interface.js'
 export const COMPILATION_QUEUE_NAME = 'compilation-queue';
 export const SCRAPE_EXECUTION_QUEUE_NAME = 'scrape-execution-queue';
 export const MAINTENANCE_QUEUE_NAME = 'maintenance-queue';
-const COMPILATION_MAX_ATTEMPTS = 3;
 
 export function getRedisConnectionOptions(): ConnectionOptions {
   if (env.REDIS_URL) {
@@ -44,7 +43,7 @@ export class BullMqJobScheduler implements IJobScheduler {
     this.compilationQueue = new Queue(COMPILATION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: COMPILATION_MAX_ATTEMPTS,
+        attempts: env.COMPILATION_MAX_ATTEMPTS,
         backoff: {
           type: 'exponential',
           delay: 5000,
