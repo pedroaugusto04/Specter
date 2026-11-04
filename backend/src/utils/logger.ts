@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { redactObject } from '../extraction/evidence.js';
 import { env } from '../config/env.js';
 

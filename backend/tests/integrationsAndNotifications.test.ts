@@ -54,7 +54,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
 
   it('TelegramNotificationProvider formats HTML message and dispatches HTTP POST to Telegram Bot API', async () => {
     let capturedUrl = '';
-    let capturedBody: any = null;
+    let capturedBody: Record<string, unknown> | null = null;
 
     global.fetch = vi.fn().mockImplementation(async (url, init) => {
       capturedUrl = String(url);
@@ -177,7 +177,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       emailProvider,
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
-      integrationRepository: integrationRepo as any,
+      integrationRepository: integrationRepo,
     });
 
     for (const delivery of await dispatcher.prepare(sampleAlert))
@@ -188,13 +188,16 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(webhookSent).toBe(true);
   });
 
-  it('NotificationDispatcher respects job-specific webhookUrl override', async () => {
+  it('NotificationDispatcher respects job-specific webhookUrl override and signs with job webhookSecret', async () => {
     const emailProvider = new MockNotificationProvider();
     const integrationRepo = new InMemoryIntegrationRepository();
 
     let deliveredUrl = '';
-    global.fetch = vi.fn().mockImplementation(async (url) => {
+    let deliveredSignature = '';
+    global.fetch = vi.fn().mockImplementation(async (url, init) => {
       deliveredUrl = String(url);
+      deliveredSignature =
+        (init?.headers as Record<string, string>)?.['X-Specter-Signature-256'] ?? '';
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     });
 
@@ -202,17 +205,19 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       emailProvider,
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
-      integrationRepository: integrationRepo as any,
+      integrationRepository: integrationRepo,
     });
 
     const deliveries = await dispatcher.prepare({
       ...sampleAlert,
       to: '',
       webhookUrl: 'https://custom-job-webhook.org/endpoint',
+      webhookSecret: 'job-specific-secret-123',
     });
     for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
 
     expect(deliveredUrl).toBe('https://custom-job-webhook.org/endpoint');
+    expect(deliveredSignature).toMatch(/^sha256=[0-9a-f]{64}$/);
   });
 
   it('Integration HTTP REST endpoints allow retrieving and updating integration settings', async () => {
@@ -225,9 +230,9 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
     const webhookProvider = new WebhookNotificationProvider();
 
-    const jobService = new JobService(jobRepo as any, jobScheduler, scraperEngine);
+    const jobService = new JobService(jobRepo, jobScheduler, scraperEngine);
     const integrationService = new IntegrationService(
-      integrationRepo as any,
+      integrationRepo,
       telegramProvider,
       webhookProvider
     );

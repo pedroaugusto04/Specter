@@ -31,7 +31,21 @@ describe('Session domain behavior', () => {
 
   describe('resolveSessionStorageState', () => {
     it('resolves storage state using candidate domain matching', async () => {
-      const mockStorageState = { cookies: [{ name: 'auth', value: '123' } as any], origins: [] };
+      const mockStorageState = {
+        cookies: [
+          {
+            name: 'auth',
+            value: '123',
+            domain: 'example.com',
+            path: '/',
+            expires: -1,
+            httpOnly: true,
+            secure: true,
+            sameSite: 'Lax' as const,
+          },
+        ],
+        origins: [],
+      };
       const mockRepo: ISessionRepository = {
         findByUserAndDomain: async (_userId, domain) => {
           if (domain === 'example.com') {

@@ -165,10 +165,9 @@ export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<
   }
 
   if (isInternalHostname(hostname)) {
-    throw new ValidationError(
-      'Access to local, internal or private network hosts is forbidden.',
-      [{ field: fieldName, message: 'Internal hostnames are forbidden (SSRF protection).' }]
-    );
+    throw new ValidationError('Access to local, internal or private network hosts is forbidden.', [
+      { field: fieldName, message: 'Internal hostnames are forbidden (SSRF protection).' },
+    ]);
   }
 
   // Direct IP address

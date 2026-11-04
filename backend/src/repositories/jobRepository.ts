@@ -8,13 +8,15 @@ import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
 import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
+import { encryptText } from '../utils/crypto.js';
 
 export interface CreateJobInput {
   userId?: string;
   url: string;
   userPrompt: string;
-  notificationEmail: string;
+  notificationEmail?: string | null;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   cronExpression: string;
   captureScreenshotOnChange?: boolean;
 }
@@ -22,8 +24,9 @@ export interface CreateJobInput {
 export interface UpdateJobPatch {
   url?: string;
   userPrompt?: string;
-  notificationEmail?: string;
+  notificationEmail?: string | null;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   cronExpression?: string;
   bullmqRepeatableKey?: string | null;
   contractRevision?: string | null;
@@ -96,8 +99,9 @@ export class DrizzleJobRepository implements IJobRepository {
         userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
         url: input.url,
         userPrompt: input.userPrompt,
-        notificationEmail: input.notificationEmail,
+        notificationEmail: input.notificationEmail ?? null,
         webhookUrl: input.webhookUrl ?? null,
+        webhookSecret: input.webhookSecret ? encryptText(input.webhookSecret) : null,
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
         status: JobStatus.PendingCompilation,
@@ -149,10 +153,16 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null> {
+    const encryptedPatch = {
+      ...patch,
+      ...(patch.webhookSecret !== undefined
+        ? { webhookSecret: patch.webhookSecret ? encryptText(patch.webhookSecret) : null }
+        : {}),
+    };
     const [row] = await this.db
       .update(scrapingJobs)
       .set({
-        ...patch,
+        ...encryptedPatch,
         updatedAt: new Date(),
       })
       .where(eq(scrapingJobs.id, id))

@@ -118,8 +118,9 @@ export class JobService {
       userId: request.userId,
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
-      notificationEmail: (request.notificationEmail ?? '').trim(),
+      notificationEmail: request.notificationEmail?.trim() || null,
       webhookUrl,
+      webhookSecret: request.webhookSecret?.trim() || null,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
@@ -173,7 +174,10 @@ export class JobService {
       patch.userPrompt = request.userPrompt.trim();
     }
     if (request.notificationEmail !== undefined) {
-      patch.notificationEmail = request.notificationEmail.trim();
+      patch.notificationEmail = request.notificationEmail?.trim() || null;
+    }
+    if (request.webhookSecret !== undefined) {
+      patch.webhookSecret = request.webhookSecret?.trim() || null;
     }
     if (request.webhookUrl !== undefined) {
       patch.webhookUrl = request.webhookUrl?.trim()
@@ -267,11 +271,7 @@ export class JobService {
         bullmqRepeatableKey: null,
       });
       const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService?.notifyJobUpdated(
-        existing.userId,
-        resultDto.id,
-        resultDto.status
-      );
+      await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
       return resultDto;
     }
 
@@ -281,11 +281,7 @@ export class JobService {
       });
       await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
       const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService?.notifyJobUpdated(
-        existing.userId,
-        resultDto.id,
-        resultDto.status
-      );
+      await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
       return resultDto;
     }
 

@@ -252,7 +252,10 @@ export class ScrapeExecutionService {
       }
 
       if (error instanceof AcquisitionFailureError) {
-        await this.deps.jobRepository.updateJob(job.id, { lastError: userMessage, failureCount: 0 });
+        await this.deps.jobRepository.updateJob(job.id, {
+          lastError: userMessage,
+          failureCount: 0,
+        });
         await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         throw error;
       }

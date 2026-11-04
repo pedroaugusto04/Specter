@@ -33,7 +33,12 @@ import type {
   JobStatus,
   ScrapingJobEntity,
   UserEntity,
+  UserIntegrationEntity,
 } from '../../src/types/domain.js';
+import type {
+  IIntegrationRepository,
+  UpsertIntegrationInput,
+} from '../../src/repositories/integrationRepository.js';
 export class InMemoryUserRepository implements IUserRepository {
   public users = new Map<string, UserEntity>();
   async findById(id: string): Promise<UserEntity | null> {
@@ -113,8 +118,9 @@ export class InMemoryJobRepository implements IJobRepository {
       userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
       url: input.url,
       userPrompt: input.userPrompt,
-      notificationEmail: input.notificationEmail,
+      notificationEmail: input.notificationEmail ?? null,
       webhookUrl: input.webhookUrl ?? null,
+      webhookSecret: input.webhookSecret ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
       extractionPlan: null,
@@ -150,6 +156,12 @@ export class InMemoryJobRepository implements IJobRepository {
     const updated: ScrapingJobEntity = {
       ...existing,
       ...patch,
+      notificationEmail:
+        patch.notificationEmail !== undefined
+          ? (patch.notificationEmail ?? null)
+          : existing.notificationEmail,
+      webhookSecret:
+        patch.webhookSecret !== undefined ? (patch.webhookSecret ?? null) : existing.webhookSecret,
       updatedAt: new Date(),
     };
     this.jobs.set(id, updated);
@@ -319,16 +331,16 @@ export class MockJobScheduler implements IJobScheduler {
     this.scheduledRepeatables.delete(jobId);
   }
 }
-export class InMemoryIntegrationRepository {
-  public integrations = new Map<string, any>();
-  async findByUserId(userId: string): Promise<any | null> {
+export class InMemoryIntegrationRepository implements IIntegrationRepository {
+  public integrations = new Map<string, UserIntegrationEntity>();
+  async findByUserId(userId: string): Promise<UserIntegrationEntity | null> {
     const item = this.integrations.get(userId);
     return item ? { ...item } : null;
   }
-  async upsert(userId: string, input: any): Promise<any> {
+  async upsert(userId: string, input: UpsertIntegrationInput): Promise<UserIntegrationEntity> {
     const existing = this.integrations.get(userId);
     const now = new Date();
-    const entity = {
+    const entity: UserIntegrationEntity = {
       id: existing?.id ?? crypto.randomUUID(),
       userId,
       telegramEnabled: input.telegramEnabled ?? existing?.telegramEnabled ?? false,

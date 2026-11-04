@@ -80,7 +80,7 @@ function shouldKeepMetaTag(attribs: Record<string, string | undefined>): boolean
 
 function appendMetaIfMissing(
   $: cheerio.CheerioAPI,
-  head: cheerio.Cheerio<any>,
+  head: ReturnType<cheerio.CheerioAPI>,
   attrs: { property?: string; itemprop?: string; content?: string | number | null }
 ): void {
   if (attrs.content === undefined || attrs.content === null) return;

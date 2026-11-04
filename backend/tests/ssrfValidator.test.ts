@@ -86,7 +86,9 @@ describe('SSRF Protection & URL Validation (ssrfValidator)', () => {
 
     it('rejects URLs pointing to loopback, private, and AWS metadata IPs', async () => {
       await expect(assertSafeUrl('http://127.0.0.1:8080')).rejects.toThrow(/forbidden/i);
-      await expect(assertSafeUrl('http://169.254.169.254/latest/meta-data')).rejects.toThrow(/forbidden/i);
+      await expect(assertSafeUrl('http://169.254.169.254/latest/meta-data')).rejects.toThrow(
+        /forbidden/i
+      );
       await expect(assertSafeUrl('http://10.0.0.5/admin')).rejects.toThrow(/forbidden/i);
       await expect(assertSafeUrl('http://192.168.1.100')).rejects.toThrow(/forbidden/i);
       await expect(assertSafeUrl('http://[::1]:3000')).rejects.toThrow(/forbidden/i);

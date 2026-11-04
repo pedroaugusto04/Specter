@@ -4,7 +4,10 @@ import {
   fetchRemoteScreenshot,
   uploadScreenshotIfEligible,
 } from '../src/utils/screenshotHelper.js';
-import type { IStorageProvider, StorageUploadResult } from '../src/providers/storage/storage.interface.js';
+import type {
+  IStorageProvider,
+  StorageUploadResult,
+} from '../src/providers/storage/storage.interface.js';
 
 describe('screenshotHelper utils', () => {
   describe('decodeBase64Screenshot', () => {
@@ -95,10 +98,7 @@ describe('screenshotHelper utils', () => {
   describe('uploadScreenshotIfEligible', () => {
     const dummyScreenshot = Buffer.from('screenshot-image');
 
-    const createMockStorageProvider = (
-      isEnabled = true,
-      shouldFail = false
-    ): IStorageProvider => ({
+    const createMockStorageProvider = (isEnabled = true, shouldFail = false): IStorageProvider => ({
       isEnabled,
       upload: vi.fn(async (key: string): Promise<StorageUploadResult> => {
         if (shouldFail) {

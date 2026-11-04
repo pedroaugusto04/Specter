@@ -4,6 +4,7 @@ import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
+import { decryptText } from '../utils/crypto.js';
 
 export const JobMapper = {
   rowToEntity(row: ScrapingJobRow): ScrapingJobEntity {
@@ -12,8 +13,9 @@ export const JobMapper = {
       userId: row.userId,
       url: row.url,
       userPrompt: row.userPrompt,
-      notificationEmail: row.notificationEmail,
+      notificationEmail: row.notificationEmail ?? null,
       webhookUrl: row.webhookUrl ?? null,
+      webhookSecret: decryptText(row.webhookSecret),
       cronExpression: row.cronExpression,
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       contractRevision: row.contractRevision,
@@ -38,8 +40,9 @@ export const JobMapper = {
       id: entity.id,
       url: entity.url,
       userPrompt: entity.userPrompt,
-      notificationEmail: entity.notificationEmail,
+      notificationEmail: entity.notificationEmail ?? '',
       webhookUrl: entity.webhookUrl ?? null,
+      hasWebhookSecret: Boolean(entity.webhookSecret),
       cronExpression: entity.cronExpression,
       extractionPlan: entity.extractionPlan,
       status: entity.status,

@@ -65,8 +65,9 @@ export const scrapingJobs = pgTable(
       .notNull(),
     url: text('url').notNull(),
     userPrompt: text('user_prompt').notNull(),
-    notificationEmail: text('notification_email').notNull(),
+    notificationEmail: text('notification_email'),
     webhookUrl: text('webhook_url'),
+    webhookSecret: text('webhook_secret'),
 
     // Scheduling
     cronExpression: text('cron_expression').notNull().default('0 */6 * * *'),
@@ -75,7 +76,7 @@ export const scrapingJobs = pgTable(
     // Compiled AI Extractor Configuration
     contractRevision: text('contract_revision'),
     planRevision: text('plan_revision'),
-    extractionPlan: jsonb('extractor_config').$type<ExtractionPlan>(),
+    extractionPlan: jsonb('extraction_plan').$type<ExtractionPlan>(),
 
     status: text('status', {
       enum: Object.values(JobStatus) as [string, ...string[]],

@@ -152,14 +152,30 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
     token = reg.tokens.accessToken;
     userId = reg.user.id;
 
-    const dummyJobRepo = {} as IJobRepository;
-    const dummyScheduler = {} as IJobScheduler;
+    const dummyJobRepo = {} as unknown as IJobRepository;
+    const dummyScheduler = {} as unknown as IJobScheduler;
     const jobService = new JobService(dummyJobRepo, dummyScheduler, undefined, sessionRepo);
-    const dummyIntegrationRepo = {
+    const dummyIntegrationRepo: IIntegrationRepository = {
       findByUserId: async () => null,
-      upsert: async () => ({}) as any,
-    } as unknown as IIntegrationRepository;
-    const integrationService = new IntegrationService(dummyIntegrationRepo, {} as any, {} as any);
+      upsert: async () => {
+        throw new Error('Not implemented');
+      },
+    };
+    const dummyTelegram = {
+      name: 'dummy-telegram',
+      sendAlert: async () => {},
+      sendTestMessage: async () => ({ ok: true }),
+    };
+    const dummyWebhook = {
+      name: 'dummy-webhook',
+      sendAlert: async () => {},
+      sendTestEvent: async () => ({ ok: true }),
+    };
+    const integrationService = new IntegrationService(
+      dummyIntegrationRepo,
+      dummyTelegram,
+      dummyWebhook
+    );
 
     app = await buildApp({
       jobService,

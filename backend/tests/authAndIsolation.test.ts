@@ -386,12 +386,10 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
     const { AuthService } = await import('../src/services/authService.js');
     const { IntegrationService } = await import('../src/services/integrationService.js');
     const { JobService } = await import('../src/services/jobService.js');
-    const { TelegramNotificationProvider } = await import(
-      '../src/providers/notifications/telegramNotification.provider.js'
-    );
-    const { WebhookNotificationProvider } = await import(
-      '../src/providers/notifications/webhookNotification.provider.js'
-    );
+    const { TelegramNotificationProvider } =
+      await import('../src/providers/notifications/telegramNotification.provider.js');
+    const { WebhookNotificationProvider } =
+      await import('../src/providers/notifications/webhookNotification.provider.js');
     const {
       InMemoryIntegrationRepository,
       InMemoryJobRepository,

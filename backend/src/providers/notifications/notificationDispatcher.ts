@@ -46,7 +46,7 @@ export class NotificationDispatcher implements IAlertRouter, IAlertSender {
         : null;
       return this.deps.webhookProvider.sendAlert(payload, {
         webhookUrl: delivery.destination,
-        secret: integration?.webhookSecret,
+        secret: payload.webhookSecret ?? integration?.webhookSecret,
       });
     }
     const unsupported: never = delivery.channel;

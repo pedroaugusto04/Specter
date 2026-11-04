@@ -209,11 +209,7 @@ export class CompilationService {
         await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
       }
 
-      await this.deps.realtimeService?.notifyJobUpdated(
-        job.userId,
-        job.id,
-        failureStatus
-      );
+      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, failureStatus);
 
       throw error;
     }
