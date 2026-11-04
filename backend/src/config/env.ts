@@ -6,7 +6,13 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   HOST: z.string().min(1).default('0.0.0.0'),
   CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+    .default('info'),
+  LOG_PRETTY_CONSOLE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
 
   // Database & Redis
   DATABASE_URL: z

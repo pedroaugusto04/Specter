@@ -21,10 +21,10 @@ function formatLog(level: string, message: string, context?: LogContext): string
   return JSON.stringify(payload);
 }
 
-function colorizeTerminalLog(level: 'warn' | 'error', output: string): string {
-  if (!process.stderr.isTTY || process.env.NO_COLOR !== undefined) return output;
+function colorizeLog(level: 'warn' | 'error', output: string): string {
+  if (!env.LOG_PRETTY_CONSOLE || process.env.NO_COLOR !== undefined) return output;
   const color = level === 'warn' ? '\u001b[33m' : '\u001b[31m';
-  return `${color}${output}\u001b[39m`;
+  return `${color}${output}\u001b[0m`;
 }
 
 export const logger = {
@@ -34,11 +34,11 @@ export const logger = {
   },
   warn(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL === 'silent') return;
-    console.warn(colorizeTerminalLog('warn', formatLog('warn', message, context)));
+    console.warn(colorizeLog('warn', formatLog('warn', message, context)));
   },
   error(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL === 'silent') return;
-    console.error(colorizeTerminalLog('error', formatLog('error', message, context)));
+    console.error(colorizeLog('error', formatLog('error', message, context)));
   },
   debug(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL !== 'debug' && env.LOG_LEVEL !== 'trace') return;

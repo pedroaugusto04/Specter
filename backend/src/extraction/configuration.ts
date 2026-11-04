@@ -170,7 +170,26 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         const strategy = await run('plan', () =>
           this.stages.generator.generate(input(), fixedIntent, feedback)
         );
-        const plan = extractionPlanSchema.parse({ version: 3, intent: fixedIntent, strategy });
+        const parsedPlan = extractionPlanSchema.safeParse({ version: 3, intent: fixedIntent, strategy });
+        if (!parsedPlan.success) {
+          const expectedFields = Object.keys(fixedIntent.fields).sort();
+          const actualFields = strategy && typeof strategy === 'object' && 'fields' in strategy && strategy.fields && typeof strategy.fields === 'object'
+            ? Object.keys(strategy.fields).sort()
+            : [];
+          logger.warn('Generated extraction strategy failed schema validation', {
+            jobId: request.jobId,
+            stage: 'plan-validation',
+            attempt: attempt + 1,
+            maxAttempts: this.options.maxAttempts,
+            issueMessages: parsedPlan.error.issues.map((issue) => issue.message),
+            expectedFields,
+            actualFields,
+            missingFields: expectedFields.filter((field) => !actualFields.includes(field)),
+            unexpectedFields: actualFields.filter((field) => !expectedFields.includes(field)),
+          });
+          throw parsedPlan.error;
+        }
+        const plan = parsedPlan.data;
         const execution = await run('validation', () =>
           this.executor.execute(request.url, plan, {
             timeoutMs: context.remaining(),
