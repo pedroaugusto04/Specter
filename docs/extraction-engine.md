@@ -151,8 +151,9 @@ and are not copied into the outbox payload.
 ## Settings and deployment
 
 Defaults and validation are in `config/env.ts`; examples and the deployment
-environment generator expose all new settings. Model budgets continue using
-COMPILATION_BUDGET_MS and COMPILATION_MAX_ATTEMPTS.
+environment generator expose all new settings. Candidate-plan retries use
+COMPILATION_MAX_ATTEMPTS. BullMQ retries for transient compilation failures use
+COMPILATION_QUEUE_MAX_ATTEMPTS.
 
 Stop and drain previous workers before applying migration 0009 and deploying
 the new backend/frontend together. This is a breaking execution-contract change:

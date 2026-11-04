@@ -56,6 +56,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       COMPILATION_MAX_ATTEMPTS: ${COMPILATION_MAX_ATTEMPTS:-3}
+      COMPILATION_QUEUE_MAX_ATTEMPTS: ${COMPILATION_QUEUE_MAX_ATTEMPTS:-3}
       AGY_CLI_PATH: /usr/local/bin/agy
       CODEX_CLI_PATH: /usr/local/bin/codex
       CODEX_HOME: /root/.codex
