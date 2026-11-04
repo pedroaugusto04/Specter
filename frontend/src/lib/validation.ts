@@ -64,21 +64,6 @@ export function validateNotificationEmail(email?: string | null): string | null 
   return null;
 }
 
-export function validateWebhookUrl(url?: string | null): string | null {
-  if (!url) return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-    return 'Webhook URL must start with http:// or https://';
-  }
-  try {
-    new URL(trimmed);
-  } catch {
-    return 'Please enter a valid URL format for Webhook (e.g. https://domain.com/webhook).';
-  }
-  return null;
-}
-
 export function validateCron(cronExpression: string): string | null {
   const trimmed = cronExpression.trim();
   if (!trimmed) {

@@ -1,3 +1,5 @@
+import { encryptJson } from '../src/utils/crypto.js';
+import { DecryptionError } from '../src/errors/domainErrors.js';
 import { describe, expect, it } from 'vitest';
 import { SessionMapper } from '../src/mappers/sessionMapper.js';
 import { extractDomainCandidates, normalizeDomain } from '../src/utils/urlNormalizer.js';
@@ -13,7 +15,7 @@ describe('SessionMapper & Domain Utilities', () => {
       userId: 'user-abc',
       domain: 'amazon.com',
       name: 'Amazon Session',
-      storageState: { cookies: [], origins: [] },
+      storageState: encryptJson({ cookies: [], origins: [] }),
       cookieCount: 5,
       createdAt: fixedDate,
       updatedAt: fixedDate,
@@ -32,9 +34,6 @@ describe('SessionMapper & Domain Utilities', () => {
       createdAt: '2026-11-01T12:00:00.000Z',
       updatedAt: '2026-11-01T12:00:00.000Z',
     });
-
-    const directDto = SessionMapper.rowToDto(mockRow);
-    expect(directDto).toEqual(dto);
   });
 
   describe('normalizeDomain', () => {
@@ -96,4 +95,15 @@ describe('SessionMapper & Domain Utilities', () => {
       expect(notFound).toBeUndefined();
     });
   });
+});
+
+it('does not silently discard an undecryptable saved session', async () => {
+  const repository = {
+    findByUserAndDomain: async () => {
+      throw new DecryptionError();
+    },
+  } as unknown as ISessionRepository;
+  await expect(
+    resolveSessionStorageState(repository, 'user', 'https://example.com')
+  ).rejects.toBeInstanceOf(DecryptionError);
 });

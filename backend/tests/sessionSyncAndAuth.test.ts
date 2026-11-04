@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/services/authService.js';
 import { JobService } from '../src/services/jobService.js';
@@ -13,7 +13,7 @@ import type { IUserRepository, UserEntity } from '../src/repositories/userReposi
 import type { IJobRepository } from '../src/repositories/jobRepository.js';
 import type { IIntegrationRepository } from '../src/repositories/integrationRepository.js';
 import type { IJobScheduler } from '../src/queues/scheduler.interface.js';
-import type { UserWebSessionRow } from '../src/db/schema.js';
+import type { UserWebSessionEntity } from '../src/types/domain.js';
 
 // In-Memory User Repository Mock
 class InMemoryUserRepository implements IUserRepository {
@@ -65,12 +65,12 @@ class InMemoryUserRepository implements IUserRepository {
 
 // In-Memory Session Repository Mock
 class InMemorySessionRepository implements ISessionRepository {
-  private sessions: Map<string, UserWebSessionRow> = new Map();
+  private sessions: Map<string, UserWebSessionEntity> = new Map();
 
   async findByUserAndDomain(
     userId: string,
     hostOrDomain: string
-  ): Promise<UserWebSessionRow | null> {
+  ): Promise<UserWebSessionEntity | null> {
     const clean = hostOrDomain.trim().toLowerCase();
     for (const s of this.sessions.values()) {
       if (s.userId === userId && (s.domain === clean || clean.endsWith(`.${s.domain}`))) {
@@ -80,19 +80,19 @@ class InMemorySessionRepository implements ISessionRepository {
     return null;
   }
 
-  async listByUserId(userId: string): Promise<UserWebSessionRow[]> {
+  async listByUserId(userId: string): Promise<UserWebSessionEntity[]> {
     return Array.from(this.sessions.values()).filter((s) => s.userId === userId);
   }
 
-  async findById(id: string): Promise<UserWebSessionRow | null> {
+  async findById(id: string): Promise<UserWebSessionEntity | null> {
     return this.sessions.get(id) ?? null;
   }
 
-  async upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionRow> {
+  async upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity> {
     const domain = input.domain.trim().toLowerCase();
     for (const [id, s] of this.sessions.entries()) {
       if (s.userId === userId && s.domain === domain) {
-        const updated: UserWebSessionRow = {
+        const updated: UserWebSessionEntity = {
           ...s,
           name: input.name || s.name,
           storageState: input.storageState,
@@ -104,7 +104,7 @@ class InMemorySessionRepository implements ISessionRepository {
       }
     }
 
-    const row: UserWebSessionRow = {
+    const row: UserWebSessionEntity = {
       id: `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       userId,
       domain,

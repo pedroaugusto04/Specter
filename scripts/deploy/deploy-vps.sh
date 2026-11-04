@@ -52,7 +52,7 @@ fi
 
 echo "3. Compilando/Verificando imagem Docker do Backend..."
 if [ -f "backend/Dockerfile" ]; then
-  docker build -t "$DOCKER_IMAGE_NAME" -f backend/Dockerfile backend/
+  docker build -t "$DOCKER_IMAGE_NAME" -f backend/Dockerfile .
 fi
 
 echo "4. Atualizando containers (Docker Compose)..."

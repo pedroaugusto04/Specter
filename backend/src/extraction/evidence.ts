@@ -3,9 +3,10 @@ import type { Scalar } from './contracts.js';
 export function redactText(value: string, limit = 2048): string {
   return value
     .replace(
-      /([?&](?:token|key|secret|session_id|access_token|api_key)=)[^&#\s"']*/gi,
+      /([?&](?:token|key|secret|session_id|access_token|api_key|apikey|password|refresh_token)=)[^&#\s"']*/gi,
       '$1[REDACTED]'
     )
+    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
     .replace(/Bearer\s+[a-z0-9._~-]+/gi, 'Bearer [REDACTED]')
     .slice(0, limit);
 }

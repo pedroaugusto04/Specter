@@ -77,3 +77,107 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+## Política de aquisição e bloqueios
+
+A aquisição usa uma política sequencial compartilhada (`src/acquisition/runner.ts`)
+para sondagem, descoberta e execução validada. O executor coordenado recebe os
+adapters na composição e valida cada alternativa com o executor determinístico.
+O adapter de sondagem utiliza a mesma política, sem um segundo mecanismo de retry.
+Requisitos de browser e capacidades das sessões ficam em `extraction/capabilities.ts`.
+
+HTTP começa localmente. Providers habilitados são usados após falha de acesso;
+falhas locais de seletor não consomem cota externa. Respostas de providers só são
+aceitas após validação. HTML passivo não substitui interação, iframe, Shadow DOM
+ou respostas de rede exigidas pelo plano. Sondagem confirma acesso, não extração.
+Sessões autenticadas não são encaminhadas aos providers externos.
+
+Cada coleta compartilha o deadline `EXTRACTION_TIMEOUT_MS`, com navegações limitadas
+por `PLAYWRIGHT_TIMEOUT_MS`. Falhas de aquisição já tratadas pelo coordenador não
+reexecutam todo o orçamento via BullMQ; falhas de infraestrutura anteriores à
+coleta continuam sujeitas ao retry da fila.
+
+As configurações abaixo aceitam inteiros positivos e são validadas no startup:
+
+| Variável                        | Default | Efeito                                               |
+| ------------------------------- | ------- | ---------------------------------------------------- |
+| `ACQUISITION_MAX_ATTEMPTS`      | `3`     | Alternativas por coleta, incluindo a local           |
+| `ACCESS_BLOCK_THRESHOLD`        | `2`     | Execuções consecutivas bloqueadas antes da suspensão |
+| `ACCESS_BLOCK_COOLDOWN_MINUTES` | `60`    | Duração da suspensão por monitor                     |
+
+Configure-as no `.env` em desenvolvimento e em **GitHub Actions Variables** no
+deploy automatizado. O workflow repassa os valores ao gerador de `backend.env`,
+copiado para `.env.prod` e carregado pelo container. No deploy manual, forneça
+`backend.env` ou edite `.env.prod` existente; sem esses arquivos, o script gera o
+ambiente e o backend aplica os defaults. O deploy manual preserva um `.env.prod`
+existente, portanto alterar apenas `.env` não substitui seus valores.
+
+O cooldown usa Redis com atualizações atômicas e expiração. Continua válido entre
+workers e ignora coletas manuais e agendadas sem alterar baseline, cron ou status.
+URL, revisão do plano e atualização da sessão delimitam a suspensão; mudar qualquer
+uma dessas referências inicia uma política de acesso nova. A contagem anterior à
+suspensão permanece por tempo suficiente para os próximos agendamentos do monitor.
+Se o controle de acesso estiver indisponível, a coleta não começa. Perda dos dados
+do Redis perde também o cooldown, sem alterar a baseline em PostgreSQL.
+
+O dashboard apresenta o prazo de retomada; logs e traces registram alternativas,
+classificação e duração. Diagnósticos públicos passam por um apresentador comum,
+inclusive no histórico, e os logs aplicam redação de credenciais.
+
+`npm run --prefix backend evaluate:extraction` avalia 12 casos controlados com os
+componentes reais de comparação e construção de alertas. Os cenários de aquisição,
+cooldown, browser e persistência estão na suíte Vitest. Esse corpus não demonstra
+cobertura geral da web: a próxima ampliação deve incorporar capturas autorizadas,
+anonimizadas e com expectativas revisadas, registrando sua origem e autorização.
+
+### Capacidade de browser e webhooks
+
+O lock de monitor impede execuções concorrentes sobre o mesmo monitor. A capacidade
+é reservada separadamente pelo `BrowserDocumentAdapter`, apenas enquanto houver
+uma sessão Chromium em abertura ou uso. Sondagem pela API e workers compartilham
+os mesmos slots Redis definidos por `SCRAPER_CONCURRENCY`. Etapas de IA e coletas
+HTTP não ocupam slots de browser. Capacidade esgotada não inicia um browser;
+perda da reserva cancela a sessão. Encerramento e liberação são idempotentes.
+
+Webhooks de alerta e de teste utilizam o mesmo envio assinado e não seguem
+redirects. Um endpoint que responde 3xx deve ser substituído pelo endereço final
+HTTPS cadastrado. Isso evita encaminhar payloads e assinaturas para destinos que
+não passaram pela validação inicial de URL.
+
+### Chave de criptografia
+
+`ENCRYPTION_KEY` é obrigatória em todos os ambientes: 64 caracteres hexadecimais
+(32 bytes), gerados com `openssl rand -hex 32`. Configure-a no ambiente local e
+em GitHub Actions Secrets. O deploy a encaminha ao container. Não use o segredo
+JWT como chave de criptografia.
+
+Somente o formato criptografado atual é aceito. Sessões e integrações locais
+criadas com representações antigas devem ser recriadas. A chave deve permanecer
+estável entre reinícios; perder ou substituir a chave torna esses dados ilegíveis.
+
+## Contratos HTTP e fronteiras de dados
+
+`packages/contracts` é um pacote ESM independente, sem banco, serviços, configuração
+ou SDKs. Backend e frontend dependem dele via `file:../packages/contracts`; não
+importam a implementação um do outro. Os DTOs e modelos públicos estão em arquivos
+de declaração e o vocabulário de domínio tem uma única implementação JavaScript.
+Após alterar `vocabulary.js`, regenere suas declarações a partir de um consumidor
+com TypeScript instalado: `cd backend && node ../packages/contracts/generate-types.mjs`.
+As declarações geradas devem acompanhar a mudança no repositório.
+
+Os serviços retornam projeções explícitas. A apresentação de monitores resolve
+cooldown e política semântica fora dos mappers puros. Sessões HTTP contêm somente
+metadados; hashes de senha, cookies, tokens de integração e chaves de fila não fazem
+parte dos DTOs. O segredo de webhook é somente de escrita: a leitura retorna
+`hasWebhookSecret`. Omitir o segredo preserva o valor salvo; enviar `null` remove-o.
+O frontend oferece essas operações sem receber o segredo existente.
+
+A preparação comum de snapshots, comparação com baseline e alertas fica em
+`SuccessfulRunService`. Compilação, coleta e healing mantêm suas próprias decisões
+de ciclo de vida e persistem snapshots e entregas na transação existente.
+
+Os builds Docker usam o contexto da raiz, copiando apenas o projeto correspondente
+e o pacote de contratos. Mudanças nesse pacote disparam a validação dos dois
+consumidores no workflow. O endpoint SSE exige autenticação e não possui usuário
+padrão compartilhado. O histórico de migrações permanece necessário para reconstruir
+o schema; compatibilidades de leitura de dados antigos foram removidas do runtime.

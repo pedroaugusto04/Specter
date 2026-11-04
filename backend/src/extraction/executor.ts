@@ -1,3 +1,5 @@
+import { discoverWithCapabilities } from './capabilities.js';
+import { classifyAccessFailure } from '../acquisition/failure.js';
 import {
   ExtractionMode,
   ExtractionQuality,
@@ -77,7 +79,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
         context.check();
         if (actions >= this.policy.maxActions) throw new Error('Setup action limit reached.');
         actions++;
-        await session!.discover(action);
+        await discoverWithCapabilities(session!, action);
       }
     };
     const seenUrls = new Set<string>();
@@ -236,7 +238,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
       }
       return partial('Page limit reached.');
     } catch (error) {
-      if (!records.size) throw error;
+      if (!records.size || classifyAccessFailure(error)) throw error;
       return partial(
         error instanceof Error ? error.message : 'Execution interrupted.',
         context.signal.aborted ? FailureCode.Timeout : FailureCode.Navigation

@@ -2,17 +2,17 @@ export {
   ExtractionScope as EXTRACTION_SCOPE,
   TriggerMatchMode as TRIGGER_MATCH_MODE,
   TriggerOperator as TRIGGER_OPERATOR,
-} from '../../../backend/src/extraction/constants';
-export type { ExtractionScope, TriggerMatchMode } from '../../../backend/src/extraction/constants';
+} from '@specter/contracts';
+export type { ExtractionScope, TriggerMatchMode } from '@specter/contracts';
 
 // Shared domain contracts contain no runtime/backend dependencies.
 export type {
-  ExtractionPlan,
-  TriggerRule,
-  TriggerOperator,
   IntentField as ExtractionField,
+  ExtractionPlan,
+  ExtractionReport,
+  FieldEvidence,
   SemanticPolicy,
   SemanticReview,
-  FieldEvidence,
-  ExtractionReport,
-} from '../../../backend/src/extraction/contracts';
+  TriggerOperator,
+  TriggerRule,
+} from '@specter/contracts';

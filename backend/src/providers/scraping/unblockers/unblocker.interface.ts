@@ -14,7 +14,7 @@ export class UnblockerError extends Error {
 
 /**
  * Thrown when an unblocker service responds with 429, 402, or a quota exhaustion message.
- * Signals to CascadeScraperEngine that it should immediately try the next provider.
+ * Signals to AccessScraperEngine that it should immediately try the next provider.
  */
 export class UnblockerQuotaExhaustedError extends UnblockerError {
   constructor(

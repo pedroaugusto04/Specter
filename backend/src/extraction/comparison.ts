@@ -35,8 +35,7 @@ export function compareSnapshots(
   return {
     ...buildDiffSummary(
       comparisonPayload(previous, identityFields),
-      comparisonPayload(current, identityFields),
-      false
+      comparisonPayload(current, identityFields)
     ),
     entityChanges,
   };

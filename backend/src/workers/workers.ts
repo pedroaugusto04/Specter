@@ -37,15 +37,7 @@ export class WorkerManager {
       COMPILATION_QUEUE_NAME,
       async (job: Job<{ jobId: string; reason?: string }>) => {
         const { jobId, reason } = job.data;
-        try {
-          await this.executionLease.run(jobId, () =>
-            this.deps.compilationService.compileJob(jobId, reason)
-          );
-        } catch (error) {
-          if (error instanceof DomainError && !error.isRetryable)
-            throw new UnrecoverableError(error.message);
-          throw error;
-        }
+        await this.runMonitor(jobId, () => this.deps.compilationService.compileJob(jobId, reason));
       },
       {
         concurrency: env.COMPILER_CONCURRENCY,
@@ -58,8 +50,11 @@ export class WorkerManager {
       SCRAPE_EXECUTION_QUEUE_NAME,
       async (job: Job<{ jobId: string }>) => {
         const { jobId } = job.data;
-        await this.executionLease.run(jobId, () =>
-          this.deps.scrapeExecutionService.executeScrape(jobId)
+        if (await this.deps.scrapeExecutionService.isAccessSuspended(jobId)) return;
+        await this.runMonitor(
+          jobId,
+          () => this.deps.scrapeExecutionService.executeScrape(jobId),
+          () => this.deps.scrapeExecutionService.isAccessSuspended(jobId)
         );
       },
       {
@@ -98,6 +93,20 @@ export class WorkerManager {
       compilerConcurrency: env.COMPILER_CONCURRENCY,
       scraperConcurrency: env.SCRAPER_CONCURRENCY,
     });
+  }
+
+  private async runMonitor<T>(
+    jobId: string,
+    action: () => Promise<T>,
+    shouldSkip?: () => Promise<boolean>
+  ) {
+    try {
+      return await this.executionLease.run(jobId, action, shouldSkip);
+    } catch (error) {
+      if (error instanceof DomainError && !error.isRetryable)
+        throw new UnrecoverableError(error.message);
+      throw error;
+    }
   }
 
   async stop(): Promise<void> {

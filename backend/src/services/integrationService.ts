@@ -8,7 +8,8 @@ import type {
   TelegramTestResult,
   WebhookTestResult,
 } from '../providers/notifications/notification.interface.js';
-import { IntegrationMapper, type UserIntegrationsDto } from '../mappers/integrationMapper.js';
+import { IntegrationMapper } from '../mappers/integrationMapper.js';
+import type { UserIntegrationsDto } from '@specter/contracts';
 
 export class IntegrationService {
   private readonly integrationRepository: IIntegrationRepository;
@@ -34,18 +35,7 @@ export class IntegrationService {
       return { ...dto, botUsername };
     }
 
-    const defaultDto = IntegrationMapper.entityToDto({
-      id: '',
-      userId,
-      telegramEnabled: false,
-      telegramBotToken: null,
-      telegramChatId: null,
-      webhookEnabled: false,
-      webhookUrl: null,
-      webhookSecret: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    const defaultDto = IntegrationMapper.emptyDto(userId);
 
     return { ...defaultDto, botUsername };
   }
@@ -64,11 +54,23 @@ export class IntegrationService {
     return this.telegramProvider.sendTestMessage(input);
   }
 
-  async testWebhook(input: {
-    webhookUrl: string;
-    secret?: string | null;
-  }): Promise<WebhookTestResult> {
-    return this.webhookProvider.sendTestEvent(input);
+  async testWebhook(
+    input: {
+      webhookUrl: string;
+      secret?: string | null;
+    },
+    userId?: string
+  ): Promise<WebhookTestResult> {
+    const stored =
+      userId && input.secret === undefined
+        ? await this.integrationRepository.findByUserId(userId)
+        : null;
+    const secret =
+      stored?.webhookUrl?.trim() === input.webhookUrl.trim() ? stored.webhookSecret : undefined;
+    return this.webhookProvider.sendTestEvent({
+      ...input,
+      secret: input.secret === undefined ? secret : input.secret,
+    });
   }
 
   async getBotUsername(): Promise<string | null> {

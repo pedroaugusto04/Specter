@@ -547,6 +547,383 @@
       },
       "expectedRecords": [],
       "expectedQuality": "INCONCLUSIVE"
+    },
+    {
+      "name": "HTTP error cannot establish empty baseline",
+      "snapshot": {
+        "html": "<main>No items</main>",
+        "url": "https://example.com/product",
+        "httpStatus": 403,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "BLOCKED"
+    },
+    {
+      "name": "service outage cannot establish baseline",
+      "snapshot": {
+        "html": "<main>Unavailable</main>",
+        "url": "https://example.com/product",
+        "httpStatus": 503,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "INCONCLUSIVE"
+    },
+    {
+      "name": "volatile text does not send an alert",
+      "snapshot": {
+        "html": "<main><h1>Chair posted 3 minutes ago</h1><b class=\"current\">$100</b></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true,
+              "normalizeVolatileText": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false
+    },
+    {
+      "name": "JSON-LD uses the declared product",
+      "snapshot": {
+        "html": "<main></main><script type=\"application/ld+json\">{\"@type\":\"Product\",\"name\":\"Chair\",\"price\":100}</script>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "jsonld",
+            "type": "Product"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "jsonld",
+                "path": ["name"]
+              }
+            ],
+            "price": [
+              {
+                "kind": "jsonld",
+                "path": ["price"]
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE"
+    },
+    {
+      "name": "observed response uses declared fields",
+      "snapshot": {
+        "html": "<main></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": [
+          {
+            "url": "https://example.com/api/product",
+            "method": "GET",
+            "status": 200,
+            "body": {
+              "name": "Chair",
+              "price": 100
+            }
+          }
+        ]
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "browser",
+          "records": {
+            "kind": "response",
+            "match": {
+              "urlPattern": "/api/product"
+            },
+            "path": []
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "response",
+                "path": ["name"]
+              }
+            ],
+            "price": [
+              {
+                "kind": "response",
+                "path": ["price"]
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE"
     }
   ]
 }

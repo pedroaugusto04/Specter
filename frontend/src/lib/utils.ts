@@ -1,18 +1,10 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+export { CRON_PRESETS } from './cronPresets';
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
-
-export const CRON_PRESETS = [
-  { label: 'Every 15 minutes', value: '*/15 * * * *' },
-  { label: 'Every 30 minutes', value: '*/30 * * * *' },
-  { label: 'Every 1 hour', value: '0 * * * *' },
-  { label: 'Every 6 hours (Default)', value: '0 */6 * * *' },
-  { label: 'Every 12 hours', value: '0 */12 * * *' },
-  { label: 'Daily at 09:00 UTC', value: '0 9 * * *' },
-] as const;
 
 export function validateClientCron(cronExpression: string): { valid: boolean; error?: string } {
   const trimmed = cronExpression.trim();

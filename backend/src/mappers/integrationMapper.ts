@@ -1,18 +1,7 @@
+import { decryptText } from '../utils/crypto.js';
+import type { UserIntegrationsDto } from '@specter/contracts';
 import type { UserIntegrationRow } from '../db/schema.js';
 import type { UserIntegrationEntity } from '../types/domain.js';
-
-export interface UserIntegrationsDto {
-  id: string;
-  userId: string;
-  telegramEnabled: boolean;
-  telegramChatId: string | null;
-  webhookEnabled: boolean;
-  webhookUrl: string | null;
-  webhookSecret: string | null;
-  botUsername?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export const IntegrationMapper = {
   rowToEntity(row: UserIntegrationRow): UserIntegrationEntity {
@@ -20,11 +9,11 @@ export const IntegrationMapper = {
       id: row.id,
       userId: row.userId,
       telegramEnabled: row.telegramEnabled,
-      telegramBotToken: row.telegramBotToken ?? null,
+      telegramBotToken: decryptText(row.telegramBotToken),
       telegramChatId: row.telegramChatId ?? null,
       webhookEnabled: row.webhookEnabled,
       webhookUrl: row.webhookUrl ?? null,
-      webhookSecret: row.webhookSecret ?? null,
+      webhookSecret: decryptText(row.webhookSecret),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -38,19 +27,23 @@ export const IntegrationMapper = {
       telegramChatId: entity.telegramChatId,
       webhookEnabled: entity.webhookEnabled,
       webhookUrl: entity.webhookUrl,
-      webhookSecret: entity.webhookSecret,
-      createdAt:
-        entity.createdAt instanceof Date
-          ? entity.createdAt.toISOString()
-          : String(entity.createdAt),
-      updatedAt:
-        entity.updatedAt instanceof Date
-          ? entity.updatedAt.toISOString()
-          : String(entity.updatedAt),
+      hasWebhookSecret: Boolean(entity.webhookSecret),
+      createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString(),
     };
   },
 
-  rowToDto(row: UserIntegrationRow): UserIntegrationsDto {
-    return IntegrationMapper.entityToDto(IntegrationMapper.rowToEntity(row));
+  emptyDto(userId: string): UserIntegrationsDto {
+    return {
+      id: null,
+      userId,
+      telegramEnabled: false,
+      telegramChatId: null,
+      webhookEnabled: false,
+      webhookUrl: null,
+      hasWebhookSecret: false,
+      createdAt: null,
+      updatedAt: null,
+    };
   },
 };

@@ -1,3 +1,9 @@
+import { JobPresenter } from './presentation/jobPresenter.js';
+import { BrowserCapacity } from './resources/browserCapacity.js';
+import { RedisLeaseStore } from './resources/redisLeaseStore.js';
+import { Redis } from 'ioredis';
+import { AccessCooldownService } from './acquisition/cooldown.js';
+import { RedisAccessCooldownStore } from './acquisition/redisCooldownStore.js';
 import { createModelStages } from './extraction/modelStages.js';
 import { composeExtraction } from './extraction/composition.js';
 import { ConfigurationPipeline } from './extraction/configuration.js';
@@ -11,7 +17,7 @@ import { createNotificationProvider } from './providers/notifications/notificati
 import { NotificationDispatcher } from './providers/notifications/notificationDispatcher.js';
 import { TelegramNotificationProvider } from './providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from './providers/notifications/webhookNotification.provider.js';
-import { createScraperEngine } from './providers/scraping/scraper.factory.js';
+import { createScraperEngine, createHttpCandidates } from './providers/scraping/scraper.factory.js';
 import { createStorageProvider } from './providers/storage/index.js';
 import { createRealtimeEventBus } from './providers/realtime/realtime.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
@@ -33,13 +39,19 @@ import { JobStatus } from './types/enums.js';
 import { WorkerManager } from './workers/workers.js';
 
 async function bootstrap(): Promise<void> {
+  const accessRedis = new Redis(env.REDIS_URL);
   const jobRepository = new DrizzleJobRepository();
   const userRepository = new DrizzleUserRepository();
   const integrationRepository = new DrizzleIntegrationRepository();
   const sessionRepository = new DrizzleSessionRepository();
   const jobScheduler = new BullMqJobScheduler();
+  const accessCooldown = new AccessCooldownService(
+    new RedisAccessCooldownStore(accessRedis),
+    sessionRepository
+  );
   const compilerProvider = createCompilerProvider();
-  const extraction = composeExtraction(createScraperEngine('cheerio'));
+  const browserCapacity = new BrowserCapacity(new RedisLeaseStore(accessRedis));
+  const extraction = composeExtraction(createHttpCandidates(), browserCapacity);
   const configurationPipeline = new ConfigurationPipeline(
     createModelStages(compilerProvider),
     extraction.discovery,
@@ -53,7 +65,7 @@ async function bootstrap(): Promise<void> {
       semanticThreshold: env.SEMANTIC_REVIEW_THRESHOLD,
     }
   );
-  const scraperEngine = createScraperEngine();
+  const scraperEngine = createScraperEngine(browserCapacity, env.SCRAPER_ENGINE);
   const storageProvider = createStorageProvider();
   const realtimeEventBus = createRealtimeEventBus();
   const realtimeService = new RealtimeService(realtimeEventBus);
@@ -80,6 +92,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
+    accessCooldown,
     jobRepository,
     planExecutor: extraction.planExecutor,
     alertRouter: notificationDispatcher,
@@ -95,7 +108,8 @@ async function bootstrap(): Promise<void> {
     jobScheduler,
     scraperEngine,
     sessionRepository,
-    realtimeService
+    realtimeService,
+    new JobPresenter(accessCooldown)
   );
   const authService = new AuthService(userRepository);
   const integrationService = new IntegrationService(
@@ -166,6 +180,7 @@ async function bootstrap(): Promise<void> {
     await workerManager.stop();
     await outboxWorker.close();
     await jobScheduler.close();
+    await accessRedis.quit();
     await realtimeService.close();
     await closeDb();
     process.exit(0);

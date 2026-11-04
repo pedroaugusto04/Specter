@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import type { UserDto } from '@/lib/api';
 import { AuthForm } from './AuthForm';

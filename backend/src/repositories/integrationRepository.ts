@@ -3,7 +3,7 @@ import { getDb, type Database } from '../db/index.js';
 import { userIntegrations } from '../db/schema.js';
 import { IntegrationMapper } from '../mappers/integrationMapper.js';
 import type { UserIntegrationEntity } from '../types/domain.js';
-import { encryptText, decryptText } from '../utils/crypto.js';
+import { encryptText } from '../utils/crypto.js';
 
 export interface UpsertIntegrationInput {
   telegramEnabled?: boolean;
@@ -17,21 +17,6 @@ export interface UpsertIntegrationInput {
 export interface IIntegrationRepository {
   findByUserId(userId: string): Promise<UserIntegrationEntity | null>;
   upsert(userId: string, input: UpsertIntegrationInput): Promise<UserIntegrationEntity>;
-}
-
-export const integrationRowToEntity = IntegrationMapper.rowToEntity;
-
-/**
- * Decrypts sensitive fields from a raw DB row before mapping to entity.
- */
-function decryptIntegrationRow<T extends { telegramBotToken: string | null; webhookSecret: string | null }>(
-  row: T
-): T {
-  return {
-    ...row,
-    telegramBotToken: decryptText(row.telegramBotToken),
-    webhookSecret: decryptText(row.webhookSecret),
-  };
 }
 
 export class DrizzleIntegrationRepository implements IIntegrationRepository {
@@ -48,7 +33,7 @@ export class DrizzleIntegrationRepository implements IIntegrationRepository {
       .where(eq(userIntegrations.userId, userId))
       .limit(1);
 
-    return row ? integrationRowToEntity(decryptIntegrationRow(row)) : null;
+    return row ? IntegrationMapper.rowToEntity(row) : null;
   }
 
   async upsert(userId: string, input: UpsertIntegrationInput): Promise<UserIntegrationEntity> {
@@ -57,8 +42,12 @@ export class DrizzleIntegrationRepository implements IIntegrationRepository {
     // Encrypt sensitive fields before persisting
     const encryptedInput = {
       ...input,
-      telegramBotToken: input.telegramBotToken != null ? encryptText(input.telegramBotToken) : input.telegramBotToken,
-      webhookSecret: input.webhookSecret != null ? encryptText(input.webhookSecret) : input.webhookSecret,
+      telegramBotToken:
+        input.telegramBotToken != null
+          ? encryptText(input.telegramBotToken)
+          : input.telegramBotToken,
+      webhookSecret:
+        input.webhookSecret != null ? encryptText(input.webhookSecret) : input.webhookSecret,
     };
 
     if (existing) {
@@ -71,7 +60,7 @@ export class DrizzleIntegrationRepository implements IIntegrationRepository {
         .where(eq(userIntegrations.userId, userId))
         .returning();
 
-      return integrationRowToEntity(decryptIntegrationRow(updated!));
+      return IntegrationMapper.rowToEntity(updated!);
     }
 
     const [inserted] = await this.db
@@ -87,6 +76,6 @@ export class DrizzleIntegrationRepository implements IIntegrationRepository {
       })
       .returning();
 
-    return integrationRowToEntity(decryptIntegrationRow(inserted!));
+    return IntegrationMapper.rowToEntity(inserted!);
   }
 }

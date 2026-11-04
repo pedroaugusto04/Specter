@@ -1,24 +1,6 @@
 'use client';
+import { formToIntegrations } from '@/forms/integrationForm';
 
-import * as React from 'react';
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  ExternalLink,
-  Globe,
-  HelpCircle,
-  Key,
-  Layers,
-  Loader2,
-  Lock,
-  MessageSquare,
-  Radio,
-  Send,
-  ShieldCheck,
-  Trash2,
-  Webhook,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
@@ -31,8 +13,25 @@ import {
   useTestWebhookMutation,
   useUpdateIntegrationsMutation,
 } from '@/hooks/useDashboardQueries';
-import { api, type SessionDto, type UserIntegrationsDto } from '@/lib/api';
+import { type SessionDto, type UserIntegrationsDto } from '@/lib/api';
 import { cn, DEFAULT_TIMEZONE, formatDateTime } from '@/lib/utils';
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ExternalLink,
+  Globe,
+  HelpCircle,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Radio,
+  Send,
+  ShieldCheck,
+  Trash2,
+  Webhook,
+} from 'lucide-react';
+import * as React from 'react';
 
 export interface IntegrationsModalProps {
   isOpen: boolean;
@@ -72,6 +71,7 @@ export function IntegrationsModal({
   const [webhookEnabled, setWebhookEnabled] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState('');
   const [webhookSecret, setWebhookSecret] = React.useState('');
+  const [clearWebhookSecret, setClearWebhookSecret] = React.useState(false);
   const [isTestingWebhook, setIsTestingWebhook] = React.useState(false);
   const [webhookTestStatus, setWebhookTestStatus] = React.useState<{
     ok: boolean;
@@ -105,7 +105,8 @@ export function IntegrationsModal({
       );
       setWebhookEnabled(Boolean(data.webhookEnabled));
       setWebhookUrl(data.webhookUrl || '');
-      setWebhookSecret(data.webhookSecret || '');
+      setWebhookSecret('');
+      setClearWebhookSecret(false);
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Failed to load integration settings.');
     } finally {
@@ -152,9 +153,18 @@ export function IntegrationsModal({
       telegramChatId !== (initialData.telegramChatId || '') ||
       webhookEnabled !== Boolean(initialData.webhookEnabled) ||
       webhookUrl !== (initialData.webhookUrl || '') ||
-      webhookSecret !== (initialData.webhookSecret || '')
+      Boolean(webhookSecret.trim()) ||
+      clearWebhookSecret
     );
-  }, [initialData, telegramEnabled, telegramChatId, webhookEnabled, webhookUrl, webhookSecret]);
+  }, [
+    initialData,
+    telegramEnabled,
+    telegramChatId,
+    webhookEnabled,
+    webhookUrl,
+    webhookSecret,
+    clearWebhookSecret,
+  ]);
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -163,15 +173,17 @@ export function IntegrationsModal({
     setSaveSuccess(false);
 
     try {
-      const payload: Partial<UserIntegrationsDto> = {
+      const payload = formToIntegrations({
         telegramEnabled,
-        telegramChatId: telegramChatId.trim() || null,
+        telegramChatId,
         webhookEnabled,
-        webhookUrl: webhookUrl.trim() || null,
-        webhookSecret: webhookSecret.trim() || null,
-      };
-
-      const updated = await updateIntegrationsMutation.mutateAsync(payload as any);
+        webhookUrl,
+        webhookSecret,
+        clearWebhookSecret,
+      });
+      const updated = await updateIntegrationsMutation.mutateAsync(payload);
+      setWebhookSecret('');
+      setClearWebhookSecret(false);
       setInitialData(updated);
       setSaveSuccess(true);
       onSaved?.(updated);
@@ -219,7 +231,7 @@ export function IntegrationsModal({
     try {
       const res = await testWebhookMutation.mutateAsync({
         webhookUrl: webhookUrl.trim(),
-        secret: webhookSecret.trim() || null,
+        secret: clearWebhookSecret ? null : webhookSecret.trim() || undefined,
       });
       setWebhookTestStatus({ ok: true, msg: res?.message || 'Webhook test event delivered!' });
     } catch (err) {
@@ -596,16 +608,35 @@ export function IntegrationsModal({
                   <div className="relative">
                     <Input
                       type="password"
-                      placeholder="whsec_xxxxxxxxxxxxxxxx"
+                      placeholder={
+                        initialData?.hasWebhookSecret
+                          ? 'Secret configured; leave blank to keep it'
+                          : 'whsec_xxxxxxxxxxxxxxxx'
+                      }
                       value={webhookSecret}
                       onChange={(e) => {
                         setWebhookSecret(e.target.value);
+                        setClearWebhookSecret(false);
                         setWebhookTestStatus(null);
                       }}
                       className="font-mono text-xs sm:text-sm"
                     />
                   </div>
                 </FormField>
+
+                {initialData?.hasWebhookSecret && (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={clearWebhookSecret}
+                      onChange={(event) => {
+                        setClearWebhookSecret(event.target.checked);
+                        setWebhookSecret('');
+                      }}
+                    />
+                    Remove the configured signing secret
+                  </label>
+                )}
 
                 {/* Webhook Test Button & Status */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-border/60">

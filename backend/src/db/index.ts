@@ -28,8 +28,4 @@ export async function closeDb(): Promise<void> {
   }
 }
 
-export const db: Database = new Proxy({} as Database, {
-  get: (_target, prop) => (getDb() as any)[prop],
-});
-
 export { schema };

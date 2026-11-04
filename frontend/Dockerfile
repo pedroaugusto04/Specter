@@ -1,19 +1,21 @@
 # --- Build Stage ---
 FROM node:22-alpine AS builder
 
-WORKDIR /app
+WORKDIR /workspace/frontend
 
 # Install dependencies based on lockfile
-COPY package.json package-lock.json* ./
+COPY packages/contracts /workspace/packages/contracts
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 # Copy source code and build Next.js application
-COPY . .
+COPY frontend/ .
 
 # Accept NEXT_PUBLIC_API_URL build argument for client-side bundle
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT=standalone
 
 RUN npm run build
 
@@ -32,12 +34,12 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy static assets and standalone server bundle produced by Next.js
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /workspace/frontend/public ./frontend/public
+COPY --from=builder --chown=nextjs:nodejs /workspace/frontend/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /workspace/frontend/.next/static ./frontend/.next/static
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "frontend/server.js"]

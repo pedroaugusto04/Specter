@@ -1,3 +1,4 @@
+import { NavigationTimeoutError } from '../errors/domainErrors.js';
 import { randomUUID } from 'node:crypto';
 import type { ExecutionContext, ExecutionPolicy } from './contracts.js';
 
@@ -11,7 +12,11 @@ export function createExecutionContext(timeoutMs: number, signal?: AbortSignal):
     signal: combined,
     remaining: () => Math.max(0, deadline - Date.now()),
     check() {
-      combined.throwIfAborted();
+      if (combined.aborted)
+        throw new NavigationTimeoutError(
+          combined.reason instanceof Error ? combined.reason.message : 'Execution cancelled.',
+          combined.reason
+        );
       if (Date.now() >= deadline) throw new Error('Execution deadline exhausted.');
     },
   };

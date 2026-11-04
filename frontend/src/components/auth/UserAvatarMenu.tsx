@@ -1,8 +1,8 @@
 'use client';
 
-import * as React from 'react';
-import { ChevronDown, LogOut, Radio, ShieldCheck, User } from 'lucide-react';
 import type { UserDto } from '@/lib/api';
+import { LogOut, Radio, ShieldCheck, User } from 'lucide-react';
+import * as React from 'react';
 
 export interface UserAvatarMenuProps {
   user: UserDto;

@@ -3,10 +3,11 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY packages/contracts /packages/contracts
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-COPY . .
+COPY backend/ .
 RUN npm run build
 
 # --- Production Runner Stage ---
@@ -25,7 +26,8 @@ RUN apt-get update && \
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+COPY packages/contracts /packages/contracts
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # Keep the local Codex provider available inside the backend container.
@@ -37,7 +39,7 @@ RUN npx playwright install --with-deps chromium
 # Copy compiled files and migrations
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/drizzle ./drizzle
-COPY drizzle.config.ts ./
+COPY backend/drizzle.config.ts ./
 
 EXPOSE 3001
 

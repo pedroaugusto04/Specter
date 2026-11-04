@@ -1,14 +1,5 @@
-export type RealtimeEventType = 'JOB_CREATED' | 'JOB_UPDATED' | 'JOB_DELETED' | 'JOB_RUN_COMPLETED';
-
-export interface RealtimeEvent {
-  type: RealtimeEventType;
-  userId: string;
-  jobId: string;
-  status?: string;
-  runId?: string;
-  hasChanges?: string;
-  timestamp: string;
-}
+import type { RealtimeEventDto as RealtimeEvent } from '@specter/contracts';
+export type { RealtimeEventDto as RealtimeEvent, RealtimeEventType } from '@specter/contracts';
 
 export type RealtimeEventHandler = (event: RealtimeEvent) => void;
 

@@ -44,8 +44,13 @@ export function centralErrorHandler(
     });
   }
 
+  const fastifyError = error as Partial<FastifyError> & {
+    error?: string;
+    retryAfterSeconds?: number;
+  };
+
   // Fastify schema validation error (if using fastify internal schemas)
-  if ('validation' in error && Array.isArray((error as any).validation)) {
+  if (Array.isArray(fastifyError.validation)) {
     return reply.status(400).send({
       error: 'VALIDATION_ERROR',
       message: error.message,
@@ -53,12 +58,12 @@ export function centralErrorHandler(
   }
 
   // Rate-limit error (HTTP 429)
-  if ((error as any).statusCode === 429 || (error as any).code === 'FST_ERR_RATE_LIMIT_EXCEEDED') {
+  if (fastifyError.statusCode === 429 || fastifyError.code === 'FST_ERR_RATE_LIMIT_EXCEEDED') {
     return reply.status(429).send({
-      error: (error as any).error || 'TOO_MANY_REQUESTS',
+      error: fastifyError.error || 'TOO_MANY_REQUESTS',
       message: 'Too many requests. Please wait a moment and try again.',
-      ...((error as any).retryAfterSeconds
-        ? { retryAfterSeconds: (error as any).retryAfterSeconds }
+      ...(fastifyError.retryAfterSeconds
+        ? { retryAfterSeconds: fastifyError.retryAfterSeconds }
         : {}),
     });
   }
@@ -70,7 +75,7 @@ export function centralErrorHandler(
     stack: error.stack,
   });
 
-  const statusCode = (error as FastifyError).statusCode ?? 500;
+  const statusCode = fastifyError.statusCode ?? 500;
   return reply.status(statusCode).send({
     error: 'INTERNAL_SERVER_ERROR',
     message: 'We could not complete this request. Please try again later.',

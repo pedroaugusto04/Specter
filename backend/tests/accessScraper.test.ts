@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AntiBotBlockedError } from '../src/errors/domainErrors.js';
-import { CascadeScraperEngine } from '../src/providers/scraping/cascadeScraper.provider.js';
+import { AccessScraperEngine } from '../src/providers/scraping/accessScraper.provider.js';
 import type { IScraperEngine, ScrapeResult } from '../src/providers/scraping/scraper.interface.js';
 import {
   UnblockerError,
@@ -253,7 +253,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
     });
   });
 
-  describe('CascadeScraperEngine', () => {
+  describe('AccessScraperEngine', () => {
     const mockSuccessResult: ScrapeResult = {
       rawHtml: '<html><body>Success</body></html>',
       httpStatus: 200,
@@ -261,7 +261,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       durationMs: 150,
     };
 
-    it('returns result from the first enabled unblocker if it succeeds', async () => {
+    it('uses the first enabled provider after local access is blocked', async () => {
       const unblocker1: IUnblockerProvider = {
         name: 'zenrows',
         isEnabled: () => true,
@@ -276,16 +276,16 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
 
       const localEngine: IScraperEngine = {
         name: 'playwright',
-        fetchHtml: vi.fn(),
+        fetchHtml: vi.fn().mockRejectedValue(new AntiBotBlockedError('Blocked')),
       };
 
-      const cascade = new CascadeScraperEngine(localEngine, [unblocker1, unblocker2]);
+      const cascade = new AccessScraperEngine(localEngine, [unblocker1, unblocker2]);
       const res = await cascade.fetchHtml('https://example.com');
 
       expect(res.rawHtml).toContain('Success');
       expect(unblocker1.fetchHtml).toHaveBeenCalledTimes(1);
       expect(unblocker2.fetchHtml).not.toHaveBeenCalled();
-      expect(localEngine.fetchHtml).not.toHaveBeenCalled();
+      expect(localEngine.fetchHtml).toHaveBeenCalledTimes(1);
     });
 
     it('cascades to the second unblocker when the first provider exhausts its quota', async () => {
@@ -308,19 +308,19 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
 
       const localEngine: IScraperEngine = {
         name: 'playwright',
-        fetchHtml: vi.fn(),
+        fetchHtml: vi.fn().mockRejectedValue(new AntiBotBlockedError('Blocked')),
       };
 
-      const cascade = new CascadeScraperEngine(localEngine, [unblocker1, unblocker2]);
+      const cascade = new AccessScraperEngine(localEngine, [unblocker1, unblocker2]);
       const res = await cascade.fetchHtml('https://example.com');
 
       expect(res.rawHtml).toContain('From ScraperAPI');
       expect(unblocker1.fetchHtml).toHaveBeenCalledTimes(1);
       expect(unblocker2.fetchHtml).toHaveBeenCalledTimes(1);
-      expect(localEngine.fetchHtml).not.toHaveBeenCalled();
+      expect(localEngine.fetchHtml).toHaveBeenCalledTimes(1);
     });
 
-    it('falls back to localEngine when all configured unblockers fail', async () => {
+    it('prefers local access without consuming provider quota', async () => {
       const unblocker1: IUnblockerProvider = {
         name: 'zenrows',
         isEnabled: () => true,
@@ -335,11 +335,11 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         }),
       };
 
-      const cascade = new CascadeScraperEngine(localEngine, [unblocker1]);
+      const cascade = new AccessScraperEngine(localEngine, [unblocker1]);
       const res = await cascade.fetchHtml('https://example.com');
 
       expect(res.rawHtml).toContain('From Local Playwright');
-      expect(unblocker1.fetchHtml).toHaveBeenCalledTimes(1);
+      expect(unblocker1.fetchHtml).not.toHaveBeenCalled();
       expect(localEngine.fetchHtml).toHaveBeenCalledTimes(1);
     });
 
@@ -355,7 +355,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         fetchHtml: vi.fn().mockResolvedValue(mockSuccessResult),
       };
 
-      const cascade = new CascadeScraperEngine(localEngine, [unblocker1]);
+      const cascade = new AccessScraperEngine(localEngine, [unblocker1]);
       const res = await cascade.fetchHtml('https://example.com');
 
       expect(res.rawHtml).toContain('Success');
@@ -363,7 +363,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(localEngine.fetchHtml).toHaveBeenCalledTimes(1);
     });
 
-    it('enhances AntiBotBlockedError message when local engine is blocked after all unblockers failed', async () => {
+    it('reports exhaustion without exposing provider errors', async () => {
       const unblocker1: IUnblockerProvider = {
         name: 'zenrows',
         isEnabled: () => true,
@@ -379,10 +379,10 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
           .mockRejectedValue(new AntiBotBlockedError('Cloudflare 403 Forbidden', 403)),
       };
 
-      const cascade = new CascadeScraperEngine(localEngine, [unblocker1]);
+      const cascade = new AccessScraperEngine(localEngine, [unblocker1]);
 
       await expect(cascade.fetchHtml('https://example.com')).rejects.toThrow(
-        /Target site blocked automated requests.*zenrows:.*Credit limit reached/
+        'Acquisition alternatives exhausted.'
       );
     });
   });

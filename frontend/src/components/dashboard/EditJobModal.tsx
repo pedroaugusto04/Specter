@@ -1,26 +1,19 @@
 'use client';
+import { formToUpdateJob, jobToForm } from '@/forms/jobForm';
+import { useJobForm } from '@/hooks/useJobForm';
+import { JobScheduleFields } from './JobScheduleFields';
 
-import * as React from 'react';
-import { SemanticReviewSettings } from './SemanticReviewSettings';
-import type { SemanticPolicy } from '@/lib/extractionPlan';
-import { AlertTriangle, Check, HelpCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
 import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
-import {
-  ApiError,
-  api,
-  type ScrapingJobDto,
-  type TriggerOperator,
-  type TriggerMatchMode,
-  type TriggerRule,
-  type UserDto,
-} from '@/lib/api';
-import { cn, CRON_PRESETS } from '@/lib/utils';
+import { ApiError, type ScrapingJobDto, type TriggerOperator, type UserDto } from '@/lib/api';
 import { TRIGGER_MATCH_MODE, TRIGGER_OPERATOR } from '@/lib/extractionPlan';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
+import { AlertTriangle, Check, HelpCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import { SemanticReviewSettings } from './SemanticReviewSettings';
 
 export interface EditJobModalProps {
   job: ScrapingJobDto | null;
@@ -31,22 +24,36 @@ export interface EditJobModalProps {
 }
 
 export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobModalProps) {
+  const {
+    values,
+    reset: resetForm,
+    setSemanticPolicy,
+    setUrl,
+    setUserPrompt,
+    setSendEmailAlerts,
+    setNotificationEmail,
+    setShowCustomWebhook,
+    setWebhookUrl,
+    setCaptureScreenshotOnChange,
+    setTriggerRules,
+    setTriggerMatchMode,
+  } = useJobForm();
+  const {
+    semanticPolicy,
+    url,
+    userPrompt,
+    sendEmailAlerts,
+    notificationEmail,
+    showCustomWebhook,
+    webhookUrl,
+    captureScreenshotOnChange,
+    cronPreset,
+    customCron,
+    useCustomCron,
+    triggerRules,
+    triggerMatchMode,
+  } = values;
   const updateJobMutation = useUpdateJobMutation();
-  const [semanticPolicy, setSemanticPolicy] = React.useState<SemanticPolicy | null>(null);
-  const [url, setUrl] = React.useState('');
-  const [userPrompt, setUserPrompt] = React.useState('');
-  const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
-  const [notificationEmail, setNotificationEmail] = React.useState('');
-  const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
-  const [webhookUrl, setWebhookUrl] = React.useState('');
-  const [captureScreenshotOnChange, setCaptureScreenshotOnChange] = React.useState(false);
-  const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
-  const [customCron, setCustomCron] = React.useState('0 */6 * * *');
-  const [useCustomCron, setUseCustomCron] = React.useState(false);
-  const [triggerRules, setTriggerRules] = React.useState<TriggerRule[]>([]);
-  const [triggerMatchMode, setTriggerMatchMode] = React.useState<TriggerMatchMode>(
-    TRIGGER_MATCH_MODE.All
-  );
   const [showTriggerHelp, setShowTriggerHelp] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -55,31 +62,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
 
   React.useEffect(() => {
     if (job && isOpen) {
-      setUrl(job.url);
-      setSemanticPolicy(job.semanticPolicy ?? null);
-      setUserPrompt(job.userPrompt);
-      const hasEmail = Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0);
-      setSendEmailAlerts(hasEmail);
-      setNotificationEmail(job.notificationEmail || (user?.email ?? ''));
-      setShowCustomWebhook(Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0));
-      setWebhookUrl(job.webhookUrl || '');
-      setCaptureScreenshotOnChange(Boolean(job.captureScreenshotOnChange));
-
-      const isPreset = CRON_PRESETS.some((p) => p.value === job.cronExpression);
-      if (isPreset) {
-        setCronPreset(job.cronExpression);
-        setCustomCron(job.cronExpression);
-        setUseCustomCron(false);
-      } else {
-        setCronPreset('0 */6 * * *');
-        setCustomCron(job.cronExpression);
-        setUseCustomCron(true);
-      }
-
-      setTriggerRules(
-        job.extractionPlan?.intent.triggerRules ? [...job.extractionPlan.intent.triggerRules] : []
-      );
-      setTriggerMatchMode(job.extractionPlan?.intent.triggerMatchMode ?? TRIGGER_MATCH_MODE.All);
+      resetForm(jobToForm(job, user?.email));
 
       setFieldErrors({});
       setGlobalError(null);
@@ -171,22 +154,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
 
     setLoading(true);
     try {
-      const emailToSend = sendEmailAlerts ? notificationEmail.trim() : '';
-
-      await updateJobMutation.mutateAsync({
-        id: job.id,
-        payload: {
-          url: url.trim(),
-          userPrompt: userPrompt.trim(),
-          notificationEmail: emailToSend,
-          webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
-          cronExpression: effectiveCron.trim(),
-          captureScreenshotOnChange,
-          semanticPolicy,
-          triggerRules,
-          triggerMatchMode,
-        },
-      });
+      await updateJobMutation.mutateAsync({ id: job.id, payload: formToUpdateJob(values) });
 
       onUpdated();
       onClose();
@@ -559,72 +527,14 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-2 border-t border-border">
-          <FormField
+          <JobScheduleFields
+            value={values}
+            onChange={(schedule) => resetForm((previous) => ({ ...previous, ...schedule }))}
+            onEdit={() => clearFieldError('cronExpression')}
+            error={fieldErrors.cronExpression}
+            prefix="edit-"
             label="Check Frequency"
-            htmlFor="edit-cron-preset"
-            required
-            error={!useCustomCron ? fieldErrors.cronExpression : undefined}
-          >
-            <select
-              id="edit-cron-preset"
-              aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
-              aria-describedby={
-                !useCustomCron && fieldErrors.cronExpression ? 'edit-cron-preset-error' : undefined
-              }
-              className={cn(
-                'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
-                !useCustomCron && fieldErrors.cronExpression
-                  ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
-                  : 'border-input'
-              )}
-              value={useCustomCron ? 'custom' : cronPreset}
-              onChange={(e) => {
-                clearFieldError('cronExpression');
-                if (e.target.value === 'custom') {
-                  setUseCustomCron(true);
-                } else {
-                  setUseCustomCron(false);
-                  setCronPreset(e.target.value);
-                  setCustomCron(e.target.value);
-                }
-              }}
-            >
-              {CRON_PRESETS.map((preset) => (
-                <option
-                  key={preset.value}
-                  value={preset.value}
-                  className="bg-background text-foreground"
-                >
-                  {preset.label} ({preset.value})
-                </option>
-              ))}
-              <option value="custom" className="bg-background text-foreground">
-                Custom Cron Expression...
-              </option>
-            </select>
-          </FormField>
-
-          {useCustomCron && (
-            <FormField
-              label="Cron Expression (5 fields, min. 15m)"
-              htmlFor="edit-custom-cron"
-              required
-              error={fieldErrors.cronExpression}
-              hint="5 space-delimited fields: min hour day month weekday."
-            >
-              <Input
-                id="edit-custom-cron"
-                placeholder="*/15 * * * *"
-                value={customCron}
-                hasError={Boolean(fieldErrors.cronExpression)}
-                aria-describedby={fieldErrors.cronExpression ? 'edit-custom-cron-error' : undefined}
-                onChange={(e) => {
-                  setCustomCron(e.target.value);
-                  clearFieldError('cronExpression');
-                }}
-              />
-            </FormField>
-          )}
+          />
         </div>
 
         <div className="space-y-3 pt-1">

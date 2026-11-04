@@ -1,3 +1,5 @@
+import { discoverWithCapabilities } from './capabilities.js';
+import { classifyAccessFailure } from '../acquisition/failure.js';
 import {
   ExtractionMode,
   ExtractionQuality,
@@ -136,7 +138,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         );
         if (!action) break;
         discoveryActions++;
-        snapshots.push(await run('interaction', () => session.discover(action)));
+        snapshots.push(await run('interaction', () => discoverWithCapabilities(session, action)));
         evidence = this.evidence(snapshots);
       }
     } finally {
@@ -155,6 +157,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         const execution = await run('validation', () =>
           this.executor.execute(request.url, plan, {
             timeoutMs: context.remaining(),
+            signal: context.signal,
             storageState: request.storageState,
             captureScreenshot: request.captureScreenshot,
           })
@@ -226,6 +229,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
         return { plan, execution, semanticReview, trace };
       } catch (error) {
+        if (classifyAccessFailure(error)) throw error;
         feedback = error instanceof Error ? error.message : 'Candidate validation failed.';
         if (
           attempt + 1 < this.options.maxAttempts &&
@@ -248,7 +252,9 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               discoveryActions++;
               evidence +=
                 '\nAdditional evidence:\n' +
-                this.evidence([await run('interaction', () => retrySession.discover(action))]);
+                this.evidence([
+                  await run('interaction', () => discoverWithCapabilities(retrySession, action)),
+                ]);
               evidence = evidence.slice(-this.options.evidenceLimit);
             }
           } finally {

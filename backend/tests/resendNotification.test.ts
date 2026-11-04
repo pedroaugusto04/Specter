@@ -211,6 +211,7 @@ describe('Specter Resend Notifications & Email Template', () => {
     it('throws when NOTIFICATION_PROVIDER is resend and RESEND_API_KEY is empty in production', () => {
       expect(() => {
         parseEnv({
+          ENCRYPTION_KEY: 'a'.repeat(64),
           NODE_ENV: 'production',
           NOTIFICATION_PROVIDER: 'resend',
           RESEND_API_KEY: '',
@@ -220,6 +221,7 @@ describe('Specter Resend Notifications & Email Template', () => {
 
     it('succeeds when NOTIFICATION_PROVIDER is resend and RESEND_API_KEY is provided', () => {
       const parsed = parseEnv({
+        ENCRYPTION_KEY: 'a'.repeat(64),
         NODE_ENV: 'production',
         NOTIFICATION_PROVIDER: 'resend',
         RESEND_API_KEY: 're_valid_test_key_123',
@@ -232,6 +234,7 @@ describe('Specter Resend Notifications & Email Template', () => {
 
     it('allows NOTIFICATION_PROVIDER=resend in test environment without crashing on missing key', () => {
       const parsed = parseEnv({
+        ENCRYPTION_KEY: 'a'.repeat(64),
         NODE_ENV: 'test',
         NOTIFICATION_PROVIDER: 'resend',
         RESEND_API_KEY: '',

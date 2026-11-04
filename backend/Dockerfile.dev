@@ -9,13 +9,14 @@ RUN apt-get update && \
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+COPY packages/contracts /packages/contracts
+COPY backend/package.json backend/package-lock.json ./
 RUN npm install --no-audit --no-fund
 
 # Install Playwright browser binaries with system dependencies
 RUN npx playwright install --with-deps chromium
 
-COPY . .
+COPY backend/ .
 
 EXPOSE 3001
 

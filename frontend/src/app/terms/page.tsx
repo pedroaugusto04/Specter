@@ -1,11 +1,10 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
 import { SpecterLogo } from '@/components/brand/SpecterLogo';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, CheckCircle2, ShieldCheck, Mail } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 export default function TermsPage() {
   return (

@@ -180,7 +180,8 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       integrationRepository: integrationRepo as any,
     });
 
-    await dispatcher.sendAlert(sampleAlert);
+    for (const delivery of await dispatcher.prepare(sampleAlert))
+      await dispatcher.deliver(delivery, crypto.randomUUID());
 
     expect(emailProvider.sentAlerts).toHaveLength(1);
     expect(telegramSent).toBe(true);
@@ -204,11 +205,12 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       integrationRepository: integrationRepo as any,
     });
 
-    await dispatcher.sendAlert({
+    const deliveries = await dispatcher.prepare({
       ...sampleAlert,
       to: '',
       webhookUrl: 'https://custom-job-webhook.org/endpoint',
     });
+    for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
 
     expect(deliveredUrl).toBe('https://custom-job-webhook.org/endpoint');
   });
@@ -315,8 +317,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     });
     expect(testTelRes.statusCode).toBe(200);
     const testTelBody = JSON.parse(testTelRes.body);
-    expect(testTelBody.success).toBe(true);
-    expect(testTelBody.message).toBeDefined();
+    expect(testTelBody.data.success).toBe(true);
     expect(testTelBody.data.message).toBeDefined();
 
     // 5. Multi-tenant isolation: Register User B and verify they do not see User A's integrations

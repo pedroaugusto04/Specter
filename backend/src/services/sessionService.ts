@@ -3,13 +3,11 @@ import type {
   PlaywrightStorageCookie,
   PlaywrightStorageOrigin,
   PlaywrightStorageState,
-} from '../db/schema.js';
-import { SessionMapper, type SessionDto } from '../mappers/sessionMapper.js';
+} from '../types/session.js';
+import { SessionMapper } from '../mappers/sessionMapper.js';
+import type { SessionDto } from '@specter/contracts';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type { UserWebSessionEntity } from '../types/domain.js';
 import { normalizeDomain } from '../utils/urlNormalizer.js';
-
-export type { SessionDto };
 
 export interface SyncSessionInput {
   domain: string;
@@ -38,10 +36,6 @@ export class SessionService {
     return 'Lax';
   }
 
-  public toDto(entity: UserWebSessionEntity): SessionDto {
-    return SessionMapper.entityToDto(entity);
-  }
-
   async listSessions(userId: string): Promise<SessionDto[]> {
     const entities = await this.sessionRepository.listByUserId(userId);
     return entities.map((e) => SessionMapper.entityToDto(e));
@@ -51,15 +45,6 @@ export class SessionService {
     const domain = normalizeDomain(hostOrUrl);
     const entity = await this.sessionRepository.findByUserAndDomain(userId, domain);
     return entity ? SessionMapper.entityToDto(entity) : null;
-  }
-
-  async getSessionStorageState(
-    userId: string,
-    hostOrUrl: string
-  ): Promise<PlaywrightStorageState | null> {
-    const domain = normalizeDomain(hostOrUrl);
-    const entity = await this.sessionRepository.findByUserAndDomain(userId, domain);
-    return entity ? entity.storageState : null;
   }
 
   async syncSession(userId: string, input: SyncSessionInput): Promise<SessionDto> {

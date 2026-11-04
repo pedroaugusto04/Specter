@@ -53,6 +53,9 @@ env:
   EXTRACTION_MAX_PAGES: ${{ vars.EXTRACTION_MAX_PAGES || '10' }}
   EXTRACTION_MAX_ACTIONS: ${{ vars.EXTRACTION_MAX_ACTIONS || '20' }}
   EXTRACTION_MAX_ITEMS: ${{ vars.EXTRACTION_MAX_ITEMS || '500' }}
+  ACQUISITION_MAX_ATTEMPTS: ${{ vars.ACQUISITION_MAX_ATTEMPTS || '3' }}
+  ACCESS_BLOCK_THRESHOLD: ${{ vars.ACCESS_BLOCK_THRESHOLD || '2' }}
+  ACCESS_BLOCK_COOLDOWN_MINUTES: ${{ vars.ACCESS_BLOCK_COOLDOWN_MINUTES || '60' }}
   EXTRACTION_TIMEOUT_MS: ${{ vars.EXTRACTION_TIMEOUT_MS || '120000' }}
   COMPILATION_BUDGET_MS: ${{ vars.COMPILATION_BUDGET_MS || '300000' }}
   COMPILATION_MAX_ATTEMPTS: ${{ vars.COMPILATION_MAX_ATTEMPTS || '3' }}
@@ -89,13 +92,13 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - 'packages/contracts/**'
               - 'scripts/deploy/**'
               - 'docker-compose.prod.yml'
               - '.github/workflows/deploy-fullstack.yml'
             frontend:
               - 'frontend/**'
-              - 'backend/src/extraction/contracts.ts'
-              - 'backend/src/extraction/constants.ts'
+              - 'packages/contracts/**'
               - '.github/workflows/deploy-fullstack.yml'
 
       - name: Determine target components
@@ -192,7 +195,7 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
-          context: backend
+          context: .
           file: backend/Dockerfile
           push: true
           platforms: ${{ env.DOCKER_PLATFORMS }}
@@ -229,6 +232,9 @@ jobs:
           EXTRACTION_MAX_PAGES: ${{ env.EXTRACTION_MAX_PAGES }}
           EXTRACTION_MAX_ACTIONS: ${{ env.EXTRACTION_MAX_ACTIONS }}
           EXTRACTION_MAX_ITEMS: ${{ env.EXTRACTION_MAX_ITEMS }}
+          ACQUISITION_MAX_ATTEMPTS: ${{ env.ACQUISITION_MAX_ATTEMPTS }}
+          ACCESS_BLOCK_THRESHOLD: ${{ env.ACCESS_BLOCK_THRESHOLD }}
+          ACCESS_BLOCK_COOLDOWN_MINUTES: ${{ env.ACCESS_BLOCK_COOLDOWN_MINUTES }}
           EXTRACTION_TIMEOUT_MS: ${{ env.EXTRACTION_TIMEOUT_MS }}
           COMPILATION_BUDGET_MS: ${{ env.COMPILATION_BUDGET_MS }}
           COMPILATION_MAX_ATTEMPTS: ${{ env.COMPILATION_MAX_ATTEMPTS }}
@@ -252,6 +258,7 @@ jobs:
           CRAWLBASE_TOKEN: ${{ secrets.CRAWLBASE_TOKEN }}
           HTTP_PROXY: ${{ secrets.HTTP_PROXY || vars.HTTP_PROXY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           COOKIE_SECURE: ${{ vars.COOKIE_SECURE }}
           FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://specterdev.online' }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}

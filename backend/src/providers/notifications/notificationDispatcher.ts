@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { IIntegrationRepository } from '../../repositories/integrationRepository.js';
 import type {
   AlertPayload,
@@ -13,7 +12,7 @@ export interface NotificationDispatcherDeps {
   webhookProvider: IWebhookNotificationProvider;
   integrationRepository: IIntegrationRepository;
 }
-export class NotificationDispatcher implements INotificationProvider, IAlertRouter, IAlertSender {
+export class NotificationDispatcher implements IAlertRouter, IAlertSender {
   readonly name = 'composite-dispatcher';
   constructor(private readonly deps: NotificationDispatcherDeps) {}
   async prepare(payload: AlertPayload): Promise<AlertDelivery[]> {
@@ -52,17 +51,5 @@ export class NotificationDispatcher implements INotificationProvider, IAlertRout
     }
     const unsupported: never = delivery.channel;
     throw new Error('Unsupported delivery channel: ' + unsupported);
-  }
-
-  async sendAlert(payload: AlertPayload): Promise<void> {
-    const results = await Promise.allSettled(
-      (await this.prepare(payload)).map((delivery) => this.deliver(delivery, randomUUID()))
-    );
-    const failures = results.filter((entry) => entry.status === 'rejected');
-    if (failures.length)
-      throw new AggregateError(
-        failures.map((entry) => entry.reason),
-        'Notification channels failed.'
-      );
   }
 }

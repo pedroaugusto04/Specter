@@ -1,5 +1,6 @@
+import { toRealtimeDto } from '../mappers/realtimeMapper.js';
 import type { FastifyInstance } from 'fastify';
-import { optionalAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { RealtimeService } from '../services/realtimeService.js';
 
@@ -8,11 +9,10 @@ export function registerRealtimeRoutes(
   realtimeService: RealtimeService,
   authService: AuthService
 ): void {
-  const withOptionalAuth = optionalAuth(authService);
+  const withAuth = requireAuth(authService);
 
-  app.get('/api/events', { preHandler: [withOptionalAuth] }, async (request, reply) => {
-    const user = request.user;
-    const userId = user?.id ?? 'default-user';
+  app.get('/api/events', { preHandler: [withAuth] }, async (request, reply) => {
+    const userId = requireUser(request).id;
 
     reply.hijack();
 
@@ -48,7 +48,7 @@ export function registerRealtimeRoutes(
     // Subscribe to domain events dispatched for this specific user
     const unsubscribe = realtimeService.subscribeUser(userId, (event) => {
       if (!raw.writableEnded && !raw.destroyed) {
-        raw.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+        raw.write(`event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`);
       }
     });
 

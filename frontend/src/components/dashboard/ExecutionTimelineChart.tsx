@@ -1,28 +1,25 @@
 'use client';
 
-import * as React from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
-  Camera,
-  CheckCircle2,
-  Clock,
-  GitCompare,
-  TrendingUp,
-} from 'lucide-react';
-import type { JobRunDto } from '@/lib/api';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { Badge } from '@/components/ui/badge';
+import type { JobRunDto } from '@/lib/api';
 import {
   buildChartDataPoints,
   calculateRunMetrics,
   detectNumericFields,
   formatNumericValue,
-  type ChartDataPoint,
 } from '@/lib/chartUtils';
+import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { formatCompactDate, formatDateTime, parseErrorMessage } from '@/lib/utils';
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowUpRight,
+  Camera,
+  Clock,
+  GitCompare,
+  TrendingUp,
+} from 'lucide-react';
+import * as React from 'react';
 
 interface ExecutionTimelineChartProps {
   runs: JobRunDto[];

@@ -35,8 +35,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: backend/Dockerfile.dev
     container_name: specter-backend-dev
     restart: unless-stopped
     command: ['npm', 'run', 'dev']
@@ -59,11 +59,16 @@ services:
       SCRAPERAPI_KEY: ${SCRAPERAPI_KEY:-}
       SCRAPINGBEE_API_KEY: ${SCRAPINGBEE_API_KEY:-}
       CRAWLBASE_TOKEN: ${CRAWLBASE_TOKEN:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       HTTP_PROXY: ${HTTP_PROXY:-}
+      ACQUISITION_MAX_ATTEMPTS: ${ACQUISITION_MAX_ATTEMPTS:-3}
+      ACCESS_BLOCK_THRESHOLD: ${ACCESS_BLOCK_THRESHOLD:-2}
+      ACCESS_BLOCK_COOLDOWN_MINUTES: ${ACCESS_BLOCK_COOLDOWN_MINUTES:-60}
     ports:
       - '3001:3001'
     volumes:
       - ./backend:/app
+      - ./packages/contracts:/packages/contracts
       - /app/node_modules
       - /home/pedroduarte/.local/bin/agy:/usr/local/bin/agy:ro
       - agy_profile:/root/.gemini
@@ -76,8 +81,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: frontend/Dockerfile.dev
     container_name: specter-frontend-dev
     restart: unless-stopped
     command: ['npm', 'run', 'dev']
@@ -91,6 +96,7 @@ services:
       - '3005:3000'
     volumes:
       - ./frontend:/app
+      - ./packages/contracts:/packages/contracts
       - /app/node_modules
       - /app/.next
     depends_on:

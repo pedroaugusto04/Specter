@@ -1,3 +1,4 @@
+import { isTimeoutError } from '../../utils/networkErrors.js';
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
@@ -83,7 +84,7 @@ export class CheerioScraperEngine implements IScraperEngine {
       if (err instanceof AntiBotBlockedError) {
         throw err;
       }
-      if (err instanceof Error && (err.name === 'AbortError' || err.message.includes('timeout'))) {
+      if (isTimeoutError(err)) {
         throw new NavigationTimeoutError(
           `HTTP request timed out after ${timeoutMs}ms for URL: ${targetUrl}`,
           err

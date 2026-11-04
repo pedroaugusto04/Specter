@@ -1,19 +1,13 @@
 'use client';
 
-import * as React from 'react';
 import { getApiBaseUrl } from '@/lib/api';
+import * as React from 'react';
 
-export type RealtimeEventType = 'JOB_CREATED' | 'JOB_UPDATED' | 'JOB_DELETED' | 'JOB_RUN_COMPLETED';
-
-export interface RealtimeEventPayload {
-  type: RealtimeEventType;
-  userId: string;
-  jobId: string;
-  status?: string;
-  runId?: string;
-  hasChanges?: string;
-  timestamp: string;
-}
+import type { RealtimeEventDto as RealtimeEventPayload } from '@specter/contracts';
+export type {
+  RealtimeEventDto as RealtimeEventPayload,
+  RealtimeEventType,
+} from '@specter/contracts';
 
 export type ConnectionMode = 'realtime' | 'polling' | 'connecting' | 'disconnected';
 

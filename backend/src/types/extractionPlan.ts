@@ -1,3 +1,4 @@
+import { requiresBrowser } from '../extraction/capabilities.js';
 import {
   ExtractionMode,
   ExtractionScope,
@@ -250,22 +251,6 @@ export const extractionPlanSchema = z
     for (const item of conditions)
       if (item.kind === 'field' && !intent.fields[item.field])
         issue(`Condition references missing field '${item.field}'.`);
-    if (
-      execution.transport === Transport.Http &&
-      (execution.setup?.length ||
-        execution.document ||
-        execution.records.kind === SourceKind.Response ||
-        Object.values(execution.associations ?? {}).some(
-          (association) => association.records.kind === SourceKind.Response
-        ) ||
-        execution.pagination?.kind === 'click' ||
-        execution.pagination?.kind === 'scroll' ||
-        conditions.some(
-          (item) =>
-            item.kind === 'visible' ||
-            item.kind === SourceKind.Response ||
-            ('locator' in item && item.locator.kind === 'role')
-        ))
-    )
+    if (execution.transport === Transport.Http && requiresBrowser(execution))
       issue('The selected strategy requires browser capabilities.');
   });

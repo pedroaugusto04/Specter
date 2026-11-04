@@ -1,11 +1,8 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
-import { Plus, Radio } from 'lucide-react';
+import { AuthModal } from '@/components/auth/AuthModal';
 import { ProfileModal } from '@/components/auth/ProfileModal';
 import { UserAvatarMenu } from '@/components/auth/UserAvatarMenu';
-import { AuthModal } from '@/components/auth/AuthModal';
 import { SpecterLogo } from '@/components/brand/SpecterLogo';
 import { PENDING_JOB_STORAGE_KEY } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
@@ -16,6 +13,7 @@ import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import { useDashboardModals } from '@/hooks/useDashboardModals';
 import {
   dashboardKeys,
   useCurrentUserQuery,
@@ -24,9 +22,11 @@ import {
   useLogoutMutation,
   useStatsQuery,
 } from '@/hooks/useDashboardQueries';
-import { useDashboardModals } from '@/hooks/useDashboardModals';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import { api, type UserDto } from '@/lib/api';
+import { Plus, Radio } from 'lucide-react';
+import Link from 'next/link';
+import * as React from 'react';
 
 export default function DashboardPage() {
   const { data: user = null } = useCurrentUserQuery();
@@ -54,7 +54,7 @@ export default function DashboardPage() {
 
   // Real-time server-sent events with auto-invalidation
   const { connectionMode } = useRealtimeEvents({
-    enabled: true,
+    enabled: Boolean(user),
     onJobEvent: React.useCallback(() => {
       void invalidateJobsAndStats();
     }, [invalidateJobsAndStats]),

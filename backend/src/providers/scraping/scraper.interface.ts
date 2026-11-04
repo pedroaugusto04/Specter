@@ -1,4 +1,4 @@
-import type { PlaywrightStorageState } from '../../db/schema.js';
+import type { PlaywrightStorageState } from '../../types/session.js';
 
 export interface ScrapeOptions {
   timeoutMs?: number;

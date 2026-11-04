@@ -1,9 +1,8 @@
 'use client';
+import { emptyJobForm, formToCreateJob } from '@/forms/jobForm';
+import { useJobForm } from '@/hooks/useJobForm';
+import { JobScheduleFields } from './JobScheduleFields';
 
-import * as React from 'react';
-import { SemanticReviewSettings } from './SemanticReviewSettings';
-import type { SemanticPolicy } from '@/lib/extractionPlan';
-import { Camera, CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +13,11 @@ import {
   useCreateJobMutation,
   useProbeUrlMutation,
 } from '@/hooks/useDashboardQueries';
-import { ApiError, api, type SessionDto, type UserDto } from '@/lib/api';
-import { cn, CRON_PRESETS } from '@/lib/utils';
+import { ApiError, type SessionDto, type UserDto } from '@/lib/api';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
+import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
+import * as React from 'react';
+import { SemanticReviewSettings } from './SemanticReviewSettings';
 
 export const PENDING_JOB_STORAGE_KEY = 'specter_pending_job';
 
@@ -39,18 +40,32 @@ export function CreateJobForm({
   onDirtyChange,
   isModal = false,
 }: CreateJobFormProps) {
+  const {
+    values,
+    reset: resetForm,
+    setSemanticPolicy,
+    setUrl,
+    setUserPrompt,
+    setSendEmailAlerts,
+    setNotificationEmail,
+    setShowCustomWebhook,
+    setWebhookUrl,
+    setCaptureScreenshotOnChange,
+  } = useJobForm();
+  const {
+    semanticPolicy,
+    url,
+    userPrompt,
+    sendEmailAlerts,
+    notificationEmail,
+    showCustomWebhook,
+    webhookUrl,
+    captureScreenshotOnChange,
+    cronPreset,
+    customCron,
+    useCustomCron,
+  } = values;
   const [step, setStep] = React.useState<'form' | 'auth'>('form');
-  const [semanticPolicy, setSemanticPolicy] = React.useState<SemanticPolicy | null>(null);
-  const [url, setUrl] = React.useState('');
-  const [userPrompt, setUserPrompt] = React.useState('');
-  const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
-  const [notificationEmail, setNotificationEmail] = React.useState('');
-  const [showCustomWebhook, setShowCustomWebhook] = React.useState(false);
-  const [webhookUrl, setWebhookUrl] = React.useState('');
-  const [captureScreenshotOnChange, setCaptureScreenshotOnChange] = React.useState(false);
-  const [cronPreset, setCronPreset] = React.useState('0 */6 * * *');
-  const [customCron, setCustomCron] = React.useState('0 */6 * * *');
-  const [useCustomCron, setUseCustomCron] = React.useState(false);
   const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -161,31 +176,8 @@ export function CreateJobForm({
     setLoading(true);
     setGlobalError(null);
     try {
-      const emailToSend = sendEmailAlerts
-        ? notificationEmail.trim() || activeUser?.email || ''
-        : '';
-
-      await createJobMutation.mutateAsync({
-        url: url.trim(),
-        userPrompt: userPrompt.trim(),
-        notificationEmail: emailToSend,
-        webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
-        cronExpression: effectiveCron.trim(),
-        captureScreenshotOnChange,
-        semanticPolicy,
-      });
-
-      setUrl('');
-      setUserPrompt('');
-      setSendEmailAlerts(false);
-      setNotificationEmail('');
-      setShowCustomWebhook(false);
-      setWebhookUrl('');
-      setCaptureScreenshotOnChange(false);
-      setSemanticPolicy(null);
-      setCronPreset('0 */6 * * *');
-      setCustomCron('0 */6 * * *');
-      setUseCustomCron(false);
+      await createJobMutation.mutateAsync(formToCreateJob(values, activeUser?.email));
+      resetForm(emptyJobForm());
       setFieldErrors({});
       setProbeState({ status: 'idle' });
       setStep('form');
@@ -470,73 +462,14 @@ export function CreateJobForm({
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
+        <JobScheduleFields
+          value={values}
+          onChange={(schedule) => resetForm((previous) => ({ ...previous, ...schedule }))}
+          onEdit={() => clearFieldError('cronExpression')}
+          error={fieldErrors.cronExpression}
+          prefix=""
           label="Monitoring Frequency"
-          htmlFor="cron-preset"
-          required
-          error={!useCustomCron ? fieldErrors.cronExpression : undefined}
-        >
-          <select
-            id="cron-preset"
-            aria-invalid={!useCustomCron && Boolean(fieldErrors.cronExpression)}
-            aria-describedby={
-              !useCustomCron && fieldErrors.cronExpression ? 'cron-preset-error' : undefined
-            }
-            className={cn(
-              'flex h-10 w-full rounded-md border bg-background px-3.5 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50',
-              !useCustomCron && fieldErrors.cronExpression
-                ? 'border-red-600 bg-red-50/40 dark:border-red-500/80 dark:bg-red-950/20'
-                : 'border-input'
-            )}
-            value={useCustomCron ? 'custom' : cronPreset}
-            onChange={(e) => {
-              clearFieldError('cronExpression');
-              if (e.target.value === 'custom') {
-                setUseCustomCron(true);
-              } else {
-                setUseCustomCron(false);
-                setCronPreset(e.target.value);
-                setCustomCron(e.target.value);
-              }
-            }}
-          >
-            {CRON_PRESETS.map((preset) => (
-              <option
-                key={preset.value}
-                value={preset.value}
-                className="bg-background text-foreground"
-              >
-                {preset.label} ({preset.value})
-              </option>
-            ))}
-            <option value="custom" className="bg-background text-foreground">
-              Custom Cron Expression...
-            </option>
-          </select>
-        </FormField>
-
-        {useCustomCron && (
-          <FormField
-            label="Custom Cron Expression (min. 15m)"
-            htmlFor="custom-cron"
-            required
-            error={fieldErrors.cronExpression}
-            hint="5 space-delimited fields: minute hour day month weekday."
-          >
-            <Input
-              id="custom-cron"
-              placeholder="0 */6 * * *"
-              value={customCron}
-              hasError={Boolean(fieldErrors.cronExpression)}
-              aria-describedby={fieldErrors.cronExpression ? 'custom-cron-error' : undefined}
-              onChange={(e) => {
-                setCustomCron(e.target.value);
-                clearFieldError('cronExpression');
-              }}
-              className="font-mono text-sm"
-            />
-          </FormField>
-        )}
+        />
       </div>
 
       <div className="space-y-3 pt-1">

@@ -1,6 +1,15 @@
 'use client';
 
-import * as React from 'react';
+import { ExecutionTimelineChart } from '@/components/dashboard/ExecutionTimelineChart';
+import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimelineStrip';
+import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
+import { Badge } from '@/components/ui/badge';
+import { Drawer } from '@/components/ui/drawer';
+import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
+import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
+import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
+import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import {
   AlertCircle,
   Camera,
@@ -8,23 +17,13 @@ import {
   Code2,
   ExternalLink,
   GitCompare,
-  Layers,
   ShieldAlert,
   SlidersHorizontal,
   TrendingUp,
   ZoomIn,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Drawer } from '@/components/ui/drawer';
-import { ExecutionTimelineChart } from '@/components/dashboard/ExecutionTimelineChart';
-import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimelineStrip';
-import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
-import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
-import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import * as React from 'react';
 import { ExtractionEvidence } from './ExtractionEvidence';
-import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
-import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 
 export function JobRunsDrawer({
   job,

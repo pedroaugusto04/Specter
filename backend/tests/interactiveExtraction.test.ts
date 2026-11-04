@@ -1,3 +1,5 @@
+import { BrowserCapacity } from '../src/resources/browserCapacity.js';
+import { InMemoryLeaseStore } from './helpers/resourceFixtures.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -73,7 +75,7 @@ afterAll(async () => {
   );
 });
 const policy = { ...fixturePolicy, timeoutMs: 12000, actionTimeoutMs: 1500 };
-const adapter = new BrowserDocumentAdapter(policy);
+const adapter = new BrowserDocumentAdapter(policy, new BrowserCapacity(new InMemoryLeaseStore()));
 const executor = () =>
   new ExtractionExecutor(
     { http: adapter, browser: adapter },

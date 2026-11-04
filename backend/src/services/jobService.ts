@@ -1,15 +1,14 @@
+import { JobPresenter } from '../presentation/jobPresenter.js';
+import { DashboardMapper } from '../mappers/dashboardMapper.js';
+import type { CreateJobRequest, UpdateJobRequest } from '@specter/contracts';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { randomUUID } from 'node:crypto';
-import type { SemanticPolicy } from '../extraction/contracts.js';
 import { comparisonPayload } from '../extraction/comparison.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
-import {
-  AntiBotBlockedError,
-  NavigationTimeoutError,
-  NotFoundError,
-  ValidationError,
-} from '../errors/domainErrors.js';
-import { JobMapper, type JobRunDto, type ScrapingJobDto } from '../mappers/jobMapper.js';
+import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
+import { JobMapper } from '../mappers/jobMapper.js';
+import type { JobRunDto, ScrapingJobDto } from '@specter/contracts';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
@@ -19,35 +18,16 @@ import type {
   UpdateJobPatch,
 } from '../repositories/jobRepository.js';
 import type { DiffSummary } from '../types/domain.js';
-import { JobStatus, RunStatus, TriggerMatchMode } from '../types/enums.js';
-import type { TriggerRule } from '../types/extractionPlan.js';
+import { JobStatus, RunStatus } from '../types/enums.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { assertSafeUrl } from '../utils/ssrfValidator.js';
 
-export interface CreateScrapingJobRequest {
-  userId?: string;
-  url: string;
-  userPrompt: string;
-  notificationEmail?: string;
-  webhookUrl?: string | null;
-  cronExpression?: string;
-  captureScreenshotOnChange?: boolean;
-  semanticPolicy?: SemanticPolicy | null;
+export interface CreateScrapingJobRequest extends CreateJobRequest {
+  userId: string;
 }
-
-export interface UpdateScrapingJobRequest {
-  url?: string;
-  userPrompt?: string;
-  notificationEmail?: string;
-  webhookUrl?: string | null;
-  cronExpression?: string;
-  captureScreenshotOnChange?: boolean;
-  semanticPolicy?: SemanticPolicy | null;
-  triggerRules?: TriggerRule[];
-  triggerMatchMode?: TriggerMatchMode;
-}
+export type UpdateScrapingJobRequest = UpdateJobRequest;
 
 import type { RealtimeService } from './realtimeService.js';
 
@@ -63,7 +43,8 @@ export class JobService {
     jobScheduler: IJobScheduler,
     scraperEngine?: IScraperEngine,
     sessionRepository?: ISessionRepository,
-    realtimeService?: RealtimeService
+    realtimeService?: RealtimeService,
+    private readonly presenter: JobPresenter = new JobPresenter()
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
@@ -88,7 +69,10 @@ export class JobService {
     }
 
     if (!this.scraperEngine) {
-      return { accessible: true };
+      return {
+        accessible: false,
+        reason: formatUserErrorMessage(new Error('Acquisition adapter unavailable.')),
+      };
     }
 
     const storageState = await resolveSessionStorageState(
@@ -99,7 +83,7 @@ export class JobService {
     const hasSavedSession = Boolean(storageState);
 
     try {
-      await this.scraperEngine.fetchHtml(normalizedUrl, { timeoutMs: 8000, storageState });
+      await this.scraperEngine.fetchHtml(normalizedUrl, { storageState });
       return { accessible: true, ...(hasSavedSession ? { hasSavedSession: true } : {}) };
     } catch (err) {
       logger.warn('URL accessibility verification failed during probe', {
@@ -107,24 +91,10 @@ export class JobService {
         internalError: err instanceof Error ? err.message : String(err),
       });
 
-      if (err instanceof AntiBotBlockedError) {
-        return {
-          accessible: false,
-          reason:
-            'This website is currently protected by automated security checks (Anti-Bot / CAPTCHA) or taking too long to respond. Please verify the URL or try again in a few moments.',
-        };
-      }
-      if (err instanceof NavigationTimeoutError) {
-        return {
-          accessible: false,
-          reason:
-            'The target website took too long to respond during verification. Please try again in a few moments.',
-        };
-      }
       return {
         accessible: false,
-        reason:
-          'Unable to verify target website accessibility. Please verify the URL and try again.',
+        reason: formatUserErrorMessage(err),
+        ...(hasSavedSession ? { hasSavedSession: true } : {}),
       };
     }
   }
@@ -145,7 +115,7 @@ export class JobService {
     }
 
     const createdEntity = await this.jobRepository.createJob({
-      userId: request.userId ?? 'default-user',
+      userId: request.userId,
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
       notificationEmail: (request.notificationEmail ?? '').trim(),
@@ -169,12 +139,12 @@ export class JobService {
       userId: createdEntity.userId,
     });
 
-    return JobMapper.entityToDto(createdEntity);
+    return await this.presenter.present(createdEntity);
   }
 
   async listJobs(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobDto[]> {
     const entities = await this.jobRepository.findAll(statusFilter, userId);
-    return entities.map(JobMapper.entityToDto);
+    return Promise.all(entities.map((entity) => this.presenter.present(entity)));
   }
 
   async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
@@ -182,7 +152,7 @@ export class JobService {
     if (!entity || (userId && entity.userId !== userId)) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
-    return JobMapper.entityToDto(entity);
+    return this.presenter.present(entity);
   }
 
   async updateJob(
@@ -279,7 +249,7 @@ export class JobService {
     }
 
     const finalEntity = await this.jobRepository.findById(id);
-    const resultDto = JobMapper.entityToDto(finalEntity ?? updated);
+    const resultDto = await this.presenter.present(finalEntity ?? updated);
     await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
@@ -298,7 +268,7 @@ export class JobService {
         status: JobStatus.Paused,
         bullmqRepeatableKey: null,
       });
-      const resultDto = JobMapper.entityToDto(updated ?? existing);
+      const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
         resultDto.userId,
         resultDto.id,
@@ -312,7 +282,7 @@ export class JobService {
         status: JobStatus.PendingCompilation,
       });
       await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
-      const resultDto = JobMapper.entityToDto(updated ?? existing);
+      const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
         resultDto.userId,
         resultDto.id,
@@ -329,7 +299,7 @@ export class JobService {
       status: JobStatus.Active,
       bullmqRepeatableKey: repeatableKey,
     });
-    const resultDto = JobMapper.entityToDto(updated ?? existing);
+    const resultDto = await this.presenter.present(updated ?? existing);
     await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
@@ -367,7 +337,7 @@ export class JobService {
     });
 
     await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
-    const resultDto = JobMapper.entityToDto(updated ?? existing);
+    const resultDto = await this.presenter.present(updated ?? existing);
     await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
@@ -416,8 +386,7 @@ export class JobService {
         comparisonPayload(
           current.extractedData!,
           existing.extractionPlan?.intent.identityFields ?? []
-        ),
-        false
+        )
       );
     }
 
@@ -425,6 +394,6 @@ export class JobService {
   }
 
   async getDashboardStats(userId?: string): Promise<DashboardStats> {
-    return this.jobRepository.getStats(userId);
+    return DashboardMapper.toDto(await this.jobRepository.getStats(userId));
   }
 }

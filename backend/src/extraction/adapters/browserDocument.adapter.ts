@@ -1,3 +1,6 @@
+import { isTimeoutError } from '../../utils/networkErrors.js';
+import type { IBrowserCapacity } from '../../resources/browserCapacity.js';
+import { browserCapabilities } from '../capabilities.js';
 import { SourceKind, Transport } from '../constants.js';
 import { evaluateCondition } from '../conditions.js';
 import { NavigationTimeoutError } from '../../errors/domainErrors.js';
@@ -25,6 +28,7 @@ import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 export class BrowserDocumentAdapter implements DocumentAdapter {
   constructor(
     private readonly policy: ExecutionPolicy,
+    private readonly capacity: IBrowserCapacity,
     private readonly proxy?: string
   ) {}
   async open(
@@ -35,25 +39,54 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
   ): Promise<DocumentSession> {
     execution.check();
     const safeUrl = await assertSafeUrl(url, 'targetUrl');
+    const permit = await this.capacity.acquire(execution);
+    const original = execution;
+    const signal = AbortSignal.any([original.signal, permit.signal]);
+    execution = {
+      ...original,
+      signal,
+      check: () => {
+        original.check();
+        signal.throwIfAborted();
+      },
+    };
     let browser: Browser | undefined;
+    let launch: Promise<Browser> | undefined;
+    let closing: Promise<void> | undefined;
     let context: BrowserContext | undefined;
-    const close = async () => {
-      await context?.close().catch(() => {});
-      await browser?.close().catch(() => {});
+    const close = () => {
+      closing ??= (async () => {
+        // Cancellation during launch must await and close the browser before releasing capacity.
+        const launched = browser ?? (await launch?.catch(() => undefined));
+        try {
+          await context?.close().catch(() => {});
+        } finally {
+          try {
+            await launched?.close().catch(() => {});
+          } finally {
+            await permit.release();
+          }
+        }
+      })();
+      return closing;
     };
     const abort = () => {
-      void close();
+      void close().catch(() => {});
     };
     execution.signal.addEventListener('abort', abort, { once: true });
     try {
-      browser = await chromium.launch({
+      execution.check();
+      launch = chromium.launch({
         headless: true,
         timeout: Math.max(1, execution.remaining()),
         ...(this.proxy ? { proxy: { server: this.proxy } } : {}),
       });
+      browser = await launch;
+      execution.check();
       context = await browser.newContext({
         storageState: options.storageState as BrowserContextOptions['storageState'],
       });
+      execution.check();
       const origin = new URL(safeUrl).origin;
       await context.route('**/*', async (route) => {
         try {
@@ -232,6 +265,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         else await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
       };
       return {
+        capabilities: browserCapabilities,
         snapshot,
         check: async (condition) => {
           // Evaluate static conditions against the same snapshot as the records.
@@ -281,7 +315,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
     } catch (error) {
       execution.signal.removeEventListener('abort', abort);
       await close();
-      if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
+      if (isTimeoutError(error))
         throw new NavigationTimeoutError('Browser navigation exceeded its budget.', error);
       throw error;
     }

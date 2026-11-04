@@ -306,7 +306,9 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(blockedRes.statusCode).toBe(200);
     const blockedData = blockedRes.json().data;
     expect(blockedData.accessible).toBe(false);
-    expect(blockedData.reason).toContain('Anti-Bot / CAPTCHA');
+    expect(blockedData.reason).toBe(
+      'The website is blocking access right now. Try again later or connect an authenticated session.'
+    );
     // 3. SSRF Protection: Probe rejects internal loopback/metadata IP
     const ssrfProbeRes = await app.inject({
       method: 'POST',

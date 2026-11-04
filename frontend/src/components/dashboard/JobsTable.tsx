@@ -1,21 +1,5 @@
 'use client';
 
-import * as React from 'react';
-import {
-  Clock,
-  ExternalLink,
-  History,
-  Loader2,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Search,
-  ShieldAlert,
-  Trash2,
-  Zap,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
 import {
@@ -32,6 +16,22 @@ import {
   formatDateTime,
   parseErrorMessage,
 } from '@/lib/utils';
+import {
+  Clock,
+  ExternalLink,
+  History,
+  Loader2,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Trash2,
+  Zap,
+} from 'lucide-react';
+import * as React from 'react';
 
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
 type StatusFilter = (typeof JOB_STATUS_FILTER)[keyof typeof JOB_STATUS_FILTER];
@@ -348,6 +348,12 @@ export function JobsTable({
                     {/* Status Pill */}
                     <td className="whitespace-nowrap px-2.5 py-3">
                       {renderStatusPill(job.status)}
+                      {job.accessState && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Access blocked. New attempts allowed after{' '}
+                          {formatDateTime(job.accessState.retryAt, timeZone)}.
+                        </p>
+                      )}
                     </td>
 
                     {/* Cron */}

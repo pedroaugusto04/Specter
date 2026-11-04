@@ -37,7 +37,7 @@ describe('Shared worker leases', () => {
     });
     expect(values.size).toBe(0);
   });
-  it('releases slots even when execution fails', async () => {
+  it('releases monitor ownership even when execution fails', async () => {
     await expect(
       new ExecutionLease().run('one', async () => {
         throw new Error('Failure');

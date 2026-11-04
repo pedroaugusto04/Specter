@@ -146,23 +146,49 @@ export class UnauthorizedError extends DomainError {
   }
 }
 
-export class ConflictError extends DomainError {
-  constructor(message: string, cause?: unknown) {
-    super(message, {
-      code: 'CONFLICT',
-      statusCode: 409,
-      isRetryable: false,
-      cause,
-    });
-  }
-}
-
 export class UpstreamHttpError extends DomainError {
   constructor(public readonly httpStatus: number) {
     super(`Target returned HTTP ${httpStatus}; response cannot establish an extraction baseline.`, {
       code: 'UPSTREAM_HTTP_ERROR',
       statusCode: 502,
       isRetryable: httpStatus >= 500 || httpStatus === 408,
+    });
+  }
+}
+
+export class UnsupportedCapabilityError extends DomainError {
+  constructor(message: string) {
+    super(message, { code: 'UNSUPPORTED_CAPABILITY' });
+  }
+}
+
+export const ResourceErrorCode = {
+  BrowserCapacity: 'BROWSER_CAPACITY_EXHAUSTED',
+  LeaseLost: 'RESOURCE_LEASE_LOST',
+} as const;
+export class BrowserCapacityError extends DomainError {
+  constructor() {
+    super('Browser capacity is currently in use. Retry later.', {
+      code: ResourceErrorCode.BrowserCapacity,
+      statusCode: 503,
+      isRetryable: true,
+    });
+  }
+}
+export class ResourceLeaseLostError extends DomainError {
+  constructor() {
+    super('Execution lease was lost. Discarding stale results.', {
+      code: ResourceErrorCode.LeaseLost,
+      isRetryable: true,
+    });
+  }
+}
+export const CryptoErrorCode = { Decryption: 'DECRYPTION_FAILED' } as const;
+export class DecryptionError extends DomainError {
+  constructor(cause?: unknown) {
+    super('Stored credentials could not be decrypted.', {
+      code: CryptoErrorCode.Decryption,
+      cause,
     });
   }
 }

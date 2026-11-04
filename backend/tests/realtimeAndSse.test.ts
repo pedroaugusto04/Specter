@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { InMemoryRealtimeEventBus } from '../src/providers/realtime/inMemoryRealtime.provider.js';
 import type { RealtimeEvent } from '../src/providers/realtime/realtime.interface.js';
-import { DrizzleJobRepository } from '../src/repositories/jobRepository.js';
-import { DrizzleUserRepository } from '../src/repositories/userRepository.js';
 import { AuthService } from '../src/services/authService.js';
 import { IntegrationService } from '../src/services/integrationService.js';
 import { JobService } from '../src/services/jobService.js';
 import { RealtimeService } from '../src/services/realtimeService.js';
-import { MockJobScheduler, MockScraperEngine } from './helpers/testDoubles.js';
+import {
+  MockJobScheduler,
+  MockScraperEngine,
+  InMemoryJobRepository,
+  InMemoryUserRepository,
+} from './helpers/testDoubles.js';
 
 describe('Realtime EventBus & SSE Streaming', () => {
   describe('InMemoryRealtimeEventBus', () => {
@@ -85,13 +88,18 @@ describe('Realtime EventBus & SSE Streaming', () => {
       const bus = new InMemoryRealtimeEventBus();
       const realtimeService = new RealtimeService(bus);
 
-      const jobRepo = new DrizzleJobRepository();
-      const userRepo = new DrizzleUserRepository();
+      const jobRepo = new InMemoryJobRepository();
+      const userRepo = new InMemoryUserRepository();
       const scheduler = new MockJobScheduler();
       const scraper = new MockScraperEngine();
 
       const jobService = new JobService(jobRepo, scheduler, scraper, undefined, realtimeService);
       const authService = new AuthService(userRepo);
+      const authenticated = await authService.register({
+        email: 'events@example.com',
+        password: 'events-test-password',
+        name: 'Events owner',
+      });
       const integrationService = {
         getIntegrationSettings: async () => ({}),
         updateIntegrationSettings: async () => ({}),
@@ -107,6 +115,8 @@ describe('Realtime EventBus & SSE Streaming', () => {
         enableLogger: false,
       });
 
+      const anonymous = await app.inject({ method: 'GET', url: '/api/events' });
+      expect(anonymous.statusCode).toBe(401);
       await app.listen({ port: 0, host: '127.0.0.1' });
       const address = app.server.address();
       const port = typeof address === 'object' && address ? address.port : 0;
@@ -114,6 +124,7 @@ describe('Realtime EventBus & SSE Streaming', () => {
       const controller = new AbortController();
       const response = await fetch(`http://127.0.0.1:${port}/api/events`, {
         signal: controller.signal,
+        headers: { Authorization: `Bearer ${authenticated.tokens.accessToken}` },
       });
 
       expect(response.status).toBe(200);
@@ -132,7 +143,7 @@ describe('Realtime EventBus & SSE Streaming', () => {
 
       // Publish a realtime event and verify it is pushed through SSE
       const chunkPromise = reader!.read();
-      await realtimeService.notifyJobUpdated('default-user', 'job-123', 'ACTIVE');
+      await realtimeService.notifyJobUpdated(authenticated.user.id, 'job-123', 'ACTIVE');
       const liveChunk = await chunkPromise;
       const liveText = new TextDecoder().decode(liveChunk.value);
 

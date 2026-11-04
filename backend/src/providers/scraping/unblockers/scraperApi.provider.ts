@@ -1,3 +1,4 @@
+import { normalizeUnblockerError } from './unblockerErrors.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
@@ -32,7 +33,11 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+    const signal = options?.signal
+      ? AbortSignal.any([controller.signal, options.signal])
+      : controller.signal;
     try {
+      signal.throwIfAborted();
       const endpoint = new URL('https://api.scraperapi.com/');
       endpoint.searchParams.set('api_key', this.apiKey.trim());
       endpoint.searchParams.set('url', targetUrl);
@@ -45,7 +50,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
 
       const response = await this.fetchFn(endpoint.toString(), {
         method: 'GET',
-        signal: controller.signal,
+        signal,
       });
 
       const httpStatus = response.status;
@@ -85,7 +90,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       let screenshot: Buffer | undefined;
       const screenshotUrl = response.headers.get('sa-screenshot');
       if (options?.captureScreenshot && screenshotUrl) {
-        screenshot = await fetchRemoteScreenshot(screenshotUrl, this.fetchFn, controller.signal);
+        screenshot = await fetchRemoteScreenshot(screenshotUrl, this.fetchFn, signal);
       }
 
       // Verify that the destination page itself did not return an unhandled challenge
@@ -99,18 +104,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         screenshot,
       };
     } catch (err) {
-      if (err instanceof UnblockerError) {
-        throw err;
-      }
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new UnblockerError(this.name, `Request timed out after ${timeoutMs}ms`, 504, err);
-      }
-      throw new UnblockerError(
-        this.name,
-        err instanceof Error ? err.message : String(err),
-        500,
-        err
-      );
+      throw normalizeUnblockerError(this.name, err, timeoutMs);
     } finally {
       clearTimeout(timer);
     }

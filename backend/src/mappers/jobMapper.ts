@@ -1,58 +1,9 @@
-import { env } from '../config/env.js';
-import type { SemanticPolicy } from '../extraction/contracts.js';
-import type { ExtractionReport } from '../types/extractionPlan.js';
+import type { ScrapingJobDto, JobRunDto } from '@specter/contracts';
+import { presentExtractionReport } from '../utils/errorSanitizer.js';
+import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
-import type { ExtractionPlan } from '../types/extractionPlan.js';
-import type { ExtractedPayload } from '../types/extractor.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
-
-export interface ScrapingJobDto {
-  id: string;
-  userId: string;
-  url: string;
-  userPrompt: string;
-  notificationEmail: string;
-  webhookUrl: string | null;
-  cronExpression: string;
-  contractRevision?: string | null;
-  planRevision?: string | null;
-  semanticPolicy?: SemanticPolicy | null;
-  extractionPlan: ExtractionPlan | null;
-  effectiveSemanticPolicy: { enabled: boolean; threshold: number };
-  status: JobStatus;
-  lastError: string | null;
-  healingAttempts?: number;
-  failureCount: number;
-  captureScreenshotOnChange: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface JobRunDto {
-  id: string;
-  jobId: string;
-  contractRevision?: string | null;
-  extractionReport?: ExtractionReport | null;
-  extractedData: ExtractedPayload | null;
-  normalizedHash: string | null;
-  hasChanges: ChangeStatus;
-  status: RunStatus;
-  errorMessage: string | null;
-  httpStatus: number | null;
-  durationMs: number | null;
-  screenshotUrl: string | null;
-  executedAt: string;
-}
-
-export interface DashboardStatsDto {
-  totalJobs: number;
-  activeJobs: number;
-  healingOrCompilingJobs: number;
-  failedOrPausedJobs: number;
-  totalRuns: number;
-  DetectedChangesCount: number;
-}
 
 export const JobMapper = {
   rowToEntity(row: ScrapingJobRow): ScrapingJobEntity {
@@ -80,7 +31,13 @@ export const JobMapper = {
     };
   },
 
-  entityToDto(entity: ScrapingJobEntity): ScrapingJobDto {
+  entityToDto(
+    entity: ScrapingJobEntity,
+    context: {
+      semanticDefaults: { enabled: boolean; threshold: number };
+      accessState: AccessState | null;
+    }
+  ): ScrapingJobDto {
     return {
       id: entity.id,
       userId: entity.userId,
@@ -94,10 +51,11 @@ export const JobMapper = {
       semanticPolicy: entity.semanticPolicy,
       extractionPlan: entity.extractionPlan,
       effectiveSemanticPolicy: {
-        enabled: entity.semanticPolicy?.enabled ?? env.SEMANTIC_REVIEW_ENABLED,
-        threshold: entity.semanticPolicy?.threshold ?? env.SEMANTIC_REVIEW_THRESHOLD,
+        enabled: entity.semanticPolicy?.enabled ?? context.semanticDefaults.enabled,
+        threshold: entity.semanticPolicy?.threshold ?? context.semanticDefaults.threshold,
       },
       status: entity.status,
+      accessState: context.accessState,
       lastError: entity.lastError,
       failureCount: entity.failureCount,
       healingAttempts: entity.healingAttempts,
@@ -105,10 +63,6 @@ export const JobMapper = {
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
     };
-  },
-
-  rowToDto(row: ScrapingJobRow): ScrapingJobDto {
-    return JobMapper.entityToDto(JobMapper.rowToEntity(row));
   },
 
   runRowToEntity(row: JobRunRow): JobRunEntity {
@@ -134,7 +88,9 @@ export const JobMapper = {
       id: entity.id,
       jobId: entity.jobId,
       contractRevision: entity.contractRevision,
-      extractionReport: entity.extractionReport,
+      extractionReport: entity.extractionReport
+        ? presentExtractionReport(entity.extractionReport)
+        : entity.extractionReport,
       extractedData: entity.extractedData,
       normalizedHash: entity.normalizedHash,
       hasChanges: entity.hasChanges,
@@ -145,9 +101,5 @@ export const JobMapper = {
       screenshotUrl: entity.screenshotUrl,
       executedAt: entity.executedAt.toISOString(),
     };
-  },
-
-  runRowToDto(row: JobRunRow): JobRunDto {
-    return JobMapper.runEntityToDto(JobMapper.runRowToEntity(row));
   },
 };

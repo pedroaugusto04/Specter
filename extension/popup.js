@@ -385,7 +385,7 @@ btnLogin.addEventListener('click', async () => {
       return;
     }
 
-    const token = json.token || json.tokens?.accessToken;
+    const token = json.token;
     const userEmail = json.data?.email || email;
 
     await saveStoredConfig({

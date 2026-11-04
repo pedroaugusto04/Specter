@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { UnauthorizedError } from '../errors/domainErrors.js';
-import type { UserDto } from '../mappers/userMapper.js';
+import type { UserDto } from '@specter/contracts';
 import type { AuthService } from '../services/authService.js';
 import { ACCESS_COOKIE_NAME, parseCookies, REFRESH_COOKIE_NAME } from '../utils/cookies.js';
 

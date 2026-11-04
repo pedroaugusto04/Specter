@@ -55,6 +55,9 @@ export const envSchema = z.object({
   EXTRACTION_MAX_PAGES: z.coerce.number().int().positive().default(10),
   EXTRACTION_MAX_ACTIONS: z.coerce.number().int().positive().default(20),
   EXTRACTION_MAX_ITEMS: z.coerce.number().int().positive().default(500),
+  ACQUISITION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  ACCESS_BLOCK_THRESHOLD: z.coerce.number().int().positive().default(2),
+  ACCESS_BLOCK_COOLDOWN_MINUTES: z.coerce.number().int().positive().default(60),
   EXTRACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
   COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(300000),
   COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
@@ -75,7 +78,12 @@ export const envSchema = z.object({
   TELEGRAM_BOT_USERNAME: z.string().optional().default(''),
 
   // Encryption at Rest (AES-256-GCM)
-  ENCRYPTION_KEY: z.string().optional().default(''),
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'ENCRYPTION_KEY must contain exactly 64 hexadecimal characters (32 bytes)'
+    ),
 
   // Chrome Extension CORS Allow-list
   // Production: set to the exact extension ID (e.g. "abcdefghijklmnopabcdefghijklmnop")

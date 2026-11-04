@@ -1,11 +1,16 @@
-import type { SemanticPolicy, ExtractionReport } from './extractionPlan';
 import type {
-  ExtractionPlan,
-  ExtractionScope,
-  TriggerMatchMode,
-  TriggerRule,
-} from './extractionPlan';
-import type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
+  CreateJobRequest,
+  DashboardStatsDto as DashboardStats,
+  JobRunsDto,
+  JobStatus,
+  ProbeUrlDto,
+  ScrapingJobDto,
+  SessionDto,
+  UpdateIntegrationsRequest,
+  UpdateJobRequest,
+  UserDto,
+  UserIntegrationsDto,
+} from '@specter/contracts';
 export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
 export type {
   ExtractionPlan,
@@ -14,95 +19,16 @@ export type {
   TriggerRule,
 } from './extractionPlan';
 
-export interface UserDto {
-  id: string;
-  email: string;
-  name: string | null;
-  timezone: string;
-  createdAt: string;
-}
-
-export interface ScrapingJobDto {
-  id: string;
-  userId: string;
-  url: string;
-  userPrompt: string;
-  notificationEmail: string;
-  webhookUrl?: string | null;
-  cronExpression: string;
-  extractionPlan: ExtractionPlan | null;
-  semanticPolicy?: SemanticPolicy | null;
-  effectiveSemanticPolicy?: { enabled: boolean; threshold: number };
-  planRevision?: string | null;
-  status: JobStatus;
-  lastError: string | null;
-  failureCount: number;
-  captureScreenshotOnChange: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface JobRunDto {
-  extractionReport?: ExtractionReport | null;
-  id: string;
-  jobId: string;
-  extractedData: Record<string, unknown> | null;
-  normalizedHash: string | null;
-  hasChanges: ChangeStatus;
-  status: RunStatus;
-  errorMessage: string | null;
-  httpStatus: number | null;
-  durationMs: number | null;
-  screenshotUrl: string | null;
-  executedAt: string;
-}
-
-export interface DiffChangeEntry {
-  field: string;
-  changeType: 'ADDED' | 'MODIFIED' | 'REMOVED';
-  previousValue: unknown;
-  currentValue: unknown;
-}
-
-export interface DiffSummary {
-  hasChanges: boolean;
-  totalChanges: number;
-  added: DiffChangeEntry[];
-  modified: DiffChangeEntry[];
-  removed: DiffChangeEntry[];
-  summaryText: string;
-  summaryHtml: string;
-}
-
-export interface DashboardStats {
-  totalJobs: number;
-  activeJobs: number;
-  healingOrCompilingJobs: number;
-  failedOrPausedJobs: number;
-  totalRuns: number;
-  DetectedChangesCount: number;
-}
-
-export interface UserIntegrationsDto {
-  id?: string;
-  userId?: string;
-  telegramEnabled: boolean;
-  telegramChatId?: string | null;
-  webhookEnabled: boolean;
-  webhookUrl?: string | null;
-  webhookSecret?: string | null;
-  botUsername?: string | null;
-}
-
-export interface SessionDto {
-  id: string;
-  domain: string;
-  name: string;
-  cookieCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
+export type {
+  DashboardStatsDto as DashboardStats,
+  DiffChangeEntry,
+  DiffSummary,
+  JobRunDto,
+  ScrapingJobDto,
+  SessionDto,
+  UserDto,
+  UserIntegrationsDto,
+} from '@specter/contracts';
 export interface ApiValidationErrorDetail {
   field: string;
   message: string;
@@ -130,34 +56,14 @@ export class ApiError extends Error {
     this.code = data?.error;
     this.details = data?.details;
     this.fieldErrors = { ...(data?.fields ?? {}) };
-    if (data?.details && Object.keys(this.fieldErrors).length === 0) {
-      for (const item of data.details) {
-        if (item.field && item.message && !this.fieldErrors[item.field]) {
-          this.fieldErrors[item.field] = item.message;
-        }
-      }
-    }
   }
 }
 
 export function getApiBaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    // Dynamically detect context: if loaded on /scrapper (dev/staging), route API calls to /scrapper
-    if (window.location.pathname.startsWith('/scrapper')) {
-      return '/scrapper';
-    }
-    // In production root (specterdev.online), route API calls to root (/api)
-    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (envUrl) {
-      return envUrl.replace(/\/$/, '').replace(/\/api$/, '');
-    }
-    return '';
-  }
-  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (envUrl) {
-    return envUrl.replace(/\/$/, '').replace(/\/api$/, '');
-  }
-  return 'http://localhost:3001';
+  return (process.env.NEXT_PUBLIC_API_URL ?? '')
+    .trim()
+    .replace(/\/$/, '')
+    .replace(/\/api$/, '');
 }
 
 async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
@@ -203,7 +109,12 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     );
   }
 
-  return (body.data !== undefined ? body.data : body) as T;
+  if (!body || typeof body !== 'object' || !Object.hasOwn(body, 'data')) {
+    throw new ApiError('The server returned an invalid response.', response.status, {
+      error: 'INVALID_API_RESPONSE',
+    });
+  }
+  return body.data as T;
 }
 
 export const api = {
@@ -251,42 +162,21 @@ export const api = {
     return request<ScrapingJobDto[]>(`/api/jobs${query}`);
   },
 
-  probeUrl(url: string): Promise<{ accessible: boolean; reason?: string }> {
-    return request<{ accessible: boolean; reason?: string }>('/api/jobs/probe', {
+  probeUrl(url: string): Promise<ProbeUrlDto> {
+    return request<ProbeUrlDto>('/api/jobs/probe', {
       method: 'POST',
       body: JSON.stringify({ url }),
     });
   },
 
-  createJob(input: {
-    url: string;
-    userPrompt: string;
-    notificationEmail: string;
-    webhookUrl?: string | null;
-    cronExpression: string;
-    captureScreenshotOnChange?: boolean;
-    semanticPolicy?: SemanticPolicy | null;
-  }): Promise<ScrapingJobDto> {
+  createJob(input: CreateJobRequest): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>('/api/jobs', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   },
 
-  updateJob(
-    id: string,
-    input: {
-      url?: string;
-      userPrompt?: string;
-      notificationEmail?: string;
-      webhookUrl?: string | null;
-      cronExpression?: string;
-      captureScreenshotOnChange?: boolean;
-      semanticPolicy?: SemanticPolicy | null;
-      triggerRules?: TriggerRule[];
-      triggerMatchMode?: TriggerMatchMode;
-    }
-  ): Promise<ScrapingJobDto> {
+  updateJob(id: string, input: UpdateJobRequest): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>(`/api/jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(input),
@@ -324,13 +214,7 @@ export const api = {
     return request<UserIntegrationsDto>('/api/integrations');
   },
 
-  updateIntegrations(input: {
-    telegramEnabled: boolean;
-    telegramChatId?: string | null;
-    webhookEnabled: boolean;
-    webhookUrl?: string | null;
-    webhookSecret?: string | null;
-  }): Promise<UserIntegrationsDto> {
+  updateIntegrations(input: UpdateIntegrationsRequest): Promise<UserIntegrationsDto> {
     return request<UserIntegrationsDto>('/api/integrations', {
       method: 'PUT',
       body: JSON.stringify(input),
@@ -354,8 +238,8 @@ export const api = {
     });
   },
 
-  getJobRuns(id: string): Promise<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }> {
-    return request<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }>(`/api/jobs/${id}/runs`);
+  getJobRuns(id: string): Promise<JobRunsDto> {
+    return request<JobRunsDto>(`/api/jobs/${id}/runs`);
   },
 
   getSessions(): Promise<SessionDto[]> {

@@ -4,12 +4,14 @@ import type {
   ExtractionPlan,
   ExecutionContext,
 } from '../contracts.js';
-import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
-/** Passive acquisition can replace a blocked browser, but never pretends to support interactions. */
+import type { DocumentCandidate } from '../../acquisition/coordinatedExecutor.js';
+import { acquire } from '../../acquisition/runner.js';
+import { requiresBrowser } from '../capabilities.js';
+
 export class DiscoveryDocumentAdapter implements DocumentAdapter {
   constructor(
     private readonly browser: DocumentAdapter,
-    private readonly passive: DocumentAdapter
+    private readonly passive: DocumentCandidate[]
   ) {}
   async open(
     url: string,
@@ -17,17 +19,30 @@ export class DiscoveryDocumentAdapter implements DocumentAdapter {
     context: ExecutionContext,
     options: { storageState?: unknown }
   ): Promise<DocumentSession> {
-    let session: DocumentSession | undefined;
-    try {
-      session = await this.browser.open(url, plan, context, options);
-      await session.snapshot();
-      return session;
-    } catch (error) {
-      await session?.close();
-      if (!(error instanceof AntiBotBlockedError || error instanceof NavigationTimeoutError))
-        throw error;
-      context.check();
-      return this.passive.open(url, plan, context, options);
-    }
+    const candidates = [
+      { name: 'browser', external: false, adapter: this.browser },
+      ...(requiresBrowser(plan.strategy) ? [] : this.passive),
+    ];
+    return acquire(
+      candidates.map((candidate) => ({
+        ...candidate,
+        run: async () => {
+          const session = await candidate.adapter.open(url, plan, context, {
+            ...options,
+            storageState: candidate.external ? undefined : options.storageState,
+          });
+          try {
+            await session.snapshot();
+            context.check();
+            return session;
+          } catch (error) {
+            await session.close();
+            throw error;
+          }
+        },
+      })),
+      context,
+      () => true
+    );
   }
 }

@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../errors/domainErrors.js';
-import { UserMapper, type UserDto } from '../mappers/userMapper.js';
+import { UserMapper } from '../mappers/userMapper.js';
+import type { UserDto } from '@specter/contracts';
 import type { IUserRepository } from '../repositories/userRepository.js';
 import {
   ACCESS_COOKIE_NAME,

@@ -6,10 +6,11 @@ ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV WATCHPACK_POLLING=true
 
-COPY package.json package-lock.json* ./
+COPY packages/contracts /packages/contracts
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm install --no-audit --no-fund
 
-COPY . .
+COPY frontend/ .
 
 EXPOSE 3000
 

@@ -2,7 +2,7 @@ import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { ExtractionPlan, ExtractionReport } from './extractionPlan.js';
 import type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 import type { ExtractedPayload } from './extractor.js';
-import type { PlaywrightStorageState } from '../db/schema.js';
+import type { PlaywrightStorageState } from './session.js';
 
 export type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 
@@ -80,20 +80,4 @@ export interface JobRunEntity {
   executedAt: Date;
 }
 
-export interface DiffChangeEntry {
-  field: string;
-  changeType: 'ADDED' | 'MODIFIED' | 'REMOVED';
-  previousValue: unknown;
-  currentValue: unknown;
-}
-
-export interface DiffSummary {
-  entityChanges?: import('../extraction/contracts.js').EntityChange[];
-  hasChanges: boolean;
-  totalChanges: number;
-  added: DiffChangeEntry[];
-  modified: DiffChangeEntry[];
-  removed: DiffChangeEntry[];
-  summaryText: string;
-  summaryHtml: string;
-}
+export type { DiffChangeEntry, DiffSummary } from '@specter/contracts';

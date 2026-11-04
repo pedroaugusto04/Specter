@@ -1,4 +1,5 @@
-import type { PlaywrightStorageState } from '../db/schema.js';
+import { DecryptionError } from '../errors/domainErrors.js';
+import type { PlaywrightStorageState } from '../types/session.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import { logger } from './logger.js';
 import { extractDomainCandidates } from './urlNormalizer.js';
@@ -38,7 +39,8 @@ export async function resolveSessionStorageState(
       }
       return savedSession.storageState;
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof DecryptionError) throw error;
     // Gracefully ignore parsing or lookup failures for session injection
   }
 

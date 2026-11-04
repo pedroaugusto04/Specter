@@ -7,7 +7,10 @@ import type { ExtractedPayload } from '../types/extractor.js';
 import { evaluateTriggerRules } from './triggerEvaluator.js';
 
 export interface BuildChangeAlertOptions {
-  job: ScrapingJobEntity;
+  job: Pick<
+    ScrapingJobEntity,
+    'id' | 'userId' | 'url' | 'userPrompt' | 'notificationEmail' | 'webhookUrl' | 'extractionPlan'
+  >;
   currentData: ExtractedPayload;
   previousData: ExtractedPayload | null;
   triggerRules?: TriggerRule[];

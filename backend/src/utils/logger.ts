@@ -1,3 +1,4 @@
+import { redactObject } from '../extraction/evidence.js';
 import { env } from '../config/env.js';
 
 export interface LogContext {
@@ -14,7 +15,7 @@ function formatLog(level: string, message: string, context?: LogContext): string
     timestamp: new Date().toISOString(),
     level,
     message,
-    ...context,
+    ...(redactObject(context) as LogContext),
   };
   return JSON.stringify(payload);
 }

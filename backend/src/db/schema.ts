@@ -1,3 +1,4 @@
+import type { EncryptedJsonEnvelope } from '../types/crypto.js';
 import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { AlertPayload } from '../providers/notifications/notification.interface.js';
 import type { DeliveryChannel } from '../notifications/contracts.js';
@@ -132,27 +133,6 @@ export const jobRuns = pgTable(
   ]
 );
 
-export interface PlaywrightStorageCookie {
-  name: string;
-  value: string;
-  domain: string;
-  path: string;
-  expires: number;
-  httpOnly: boolean;
-  secure: boolean;
-  sameSite: 'Strict' | 'Lax' | 'None';
-}
-
-export interface PlaywrightStorageOrigin {
-  origin: string;
-  localStorage: Array<{ name: string; value: string }>;
-}
-
-export interface PlaywrightStorageState {
-  cookies: PlaywrightStorageCookie[];
-  origins: PlaywrightStorageOrigin[];
-}
-
 export const userWebSessions = pgTable(
   'user_web_sessions',
   {
@@ -162,7 +142,7 @@ export const userWebSessions = pgTable(
       .notNull(),
     domain: text('domain').notNull(),
     name: text('name').notNull(),
-    storageState: jsonb('storage_state').$type<PlaywrightStorageState>().notNull(),
+    storageState: jsonb('storage_state').$type<EncryptedJsonEnvelope>().notNull(),
     cookieCount: integer('cookie_count').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

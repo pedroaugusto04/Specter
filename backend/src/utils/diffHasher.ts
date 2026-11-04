@@ -17,9 +17,6 @@ const RELATIVE_TIME_PATTERNS: RegExp[] = [
 const VOLATILE_QUERY_PARAM_PATTERN =
   /([?&])(?:utm_[a-z_]+|session_?id|sid|phpsessid|jsessionid|__cf_chl_[a-z0-9_]*|_t|timestamp|cb|cachebuster)=[^&#\s]*/gi;
 
-const VOLATILE_FIELD_NAME_PATTERN =
-  /^(?:_id|sessionId|session_id|requestId|request_id|traceId|trace_id|lastChecked|scrapedAt|timestamp)$/i;
-
 export function sanitizeVolatileString(input: string): string {
   let cleaned = input;
 
@@ -33,42 +30,6 @@ export function sanitizeVolatileString(input: string): string {
   cleaned = cleaned.replace(/\?&/g, '?');
 
   return cleaned.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Recursively sanitizes volatile dynamic data and sorts object keys alphabetically.
- */
-export function normalizeForDiff(payload: unknown): unknown {
-  if (payload === null || payload === undefined) {
-    return null;
-  }
-
-  if (typeof payload === 'string') {
-    return sanitizeVolatileString(payload);
-  }
-
-  if (typeof payload === 'number' || typeof payload === 'boolean') {
-    return payload;
-  }
-
-  if (Array.isArray(payload)) {
-    return payload.map((item) => normalizeForDiff(item));
-  }
-
-  if (typeof payload === 'object') {
-    const obj = payload as Record<string, unknown>;
-    const sortedKeys = Object.keys(obj)
-      .filter((key) => !VOLATILE_FIELD_NAME_PATTERN.test(key))
-      .sort((a, b) => a.localeCompare(b));
-
-    const result: Record<string, unknown> = {};
-    for (const key of sortedKeys) {
-      result[key] = normalizeForDiff(obj[key]);
-    }
-    return result;
-  }
-
-  return payload;
 }
 
 /**
@@ -89,15 +50,6 @@ export function sortObjectKeys(value: unknown): unknown {
     sorted[key] = sortObjectKeys(obj[key]);
   }
   return sorted;
-}
-
-/**
- * Computes a deterministic SHA-256 hash of a normalized payload.
- */
-export function computeNormalizedHash(payload: unknown): string {
-  const normalized = normalizeForDiff(payload);
-  const serialized = JSON.stringify(normalized);
-  return crypto.createHash('sha256').update(serialized).digest('hex');
 }
 
 function flattenPayload(
@@ -155,13 +107,9 @@ function escapeHtml(value: unknown): string {
 /**
  * Builds a human-readable and HTML-formatted diff summary between two payloads.
  */
-export function buildDiffSummary(
-  previousData: unknown,
-  currentData: unknown,
-  normalize = true
-): DiffSummary {
-  const normalizedPrev = normalize ? normalizeForDiff(previousData) : sortObjectKeys(previousData);
-  const normalizedCurr = normalize ? normalizeForDiff(currentData) : sortObjectKeys(currentData);
+export function buildDiffSummary(previousData: unknown, currentData: unknown): DiffSummary {
+  const normalizedPrev = sortObjectKeys(previousData);
+  const normalizedCurr = sortObjectKeys(currentData);
 
   const flatPrev = flattenPayload(normalizedPrev);
   const flatCurr = flattenPayload(normalizedCurr);

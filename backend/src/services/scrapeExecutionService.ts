@@ -1,3 +1,8 @@
+import { SuccessfulRunService } from './successfulRunService.js';
+import { AccessFailure } from '../types/access.js';
+import { FailureCode } from '../extraction/constants.js';
+import { classifyAccessFailure, AcquisitionFailureError } from '../acquisition/failure.js';
+import type { AccessCooldownService } from '../acquisition/cooldown.js';
 import type { IAlertRouter } from '../notifications/contracts.js';
 import type { IPlanExecutor } from './planExecutionService.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
@@ -15,10 +20,8 @@ import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { JobRunEntity } from '../types/domain.js';
-import { computeExtractionHash } from '../utils/diffHasher.js';
-import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
+import { presentExtractionReport, formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { logger } from '../utils/logger.js';
-import { buildChangeAlert } from '../utils/changeAlertHelper.js';
 import {
   ChangeStatus,
   ExtractionQuality,
@@ -26,11 +29,11 @@ import {
   JobStatus,
   RunStatus,
 } from '../types/enums.js';
-import { uploadScreenshotIfEligible } from '../utils/screenshotHelper.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
 
 export interface ScrapeExecutionServiceDeps {
+  accessCooldown?: AccessCooldownService;
   jobRepository: IJobRepository;
   planExecutor: IPlanExecutor;
   alertRouter: IAlertRouter;
@@ -43,32 +46,26 @@ export interface ScrapeExecutionServiceDeps {
 }
 
 export class ScrapeExecutionService {
-  private readonly jobRepository: IJobRepository;
-  private readonly planExecutor: IPlanExecutor;
-  private readonly alertRouter: IAlertRouter;
-  private readonly jobScheduler: IJobScheduler;
-  private readonly storageProvider: IStorageProvider;
-  private readonly sessionRepository?: ISessionRepository;
-  private readonly realtimeService?: RealtimeService;
   private readonly consecutiveFailuresForHealing: number;
   private readonly maxHealingRetries: number;
-
-  constructor(deps: ScrapeExecutionServiceDeps) {
-    this.jobRepository = deps.jobRepository;
-    this.planExecutor = deps.planExecutor;
-    this.alertRouter = deps.alertRouter;
-    this.jobScheduler = deps.jobScheduler;
-    this.storageProvider = deps.storageProvider;
-    this.sessionRepository = deps.sessionRepository;
-    this.realtimeService = deps.realtimeService;
+  constructor(private readonly deps: ScrapeExecutionServiceDeps) {
     this.consecutiveFailuresForHealing =
       deps.consecutiveFailuresForHealing ?? env.CONSECUTIVE_FAILURES_FOR_HEALING;
     this.maxHealingRetries = deps.maxHealingRetries ?? env.MAX_HEALING_RETRIES;
   }
 
+  async isAccessSuspended(jobId: string): Promise<boolean> {
+    if (!this.deps.accessCooldown) return false;
+    const job = await this.deps.jobRepository.findById(jobId);
+    const state = job ? await this.deps.accessCooldown.state(job) : null;
+    if (state)
+      logger.info('Skipping scrape during access cooldown', { jobId, retryAt: state.retryAt });
+    return Boolean(state);
+  }
+
   async executeScrape(jobId: string): Promise<JobRunEntity | null> {
     const startTime = Date.now();
-    const job = await this.jobRepository.findById(jobId);
+    const job = await this.deps.jobRepository.findById(jobId);
 
     if (!job) {
       throw new NotFoundError(`Scraping job not found: ${jobId}`);
@@ -79,9 +76,12 @@ export class ScrapeExecutionService {
       return null;
     }
 
+    const access = await this.deps.accessCooldown?.forMonitor(job);
+    if (await access?.state()) return null;
+
     if (!job.extractionPlan) {
       logger.info('Job has no extractionPlan; enqueueing compilation', { jobId: job.id });
-      await this.jobScheduler.enqueueCompilation(job.id, 'initial');
+      await this.deps.jobScheduler.enqueueCompilation(job.id, 'initial');
       return null;
     }
 
@@ -90,7 +90,7 @@ export class ScrapeExecutionService {
 
     try {
       const storageState = await resolveSessionStorageState(
-        this.sessionRepository,
+        this.deps.sessionRepository,
         job.userId,
         job.url,
         {
@@ -99,7 +99,7 @@ export class ScrapeExecutionService {
         }
       );
 
-      const execution = await this.planExecutor.execute(job.url, job.extractionPlan, {
+      const execution = await this.deps.planExecutor.execute(job.url, job.extractionPlan, {
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });
@@ -109,7 +109,7 @@ export class ScrapeExecutionService {
       const extractedData = execution.data;
       httpStatus = scrapeResult.httpStatus;
       await assertExecutionLease();
-      const latest = await this.jobRepository.findById(job.id);
+      const latest = await this.deps.jobRepository.findById(job.id);
       if (
         !latest ||
         latest.status !== job.status ||
@@ -117,83 +117,56 @@ export class ScrapeExecutionService {
       )
         return null;
 
+      await access?.record(false);
       if (!isAcceptedExtractionQuality(execution.report.quality)) {
+        logger.warn('Extraction rejected', {
+          jobId: job.id,
+          quality: execution.report.quality,
+          failureCode: execution.report.failureCode,
+          issues: execution.report.issues,
+        });
         if (
           execution.report.quality === ExtractionQuality.Invalid ||
           ((execution.report.quality === ExtractionQuality.Inconclusive ||
-            execution.report.failureCode === 'NO_PROGRESS') &&
+            execution.report.failureCode === FailureCode.NoProgress) &&
             job.failureCount + 1 >= this.consecutiveFailuresForHealing)
         )
           throw new SelectorMismatchError(execution.report.issues.join(' '));
-        await this.jobRepository.createRun({
+        await this.deps.jobRepository.createRun({
           jobId: job.id,
           extractedData,
           hasChanges: ChangeStatus.Unchanged,
           status: RunStatus.Failed,
-          extractionReport: execution.report,
-          errorMessage: execution.report.issues.join(' '),
+          extractionReport: presentExtractionReport(execution.report),
+          errorMessage: formatUserErrorMessage(
+            new SelectorMismatchError('Extraction could not be validated.')
+          ),
           httpStatus,
         });
-        await this.jobRepository.updateJob(job.id, {
-          lastError: execution.report.issues.join(' '),
+        await this.deps.jobRepository.updateJob(job.id, {
+          lastError: formatUserErrorMessage(
+            new SelectorMismatchError('Extraction could not be validated.')
+          ),
           failureCount: job.failureCount + 1,
         });
         return null;
       }
-      const currentHash = computeExtractionHash(extractedData);
-      const candidate = await this.jobRepository.findLatestSuccessfulRun(job.id);
-      const previousRun = candidate?.contractRevision === job.contractRevision ? candidate : null;
-
-      let hasChanges: ChangeStatus = ChangeStatus.Initial;
-      if (previousRun) {
-        hasChanges =
-          previousRun.normalizedHash === currentHash
-            ? ChangeStatus.Unchanged
-            : ChangeStatus.Changed;
-      }
-
-      const screenshotUrl = await uploadScreenshotIfEligible({
-        jobId: job.id,
-        captureScreenshotOnChange: job.captureScreenshotOnChange,
-        hasChanges,
-        screenshot: scrapeResult.screenshot,
-        storageProvider: this.storageProvider,
+      const prepared = await new SuccessfulRunService(this.deps).prepare({
+        job,
+        plan: job.extractionPlan,
+        execution,
+        contractRevision: job.contractRevision,
+        startedAt: startTime,
         logContext: 'routine scraping',
       });
-
-      const durationMs = Date.now() - startTime;
-
-      const alert =
-        hasChanges === ChangeStatus.Changed && previousRun
-          ? buildChangeAlert({
-              job,
-              currentData: extractedData,
-              previousData: previousRun.extractedData,
-              triggerRules: job.extractionPlan?.intent.triggerRules,
-              triggerMatchMode: job.extractionPlan?.intent.triggerMatchMode,
-              screenshotUrl,
-            })
-          : null;
-      const deliveries = alert ? await this.alertRouter.prepare(alert) : [];
-
-      const runRecord = await this.jobRepository.commitRun(
-        {
-          jobId: job.id,
-          extractedData,
-          normalizedHash: currentHash,
-          hasChanges,
-          status: RunStatus.Success,
-          extractionReport: execution.report,
-          contractRevision: job.contractRevision,
-          httpStatus,
-          durationMs,
-          screenshotUrl,
-        },
-        deliveries,
+      const runRecord = await this.deps.jobRepository.commitRun(
+        prepared.run,
+        prepared.deliveries,
         { status: JobStatus.Active, failureCount: 0, lastError: null },
         job.updatedAt
       );
-
+      const durationMs = prepared.run.durationMs ?? undefined;
+      const hasChanges = prepared.run.hasChanges;
       logger.info('Deterministic scrape execution completed', {
         jobId: job.id,
         durationMs,
@@ -201,13 +174,13 @@ export class ScrapeExecutionService {
         hasChanges,
       });
 
-      await this.realtimeService?.notifyJobRunCompleted(
+      await this.deps.realtimeService?.notifyJobRunCompleted(
         job.userId,
         job.id,
         runRecord.id,
         hasChanges
       );
-      await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
+      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
 
       return runRecord;
     } catch (error) {
@@ -229,43 +202,53 @@ export class ScrapeExecutionService {
       });
 
       await assertExecutionLease();
-      const current = await this.jobRepository.findById(job.id);
+      const current = await this.deps.jobRepository.findById(job.id);
       if (
         !current ||
         current.status !== job.status ||
         current.updatedAt.getTime() !== job.updatedAt.getTime()
       )
         return null;
+      const accessFailure = classifyAccessFailure(error);
+      if (!extractionReport) await access?.record(accessFailure === AccessFailure.Blocked);
       const userMessage = formatUserErrorMessage(error);
 
-      await this.jobRepository.createRun({
+      await this.deps.jobRepository.createRun({
         jobId: job.id,
         extractedData: null,
         normalizedHash: null,
         hasChanges: ChangeStatus.Unchanged,
         status: RunStatus.Failed,
-        extractionReport: extractionReport ?? {
-          quality:
-            error instanceof AntiBotBlockedError
-              ? ExtractionQuality.Blocked
-              : ExtractionQuality.Inconclusive,
-          scope: job.extractionPlan.intent.scope,
-          pagesVisited: 0,
-          issues: [userMessage],
-          sourcesUsed: {},
-        },
+        extractionReport: extractionReport
+          ? presentExtractionReport(extractionReport)
+          : {
+              quality:
+                accessFailure === AccessFailure.Blocked
+                  ? ExtractionQuality.Blocked
+                  : ExtractionQuality.Inconclusive,
+              scope: job.extractionPlan.intent.scope,
+              pagesVisited: 0,
+              issues: [userMessage],
+              sourcesUsed: {},
+            },
         errorMessage: userMessage,
         httpStatus,
         durationMs,
       });
 
       // 1. Anti-bot / WAF block (HTTP 403/429): DO NOT trigger layout self-healing
-      if (error instanceof AntiBotBlockedError) {
-        await this.jobRepository.updateJob(job.id, {
+      if (accessFailure === AccessFailure.Blocked) {
+        await this.deps.jobRepository.updateJob(job.id, {
           lastError: userMessage,
         });
-        await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
+        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         return null;
+      }
+
+      if (error instanceof AcquisitionFailureError) {
+        await this.deps.jobRepository.updateJob(job.id, { lastError: userMessage });
+        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+        throw error;
       }
 
       // 2. Navigation / Network Timeout: DO NOT recompile; rethrow for BullMQ exponential backoff
@@ -273,10 +256,10 @@ export class ScrapeExecutionService {
         error instanceof NavigationTimeoutError ||
         (error instanceof DomainError && error.isRetryable)
       ) {
-        await this.jobRepository.updateJob(job.id, {
+        await this.deps.jobRepository.updateJob(job.id, {
           lastError: userMessage,
         });
-        await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
+        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         throw error;
       }
 
@@ -292,22 +275,22 @@ export class ScrapeExecutionService {
             : 0) >= this.maxHealingRetries
         ) {
           // Cap maximum self-healing retries to prevent infinite recompilation loops
-          await this.jobRepository.updateJob(job.id, {
+          await this.deps.jobRepository.updateJob(job.id, {
             status: JobStatus.Failed,
             failureCount: newFailureCount,
             lastError: `Self-healing retry limit exceeded (${this.maxHealingRetries}): ${userMessage}`,
           });
-          await this.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
+          await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
           logger.warn('Job exceeded max self-healing retries and transitioned to FAILED', {
             jobId: job.id,
             failureCount: newFailureCount,
           });
-          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
+          await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
           return null;
         }
 
         if (newFailureCount >= this.consecutiveFailuresForHealing) {
-          await this.jobRepository.updateJob(job.id, {
+          await this.deps.jobRepository.updateJob(job.id, {
             status: JobStatus.Healing,
             healingAttempts:
               (job.healingWindowStartedAt &&
@@ -329,26 +312,26 @@ export class ScrapeExecutionService {
               failureCount: newFailureCount,
             }
           );
-          await this.jobScheduler.enqueueCompilation(job.id, 'healing');
-          await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Healing);
+          await this.deps.jobScheduler.enqueueCompilation(job.id, 'healing');
+          await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Healing);
           return null;
         }
 
         // First selector failure: keep ACTIVE, increment failureCount
-        await this.jobRepository.updateJob(job.id, {
+        await this.deps.jobRepository.updateJob(job.id, {
           status: JobStatus.Active,
           failureCount: newFailureCount,
           lastError: userMessage,
         });
-        await this.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
+        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
         return null;
       }
 
       // Unexpected errors: record lastError
-      await this.jobRepository.updateJob(job.id, {
+      await this.deps.jobRepository.updateJob(job.id, {
         lastError: userMessage,
       });
-      await this.realtimeService?.notifyJobUpdated(job.userId, job.id);
+      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
       throw error;
     }
   }
