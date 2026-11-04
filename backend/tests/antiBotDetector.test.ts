@@ -46,12 +46,6 @@ describe('Anti-Bot Detection & Verification Interstitial Defense', () => {
   });
 
   it('CheerioScraperEngine throws AntiBotBlockedError when response redirects to verification page', async () => {
-    const mockFetch: typeof fetch = async () =>
-      new Response('<title id="root-title">Mercado Libre</title>', {
-        status: 200,
-        headers: { 'Content-Type': 'text/html' },
-      });
-
     // Mock response.url being redirected
     const mockRedirectFetch: typeof fetch = async () => {
       const resp = new Response('<title id="root-title">Mercado Libre</title>', {

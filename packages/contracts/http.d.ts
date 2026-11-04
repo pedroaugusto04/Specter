@@ -38,7 +38,6 @@ export interface UserIntegrationsDto {
 
 export interface ScrapingJobDto {
   id: string;
-  userId: string;
   url: string;
   userPrompt: string;
   notificationEmail: string;
@@ -48,7 +47,6 @@ export interface ScrapingJobDto {
   status: JobStatus;
   accessState?: AccessState | null;
   lastError: string | null;
-  healingAttempts?: number;
   failureCount: number;
   captureScreenshotOnChange: boolean;
   createdAt: string;
@@ -60,7 +58,6 @@ export interface JobRunDto {
   jobId: string;
   extractionReport?: ExtractionReport | null;
   extractedData: ExtractedPayload | null;
-  normalizedHash: string | null;
   hasChanges: ChangeStatus;
   status: RunStatus;
   errorMessage: string | null;

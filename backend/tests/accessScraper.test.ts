@@ -3,7 +3,6 @@ import { AntiBotBlockedError } from '../src/errors/domainErrors.js';
 import { AccessScraperEngine } from '../src/providers/scraping/accessScraper.provider.js';
 import type { IScraperEngine, ScrapeResult } from '../src/providers/scraping/scraper.interface.js';
 import {
-  UnblockerError,
   UnblockerQuotaExhaustedError,
   type IUnblockerProvider,
 } from '../src/providers/scraping/unblockers/unblocker.interface.js';

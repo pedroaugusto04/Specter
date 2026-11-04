@@ -176,6 +176,8 @@ describe('HTTP DTO boundaries', () => {
       expect(dto).not.toHaveProperty('effectiveSemanticPolicy');
       expect(dto).not.toHaveProperty('bullmqRepeatableKey');
       expect(dto).not.toHaveProperty('internalOnly');
+      expect(dto).not.toHaveProperty('userId');
+      expect(dto).not.toHaveProperty('healingAttempts');
       expect(dto).not.toHaveProperty('contractRevision');
       expect(dto).not.toHaveProperty('planRevision');
     }
@@ -204,6 +206,7 @@ describe('HTTP DTO boundaries', () => {
     expect(history.body).not.toContain('private-diagnostic');
     expect(history.body).not.toContain('private-run');
     expect(history.json().data.runs[0].extractedData).toEqual({ title: 'Requested title' });
+    expect(history.json().data.runs[0]).not.toHaveProperty('normalizedHash');
     const stats = Object.assign(await jobs.getStats(), { internalOnly: 'private-stat' });
     vi.spyOn(jobs, 'getStats').mockResolvedValueOnce(stats);
     const dashboard = await app.inject({ method: 'GET', url: '/api/stats', headers });

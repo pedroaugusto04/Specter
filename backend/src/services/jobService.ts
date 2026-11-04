@@ -248,7 +248,7 @@ export class JobService {
 
     const finalEntity = await this.jobRepository.findById(id);
     const resultDto = await this.presenter.present(finalEntity ?? updated);
-    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
+    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -268,7 +268,7 @@ export class JobService {
       });
       const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
-        resultDto.userId,
+        existing.userId,
         resultDto.id,
         resultDto.status
       );
@@ -282,7 +282,7 @@ export class JobService {
       await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
       const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
-        resultDto.userId,
+        existing.userId,
         resultDto.id,
         resultDto.status
       );
@@ -298,7 +298,7 @@ export class JobService {
       bullmqRepeatableKey: repeatableKey,
     });
     const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
+    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -336,7 +336,7 @@ export class JobService {
 
     await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
     const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
+    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 

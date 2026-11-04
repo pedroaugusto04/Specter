@@ -36,7 +36,6 @@ export const JobMapper = {
   ): ScrapingJobDto {
     return {
       id: entity.id,
-      userId: entity.userId,
       url: entity.url,
       userPrompt: entity.userPrompt,
       notificationEmail: entity.notificationEmail,
@@ -47,7 +46,6 @@ export const JobMapper = {
       accessState: context.accessState,
       lastError: entity.lastError,
       failureCount: entity.failureCount,
-      healingAttempts: entity.healingAttempts,
       captureScreenshotOnChange: entity.captureScreenshotOnChange,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
@@ -80,7 +78,6 @@ export const JobMapper = {
         ? presentExtractionReport(entity.extractionReport)
         : entity.extractionReport,
       extractedData: entity.extractedData,
-      normalizedHash: entity.normalizedHash,
       hasChanges: entity.hasChanges,
       status: entity.status,
       errorMessage: entity.errorMessage,

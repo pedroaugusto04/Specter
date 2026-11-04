@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { NotificationDispatcher } from '../src/providers/notifications/notificationDispatcher.js';
 import { TelegramNotificationProvider } from '../src/providers/notifications/telegramNotification.provider.js';
