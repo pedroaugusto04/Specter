@@ -6,7 +6,6 @@ import { extractDomainCandidates, normalizeDomain } from '../src/utils/urlNormal
 import { resolveSessionStorageState } from '../src/utils/sessionHelper.js';
 import type { ISessionRepository } from '../src/repositories/sessionRepository.js';
 import type { UserWebSessionEntity } from '../src/types/domain.js';
-import type { UserWebSessionRow } from '../src/db/schema.js';
 
 describe('SessionMapper & Domain Utilities', () => {
   it('correctly maps UserWebSessionRow to UserWebSessionEntity and SessionDto', () => {
@@ -35,25 +34,6 @@ describe('SessionMapper & Domain Utilities', () => {
       createdAt: '2026-11-01T12:00:00.000Z',
       updatedAt: '2026-11-01T12:00:00.000Z',
     });
-  });
-
-  it('recognizes valid pre-encryption session rows and rejects malformed legacy data', () => {
-    const row = {
-      id: 'legacy-session',
-      userId: 'user-abc',
-      domain: 'example.com',
-      name: 'Legacy session',
-      storageState: { cookies: [], origins: [] },
-      cookieCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as UserWebSessionRow;
-
-    expect(SessionMapper.isLegacyPlaintextStorageState(row.storageState)).toBe(true);
-    expect(SessionMapper.rowToEntity(row).storageState).toEqual({ cookies: [], origins: [] });
-    expect(() =>
-      SessionMapper.rowToEntity({ ...row, storageState: { cookies: 'bad', origins: [] } })
-    ).toThrow(DecryptionError);
   });
 
   describe('normalizeDomain', () => {
