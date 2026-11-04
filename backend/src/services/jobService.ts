@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { SemanticPolicy } from '../extraction/contracts.js';
-import { comparisonPayload } from '../utils/planExtraction.js';
+import { comparisonPayload } from '../extraction/comparison.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
 import {

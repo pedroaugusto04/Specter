@@ -1,3 +1,4 @@
+import { ExtractionMode, ExtractionQuality } from './constants.js';
 import { matchesRecord } from './recordFilter.js';
 import * as cheerio from 'cheerio';
 import type { DocumentSnapshot, ExtractionPlan, PageExtraction, Scalar } from './contracts.js';
@@ -5,6 +6,7 @@ import { evaluateCondition, readPath } from './conditions.js';
 import { convertFieldValue, recordIdentity } from './values.js';
 import { evidenceValue, redactText } from './evidence.js';
 import type { SourceReaders } from './sources.js';
+
 export interface IPageExtractor {
   extract(
     snapshot: DocumentSnapshot,
@@ -12,6 +14,7 @@ export interface IPageExtractor {
     observed?: Map<string, boolean>
   ): PageExtraction;
 }
+
 export class PageExtractor implements IPageExtractor {
   constructor(private readonly readers: SourceReaders) {}
   extract(
@@ -24,7 +27,7 @@ export class PageExtractor implements IPageExtractor {
       records: [],
       observedIdentities: [],
       validatedSourceRecords: 0,
-      quality: 'COMPLETE',
+      quality: ExtractionQuality.Complete,
       issues: [],
       sourcesUsed: {},
       evidence: [],
@@ -36,17 +39,17 @@ export class PageExtractor implements IPageExtractor {
         ...result,
         quality:
           snapshot.httpStatus === 401 || snapshot.httpStatus === 403 || snapshot.httpStatus === 429
-            ? 'BLOCKED'
-            : 'INCONCLUSIVE',
+            ? ExtractionQuality.Blocked
+            : ExtractionQuality.Inconclusive,
         issues: ['An HTTP error response cannot establish valid data.'],
       };
     const fail = (message: string) => {
-      result.quality = 'INVALID';
+      result.quality = ExtractionQuality.Invalid;
       result.issues.push(message);
     };
     try {
       const contexts = this.readers[strategy.records.kind].select(snapshot, strategy.records);
-      if (intent.mode === 'single' && contexts.length !== 1)
+      if (intent.mode === ExtractionMode.Single && contexts.length !== 1)
         fail('A single entity must be selected unambiguously.');
       const associations = Object.fromEntries(
         Object.entries(strategy.associations ?? {}).map(([key, association]) => [
@@ -141,7 +144,7 @@ export class PageExtractor implements IPageExtractor {
         result.records.push(record);
       }
       const seen = new Set<string>();
-      if (intent.mode === 'collection')
+      if (intent.mode === ExtractionMode.Collection)
         for (const record of result.records) {
           const identity = recordIdentity(record, intent.identityFields);
           if (seen.has(identity)) fail('Duplicate collection identity.');
@@ -154,9 +157,9 @@ export class PageExtractor implements IPageExtractor {
         );
       result.ready = all(strategy.ready);
       result.ended = !strategy.pagination || all(strategy.pagination.end);
-      if (result.quality !== 'INVALID') {
+      if (result.quality !== ExtractionQuality.Invalid) {
         if (!result.ready) {
-          result.quality = 'INCONCLUSIVE';
+          result.quality = ExtractionQuality.Inconclusive;
           result.issues.push('Readiness conditions were not satisfied.');
         } else if (!result.records.length) {
           result.quality =
@@ -164,9 +167,9 @@ export class PageExtractor implements IPageExtractor {
             (strategy.filters?.length &&
               contexts.length &&
               result.validatedSourceRecords === contexts.length)
-              ? 'EMPTY'
-              : 'INCONCLUSIVE';
-          if (result.quality === 'INCONCLUSIVE')
+              ? ExtractionQuality.Empty
+              : ExtractionQuality.Inconclusive;
+          if (result.quality === ExtractionQuality.Inconclusive)
             result.issues.push('No records without positive empty-state evidence.');
         }
       }

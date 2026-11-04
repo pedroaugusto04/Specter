@@ -11,19 +11,18 @@ export class OutboxWorker {
     private readonly deliveryTimeoutMs = 30000
   ) {}
   start(): void {
-    this.timer = setInterval(() => {
-      void this.tick().catch((error) =>
-        logger.error('Outbox processing failed', {
-          error: redactText(error instanceof Error ? error.message : String(error)),
-        })
-      );
-    }, 5000);
+    this.timer = setInterval(() => this.scheduleTick(), 5000);
+    this.scheduleTick();
+  }
+
+  private scheduleTick(): void {
     void this.tick().catch((error) =>
       logger.error('Outbox processing failed', {
         error: redactText(error instanceof Error ? error.message : String(error)),
       })
     );
   }
+
   async tick(): Promise<void> {
     if (this.running) return this.running;
     this.running = this.process().finally(() => {

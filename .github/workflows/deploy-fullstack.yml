@@ -95,6 +95,7 @@ jobs:
             frontend:
               - 'frontend/**'
               - 'backend/src/extraction/contracts.ts'
+              - 'backend/src/extraction/constants.ts'
               - '.github/workflows/deploy-fullstack.yml'
 
       - name: Determine target components

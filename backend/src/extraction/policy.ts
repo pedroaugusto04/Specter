@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import type { ExecutionPolicy } from './contracts.js';
+
 export function executionPolicy(): ExecutionPolicy {
   return {
     timeoutMs: env.EXTRACTION_TIMEOUT_MS,

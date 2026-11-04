@@ -9,6 +9,7 @@ export function redactText(value: string, limit = 2048): string {
     .replace(/Bearer\s+[a-z0-9._~-]+/gi, 'Bearer [REDACTED]')
     .slice(0, limit);
 }
+
 export function evidenceValue(value: unknown): Scalar {
   return typeof value === 'string'
     ? redactText(value)
@@ -16,6 +17,7 @@ export function evidenceValue(value: unknown): Scalar {
       ? value
       : null;
 }
+
 export function redactObject(value: unknown, depth = 0): unknown {
   if (depth > 16) return '[DEPTH LIMIT]';
   if (typeof value === 'string') return redactText(value, 8000);

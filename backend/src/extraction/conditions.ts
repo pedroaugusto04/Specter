@@ -1,5 +1,7 @@
+import { SourceKind } from './constants.js';
 import * as cheerio from 'cheerio';
 import type { Condition, DocumentSnapshot, NetworkResponse, Scalar } from './contracts.js';
+
 export function readPath(value: unknown, path: Array<string | number>): unknown {
   return path.reduce<unknown>((current, key) => {
     if (['__proto__', 'constructor', 'prototype'].includes(String(key))) return undefined;
@@ -8,6 +10,7 @@ export function readPath(value: unknown, path: Array<string | number>): unknown 
       : undefined;
   }, value);
 }
+
 export function matchingResponses(
   snapshot: DocumentSnapshot,
   match: { urlPattern: string; method?: string }
@@ -21,6 +24,7 @@ export function matchingResponses(
       (!match.method || response.method === match.method.toUpperCase())
   );
 }
+
 export function evaluateCondition(
   condition: Condition,
   snapshot: DocumentSnapshot,
@@ -36,7 +40,7 @@ export function evaluateCondition(
         (record) => record[condition.field] !== null && record[condition.field] !== undefined
       )
     );
-  if (condition.kind === 'response')
+  if (condition.kind === SourceKind.Response)
     return matchingResponses(snapshot, condition.match).some((response) => {
       const value = condition.path ? readPath(response.body, condition.path) : response.body;
       return condition.equals === undefined

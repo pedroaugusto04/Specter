@@ -8,6 +8,7 @@ import { HttpDocumentAdapter } from './adapters/httpDocument.adapter.js';
 import { ExtractionExecutor } from './executor.js';
 import { PageExtractor } from './pageExtractor.js';
 import { PlanExecutionService } from '../services/planExecutionService.js';
+
 export function composeExtraction(scraper: IScraperEngine) {
   const policy = executionPolicy();
   const browser = new BrowserDocumentAdapter(policy, env.HTTP_PROXY || undefined);

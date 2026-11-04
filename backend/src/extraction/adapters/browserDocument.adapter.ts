@@ -1,3 +1,4 @@
+import { SourceKind, Transport } from '../constants.js';
 import { evaluateCondition } from '../conditions.js';
 import { NavigationTimeoutError } from '../../errors/domainErrors.js';
 import {
@@ -158,7 +159,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         const currentUrl = page.url();
         detectAntiBotBlock(currentUrl, html, httpStatus);
         return {
-          transport: 'browser' as const,
+          transport: Transport.Browser,
           html,
           url: currentUrl,
           httpStatus,
@@ -167,7 +168,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       const check = async (condition: Condition): Promise<boolean | undefined> => {
         if (condition.kind === 'field') return undefined;
-        if (condition.kind === 'response')
+        if (condition.kind === SourceKind.Response)
           return evaluateCondition(
             condition,
             { html: '', url: page.url(), httpStatus, responses },
@@ -232,7 +233,17 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       return {
         snapshot,
-        check,
+        check: async (condition) => {
+          // Evaluate static conditions against the same snapshot as the records.
+          if (
+            condition.kind === SourceKind.Response ||
+            ('locator' in condition &&
+              condition.locator.kind === 'css' &&
+              condition.kind !== 'visible')
+          )
+            return undefined;
+          return check(condition);
+        },
         advance: async (pagination) => {
           execution.check();
           if (pagination.kind === 'scroll') await scroll(pagination.scrollTarget);

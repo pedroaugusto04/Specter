@@ -1,6 +1,8 @@
+import { isAcceptedExtractionQuality } from './constants.js';
 import type { DocumentSnapshot, ExtractionPlan, Scalar } from './contracts.js';
 import type { IPageExtractor } from './pageExtractor.js';
 import { sortObjectKeys } from '../utils/diffHasher.js';
+
 export interface EvaluationCase {
   name: string;
   snapshot: DocumentSnapshot;
@@ -10,6 +12,7 @@ export interface EvaluationCase {
   previousRecords?: Record<string, Scalar>[];
   expectChange?: boolean;
 }
+
 export function evaluateCorpus(cases: EvaluationCase[], extractor: IPageExtractor) {
   const started = Date.now();
   let correctFields = 0,
@@ -32,7 +35,7 @@ export function evaluateCorpus(cases: EvaluationCase[], extractor: IPageExtracto
     });
     const wouldAlert =
       item.previousRecords !== undefined &&
-      ['COMPLETE', 'EMPTY'].includes(extracted.quality) &&
+      isAcceptedExtractionQuality(extracted.quality) &&
       serialize(item.previousRecords) !== serialize(extracted.records);
     if (wouldAlert && item.expectChange === false) falseAlerts++;
     return {

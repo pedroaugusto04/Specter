@@ -1,6 +1,7 @@
-import { recordIdentity } from './planExtraction.js';
+import { payloadRecords } from '../extraction/comparison.js';
+import { recordIdentity } from '../extraction/values.js';
 import type { TriggerRule } from '../types/extractionPlan.js';
-import type { ExtractedPayload, ExtractedRecord } from '../types/extractor.js';
+import type { ExtractedPayload } from '../types/extractor.js';
 import { TriggerMatchMode, TriggerOperator } from '../types/enums.js';
 
 export interface TriggerEvaluationResult {
@@ -343,16 +344,11 @@ export function evaluateTriggerRules(
   if (!rules?.length) return { triggered: true, hasRules: false, matchedRules: [], reasons: [] };
   if (!payload)
     return { triggered: false, hasRules: true, matchedRules: [], reasons: ['No data available.'] };
-  const records =
-    'items' in payload && Array.isArray(payload.items)
-      ? payload.items
-      : [payload as ExtractedRecord];
-  const previous =
-    previousPayload && 'items' in previousPayload && Array.isArray(previousPayload.items)
-      ? previousPayload.items
-      : previousPayload
-        ? [previousPayload as ExtractedRecord]
-        : [];
+  const records = payloadRecords(payload);
+  const previous = previousPayload ? payloadRecords(previousPayload) : [];
+  const previousByIdentity = new Map(
+    previous.map((record) => [recordIdentity(record, identityFields), record])
+  );
   const collection = 'items' in payload && Array.isArray(payload.items);
   if (collection && !identityFields.length)
     return {
@@ -363,9 +359,7 @@ export function evaluateTriggerRules(
     };
   for (const record of records) {
     const old = collection
-      ? previous.find(
-          (item) => recordIdentity(item, identityFields) === recordIdentity(record, identityFields)
-        )
+      ? previousByIdentity.get(recordIdentity(record, identityFields))
       : previous[0];
     if (old && JSON.stringify(old) === JSON.stringify(record)) continue;
     const results = rules.map((rule) => ({

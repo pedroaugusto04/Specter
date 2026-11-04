@@ -1,3 +1,12 @@
+import {
+  ExtractionMode,
+  ExtractionQuality,
+  SemanticReviewStatus,
+  SourceKind,
+  TraceStatus,
+  Transport,
+  isAcceptedExtractionQuality,
+} from './constants.js';
 import { DomainError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
@@ -15,6 +24,7 @@ import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
 import { sortObjectKeys } from '../utils/diffHasher.js';
+
 export interface ConfigurationRequest {
   jobId: string;
   url: string;
@@ -24,12 +34,14 @@ export interface ConfigurationRequest {
   storageState?: unknown;
   captureScreenshot?: boolean;
 }
+
 export interface ConfigurationResult {
   plan: ExtractionPlan;
   execution: ExecutionResult;
   semanticReview: SemanticReview;
   trace: StageTrace[];
 }
+
 export class ConfigurationFailure extends DomainError {
   constructor(
     message: string,
@@ -39,9 +51,11 @@ export class ConfigurationFailure extends DomainError {
     super(message, { code: 'CONFIGURATION_REJECTED', statusCode: 422, isRetryable: false });
   }
 }
+
 export interface IConfigurationPipeline {
   configure(request: ConfigurationRequest): Promise<ConfigurationResult>;
 }
+
 export interface ConfigurationOptions {
   budgetMs: number;
   maxAttempts: number;
@@ -66,13 +80,13 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       const started = Date.now();
       try {
         const result = await action();
-        trace.push({ stage, durationMs: Date.now() - started, status: 'SUCCESS' });
+        trace.push({ stage, durationMs: Date.now() - started, status: TraceStatus.Success });
         return result;
       } catch (error) {
         trace.push({
           stage,
           durationMs: Date.now() - started,
-          status: 'FAILED',
+          status: TraceStatus.Failed,
           code: 'STAGE_ERROR',
         });
         throw error;
@@ -85,14 +99,14 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         fields: {},
         filters: [],
         identityFields: [],
-        mode: 'single',
+        mode: ExtractionMode.Single,
         scope: 'page',
         triggerRules: [],
         triggerMatchMode: 'all',
       },
       strategy: {
-        transport: 'browser',
-        records: { kind: 'dom', selector: 'body' },
+        transport: Transport.Browser,
+        records: { kind: SourceKind.Dom, selector: 'body' },
         fields: {},
         ready: [{ kind: 'exists', locator: { kind: 'css', selector: 'body' } }],
         empty: [],
@@ -145,18 +159,18 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             captureScreenshot: request.captureScreenshot,
           })
         );
-        if (!['COMPLETE', 'EMPTY'].includes(execution.report.quality))
+        if (!isAcceptedExtractionQuality(execution.report.quality))
           throw new Error(execution.report.issues.join(' '));
         if (
           !request.intent &&
-          execution.report.quality === 'EMPTY' &&
+          execution.report.quality === ExtractionQuality.Empty &&
           !execution.report.validatedSourceRecords
         )
           throw new Error('An initially empty collection cannot validate field sources.');
         const enabled = request.semanticPolicy?.enabled ?? this.options.semanticEnabled;
         const threshold = request.semanticPolicy?.threshold ?? this.options.semanticThreshold;
         let semanticReview: SemanticReview = {
-          status: 'SKIPPED',
+          status: SemanticReviewStatus.Skipped,
           score: null,
           reasons: ['Semantic review disabled.'],
           evidenceRefs: [],
@@ -173,11 +187,15 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             semanticReview = {
               ...review,
               status:
-                review.score < threshold ? 'REJECTED' : review.score < 7 ? 'WARNING' : 'PASSED',
+                review.score < threshold
+                  ? SemanticReviewStatus.Rejected
+                  : review.score < 7
+                    ? SemanticReviewStatus.Warning
+                    : SemanticReviewStatus.Passed,
             };
           } catch {
             semanticReview = {
-              status: 'ERROR',
+              status: SemanticReviewStatus.Error,
               score: null,
               reasons: [
                 'Semantic reviewer unavailable or invalid response; deterministic checks passed.',
@@ -185,22 +203,22 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               evidenceRefs: [],
             };
           }
-        } else trace.push({ stage: 'semantic', durationMs: 0, status: 'SKIPPED' });
+        } else trace.push({ stage: 'semantic', durationMs: 0, status: TraceStatus.Skipped });
         lastReview = semanticReview;
         trace.push({
           stage: 'semantic-policy',
           durationMs: 0,
           status:
-            semanticReview.status === 'REJECTED'
-              ? 'FAILED'
-              : semanticReview.status === 'SKIPPED'
-                ? 'SKIPPED'
-                : 'SUCCESS',
+            semanticReview.status === SemanticReviewStatus.Rejected
+              ? TraceStatus.Failed
+              : semanticReview.status === SemanticReviewStatus.Skipped
+                ? TraceStatus.Skipped
+                : TraceStatus.Success,
           code:
             semanticReview.status +
             (semanticReview.score === null ? '' : '_' + semanticReview.score),
         });
-        if (semanticReview.status === 'REJECTED')
+        if (semanticReview.status === SemanticReviewStatus.Rejected)
           throw new Error(
             'Semantic review rejected candidate: ' + semanticReview.reasons.join(' ')
           );
@@ -245,6 +263,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       lastReview
     );
   }
+
   private evidence(snapshots: DocumentSnapshot[]): string {
     const perSnapshot = Math.max(1, Math.floor(this.options.evidenceLimit / snapshots.length));
     return snapshots
@@ -265,6 +284,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       .slice(0, this.options.evidenceLimit);
   }
 }
+
 export function sameIntent(a: ExtractionIntent, b: ExtractionIntent): boolean {
   return JSON.stringify(sortObjectKeys(a)) === JSON.stringify(sortObjectKeys(b));
 }

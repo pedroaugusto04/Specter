@@ -177,3 +177,14 @@ and model calls. This corpus evaluates deterministic extraction behavior; it
 does not establish live-site coverage or semantic-model accuracy. Extend it
 with sanitized production failures and separately assess live compiler/provider
 quality before making broad coverage claims.
+
+### Shared vocabulary and maintenance
+
+`backend/src/extraction/constants.ts` owns extraction identifiers shared by the domain, runtime schemas and frontend. Domain contracts derive their types from these constants; `types/enums.ts` reexports the identifiers used by application services. Keep framework event names and human-readable messages local rather than treating them as domain identifiers.
+
+`extraction/prompts.ts` owns trusted model instructions; `modelStages.ts` supplies untrusted evidence separately and parses stage responses. Discovery and setup share the same action schema. `comparison.ts` owns payload record interpretation and identity-aligned comparison; the former `utils/planExtraction.ts` facade has been removed.
+
+The executor uses a single quality acceptance rule and a single pagination progress predicate. Timeout, origin, identity and completion checks remain intentional integrity boundaries. They must not be removed as cosmetic cleanup.
+
+Live readiness/end checks run before capturing the HTML used for extraction. This prevents a newly observed terminal marker from validating an older snapshot that omits the final virtualized records. A deterministic regression test covers this ordering.
+Static CSS and response conditions are evaluated from the captured snapshot instead of reading live browser state a second time. Visibility and role conditions still use the browser; discovery waits retain their live checks.

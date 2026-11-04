@@ -1,6 +1,15 @@
+import {
+  ExtractionMode,
+  ExtractionScope,
+  FieldType,
+  SourceKind,
+  Transport,
+  TriggerOperator,
+  TriggerMatchMode,
+} from '../extraction/constants.js';
 import { z } from 'zod';
-import { ExtractionQuality, TriggerOperator } from './enums.js';
-export { ExtractionQuality, TriggerOperator };
+import { ExtractionQuality } from './enums.js';
+export { ExtractionQuality };
 export type {
   ExtractionPlan,
   ExtractionIntent,
@@ -35,7 +44,7 @@ export const conditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('field'), field: text }).strict(),
   z
     .object({
-      kind: z.literal('response'),
+      kind: z.literal(SourceKind.Response),
       match,
       path: path.optional(),
       equals: z.union([z.string(), z.number().finite(), z.boolean()]).optional(),
@@ -51,14 +60,16 @@ export const discoveryActionSchema = z.discriminatedUnion('kind', [
 const source = z.discriminatedUnion('kind', [
   z
     .object({
-      kind: z.literal('dom'),
+      kind: z.literal(SourceKind.Dom),
       selector: text,
       attribute: text,
       association: text.optional(),
     })
     .strict(),
-  z.object({ kind: z.literal('jsonld'), path: path.min(1), association: text.optional() }).strict(),
-  z.object({ kind: z.literal('response'), path, association: text.optional() }).strict(),
+  z
+    .object({ kind: z.literal(SourceKind.JsonLd), path: path.min(1), association: text.optional() })
+    .strict(),
+  z.object({ kind: z.literal(SourceKind.Response), path, association: text.optional() }).strict(),
 ]);
 export const semanticPolicySchema = z
   .object({
@@ -69,14 +80,14 @@ export const semanticPolicySchema = z
 export const extractionIntentSchema = z
   .object({
     entity: text,
-    mode: z.enum(['single', 'collection']),
-    scope: z.enum(['page', 'collection']),
+    mode: z.nativeEnum(ExtractionMode),
+    scope: z.nativeEnum(ExtractionScope),
     fields: z.record(
       z.string().regex(/^[a-z][a-z0-9_]*$/),
       z
         .object({
           description: text,
-          type: z.enum(['string', 'number', 'boolean', 'date', 'url']),
+          type: z.nativeEnum(FieldType),
           required: z.boolean(),
           normalizeVolatileText: z.boolean().optional(),
           locale: text.optional(),
@@ -95,25 +106,34 @@ export const extractionIntentSchema = z
         })
         .strict()
     ),
-    triggerMatchMode: z.enum(['all', 'any']),
+    triggerMatchMode: z.nativeEnum(TriggerMatchMode),
   })
   .strict();
 export const executionStrategySchema = z
   .object({
-    transport: z.enum(['http', 'browser']),
+    transport: z.nativeEnum(Transport),
     setup: z.array(discoveryActionSchema).optional(),
     document: z.object({ frame: text.optional(), shadow: text.optional() }).strict().optional(),
     records: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('dom'), selector: text }).strict(),
-      z.object({ kind: z.literal('jsonld'), type: text }).strict(),
-      z.object({ kind: z.literal('response'), match, path }).strict(),
+      z.object({ kind: z.literal(SourceKind.Dom), selector: text }).strict(),
+      z.object({ kind: z.literal(SourceKind.JsonLd), type: text }).strict(),
+      z.object({ kind: z.literal(SourceKind.Response), match, path }).strict(),
     ]),
     filters: z
       .array(
         z
           .object({
             field: text,
-            operator: z.enum(['eq', 'neq', 'lt', 'lte', 'gt', 'gte', 'contains', 'not_contains']),
+            operator: z.enum([
+              TriggerOperator.Equal,
+              TriggerOperator.NotEqual,
+              TriggerOperator.LessThan,
+              TriggerOperator.LessThanOrEqual,
+              TriggerOperator.GreaterThan,
+              TriggerOperator.GreaterThanOrEqual,
+              TriggerOperator.Contains,
+              TriggerOperator.NotContains,
+            ]),
             value: z.union([z.string(), z.number().finite(), z.boolean()]),
           })
           .strict()
@@ -127,8 +147,8 @@ export const executionStrategySchema = z
             localField: text,
             foreignPath: path.min(1),
             records: z.discriminatedUnion('kind', [
-              z.object({ kind: z.literal('jsonld'), type: text }).strict(),
-              z.object({ kind: z.literal('response'), match, path }).strict(),
+              z.object({ kind: z.literal(SourceKind.JsonLd), type: text }).strict(),
+              z.object({ kind: z.literal(SourceKind.Response), match, path }).strict(),
             ]),
           })
           .strict()
@@ -180,11 +200,14 @@ export const extractionPlanSchema = z
       if (field.type === 'boolean' && !Object.keys(field.booleanValues ?? {}).length)
         issue(`Boolean field '${key}' requires an explicit value mapping.`);
     }
-    if (intent.mode === 'collection' && !intent.identityFields.length)
+    if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length)
       issue('Collections require stable identity fields.');
-    if (intent.scope === 'collection' && (intent.mode !== 'collection' || !execution.pagination))
+    if (
+      intent.scope === ExtractionScope.Collection &&
+      (intent.mode !== ExtractionMode.Collection || !execution.pagination)
+    )
       issue('Full collection scope requires pagination and collection mode.');
-    if (execution.pagination && intent.scope !== 'collection')
+    if (execution.pagination && intent.scope !== ExtractionScope.Collection)
       issue('Pagination requires collection scope.');
     if (
       execution.pagination &&
@@ -228,19 +251,19 @@ export const extractionPlanSchema = z
       if (item.kind === 'field' && !intent.fields[item.field])
         issue(`Condition references missing field '${item.field}'.`);
     if (
-      execution.transport === 'http' &&
+      execution.transport === Transport.Http &&
       (execution.setup?.length ||
         execution.document ||
-        execution.records.kind === 'response' ||
+        execution.records.kind === SourceKind.Response ||
         Object.values(execution.associations ?? {}).some(
-          (association) => association.records.kind === 'response'
+          (association) => association.records.kind === SourceKind.Response
         ) ||
         execution.pagination?.kind === 'click' ||
         execution.pagination?.kind === 'scroll' ||
         conditions.some(
           (item) =>
             item.kind === 'visible' ||
-            item.kind === 'response' ||
+            item.kind === SourceKind.Response ||
             ('locator' in item && item.locator.kind === 'role')
         ))
     )

@@ -1,24 +1,26 @@
+import { TriggerOperator } from './constants.js';
 import type { Scalar, RecordFilter } from './contracts.js';
+
 export function matchesRecord(record: Record<string, Scalar>, filters: RecordFilter[]): boolean {
   return filters.every(({ field, operator, value }) => {
     const actual = record[field];
     if (actual === null || actual === undefined) return false;
     switch (operator) {
-      case 'eq':
+      case TriggerOperator.Equal:
         return actual === value;
-      case 'neq':
+      case TriggerOperator.NotEqual:
         return actual !== value;
-      case 'contains':
+      case TriggerOperator.Contains:
         return typeof actual === 'string' && typeof value === 'string' && actual.includes(value);
-      case 'not_contains':
+      case TriggerOperator.NotContains:
         return typeof actual === 'string' && typeof value === 'string' && !actual.includes(value);
-      case 'lt':
+      case TriggerOperator.LessThan:
         return typeof actual === 'number' && typeof value === 'number' && actual < value;
-      case 'lte':
+      case TriggerOperator.LessThanOrEqual:
         return typeof actual === 'number' && typeof value === 'number' && actual <= value;
-      case 'gt':
+      case TriggerOperator.GreaterThan:
         return typeof actual === 'number' && typeof value === 'number' && actual > value;
-      case 'gte':
+      case TriggerOperator.GreaterThanOrEqual:
         return typeof actual === 'number' && typeof value === 'number' && actual >= value;
     }
   });

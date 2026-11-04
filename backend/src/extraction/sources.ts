@@ -1,26 +1,31 @@
+import { SourceKind } from './constants.js';
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type { DocumentSnapshot, ExecutionStrategy, Source } from './contracts.js';
 import { matchingResponses, readPath } from './conditions.js';
 type RecordSelector = ExecutionStrategy['records'];
+
 export interface SourceRecord {
   kind: Source['kind'];
   value: unknown;
 }
+
 export interface ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[];
   read(snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown;
 }
+
 export class DomSourceReader implements ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[] {
-    if (selector.kind !== 'dom') throw new Error('DOM reader requires a DOM record selector.');
+    if (selector.kind !== SourceKind.Dom)
+      throw new Error('DOM reader requires a DOM record selector.');
     const $ = cheerio.load(snapshot.html);
     return $(selector.selector)
       .toArray()
-      .map((element) => ({ kind: 'dom', value: $(element) }));
+      .map((element) => ({ kind: SourceKind.Dom, value: $(element) }));
   }
   read(_snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown {
-    if (source.kind !== 'dom' || record.kind !== 'dom')
+    if (source.kind !== SourceKind.Dom || record.kind !== SourceKind.Dom)
       throw new Error('DOM source requires a matching record context.');
     const scope = record.value as cheerio.Cheerio<AnyNode>;
     const target = source.selector === ':scope' ? scope : scope.find(source.selector);
@@ -31,9 +36,11 @@ export class DomSourceReader implements ISourceReader {
 function typeName(type: string): string {
   return type.replace(/^https?:\/\/schema\.org\//, '').replace(/^schema:/, '');
 }
+
 export class JsonLdSourceReader implements ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[] {
-    if (selector.kind !== 'jsonld') throw new Error('JSON-LD reader requires an entity type.');
+    if (selector.kind !== SourceKind.JsonLd)
+      throw new Error('JSON-LD reader requires an entity type.');
     const $ = cheerio.load(snapshot.html);
     const entities: SourceRecord[] = [];
     const visit = (value: unknown, depth = 0) => {
@@ -49,7 +56,7 @@ export class JsonLdSourceReader implements ISourceReader {
           .flat()
           .some((type) => typeof type === 'string' && typeName(type) === typeName(selector.type))
       )
-        entities.push({ kind: 'jsonld', value: node });
+        entities.push({ kind: SourceKind.JsonLd, value: node });
       for (const key of ['@graph', '@included', 'mainEntity', 'itemListElement', 'item'])
         if (node[key]) visit(node[key], depth + 1);
     };
@@ -65,28 +72,34 @@ export class JsonLdSourceReader implements ISourceReader {
     return entities;
   }
   read(_snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown {
-    if (source.kind !== 'jsonld' || record.kind !== 'jsonld')
+    if (source.kind !== SourceKind.JsonLd || record.kind !== SourceKind.JsonLd)
       throw new Error('JSON-LD source requires a matching entity.');
     return readPath(record.value, source.path);
   }
 }
+
 export class ResponseSourceReader implements ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[] {
-    if (selector.kind !== 'response')
+    if (selector.kind !== SourceKind.Response)
       throw new Error('Response reader requires a response selector.');
     const response = matchingResponses(snapshot, selector.match).at(-1);
     const found = response ? readPath(response.body, selector.path) : undefined;
     return found === null || found === undefined
       ? []
-      : (Array.isArray(found) ? found : [found]).map((value) => ({ kind: 'response', value }));
+      : (Array.isArray(found) ? found : [found]).map((value) => ({
+          kind: SourceKind.Response,
+          value,
+        }));
   }
   read(_snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown {
-    if (source.kind !== 'response' || record.kind !== 'response')
+    if (source.kind !== SourceKind.Response || record.kind !== SourceKind.Response)
       throw new Error('Response source requires a matching record.');
     return readPath(record.value, source.path);
   }
 }
+
 export type SourceReaders = Record<Source['kind'], ISourceReader>;
+
 export function standardSourceReaders(): SourceReaders {
   return {
     dom: new DomSourceReader(),

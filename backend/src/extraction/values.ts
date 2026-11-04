@@ -1,23 +1,25 @@
+import { FieldType } from './constants.js';
 import { parseLocalizedNumber } from './localizedNumber.js';
 import type { IntentField, Scalar } from './contracts.js';
 import { sanitizeVolatileString } from '../utils/diffHasher.js';
+
 export function convertFieldValue(value: unknown, field: IntentField, baseUrl: string): Scalar {
   if (value === null || value === undefined || typeof value === 'object') return null;
   const text = String(value).replace(/\s+/g, ' ').trim();
   if (!text) return null;
   switch (field.type) {
-    case 'string':
+    case FieldType.String:
       return field.normalizeVolatileText ? sanitizeVolatileString(text) : text;
-    case 'boolean':
+    case FieldType.Boolean:
       return field.booleanValues?.[text.toLowerCase()] ?? null;
-    case 'url':
+    case FieldType.Url:
       try {
         const url = new URL(text, baseUrl);
         return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
       } catch {
         return null;
       }
-    case 'date': {
+    case FieldType.Date: {
       if (
         !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(text)
       )
@@ -30,12 +32,13 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
         return null;
       return date.toISOString();
     }
-    case 'number': {
+    case FieldType.Number: {
       if (typeof value === 'number') return Number.isFinite(value) ? value : null;
       return field.locale ? parseLocalizedNumber(text, field.locale) : null;
     }
   }
 }
+
 export function recordIdentity(record: Record<string, Scalar>, fields: string[]): string {
   return JSON.stringify(fields.map((field) => record[field]));
 }

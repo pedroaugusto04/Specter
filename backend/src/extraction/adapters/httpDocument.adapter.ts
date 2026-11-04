@@ -1,3 +1,4 @@
+import { Transport } from '../constants.js';
 import type {
   DocumentAdapter,
   DocumentSession,
@@ -6,6 +7,7 @@ import type {
 } from '../contracts.js';
 import type { IScraperEngine } from '../../providers/scraping/scraper.interface.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
+
 export class HttpDocumentAdapter implements DocumentAdapter {
   constructor(private readonly scraper: IScraperEngine) {}
   async open(
@@ -23,7 +25,7 @@ export class HttpDocumentAdapter implements DocumentAdapter {
         import('../../db/schema.js').PlaywrightStorageState | undefined,
     });
     const snapshot = {
-      transport: 'http' as const,
+      transport: Transport.Http,
       html: result.rawHtml,
       url: result.url,
       httpStatus: result.httpStatus,

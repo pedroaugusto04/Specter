@@ -1,25 +1,27 @@
+import type {
+  EntityChangeKind,
+  TraceStatus,
+  FieldType,
+  TriggerOperator,
+  ExtractionMode,
+  ExtractionScope,
+  Transport,
+  ExtractionQuality,
+  SemanticReviewStatus,
+  FailureCode,
+  TriggerMatchMode,
+} from './constants.js';
 /** Domain contracts: no browser, database, queue or model dependencies. */
 export type Scalar = string | number | boolean | null;
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'url';
-export type TriggerOperator =
-  | 'lt'
-  | 'lte'
-  | 'gt'
-  | 'gte'
-  | 'eq'
-  | 'neq'
-  | 'contains'
-  | 'not_contains'
-  | 'percentage_drop'
-  | 'percentage_increase'
-  | 'decreased'
-  | 'increased'
-  | 'changes';
+
+export type { FieldType, TriggerOperator } from './constants.js';
+
 export interface TriggerRule {
   field: string;
   operator: TriggerOperator;
   value: Exclude<Scalar, null>;
 }
+
 export interface IntentField {
   description: string;
   type: FieldType;
@@ -28,30 +30,36 @@ export interface IntentField {
   booleanValues?: Record<string, boolean>;
   normalizeVolatileText?: boolean;
 }
+
 export interface ExtractionIntent {
   entity: string;
-  mode: 'single' | 'collection';
-  scope: 'page' | 'collection';
+  mode: ExtractionMode;
+  scope: ExtractionScope;
   fields: Record<string, IntentField>;
   identityFields: string[];
   filters: string[];
   triggerRules: TriggerRule[];
-  triggerMatchMode: 'all' | 'any';
+  triggerMatchMode: TriggerMatchMode;
 }
+
 export type Locator =
   { kind: 'css'; selector: string } | { kind: 'role'; role: string; name: string; exact?: boolean };
+
 export interface DocumentScope {
   frame?: string;
   shadow?: string;
 }
+
 export interface ResponseMatch {
   urlPattern: string;
   method?: string;
 }
+
 export type Source =
   | { kind: 'dom'; selector: string; attribute: string; association?: string }
   | { kind: 'jsonld'; path: Array<string | number>; association?: string }
   | { kind: 'response'; path: Array<string | number>; association?: string };
+
 export type Condition =
   | { kind: 'exists' | 'visible' | 'absent' | 'disabled'; locator: Locator }
   | { kind: 'attribute'; locator: Locator; attribute: string; value?: string }
@@ -62,19 +70,22 @@ export type Condition =
       path?: Array<string | number>;
       equals?: Exclude<Scalar, null>;
     };
+
 export interface RecordFilter {
   field: string;
   operator: 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte' | 'contains' | 'not_contains';
   value: Exclude<Scalar, null>;
 }
+
 export interface EntityChange {
   identity: string;
-  kind: 'ADDED' | 'MODIFIED' | 'REMOVED';
+  kind: EntityChangeKind;
   previous: Record<string, Scalar> | null;
   current: Record<string, Scalar> | null;
 }
+
 export interface ExecutionStrategy {
-  transport: 'http' | 'browser';
+  transport: Transport;
   document?: DocumentScope;
   setup?: DiscoveryAction[];
   records:
@@ -102,21 +113,25 @@ export interface ExecutionStrategy {
     end: Condition[];
   };
 }
+
 export interface ExtractionPlan {
   version: 3;
   intent: ExtractionIntent;
   strategy: ExecutionStrategy;
 }
+
 export interface SemanticPolicy {
   enabled?: boolean;
   threshold?: number;
 }
+
 export interface SemanticReview {
-  status: 'PASSED' | 'WARNING' | 'REJECTED' | 'ERROR' | 'SKIPPED';
+  status: SemanticReviewStatus;
   score: number | null;
   reasons: string[];
   evidenceRefs: string[];
 }
+
 export interface FieldEvidence {
   recordIdentity: string;
   field: string;
@@ -125,31 +140,35 @@ export interface FieldEvidence {
   raw: Scalar;
   value: Scalar;
 }
+
 export interface StageTrace {
   stage: string;
   durationMs: number;
-  status: 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  status: TraceStatus;
   code?: string;
 }
+
 export interface NetworkResponse {
   url: string;
   method: string;
   status: number;
   body: unknown;
 }
+
 export interface DocumentSnapshot {
-  transport?: 'http' | 'browser';
+  transport?: Transport;
   html: string;
   url: string;
   httpStatus: number;
   responses: NetworkResponse[];
   screenshot?: Uint8Array;
 }
+
 export interface PageExtraction {
   records: Record<string, Scalar>[];
   observedIdentities: string[];
   validatedSourceRecords: number;
-  quality: 'COMPLETE' | 'EMPTY' | 'PARTIAL' | 'INVALID' | 'BLOCKED' | 'INCONCLUSIVE';
+  quality: ExtractionQuality;
   issues: string[];
   sourcesUsed: Record<string, number>;
   evidence: FieldEvidence[];
@@ -157,6 +176,7 @@ export interface PageExtraction {
   ended: boolean;
   nextUrl?: string;
 }
+
 export interface ExecutionPolicy {
   timeoutMs: number;
   navigationTimeoutMs: number;
@@ -167,6 +187,7 @@ export interface ExecutionPolicy {
   maxItems: number;
   maxEvidence: number;
 }
+
 export interface ExecutionContext {
   readonly runId: string;
   readonly deadline: number;
@@ -174,11 +195,13 @@ export interface ExecutionContext {
   remaining(): number;
   check(): void;
 }
+
 export type DiscoveryAction =
   | { kind: 'inspect'; selector: string }
   | { kind: 'click'; locator: Locator }
   | { kind: 'scroll'; selector?: string }
   | { kind: 'wait'; condition: Condition };
+
 export interface DocumentSession {
   snapshot(): Promise<DocumentSnapshot>;
   check(condition: Condition): Promise<boolean | undefined>;
@@ -187,6 +210,7 @@ export interface DocumentSession {
   screenshot(): Promise<Uint8Array | undefined>;
   close(): Promise<void>;
 }
+
 export interface DocumentAdapter {
   open(
     url: string,
@@ -200,14 +224,14 @@ export interface ExtractionReport {
   planRevision?: string;
   validatedSourceRecords?: number;
   quality: PageExtraction['quality'];
-  scope: 'page' | 'collection';
+  scope: ExtractionScope;
   pagesVisited: number;
   issues: string[];
   sourcesUsed: Record<string, number>;
   evidence?: FieldEvidence[];
   trace?: StageTrace[];
   semanticReview?: SemanticReview;
-  failureCode?: 'LIMIT' | 'NO_PROGRESS' | 'READINESS' | 'SOURCE' | 'NAVIGATION' | 'TIMEOUT';
+  failureCode?: FailureCode;
   integrity?: 'VALID' | 'INVALID';
   coverage?: 'COMPLETE' | 'EMPTY' | 'PARTIAL' | 'UNKNOWN';
 }

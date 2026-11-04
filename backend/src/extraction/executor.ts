@@ -1,3 +1,10 @@
+import {
+  ExtractionMode,
+  ExtractionQuality,
+  FailureCode,
+  TraceStatus,
+  isAcceptedExtractionQuality,
+} from './constants.js';
 import { UpstreamHttpError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
@@ -13,23 +20,24 @@ import type { ExtractedPayload } from '../types/extractor.js';
 import { createExecutionContext, waitForPoll } from './context.js';
 import { recordIdentity, compareIdentityText } from './values.js';
 import type { IPageExtractor } from './pageExtractor.js';
+
 export interface ExecutionResult {
   data: ExtractedPayload;
   report: ExtractionReport;
   snapshot: DocumentSnapshot;
 }
-export interface IExtractionExecutor {
-  execute(
-    url: string,
-    plan: ExtractionPlan,
-    options?: {
-      timeoutMs?: number;
-      signal?: AbortSignal;
-      storageState?: unknown;
-      captureScreenshot?: boolean;
-    }
-  ): Promise<ExecutionResult>;
+
+export interface ExecutionOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  storageState?: unknown;
+  captureScreenshot?: boolean;
 }
+
+export interface IExtractionExecutor {
+  execute(url: string, plan: ExtractionPlan, options?: ExecutionOptions): Promise<ExecutionResult>;
+}
+
 export class ExtractionExecutor implements IExtractionExecutor {
   constructor(
     private readonly adapters: Record<'http' | 'browser', DocumentAdapter>,
@@ -39,12 +47,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
   async execute(
     url: string,
     plan: ExtractionPlan,
-    options: {
-      timeoutMs?: number;
-      signal?: AbortSignal;
-      storageState?: unknown;
-      captureScreenshot?: boolean;
-    } = {}
+    options: ExecutionOptions = {}
   ): Promise<ExecutionResult> {
     const started = Date.now();
     const context = createExecutionContext(
@@ -54,7 +57,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
     const observedIdentities = new Set<string>();
     const records = new Map<string, Record<string, Scalar>>();
     const report: ExtractionReport = {
-      quality: 'INCONCLUSIVE',
+      quality: ExtractionQuality.Inconclusive,
       scope: plan.intent.scope,
       pagesVisited: 0,
       issues: [],
@@ -79,7 +82,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
     const seenUrls = new Set<string>();
     const output = (): ExecutionResult => ({
       data:
-        plan.intent.mode === 'single'
+        plan.intent.mode === ExtractionMode.Single
           ? ([...records.values()][0] ?? {})
           : {
               items: [...records.values()].sort((a, b) =>
@@ -95,10 +98,6 @@ export class ExtractionExecutor implements IExtractionExecutor {
     });
     const observe = async (): Promise<PageExtraction> => {
       context.check();
-      snapshot = await session!.snapshot();
-      if (snapshot.httpStatus >= 400) throw new UpstreamHttpError(snapshot.httpStatus);
-      if (new URL(snapshot.url).origin !== origin)
-        throw new Error('Navigation escaped the original origin.');
       const observed = new Map<string, boolean>();
       const conditions = [
         ...plan.strategy.ready,
@@ -109,6 +108,11 @@ export class ExtractionExecutor implements IExtractionExecutor {
         const value = await session!.check(condition);
         if (value !== undefined) observed.set(JSON.stringify(condition), value);
       }
+      // Capture after live checks so terminal evidence cannot precede the final records.
+      snapshot = await session!.snapshot();
+      if (snapshot.httpStatus >= 400) throw new UpstreamHttpError(snapshot.httpStatus);
+      if (new URL(snapshot.url).origin !== origin)
+        throw new Error('Navigation escaped the original origin.');
       return this.extractor.extract(snapshot, plan, observed);
     };
     const waitPage = async (
@@ -123,10 +127,10 @@ export class ExtractionExecutor implements IExtractionExecutor {
       }
       return page;
     };
-    const partial = (issue: string, code: ExtractionReport['failureCode'] = 'LIMIT') => {
+    const partial = (issue: string, code: ExtractionReport['failureCode'] = FailureCode.Limit) => {
       report.failureCode = code;
-      report.quality = 'PARTIAL';
-      report.coverage = 'PARTIAL';
+      report.quality = ExtractionQuality.Partial;
+      report.coverage = ExtractionQuality.Partial;
       report.issues.push(issue);
       return output();
     };
@@ -137,7 +141,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
       report.trace!.push({
         stage: 'acquisition',
         durationMs: Date.now() - acquisitionStarted,
-        status: 'SUCCESS',
+        status: TraceStatus.Success,
       });
       await initialize();
       let page = await waitPage((item) => item.ready, this.policy.actionTimeoutMs);
@@ -147,7 +151,9 @@ export class ExtractionExecutor implements IExtractionExecutor {
         report.trace!.push({
           stage: 'page-' + report.pagesVisited,
           durationMs: 0,
-          status: ['COMPLETE', 'EMPTY'].includes(page.quality) ? 'SUCCESS' : 'FAILED',
+          status: isAcceptedExtractionQuality(page.quality)
+            ? TraceStatus.Success
+            : TraceStatus.Failed,
           code: page.quality,
         });
         report.validatedSourceRecords =
@@ -160,16 +166,17 @@ export class ExtractionExecutor implements IExtractionExecutor {
         );
         report.quality = page.quality;
         report.issues.push(...page.issues);
-        if (!['COMPLETE', 'EMPTY'].includes(page.quality)) {
-          report.failureCode = page.ready ? 'SOURCE' : 'READINESS';
-          report.integrity = page.quality === 'INVALID' ? 'INVALID' : 'VALID';
+        if (!isAcceptedExtractionQuality(page.quality)) {
+          report.failureCode = page.ready ? FailureCode.Source : FailureCode.Readiness;
+          report.integrity =
+            page.quality === ExtractionQuality.Invalid ? ExtractionQuality.Invalid : 'VALID';
           return output();
         }
         for (const record of page.records) {
           const key = recordIdentity(record, plan.intent.identityFields);
           if (records.has(key) && JSON.stringify(records.get(key)) !== JSON.stringify(record)) {
-            report.quality = 'INVALID';
-            report.integrity = 'INVALID';
+            report.quality = ExtractionQuality.Invalid;
+            report.integrity = ExtractionQuality.Invalid;
             report.issues.push('Conflicting values for the same collection identity.');
             return output();
           }
@@ -178,8 +185,8 @@ export class ExtractionExecutor implements IExtractionExecutor {
           records.set(key, record);
         }
         if (page.ended) {
-          report.quality = records.size ? 'COMPLETE' : 'EMPTY';
-          report.coverage = records.size ? 'COMPLETE' : 'EMPTY';
+          report.quality = records.size ? ExtractionQuality.Complete : ExtractionQuality.Empty;
+          report.coverage = records.size ? ExtractionQuality.Complete : ExtractionQuality.Empty;
           if (options.captureScreenshot) {
             try {
               snapshot.screenshot = await session.screenshot();
@@ -201,7 +208,7 @@ export class ExtractionExecutor implements IExtractionExecutor {
           if (!nextUrl || new URL(nextUrl).origin !== origin || seenUrls.has(nextUrl))
             return partial(
               'Pagination URL is missing, repeated or outside the allowed origin.',
-              'NO_PROGRESS'
+              FailureCode.NoProgress
             );
           seenUrls.add(snapshot.url);
           seenUrls.add(nextUrl);
@@ -214,21 +221,15 @@ export class ExtractionExecutor implements IExtractionExecutor {
           );
           await initialize();
         } else await session.advance(pagination);
-        page = await waitPage(
-          (item) =>
-            item.ended ||
-            (['COMPLETE', 'EMPTY'].includes(item.quality) &&
-              item.observedIdentities.some((identity) => !before.has(identity))),
-          this.policy.actionTimeoutMs
-        );
-        const progressed =
-          page.ended ||
-          (['COMPLETE', 'EMPTY'].includes(page.quality) &&
-            page.observedIdentities.some((identity) => !before.has(identity)));
-        if (!progressed)
+        const hasProgress = (item: PageExtraction) =>
+          item.ended ||
+          (isAcceptedExtractionQuality(item.quality) &&
+            item.observedIdentities.some((identity) => !before.has(identity)));
+        page = await waitPage(hasProgress, this.policy.actionTimeoutMs);
+        if (!hasProgress(page))
           return partial(
             'No new identities or completion evidence after pagination.',
-            'NO_PROGRESS'
+            FailureCode.NoProgress
           );
       }
       return partial('Page limit reached.');
@@ -236,14 +237,16 @@ export class ExtractionExecutor implements IExtractionExecutor {
       if (!records.size) throw error;
       return partial(
         error instanceof Error ? error.message : 'Execution interrupted.',
-        context.signal.aborted ? 'TIMEOUT' : 'NAVIGATION'
+        context.signal.aborted ? FailureCode.Timeout : FailureCode.Navigation
       );
     } finally {
       await session?.close();
       report.trace!.push({
         stage: 'extraction',
         durationMs: Date.now() - started,
-        status: ['COMPLETE', 'EMPTY'].includes(report.quality) ? 'SUCCESS' : 'FAILED',
+        status: isAcceptedExtractionQuality(report.quality)
+          ? TraceStatus.Success
+          : TraceStatus.Failed,
         code: report.quality,
       });
     }

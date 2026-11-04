@@ -1,10 +1,12 @@
+import { ExtractionExecutor } from '../src/extraction/executor.js';
+import type { DocumentAdapter } from '../src/extraction/contracts.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { describe, it, expect } from 'vitest';
 import { extractionPlanSchema } from '../src/types/extractionPlan.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../src/extraction/values.js';
 import { evaluateTriggerRules } from '../src/utils/triggerEvaluator.js';
-import { fixtureExecutor, fixturePlan } from './helpers/extractionFixtures.js';
+import { fixtureExecutor, fixturePlan, fixturePolicy } from './helpers/extractionFixtures.js';
 
 const row = (id: string, price = '100') =>
   '<article data-id="' + id + '"><b class="price">' + price + '</b></article>';
@@ -29,6 +31,53 @@ const extract = (html: string, input = plan) =>
     input
   );
 describe('Version 3 extraction contract and integrity', () => {
+  it('captures final records after live terminal checks', async () => {
+    const input = structuredClone(plan);
+    input.intent.scope = 'collection';
+    input.strategy.pagination = {
+      kind: 'scroll',
+      end: [{ kind: 'exists', locator: { kind: 'css', selector: '.end' } }],
+    };
+    let html = '<main>' + row('a') + '</main>';
+    const adapter: DocumentAdapter = {
+      open: async () => ({
+        snapshot: async () => ({
+          html,
+          url: 'https://example.com',
+          httpStatus: 200,
+          responses: [],
+        }),
+        check: async (condition) => {
+          if (
+            'locator' in condition &&
+            condition.locator.kind === 'css' &&
+            condition.locator.selector === '.end'
+          ) {
+            html = '<main>' + row('b') + '<i class="end"></i></main>';
+            return true;
+          }
+          return undefined;
+        },
+        discover: async () => {
+          throw new Error('Unexpected discovery');
+        },
+        advance: async () => {
+          throw new Error('Unexpected pagination');
+        },
+        screenshot: async () => undefined,
+        close: async () => {},
+      }),
+    };
+    const executor = new ExtractionExecutor(
+      { http: adapter, browser: adapter },
+      new PageExtractor(standardSourceReaders()),
+      fixturePolicy
+    );
+    const result = await executor.execute('https://example.com', input);
+    expect(result.report.quality).toBe('COMPLETE');
+    expect(result.data).toMatchObject({ count: 1, items: [{ id: 'b' }] });
+  });
+
   it('extracts all records and captures provenance', () => {
     const result = extract(
       '<main>' + ['e', 'd', 'c', 'b', 'a'].map((id) => row(id)).join('') + '</main>'
