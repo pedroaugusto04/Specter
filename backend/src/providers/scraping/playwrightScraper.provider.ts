@@ -105,26 +105,25 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       const sourcesUsed: Record<string, number> = {};
       let result: PlanExecutionResult | undefined;
       for (let action = 0; action <= env.EXTRACTION_MAX_ACTIONS; action++) {
-        const readiness = page.locator(plan.readySelector).first();
-        await readiness.waitFor({ state: 'attached' });
         await page
           .waitForFunction(
             `(selector) => {
-              const element = document.querySelector(selector);
-              if (!element) return false;
-              const visible = Boolean(
-                element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden'
+              return Array.from(document.querySelectorAll(selector)).some((element) =>
+                Boolean(
+                  element.textContent?.trim() ||
+                    ['content', 'href', 'src', 'alt', 'aria-label'].some((name) =>
+                      element.getAttribute(name)?.trim()
+                    )
+                )
               );
-              const meaningful = Boolean(
-                element.textContent?.trim() ||
-                  ['content', 'href', 'src', 'alt', 'aria-label'].some((name) =>
-                    element.getAttribute(name)?.trim()
-                  )
-              );
-              return visible || meaningful;
             }`,
             plan.readySelector,
-            { timeout: Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs) }
+            {
+              timeout: Math.min(
+                env.PLAYWRIGHT_TIMEOUT_MS,
+                Math.max(1, budgetMs - (Date.now() - started))
+              ),
+            }
           )
           .catch(() => {});
         const rawHtml = await page.content();
@@ -179,33 +178,36 @@ export class PlaywrightScraperEngine implements IScraperEngine {
           return result;
         }
         if (action === env.EXTRACTION_MAX_ACTIONS || action + 1 >= env.EXTRACTION_MAX_PAGES) break;
-        const hasJsonLdSources = Object.values(plan.fields).some((field) =>
-          field.sources.some((source) => source.kind === 'jsonld')
-        );
-        const progressSelector =
-          plan.containerSelector ??
-          (hasJsonLdSources ? 'script[type="application/ld+json"]' : plan.readySelector);
-        const progressTarget = page.locator(progressSelector);
-        const previousProgress = await progressTarget.evaluateAll((elements) =>
-          elements.map((element) => element.innerHTML).join('\u0000')
-        );
-        const previousUrl = page.url();
+        const previousIdentities = new Set(records.keys());
         if (plan.pagination?.kind === PaginationKind.Scroll)
           await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
         else await page.locator(plan.pagination!.nextSelector!).first().click();
-        await page
-          .waitForFunction(
-            `({ selector, previous, previousUrl }) => {
-              if (location.href !== previousUrl) return true;
-              const current = Array.from(document.querySelectorAll(selector))
-                .map((element) => element.innerHTML)
-                .join('\u0000');
-              return current !== previous;
-            }`,
-            { selector: progressSelector, previous: previousProgress, previousUrl },
-            { timeout: Math.max(1, budgetMs - (Date.now() - started)) }
-          )
-          .catch(() => {});
+        const progressDeadline = Math.min(
+          started + budgetMs,
+          Date.now() + env.PLAYWRIGHT_TIMEOUT_MS
+        );
+        while (Date.now() < progressDeadline) {
+          const currentUrl = page.url();
+          const currentHtml = await page.content().catch(() => '');
+          if (currentHtml) {
+            const current = extractPlanPage(currentHtml, currentUrl, plan);
+            const currentItems =
+              'items' in current.data && Array.isArray(current.data.items)
+                ? current.data.items
+                : [];
+            const hasNewIdentity =
+              isAcceptedExtractionQuality(current.report.quality) &&
+              currentItems.some(
+                (item) => !previousIdentities.has(recordIdentity(item, plan.identityFields))
+              );
+            if (hasNewIdentity || current.ended) break;
+          }
+          try {
+            await page.waitForTimeout(200);
+          } catch {
+            break;
+          }
+        }
       }
       if (!result) throw new Error('Interactive extraction produced no document.');
       result.report.quality = ExtractionQuality.Partial;

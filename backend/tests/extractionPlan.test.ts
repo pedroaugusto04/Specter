@@ -59,6 +59,13 @@ describe('Validated extraction plans', () => {
     expect(
       extractPlanPage('<div class="empty"></div>', 'https://example.com', plan).report.quality
     ).toBe('INCONCLUSIVE');
+    expect(
+      extractPlanPage(
+        '<main aria-label="Catalog ready"></main><p class="empty">No records</p>',
+        'https://example.com',
+        plan
+      ).report.quality
+    ).toBe('EMPTY');
   });
   it('requires identity, explicit numeric locale and required trigger references', () => {
     expect(extractionPlanSchema.safeParse({ ...plan, identityFields: [] }).success).toBe(false);
@@ -171,6 +178,35 @@ describe('Generic field semantics', () => {
       count: 2,
     });
   });
+
+  it('rejects DOM and JSON-LD sources mixed into one collection', () => {
+    expect(
+      extractionPlanSchema.safeParse({
+        version: 2,
+        mode: 'collection',
+        containerSelector: 'article',
+        readySelector: 'main',
+        identityFields: ['id'],
+        fields: {
+          id: { type: 'string', sources: [{ kind: 'dom', selector: ':scope' }] },
+          label: { type: 'string', sources: [{ kind: 'jsonld', path: ['name'] }] },
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      extractionPlanSchema.safeParse({
+        version: 2,
+        mode: 'collection',
+        jsonLdType: 'Thing',
+        readySelector: 'main',
+        identityFields: ['id'],
+        fields: {
+          id: { type: 'string', sources: [{ kind: 'jsonld', path: ['identifier'] }] },
+          label: { type: 'string', sources: [{ kind: 'dom', selector: 'h2' }] },
+        },
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('Ambiguous structured data', () => {
@@ -189,7 +225,7 @@ describe('Ambiguous structured data', () => {
       },
     });
     const result = extractPlanPage(
-      '<main></main><script type="application/ld+json">[{"@type":"Organization","name":"Store"},{"@type":"Product","name":"Chair","offers":{"price":"19.99"}}]</script>',
+      '<main>Product details loaded</main><script type="application/ld+json">[{"@type":"Organization","name":"Store"},{"@type":"Product","name":"Chair","offers":{"price":"19.99"}}]</script>',
       'https://example.com',
       plan
     );

@@ -68,10 +68,8 @@ function hasReadinessEvidence($: cheerio.CheerioAPI, selector: string): boolean 
   const evidenceAttributes = ['content', 'href', 'src', 'alt', 'aria-label'];
   return $(selector).toArray().some((node) => {
     const element = $(node);
-    const tagName = (node as AnyNode & { tagName?: string }).tagName?.toLowerCase();
     return Boolean(
       element.text().trim() ||
-        (tagName === 'script' && element.html()?.trim()) ||
         evidenceAttributes.some((attribute) => element.attr(attribute)?.trim())
     );
   });
