@@ -21,6 +21,7 @@ import { createScraperEngine, createHttpCandidates } from './providers/scraping/
 import { createStorageProvider } from './providers/storage/index.js';
 import { createRealtimeEventBus } from './providers/realtime/realtime.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
+import { CompilationReason } from './queues/scheduler.interface.js';
 import { reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
@@ -140,7 +141,7 @@ async function bootstrap(): Promise<void> {
       activeJobs.map((j) => ({ id: j.id, cronExpression: j.cronExpression }))
     );
     for (const job of await jobRepository.findAll(JobStatus.PendingCompilation)) {
-      await jobScheduler.enqueueCompilation(job.id, 'initial');
+      await jobScheduler.enqueueCompilation(job.id, CompilationReason.Initial);
     }
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {

@@ -16,7 +16,7 @@ import {
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
-import type { IJobScheduler } from '../queues/scheduler.interface.js';
+import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { JobRunEntity } from '../types/domain.js';
@@ -81,7 +81,7 @@ export class ScrapeExecutionService {
 
     if (!job.extractionPlan) {
       logger.info('Job has no extractionPlan; enqueueing compilation', { jobId: job.id });
-      await this.deps.jobScheduler.enqueueCompilation(job.id, 'initial');
+      await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Initial);
       return null;
     }
 
@@ -126,7 +126,9 @@ export class ScrapeExecutionService {
           issues: execution.report.issues,
         });
         if (
-          execution.report.quality === ExtractionQuality.Invalid ||
+          (execution.report.quality === ExtractionQuality.Invalid &&
+            (execution.report.failureCode === FailureCode.Source ||
+              execution.report.failureCode === FailureCode.Readiness)) ||
           ((execution.report.quality === ExtractionQuality.Inconclusive ||
             execution.report.failureCode === FailureCode.NoProgress) &&
             job.failureCount + 1 >= this.consecutiveFailuresForHealing)
@@ -143,11 +145,15 @@ export class ScrapeExecutionService {
           ),
           httpStatus,
         });
+        const selectorFailure =
+          execution.report.failureCode === FailureCode.Source ||
+          execution.report.failureCode === FailureCode.Readiness ||
+          execution.report.failureCode === FailureCode.NoProgress;
         await this.deps.jobRepository.updateJob(job.id, {
           lastError: formatUserErrorMessage(
             new SelectorMismatchError('Extraction could not be validated.')
           ),
-          failureCount: job.failureCount + 1,
+          ...(selectorFailure ? { failureCount: job.failureCount + 1 } : { failureCount: 0 }),
         });
         return null;
       }
@@ -240,13 +246,14 @@ export class ScrapeExecutionService {
       if (accessFailure === AccessFailure.Blocked) {
         await this.deps.jobRepository.updateJob(job.id, {
           lastError: userMessage,
+          failureCount: 0,
         });
         await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         return null;
       }
 
       if (error instanceof AcquisitionFailureError) {
-        await this.deps.jobRepository.updateJob(job.id, { lastError: userMessage });
+        await this.deps.jobRepository.updateJob(job.id, { lastError: userMessage, failureCount: 0 });
         await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         throw error;
       }
@@ -258,6 +265,7 @@ export class ScrapeExecutionService {
       ) {
         await this.deps.jobRepository.updateJob(job.id, {
           lastError: userMessage,
+          failureCount: 0,
         });
         await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         throw error;
@@ -312,7 +320,7 @@ export class ScrapeExecutionService {
               failureCount: newFailureCount,
             }
           );
-          await this.deps.jobScheduler.enqueueCompilation(job.id, 'healing');
+          await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Healing);
           await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Healing);
           return null;
         }
@@ -330,6 +338,7 @@ export class ScrapeExecutionService {
       // Unexpected errors: record lastError
       await this.deps.jobRepository.updateJob(job.id, {
         lastError: userMessage,
+        failureCount: 0,
       });
       await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
       throw error;

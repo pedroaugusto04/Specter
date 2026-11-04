@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { DomainError, NotFoundError, CompilerValidationError } from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
+import { CompilationReason } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { ScrapingJobEntity } from '../types/domain.js';
@@ -30,7 +31,7 @@ export interface CompilationServiceDeps {
 export class CompilationService {
   constructor(private readonly deps: CompilationServiceDeps) {}
 
-  async compileJob(jobId: string, reason?: string): Promise<ScrapingJobEntity> {
+  async compileJob(jobId: string, reason?: CompilationReason): Promise<ScrapingJobEntity> {
     const startTime = Date.now();
     const job = await this.deps.jobRepository.findById(jobId);
 
@@ -191,15 +192,29 @@ export class CompilationService {
         durationMs,
       });
 
+      const retryableHealingFailure =
+        reason === CompilationReason.Healing && error instanceof DomainError && error.isRetryable;
+      const failureStatus =
+        reason === CompilationReason.Healing
+          ? retryableHealingFailure
+            ? JobStatus.Healing
+            : JobStatus.Failed
+          : job.extractionPlan
+            ? JobStatus.Active
+            : JobStatus.Failed;
       await this.deps.jobRepository.updateJob(job.id, {
-        status: job.extractionPlan ? JobStatus.Active : JobStatus.Failed,
+        status: failureStatus,
         lastError: userMessage,
       });
+
+      if (reason === CompilationReason.Healing && !retryableHealingFailure) {
+        await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
+      }
 
       await this.deps.realtimeService?.notifyJobUpdated(
         job.userId,
         job.id,
-        job.extractionPlan ? JobStatus.Active : JobStatus.Failed
+        failureStatus
       );
 
       throw error;

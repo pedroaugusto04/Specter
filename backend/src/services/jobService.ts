@@ -10,7 +10,7 @@ import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type { JobRunDto, ScrapingJobDto } from '@specter/contracts';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
-import type { IJobScheduler } from '../queues/scheduler.interface.js';
+import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type {
   DashboardStats,
@@ -125,7 +125,7 @@ export class JobService {
       semanticPolicy: request.semanticPolicy ?? null,
     });
 
-    await this.jobScheduler.enqueueCompilation(createdEntity.id, 'initial');
+    await this.jobScheduler.enqueueCompilation(createdEntity.id, CompilationReason.Initial);
 
     await this.realtimeService?.notifyJobCreated(
       createdEntity.userId,
@@ -245,7 +245,7 @@ export class JobService {
         failureCount: 0,
         lastError: null,
       });
-      await this.jobScheduler.enqueueCompilation(id, 'manual');
+      await this.jobScheduler.enqueueCompilation(id, CompilationReason.Manual);
     }
 
     const finalEntity = await this.jobRepository.findById(id);
@@ -281,7 +281,7 @@ export class JobService {
       const updated = await this.jobRepository.updateJob(id, {
         status: JobStatus.PendingCompilation,
       });
-      await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
+      await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
       const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(
         resultDto.userId,
@@ -314,7 +314,7 @@ export class JobService {
     }
 
     if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
-      await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
+      await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
       await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
       return { queued: true, mode: 'compile' };
     }
@@ -336,7 +336,7 @@ export class JobService {
       lastError: null,
     });
 
-    await this.jobScheduler.enqueueCompilation(existing.id, 'manual');
+    await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
     const resultDto = await this.presenter.present(updated ?? existing);
     await this.realtimeService?.notifyJobUpdated(resultDto.userId, resultDto.id, resultDto.status);
     return resultDto;

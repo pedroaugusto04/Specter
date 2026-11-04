@@ -12,6 +12,7 @@ import type { CompilationService } from '../services/compilationService.js';
 import type { RetentionService } from '../services/retentionService.js';
 import type { ScrapeExecutionService } from '../services/scrapeExecutionService.js';
 import { logger } from '../utils/logger.js';
+import type { CompilationReason } from '../queues/scheduler.interface.js';
 
 export interface WorkerManagerDeps {
   compilationService: CompilationService;
@@ -35,7 +36,7 @@ export class WorkerManager {
 
     this.compilationWorker = new Worker(
       COMPILATION_QUEUE_NAME,
-      async (job: Job<{ jobId: string; reason?: string }>) => {
+      async (job: Job<{ jobId: string; reason?: CompilationReason }>) => {
         const { jobId, reason } = job.data;
         await this.runMonitor(jobId, () => this.deps.compilationService.compileJob(jobId, reason));
       },

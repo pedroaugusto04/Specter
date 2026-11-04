@@ -1,11 +1,12 @@
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import type { IJobScheduler } from './scheduler.interface.js';
+import { CompilationReason, type IJobScheduler } from './scheduler.interface.js';
 
 export const COMPILATION_QUEUE_NAME = 'compilation-queue';
 export const SCRAPE_EXECUTION_QUEUE_NAME = 'scrape-execution-queue';
 export const MAINTENANCE_QUEUE_NAME = 'maintenance-queue';
+const COMPILATION_MAX_ATTEMPTS = 3;
 
 export function getRedisConnectionOptions(): ConnectionOptions {
   if (env.REDIS_URL) {
@@ -43,7 +44,7 @@ export class BullMqJobScheduler implements IJobScheduler {
     this.compilationQueue = new Queue(COMPILATION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: 1,
+        attempts: COMPILATION_MAX_ATTEMPTS,
         backoff: {
           type: 'exponential',
           delay: 5000,
@@ -75,7 +76,7 @@ export class BullMqJobScheduler implements IJobScheduler {
     });
   }
 
-  async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
+  async enqueueCompilation(jobId: string, reason: CompilationReason): Promise<void> {
     await this.compilationQueue.add(
       'compile-job',
       { jobId, reason },
