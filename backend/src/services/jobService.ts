@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import type { SemanticPolicy } from '../extraction/contracts.js';
 import { comparisonPayload } from '../utils/planExtraction.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
@@ -22,7 +24,6 @@ import type { TriggerRule } from '../types/extractionPlan.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
-import { normalizeUrl } from '../utils/urlNormalizer.js';
 import { assertSafeUrl } from '../utils/ssrfValidator.js';
 
 export interface CreateScrapingJobRequest {
@@ -33,6 +34,7 @@ export interface CreateScrapingJobRequest {
   webhookUrl?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
+  semanticPolicy?: SemanticPolicy | null;
 }
 
 export interface UpdateScrapingJobRequest {
@@ -42,6 +44,7 @@ export interface UpdateScrapingJobRequest {
   webhookUrl?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
+  semanticPolicy?: SemanticPolicy | null;
   triggerRules?: TriggerRule[];
   triggerMatchMode?: TriggerMatchMode;
 }
@@ -149,6 +152,7 @@ export class JobService {
       webhookUrl,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
+      semanticPolicy: request.semanticPolicy ?? null,
     });
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, 'initial');
@@ -226,13 +230,19 @@ export class JobService {
       if (existing.extractionPlan) {
         patch.extractionPlan = {
           ...existing.extractionPlan,
-          ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
-          ...(request.triggerMatchMode !== undefined
-            ? { triggerMatchMode: request.triggerMatchMode }
-            : {}),
+          intent: {
+            ...existing.extractionPlan.intent,
+            ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
+            ...(request.triggerMatchMode !== undefined
+              ? { triggerMatchMode: request.triggerMatchMode }
+              : {}),
+          },
         };
       }
     }
+
+    if (request.semanticPolicy !== undefined) patch.semanticPolicy = request.semanticPolicy;
+    if (patch.extractionPlan) patch.contractRevision = randomUUID();
 
     const needsRecompile =
       (patch.url !== undefined && patch.url !== existing.url) ||
@@ -399,8 +409,14 @@ export class JobService {
       const current = successfulRuns[0]!;
       const previous = successfulRuns[1]!;
       latestDiff = buildDiffSummary(
-        comparisonPayload(previous.extractedData!, existing.extractionPlan?.identityFields ?? []),
-        comparisonPayload(current.extractedData!, existing.extractionPlan?.identityFields ?? []),
+        comparisonPayload(
+          previous.extractedData!,
+          existing.extractionPlan?.intent.identityFields ?? []
+        ),
+        comparisonPayload(
+          current.extractedData!,
+          existing.extractionPlan?.intent.identityFields ?? []
+        ),
         false
       );
     }

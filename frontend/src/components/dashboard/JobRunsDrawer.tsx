@@ -22,6 +22,7 @@ import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
 import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { ExtractionEvidence } from './ExtractionEvidence';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 
@@ -379,11 +380,16 @@ export function JobRunsDrawer({
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Validated extraction plan. Scope:{' '}
-                  {job.extractionPlan.scope === EXTRACTION_SCOPE.Collection
+                  {job.extractionPlan.intent.scope === EXTRACTION_SCOPE.Collection
                     ? 'Complete collection'
                     : 'Current page'}
-                  . Fields: {Object.keys(job.extractionPlan.fields).join(', ')}.
+                  . Fields: {Object.keys(job.extractionPlan.intent.fields).join(', ')}.
                 </p>
+                <ExtractionEvidence
+                  report={
+                    (runs.find((run) => run.id === selectedRunId) ?? runs[0])?.extractionReport
+                  }
+                />
                 <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted/50 p-3.5 font-mono text-xs text-foreground">
                   {JSON.stringify(job.extractionPlan, null, 2)}
                 </pre>

@@ -1,3 +1,4 @@
+import type { SemanticPolicy, ExtractionReport } from './extractionPlan';
 import type {
   ExtractionPlan,
   ExtractionScope,
@@ -30,6 +31,9 @@ export interface ScrapingJobDto {
   webhookUrl?: string | null;
   cronExpression: string;
   extractionPlan: ExtractionPlan | null;
+  semanticPolicy?: SemanticPolicy | null;
+  effectiveSemanticPolicy?: { enabled: boolean; threshold: number };
+  planRevision?: string | null;
   status: JobStatus;
   lastError: string | null;
   failureCount: number;
@@ -39,14 +43,7 @@ export interface ScrapingJobDto {
 }
 
 export interface JobRunDto {
-  extractionReport?: {
-    quality: ExtractionQuality;
-    scope: ExtractionScope;
-    pagesVisited: number;
-    issues: string[];
-    /** Successful extraction counts keyed by `${fieldName}#${sourceIndex}`. */
-    sourcesUsed: Record<string, number>;
-  } | null;
+  extractionReport?: ExtractionReport | null;
   id: string;
   jobId: string;
   extractedData: Record<string, unknown> | null;
@@ -268,6 +265,7 @@ export const api = {
     webhookUrl?: string | null;
     cronExpression: string;
     captureScreenshotOnChange?: boolean;
+    semanticPolicy?: SemanticPolicy | null;
   }): Promise<ScrapingJobDto> {
     return request<ScrapingJobDto>('/api/jobs', {
       method: 'POST',
@@ -284,6 +282,7 @@ export const api = {
       webhookUrl?: string | null;
       cronExpression?: string;
       captureScreenshotOnChange?: boolean;
+      semanticPolicy?: SemanticPolicy | null;
       triggerRules?: TriggerRule[];
       triggerMatchMode?: TriggerMatchMode;
     }

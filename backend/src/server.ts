@@ -1,3 +1,8 @@
+import { createModelStages } from './extraction/modelStages.js';
+import { composeExtraction } from './extraction/composition.js';
+import { ConfigurationPipeline } from './extraction/configuration.js';
+import { DrizzleOutboxRepository } from './repositories/outboxRepository.js';
+import { OutboxWorker } from './notifications/outboxWorker.js';
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { closeDb } from './db/index.js';
@@ -34,6 +39,20 @@ async function bootstrap(): Promise<void> {
   const sessionRepository = new DrizzleSessionRepository();
   const jobScheduler = new BullMqJobScheduler();
   const compilerProvider = createCompilerProvider();
+  const extraction = composeExtraction(createScraperEngine('cheerio'));
+  const configurationPipeline = new ConfigurationPipeline(
+    createModelStages(compilerProvider),
+    extraction.discovery,
+    extraction.executor,
+    {
+      budgetMs: env.COMPILATION_BUDGET_MS,
+      maxAttempts: env.COMPILATION_MAX_ATTEMPTS,
+      maxDiscoveryActions: env.DISCOVERY_MAX_ACTIONS,
+      evidenceLimit: env.COMPILATION_MAX_EVIDENCE_CHARS,
+      semanticEnabled: env.SEMANTIC_REVIEW_ENABLED,
+      semanticThreshold: env.SEMANTIC_REVIEW_THRESHOLD,
+    }
+  );
   const scraperEngine = createScraperEngine();
   const storageProvider = createStorageProvider();
   const realtimeEventBus = createRealtimeEventBus();
@@ -52,9 +71,8 @@ async function bootstrap(): Promise<void> {
 
   const compilationService = new CompilationService({
     jobRepository,
-    scraperEngine,
-    compilerProvider,
-    notificationProvider: notificationDispatcher,
+    configurationPipeline,
+    alertRouter: notificationDispatcher,
     jobScheduler,
     storageProvider,
     sessionRepository,
@@ -63,8 +81,8 @@ async function bootstrap(): Promise<void> {
 
   const scrapeExecutionService = new ScrapeExecutionService({
     jobRepository,
-    scraperEngine,
-    notificationProvider: notificationDispatcher,
+    planExecutor: extraction.planExecutor,
+    alertRouter: notificationDispatcher,
     jobScheduler,
     storageProvider,
     sessionRepository,
@@ -126,6 +144,13 @@ async function bootstrap(): Promise<void> {
     retentionService,
   });
   workerManager.start();
+  const outboxWorker = new OutboxWorker(
+    new DrizzleOutboxRepository(),
+    notificationDispatcher,
+    env.NOTIFICATION_MAX_ATTEMPTS,
+    env.NOTIFICATION_TIMEOUT_MS
+  );
+  outboxWorker.start();
 
   const app = await buildApp({
     jobService,
@@ -139,6 +164,7 @@ async function bootstrap(): Promise<void> {
     logger.info(`Received ${signal}. Shutting down gracefully...`);
     await app.close();
     await workerManager.stop();
+    await outboxWorker.close();
     await jobScheduler.close();
     await realtimeService.close();
     await closeDb();

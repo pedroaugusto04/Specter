@@ -1,5 +1,6 @@
+import { DomainError } from '../errors/domainErrors.js';
 import { ExecutionLease } from '../queues/executionLease.js';
-import { Worker, type Job } from 'bullmq';
+import { Worker, UnrecoverableError, type Job } from 'bullmq';
 import { env } from '../config/env.js';
 import {
   COMPILATION_QUEUE_NAME,
@@ -35,8 +36,16 @@ export class WorkerManager {
     this.compilationWorker = new Worker(
       COMPILATION_QUEUE_NAME,
       async (job: Job<{ jobId: string; reason?: string }>) => {
-        const { jobId } = job.data;
-        await this.executionLease.run(jobId, () => this.deps.compilationService.compileJob(jobId));
+        const { jobId, reason } = job.data;
+        try {
+          await this.executionLease.run(jobId, () =>
+            this.deps.compilationService.compileJob(jobId, reason)
+          );
+        } catch (error) {
+          if (error instanceof DomainError && !error.isRetryable)
+            throw new UnrecoverableError(error.message);
+          throw error;
+        }
       },
       {
         concurrency: env.COMPILER_CONCURRENCY,

@@ -29,41 +29,14 @@ export const TRIGGER_OPERATOR = {
 
 export type ExtractionScope = (typeof EXTRACTION_SCOPE)[keyof typeof EXTRACTION_SCOPE];
 
-export interface ExtractionField {
-  sources: Array<
-    | { kind: typeof EXTRACTION_SOURCE_KIND.Dom; selector: string; attribute?: string }
-    | { kind: typeof EXTRACTION_SOURCE_KIND.JsonLd; path: Array<string | number> }
-  >;
-  type: (typeof FIELD_VALUE_TYPE)[keyof typeof FIELD_VALUE_TYPE];
-  required: boolean;
-  normalizeVolatileText?: boolean;
-  locale?: string;
-  booleanValues?: Record<string, boolean>;
-}
-
-export interface TriggerRule {
-  field: string;
-  operator: (typeof TRIGGER_OPERATOR)[keyof typeof TRIGGER_OPERATOR];
-  value: string | number | boolean;
-}
-
-export type TriggerOperator = (typeof TRIGGER_OPERATOR)[keyof typeof TRIGGER_OPERATOR];
-
-export interface ExtractionPlan {
-  version: 2;
-  mode: (typeof EXTRACTION_MODE)[keyof typeof EXTRACTION_MODE];
-  containerSelector?: string;
-  jsonLdType?: string;
-  fields: Record<string, ExtractionField>;
-  identityFields: string[];
-  readySelector: string;
-  emptySelector?: string;
-  scope: (typeof EXTRACTION_SCOPE)[keyof typeof EXTRACTION_SCOPE];
-  pagination?: {
-    kind: (typeof PAGINATION_KIND)[keyof typeof PAGINATION_KIND];
-    nextSelector?: string;
-    endSelector: string;
-  };
-  triggerRules: TriggerRule[];
-  triggerMatchMode: (typeof TRIGGER_MATCH_MODE)[keyof typeof TRIGGER_MATCH_MODE];
-}
+// Shared domain contracts contain no runtime/backend dependencies.
+export type {
+  ExtractionPlan,
+  TriggerRule,
+  TriggerOperator,
+  IntentField as ExtractionField,
+  SemanticPolicy,
+  SemanticReview,
+  FieldEvidence,
+  ExtractionReport,
+} from '../../../backend/src/extraction/contracts';

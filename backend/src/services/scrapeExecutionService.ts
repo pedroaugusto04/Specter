@@ -1,3 +1,5 @@
+import type { IAlertRouter } from '../notifications/contracts.js';
+import type { IPlanExecutor } from './planExecutionService.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import { env } from '../config/env.js';
@@ -8,18 +10,15 @@ import {
   NotFoundError,
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
-import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
-import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
-import { createStorageProvider, type IStorageProvider } from '../providers/storage/index.js';
+import type { IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { JobRunEntity } from '../types/domain.js';
 import { computeExtractionHash } from '../utils/diffHasher.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import { PlanExecutionService } from './planExecutionService.js';
 import { logger } from '../utils/logger.js';
-import { evaluateAndDispatchChangeAlert } from '../utils/changeAlertHelper.js';
+import { buildChangeAlert } from '../utils/changeAlertHelper.js';
 import {
   ChangeStatus,
   ExtractionQuality,
@@ -33,10 +32,10 @@ import type { RealtimeService } from './realtimeService.js';
 
 export interface ScrapeExecutionServiceDeps {
   jobRepository: IJobRepository;
-  scraperEngine: IScraperEngine;
-  notificationProvider: INotificationProvider;
+  planExecutor: IPlanExecutor;
+  alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
-  storageProvider?: IStorageProvider;
+  storageProvider: IStorageProvider;
   sessionRepository?: ISessionRepository;
   realtimeService?: RealtimeService;
   consecutiveFailuresForHealing?: number;
@@ -45,8 +44,8 @@ export interface ScrapeExecutionServiceDeps {
 
 export class ScrapeExecutionService {
   private readonly jobRepository: IJobRepository;
-  private readonly scraperEngine: IScraperEngine;
-  private readonly notificationProvider: INotificationProvider;
+  private readonly planExecutor: IPlanExecutor;
+  private readonly alertRouter: IAlertRouter;
   private readonly jobScheduler: IJobScheduler;
   private readonly storageProvider: IStorageProvider;
   private readonly sessionRepository?: ISessionRepository;
@@ -56,10 +55,10 @@ export class ScrapeExecutionService {
 
   constructor(deps: ScrapeExecutionServiceDeps) {
     this.jobRepository = deps.jobRepository;
-    this.scraperEngine = deps.scraperEngine;
-    this.notificationProvider = deps.notificationProvider;
+    this.planExecutor = deps.planExecutor;
+    this.alertRouter = deps.alertRouter;
     this.jobScheduler = deps.jobScheduler;
-    this.storageProvider = deps.storageProvider ?? createStorageProvider();
+    this.storageProvider = deps.storageProvider;
     this.sessionRepository = deps.sessionRepository;
     this.realtimeService = deps.realtimeService;
     this.consecutiveFailuresForHealing =
@@ -100,20 +99,31 @@ export class ScrapeExecutionService {
         }
       );
 
-      const execution = await new PlanExecutionService(this.scraperEngine).execute(
-        job.url,
-        job.extractionPlan,
-        {
-          storageState,
-          captureScreenshot: job.captureScreenshotOnChange,
-        }
-      );
+      const execution = await this.planExecutor.execute(job.url, job.extractionPlan, {
+        storageState,
+        captureScreenshot: job.captureScreenshotOnChange,
+      });
+      execution.report.planRevision = job.planRevision ?? undefined;
       extractionReport = execution.report;
       const scrapeResult = execution.scrape;
       const extractedData = execution.data;
       httpStatus = scrapeResult.httpStatus;
+      await assertExecutionLease();
+      const latest = await this.jobRepository.findById(job.id);
+      if (
+        !latest ||
+        latest.status !== job.status ||
+        latest.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return null;
+
       if (!isAcceptedExtractionQuality(execution.report.quality)) {
-        if (execution.report.quality === ExtractionQuality.Invalid)
+        if (
+          execution.report.quality === ExtractionQuality.Invalid ||
+          ((execution.report.quality === ExtractionQuality.Inconclusive ||
+            execution.report.failureCode === 'NO_PROGRESS') &&
+            job.failureCount + 1 >= this.consecutiveFailuresForHealing)
+        )
           throw new SelectorMismatchError(execution.report.issues.join(' '));
         await this.jobRepository.createRun({
           jobId: job.id,
@@ -126,18 +136,10 @@ export class ScrapeExecutionService {
         });
         await this.jobRepository.updateJob(job.id, {
           lastError: execution.report.issues.join(' '),
+          failureCount: job.failureCount + 1,
         });
         return null;
       }
-      await assertExecutionLease();
-      const latest = await this.jobRepository.findById(job.id);
-      if (
-        !latest ||
-        latest.status !== job.status ||
-        latest.updatedAt.getTime() !== job.updatedAt.getTime()
-      )
-        return null;
-
       const currentHash = computeExtractionHash(extractedData);
       const candidate = await this.jobRepository.findLatestSuccessfulRun(job.id);
       const previousRun = candidate?.contractRevision === job.contractRevision ? candidate : null;
@@ -161,40 +163,36 @@ export class ScrapeExecutionService {
 
       const durationMs = Date.now() - startTime;
 
-      const runRecord = await this.jobRepository.createRun({
-        jobId: job.id,
-        extractedData,
-        normalizedHash: currentHash,
-        hasChanges,
-        status: RunStatus.Success,
-        extractionReport: execution.report,
-        contractRevision: job.contractRevision,
-        httpStatus,
-        durationMs,
-        screenshotUrl,
-      });
+      const alert =
+        hasChanges === ChangeStatus.Changed && previousRun
+          ? buildChangeAlert({
+              job,
+              currentData: extractedData,
+              previousData: previousRun.extractedData,
+              triggerRules: job.extractionPlan?.intent.triggerRules,
+              triggerMatchMode: job.extractionPlan?.intent.triggerMatchMode,
+              screenshotUrl,
+            })
+          : null;
+      const deliveries = alert ? await this.alertRouter.prepare(alert) : [];
 
-      // Reset failure counter and ensure ACTIVE status on successful run
-      if (job.failureCount > 0 || job.lastError !== null || job.status !== JobStatus.Active) {
-        await this.jobRepository.updateJob(job.id, {
-          status: JobStatus.Active,
-          failureCount: 0,
-          lastError: null,
-        });
-      }
-
-      // Send notification only when actual changes occur compared to a prior snapshot
-      if (hasChanges === ChangeStatus.Changed && previousRun) {
-        await evaluateAndDispatchChangeAlert({
-          job,
-          currentData: extractedData,
-          previousData: previousRun.extractedData,
-          triggerRules: job.extractionPlan?.triggerRules,
-          triggerMatchMode: job.extractionPlan?.triggerMatchMode,
-          notificationProvider: this.notificationProvider,
+      const runRecord = await this.jobRepository.commitRun(
+        {
+          jobId: job.id,
+          extractedData,
+          normalizedHash: currentHash,
+          hasChanges,
+          status: RunStatus.Success,
+          extractionReport: execution.report,
+          contractRevision: job.contractRevision,
+          httpStatus,
+          durationMs,
           screenshotUrl,
-        });
-      }
+        },
+        deliveries,
+        { status: JobStatus.Active, failureCount: 0, lastError: null },
+        job.updatedAt
+      );
 
       logger.info('Deterministic scrape execution completed', {
         jobId: job.id,
@@ -251,7 +249,7 @@ export class ScrapeExecutionService {
             error instanceof AntiBotBlockedError
               ? ExtractionQuality.Blocked
               : ExtractionQuality.Inconclusive,
-          scope: job.extractionPlan.scope,
+          scope: job.extractionPlan.intent.scope,
           pagesVisited: 0,
           issues: [userMessage],
           sourcesUsed: {},
@@ -271,7 +269,10 @@ export class ScrapeExecutionService {
       }
 
       // 2. Navigation / Network Timeout: DO NOT recompile; rethrow for BullMQ exponential backoff
-      if (error instanceof NavigationTimeoutError) {
+      if (
+        error instanceof NavigationTimeoutError ||
+        (error instanceof DomainError && error.isRetryable)
+      ) {
         await this.jobRepository.updateJob(job.id, {
           lastError: userMessage,
         });

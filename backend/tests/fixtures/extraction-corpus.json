@@ -1,0 +1,552 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "main product excludes recommendations",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false
+    },
+    {
+      "name": "ambiguous prices rejected",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b><b class=\"current\">$200</b></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "INVALID",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false
+    },
+    {
+      "name": "missing required price rejected",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": null
+        }
+      ],
+      "expectedQuality": "INVALID",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false
+    },
+    {
+      "name": "two prices are not concatenated",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100 / $200</b></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": null
+        }
+      ],
+      "expectedQuality": "INVALID"
+    },
+    {
+      "name": "real price change",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$90</b></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "main"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": []
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 90
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": true
+    },
+    {
+      "name": "confirmed empty collection",
+      "snapshot": {
+        "html": "<main><p class=\"empty\">No results</p></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "collection",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": ["title"],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "article"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": ".empty"
+              }
+            }
+          ]
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "EMPTY"
+    },
+    {
+      "name": "unconfirmed missing collection",
+      "snapshot": {
+        "html": "<main></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "plan": {
+        "version": 3,
+        "intent": {
+          "entity": "Main product",
+          "mode": "collection",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": ["title"],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "strategy": {
+          "transport": "http",
+          "records": {
+            "kind": "dom",
+            "selector": "article"
+          },
+          "fields": {
+            "title": [
+              {
+                "kind": "dom",
+                "selector": "h1",
+                "attribute": "text"
+              }
+            ],
+            "price": [
+              {
+                "kind": "dom",
+                "selector": ".current",
+                "attribute": "text"
+              }
+            ]
+          },
+          "ready": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": "main"
+              }
+            }
+          ],
+          "empty": [
+            {
+              "kind": "exists",
+              "locator": {
+                "kind": "css",
+                "selector": ".empty"
+              }
+            }
+          ]
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "INCONCLUSIVE"
+    }
+  ]
+}

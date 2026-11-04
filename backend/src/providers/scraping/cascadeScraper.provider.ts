@@ -1,6 +1,5 @@
 import { env } from '../../config/env.js';
 import { NavigationTimeoutError } from '../../errors/domainErrors.js';
-import type { ExtractionPlan } from '../../types/extractionPlan.js';
 import { AntiBotBlockedError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
@@ -15,12 +14,6 @@ export class CascadeScraperEngine implements IScraperEngine {
     this.localEngine = localEngine;
     this.unblockers = unblockers;
     this.name = `cascade(${localEngine.name})`;
-  }
-
-  async executePlan(url: string, plan: ExtractionPlan, options?: ScrapeOptions) {
-    if (!this.localEngine.executePlan)
-      throw new Error('Interactive extraction is unavailable for the selected scraper.');
-    return this.localEngine.executePlan(url, plan, options);
   }
 
   getUnblockers(): IUnblockerProvider[] {

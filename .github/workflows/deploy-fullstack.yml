@@ -41,6 +41,15 @@ env:
   CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
   NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '' }}
   NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/api' }}
+  SEMANTIC_REVIEW_ENABLED: ${{ vars.SEMANTIC_REVIEW_ENABLED || 'true' }}
+  SEMANTIC_REVIEW_THRESHOLD: ${{ vars.SEMANTIC_REVIEW_THRESHOLD || '4' }}
+  EXTRACTION_ACTION_TIMEOUT_MS: ${{ vars.EXTRACTION_ACTION_TIMEOUT_MS || '10000' }}
+  EXTRACTION_POLL_INTERVAL_MS: ${{ vars.EXTRACTION_POLL_INTERVAL_MS || '250' }}
+  EXTRACTION_MAX_EVIDENCE: ${{ vars.EXTRACTION_MAX_EVIDENCE || '200' }}
+  EXTRACTION_EVIDENCE_RETENTION_DAYS: ${{ vars.EXTRACTION_EVIDENCE_RETENTION_DAYS || '7' }}
+  DISCOVERY_MAX_ACTIONS: ${{ vars.DISCOVERY_MAX_ACTIONS || '6' }}
+  NOTIFICATION_TIMEOUT_MS: ${{ vars.NOTIFICATION_TIMEOUT_MS || '30000' }}
+  NOTIFICATION_MAX_ATTEMPTS: ${{ vars.NOTIFICATION_MAX_ATTEMPTS || '5' }}
   EXTRACTION_MAX_PAGES: ${{ vars.EXTRACTION_MAX_PAGES || '10' }}
   EXTRACTION_MAX_ACTIONS: ${{ vars.EXTRACTION_MAX_ACTIONS || '20' }}
   EXTRACTION_MAX_ITEMS: ${{ vars.EXTRACTION_MAX_ITEMS || '500' }}
@@ -85,6 +94,7 @@ jobs:
               - '.github/workflows/deploy-fullstack.yml'
             frontend:
               - 'frontend/**'
+              - 'backend/src/extraction/contracts.ts'
               - '.github/workflows/deploy-fullstack.yml'
 
       - name: Determine target components
@@ -120,7 +130,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -128,6 +138,17 @@ jobs:
         working-directory: backend
         run: |
           npm ci --no-audit --no-fund
+
+      - name: Install test browser
+        working-directory: backend
+        run: npx playwright install --with-deps chromium
+
+      - name: Check backend build and lint
+        working-directory: backend
+        run: |
+          npm run build
+          npm run lint
+          npm run evaluate:extraction
 
       - name: Run backend tests
         working-directory: backend
@@ -195,6 +216,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CORS_ORIGIN: ${{ env.CORS_ORIGIN }}
+          SEMANTIC_REVIEW_ENABLED: ${{ env.SEMANTIC_REVIEW_ENABLED }}
+          SEMANTIC_REVIEW_THRESHOLD: ${{ env.SEMANTIC_REVIEW_THRESHOLD }}
+          EXTRACTION_ACTION_TIMEOUT_MS: ${{ env.EXTRACTION_ACTION_TIMEOUT_MS }}
+          EXTRACTION_POLL_INTERVAL_MS: ${{ env.EXTRACTION_POLL_INTERVAL_MS }}
+          EXTRACTION_MAX_EVIDENCE: ${{ env.EXTRACTION_MAX_EVIDENCE }}
+          EXTRACTION_EVIDENCE_RETENTION_DAYS: ${{ env.EXTRACTION_EVIDENCE_RETENTION_DAYS }}
+          DISCOVERY_MAX_ACTIONS: ${{ env.DISCOVERY_MAX_ACTIONS }}
+          NOTIFICATION_TIMEOUT_MS: ${{ env.NOTIFICATION_TIMEOUT_MS }}
+          NOTIFICATION_MAX_ATTEMPTS: ${{ env.NOTIFICATION_MAX_ATTEMPTS }}
           EXTRACTION_MAX_PAGES: ${{ env.EXTRACTION_MAX_PAGES }}
           EXTRACTION_MAX_ACTIONS: ${{ env.EXTRACTION_MAX_ACTIONS }}
           EXTRACTION_MAX_ITEMS: ${{ env.EXTRACTION_MAX_ITEMS }}
@@ -274,6 +304,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
+          command_timeout: 30m
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,GHCR_TOKEN,GH_ACTOR,BACKEND_IMAGE,APP_DIR_NAME
           script: |
             set -euo pipefail
@@ -292,7 +323,21 @@ jobs:
             fi
 
             sudo docker pull "$BACKEND_IMAGE"
+            # Drain existing workers before the new execution-contract migration.
+            sudo env DOCKER_IMAGE="$BACKEND_IMAGE" docker compose --env-file .env.prod -f "$COMPOSE_FILE" stop --timeout 1200 backend
             sudo env DOCKER_IMAGE="$BACKEND_IMAGE" docker compose --env-file .env.prod -f "$COMPOSE_FILE" up -d --remove-orphans
+
+            # Wait for migrations and API initialization before deploying the frontend.
+            for attempt in $(seq 1 60); do
+              if sudo docker exec specter-backend node -e "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                break
+              fi
+              if [ "$attempt" = "60" ]; then
+                sudo docker logs --tail 100 specter-backend
+                exit 1
+              fi
+              sleep 3
+            done
 
             # Limpa imagens antigas (mais de 7 dias)
             sudo docker image prune -a -f --filter "until=168h"
@@ -300,8 +345,8 @@ jobs:
   deploy-frontend:
     name: Build & Deploy Frontend to VPS
     runs-on: ubuntu-latest
-    needs: changes
-    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    needs: [changes, deploy-backend]
+    if: ${{ always() && needs.changes.outputs.frontend == 'true' && (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped') }}
     environment: production
     steps:
       - name: Checkout repository

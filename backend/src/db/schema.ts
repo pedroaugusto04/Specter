@@ -1,3 +1,6 @@
+import type { SemanticPolicy } from '../extraction/contracts.js';
+import type { AlertPayload } from '../providers/notifications/notification.interface.js';
+import type { DeliveryChannel } from '../notifications/contracts.js';
 import type { ExtractionReport, ExtractionPlan } from '../types/extractionPlan.js';
 import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
 import {
@@ -9,6 +12,7 @@ import {
   integer,
   index,
   boolean,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { ExtractedPayload } from '../types/extractor.js';
 
@@ -70,6 +74,8 @@ export const scrapingJobs = pgTable(
 
     // Compiled AI Extractor Configuration
     contractRevision: text('contract_revision'),
+    planRevision: text('plan_revision'),
+    semanticPolicy: jsonb('semantic_policy').$type<SemanticPolicy>(),
     extractionPlan: jsonb('extractor_config').$type<ExtractionPlan>(),
 
     status: text('status', {
@@ -177,3 +183,31 @@ export type UserIntegrationRow = typeof userIntegrations.$inferSelect;
 export type NewUserIntegrationRow = typeof userIntegrations.$inferInsert;
 export type UserWebSessionRow = typeof userWebSessions.$inferSelect;
 export type NewUserWebSessionRow = typeof userWebSessions.$inferInsert;
+
+export const alertDeliveries = pgTable(
+  'alert_deliveries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => scrapingJobs.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => jobRuns.id, { onDelete: 'cascade' }),
+    channel: text('channel').$type<DeliveryChannel>().notNull(),
+    destination: text('destination').notNull(),
+    payload: jsonb('payload').$type<AlertPayload>().notNull(),
+    status: text('status').notNull().default('PENDING'),
+    attempts: integer('attempts').notNull().default(0),
+    claimToken: text('claim_token'),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastError: text('last_error'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_alert_delivery_unique').on(table.runId, table.channel, table.destination),
+    index('idx_alert_delivery_pending').on(table.status, table.nextAttemptAt),
+  ]
+);

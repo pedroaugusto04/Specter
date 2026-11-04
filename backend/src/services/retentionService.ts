@@ -21,6 +21,9 @@ export class RetentionService {
     const cutoffMs = now.getTime() - this.retentionDays * 24 * 60 * 60 * 1000;
     const cutoffDate = new Date(cutoffMs);
 
+    await this.jobRepository.purgeEvidence(
+      new Date(now.getTime() - env.EXTRACTION_EVIDENCE_RETENTION_DAYS * 86400000)
+    );
     const deletedCount = await this.jobRepository.deleteUnchangedRunsOlderThan(cutoffDate);
 
     logger.info('Storage retention pruning completed', {

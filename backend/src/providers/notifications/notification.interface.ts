@@ -2,6 +2,7 @@ import type { DiffSummary } from '../../types/domain.js';
 import type { ExtractedPayload } from '../../types/extractor.js';
 
 export interface AlertPayload {
+  deliveryId?: string;
   to?: string;
   subject: string;
   jobId: string;

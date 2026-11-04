@@ -156,3 +156,13 @@ export class ConflictError extends DomainError {
     });
   }
 }
+
+export class UpstreamHttpError extends DomainError {
+  constructor(public readonly httpStatus: number) {
+    super(`Target returned HTTP ${httpStatus}; response cannot establish an extraction baseline.`, {
+      code: 'UPSTREAM_HTTP_ERROR',
+      statusCode: 502,
+      isRetryable: httpStatus >= 500 || httpStatus === 408,
+    });
+  }
+}

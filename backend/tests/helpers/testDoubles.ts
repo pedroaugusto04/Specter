@@ -1,9 +1,11 @@
+import type { AlertDelivery } from '../../src/notifications/contracts.js';
+import { fixturePlan } from './extractionFixtures.js';
 import crypto from 'crypto';
 import type {
-  CompilerInput,
-  ExtractionPlan,
-  ICompilerProvider,
-} from '../../src/providers/compilers/compiler.interface.js';
+  FixtureCompilerInput as CompilerInput,
+  FixtureCompiler as ICompilerProvider,
+} from './extractionFixtures.js';
+import type { ExtractionPlan } from '../../src/extraction/contracts.js';
 import type {
   AlertPayload,
   INotificationProvider,
@@ -32,15 +34,12 @@ import type {
   ScrapingJobEntity,
   UserEntity,
 } from '../../src/types/domain.js';
-
 export class InMemoryUserRepository implements IUserRepository {
   public users = new Map<string, UserEntity>();
-
   async findById(id: string): Promise<UserEntity | null> {
     const user = this.users.get(id);
     return user ? { ...user } : null;
   }
-
   async findByEmail(email: string): Promise<UserEntity | null> {
     const normalized = email.trim().toLowerCase();
     for (const user of this.users.values()) {
@@ -50,7 +49,6 @@ export class InMemoryUserRepository implements IUserRepository {
     }
     return null;
   }
-
   async findByGoogleId(googleId: string): Promise<UserEntity | null> {
     for (const user of this.users.values()) {
       if (user.googleId === googleId) {
@@ -59,7 +57,6 @@ export class InMemoryUserRepository implements IUserRepository {
     }
     return null;
   }
-
   async createUser(input: CreateUserInput): Promise<UserEntity> {
     const now = new Date();
     const entity: UserEntity = {
@@ -74,11 +71,9 @@ export class InMemoryUserRepository implements IUserRepository {
     this.users.set(entity.id, entity);
     return { ...entity };
   }
-
   async updateUser(id: string, patch: UpdateUserPatch): Promise<UserEntity | null> {
     const existing = this.users.get(id);
     if (!existing) return null;
-
     const updated: UserEntity = {
       ...existing,
       ...patch,
@@ -88,11 +83,29 @@ export class InMemoryUserRepository implements IUserRepository {
     return { ...updated };
   }
 }
-
 export class InMemoryJobRepository implements IJobRepository {
   public jobs = new Map<string, ScrapingJobEntity>();
   public runs: JobRunEntity[] = [];
-
+  public pendingDeliveries: AlertDelivery[] = [];
+  async commitRun(
+    input: CreateJobRunInput,
+    deliveries: AlertDelivery[],
+    patch?: UpdateJobPatch,
+    expectedUpdatedAt?: Date
+  ) {
+    const current = this.jobs.get(input.jobId);
+    if (
+      !current ||
+      current.status === 'PAUSED' ||
+      (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime())
+    )
+      throw new Error('Stale snapshot');
+    const run = await this.createRun(input);
+    this.pendingDeliveries.push(...deliveries);
+    if (patch) await this.updateJob(input.jobId, patch);
+    return run;
+  }
+  async purgeEvidence(_cutoff: Date) {}
   async createJob(input: CreateJobInput): Promise<ScrapingJobEntity> {
     const now = new Date();
     const entity: ScrapingJobEntity = {
@@ -115,12 +128,10 @@ export class InMemoryJobRepository implements IJobRepository {
     this.jobs.set(entity.id, entity);
     return { ...entity };
   }
-
   async findById(id: string): Promise<ScrapingJobEntity | null> {
     const job = this.jobs.get(id);
     return job ? { ...job } : null;
   }
-
   async findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]> {
     const all = Array.from(this.jobs.values());
     const filtered = all.filter((j) => {
@@ -130,15 +141,12 @@ export class InMemoryJobRepository implements IJobRepository {
     });
     return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
-
   async findActiveJobs(): Promise<ScrapingJobEntity[]> {
     return Array.from(this.jobs.values()).filter((j) => j.status === 'ACTIVE');
   }
-
   async updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null> {
     const existing = this.jobs.get(id);
     if (!existing) return null;
-
     const updated: ScrapingJobEntity = {
       ...existing,
       ...patch,
@@ -147,7 +155,6 @@ export class InMemoryJobRepository implements IJobRepository {
     this.jobs.set(id, updated);
     return { ...updated };
   }
-
   async deleteJob(id: string): Promise<boolean> {
     const existed = this.jobs.delete(id);
     if (existed) {
@@ -155,7 +162,6 @@ export class InMemoryJobRepository implements IJobRepository {
     }
     return existed;
   }
-
   async createRun(input: CreateJobRunInput): Promise<JobRunEntity> {
     const entity: JobRunEntity = {
       id: crypto.randomUUID(),
@@ -175,21 +181,18 @@ export class InMemoryJobRepository implements IJobRepository {
     this.runs.push(entity);
     return { ...entity };
   }
-
   async findRunsByJobId(jobId: string, limit = 50): Promise<JobRunEntity[]> {
     return this.runs
       .filter((r) => r.jobId === jobId)
       .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime())
       .slice(0, limit);
   }
-
   async findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null> {
     const matches = this.runs
       .filter((r) => r.jobId === jobId && r.status === 'SUCCESS')
       .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
     return matches[0] ? { ...matches[0] } : null;
   }
-
   async deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number> {
     const beforeCount = this.runs.length;
     this.runs = this.runs.filter(
@@ -197,14 +200,12 @@ export class InMemoryJobRepository implements IJobRepository {
     );
     return beforeCount - this.runs.length;
   }
-
   async getStats(userId?: string): Promise<DashboardStats> {
     const allJobs = Array.from(this.jobs.values()).filter((j) =>
       userId ? j.userId === userId : true
     );
     const jobIds = new Set(allJobs.map((j) => j.id));
     const userRuns = userId ? this.runs.filter((r) => jobIds.has(r.jobId)) : this.runs;
-
     return {
       totalJobs: allJobs.length,
       activeJobs: allJobs.filter((j) => j.status === 'ACTIVE').length,
@@ -218,59 +219,56 @@ export class InMemoryJobRepository implements IJobRepository {
     };
   }
 }
-
 export class MockCompilerProvider implements ICompilerProvider {
   public readonly name = 'mock-compiler';
   public calls: CompilerInput[] = [];
   private handler: (input: CompilerInput) => Promise<ExtractionPlan>;
-
   constructor(handler?: (input: CompilerInput) => Promise<ExtractionPlan>) {
     this.handler =
       handler ??
-      (async () => ({
-        version: 2,
-        mode: 'single',
-        readySelector: 'body',
-        scope: 'page',
-        identityFields: [],
-        triggerRules: [],
-        triggerMatchMode: 'all',
-        fields: {
-          title: {
-            sources: [
-              { kind: 'dom', selector: '[data-testid="product-title"]', attribute: 'text' },
-            ],
-            type: 'string',
-            required: true,
-            locale: 'en-US',
+      (async () =>
+        fixturePlan({
+          mode: 'single',
+          readySelector: 'body',
+          scope: 'page',
+          identityFields: [],
+          triggerRules: [],
+          triggerMatchMode: 'all',
+          fields: {
+            title: {
+              sources: [
+                { kind: 'dom', selector: '[data-testid="product-title"]', attribute: 'text' },
+              ],
+              type: 'string',
+              required: true,
+              locale: 'en-US',
+            },
+            price: {
+              sources: [
+                { kind: 'dom', selector: '[data-testid="product-price"]', attribute: 'text' },
+              ],
+              type: 'string',
+              required: true,
+              locale: 'en-US',
+            },
           },
-          price: {
-            sources: [
-              { kind: 'dom', selector: '[data-testid="product-price"]', attribute: 'text' },
-            ],
-            type: 'string',
-            required: true,
-            locale: 'en-US',
-          },
-        },
-      }));
+        }));
   }
-
   setHandler(handler: (input: CompilerInput) => Promise<ExtractionPlan>): void {
     this.handler = handler;
   }
-
   async compile(input: CompilerInput): Promise<ExtractionPlan> {
     this.calls.push(input);
     return this.handler(input);
   }
 }
-
 export class MockScraperEngine implements IScraperEngine {
   public readonly name = 'mock-scraper';
-  public calls: Array<{ url: string; options?: ScrapeOptions }> = [];
+  public calls: Array<{
+    url: string;
+    options?: ScrapeOptions;
+  }> = [];
   private handler: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>;
-
   constructor(handler?: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>) {
     this.handler =
       handler ??
@@ -281,58 +279,52 @@ export class MockScraperEngine implements IScraperEngine {
         durationMs: 42,
       }));
   }
-
   setHandler(handler: (url: string, options?: ScrapeOptions) => Promise<ScrapeResult>): void {
     this.handler = handler;
   }
-
   async fetchHtml(url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
     this.calls.push({ url, options });
     return this.handler(url, options);
   }
 }
-
 export class MockNotificationProvider implements INotificationProvider {
   public readonly name = 'mock-notification';
   public sentAlerts: AlertPayload[] = [];
-
+  async prepare(payload: AlertPayload): Promise<AlertDelivery[]> {
+    return [{ channel: 'email', destination: payload.to ?? 'test@example.com', payload }];
+  }
   async sendAlert(payload: AlertPayload): Promise<void> {
     this.sentAlerts.push(payload);
   }
 }
-
 export class MockJobScheduler implements IJobScheduler {
-  public compilationQueue: Array<{ jobId: string; reason: 'initial' | 'healing' | 'manual' }> = [];
+  public compilationQueue: Array<{
+    jobId: string;
+    reason: 'initial' | 'healing' | 'manual';
+  }> = [];
   public immediateScrapeQueue: string[] = [];
   public scheduledRepeatables = new Map<string, string>();
-
   async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
     this.compilationQueue.push({ jobId, reason });
   }
-
   async enqueueImmediateScrape(jobId: string): Promise<void> {
     this.immediateScrapeQueue.push(jobId);
   }
-
   async scheduleRepeatableJob(jobId: string, cronExpression: string): Promise<string | null> {
     const key = `repeat:${jobId}:${cronExpression}`;
     this.scheduledRepeatables.set(jobId, key);
     return key;
   }
-
   async removeRepeatableJob(jobId: string): Promise<void> {
     this.scheduledRepeatables.delete(jobId);
   }
 }
-
 export class InMemoryIntegrationRepository {
   public integrations = new Map<string, any>();
-
   async findByUserId(userId: string): Promise<any | null> {
     const item = this.integrations.get(userId);
     return item ? { ...item } : null;
   }
-
   async upsert(userId: string, input: any): Promise<any> {
     const existing = this.integrations.get(userId);
     const now = new Date();

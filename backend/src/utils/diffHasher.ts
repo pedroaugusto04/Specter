@@ -85,7 +85,7 @@ export function sortObjectKeys(value: unknown): unknown {
 
   const obj = value as Record<string, unknown>;
   const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj).sort((a, b) => a.localeCompare(b))) {
+  for (const key of Object.keys(obj).sort()) {
     sorted[key] = sortObjectKeys(obj[key]);
   }
   return sorted;

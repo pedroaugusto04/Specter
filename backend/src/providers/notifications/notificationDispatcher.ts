@@ -1,101 +1,68 @@
+import { randomUUID } from 'node:crypto';
 import type { IIntegrationRepository } from '../../repositories/integrationRepository.js';
-import { logger } from '../../utils/logger.js';
 import type {
   AlertPayload,
   INotificationProvider,
   ITelegramNotificationProvider,
   IWebhookNotificationProvider,
 } from './notification.interface.js';
-
+import type { AlertDelivery, IAlertRouter, IAlertSender } from '../../notifications/contracts.js';
 export interface NotificationDispatcherDeps {
   emailProvider: INotificationProvider;
   telegramProvider: ITelegramNotificationProvider;
   webhookProvider: IWebhookNotificationProvider;
   integrationRepository: IIntegrationRepository;
 }
-
-export class NotificationDispatcher implements INotificationProvider {
-  public readonly name = 'composite-dispatcher';
-  public readonly emailProvider: INotificationProvider;
-  public readonly telegramProvider: ITelegramNotificationProvider;
-  public readonly webhookProvider: IWebhookNotificationProvider;
-  public readonly integrationRepository: IIntegrationRepository;
-
-  constructor(deps: NotificationDispatcherDeps) {
-    this.emailProvider = deps.emailProvider;
-    this.telegramProvider = deps.telegramProvider;
-    this.webhookProvider = deps.webhookProvider;
-    this.integrationRepository = deps.integrationRepository;
+export class NotificationDispatcher implements INotificationProvider, IAlertRouter, IAlertSender {
+  readonly name = 'composite-dispatcher';
+  constructor(private readonly deps: NotificationDispatcherDeps) {}
+  async prepare(payload: AlertPayload): Promise<AlertDelivery[]> {
+    const deliveries: AlertDelivery[] = [];
+    if (payload.to?.trim())
+      deliveries.push({ channel: 'email', destination: payload.to.trim(), payload });
+    const integration = payload.userId
+      ? await this.deps.integrationRepository.findByUserId(payload.userId)
+      : null;
+    if (integration?.telegramEnabled && integration.telegramChatId)
+      deliveries.push({ channel: 'telegram', destination: integration.telegramChatId, payload });
+    const webhook =
+      payload.webhookUrl?.trim() ||
+      (integration?.webhookEnabled ? integration.webhookUrl?.trim() : null);
+    if (webhook) deliveries.push({ channel: 'webhook', destination: webhook, payload });
+    return deliveries;
+  }
+  async deliver(delivery: AlertDelivery, deliveryId: string): Promise<void> {
+    const payload = {
+      ...delivery.payload,
+      detectedAt: delivery.payload.detectedAt ? new Date(delivery.payload.detectedAt) : undefined,
+      deliveryId,
+    };
+    if (delivery.channel === 'email')
+      return this.deps.emailProvider.sendAlert({ ...payload, to: delivery.destination });
+    if (delivery.channel === 'telegram')
+      return this.deps.telegramProvider.sendAlert(payload, { chatId: delivery.destination });
+    if (delivery.channel === 'webhook') {
+      const integration = payload.userId
+        ? await this.deps.integrationRepository.findByUserId(payload.userId)
+        : null;
+      return this.deps.webhookProvider.sendAlert(payload, {
+        webhookUrl: delivery.destination,
+        secret: integration?.webhookSecret,
+      });
+    }
+    const unsupported: never = delivery.channel;
+    throw new Error('Unsupported delivery channel: ' + unsupported);
   }
 
   async sendAlert(payload: AlertPayload): Promise<void> {
-    const tasks: Array<{ channel: string; run: () => Promise<void> }> = [];
-
-    // 1. Email Channel
-    if (payload.to && payload.to.trim()) {
-      tasks.push({
-        channel: `email(${this.emailProvider.name})`,
-        run: () => this.emailProvider.sendAlert(payload),
-      });
-    }
-
-    // 2. Lookup user integrations if userId is available
-    let integrations = null;
-    if (payload.userId) {
-      try {
-        integrations = await this.integrationRepository.findByUserId(payload.userId);
-      } catch (err) {
-        logger.warn('Failed to load user integrations for notification dispatch', {
-          jobId: payload.jobId,
-          userId: payload.userId,
-          errorMessage: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    // 3. Telegram Channel
-    if (integrations?.telegramEnabled && integrations.telegramChatId) {
-      const chatId = integrations.telegramChatId;
-      tasks.push({
-        channel: 'telegram',
-        run: () => this.telegramProvider.sendAlert(payload, { chatId }),
-      });
-    }
-
-    // 4. Webhook Channel (Job-specific URL takes precedence, otherwise fallback to user-level webhook)
-    const targetWebhookUrl =
-      payload.webhookUrl?.trim() ||
-      (integrations?.webhookEnabled ? integrations.webhookUrl?.trim() : null);
-    if (targetWebhookUrl) {
-      const secret = integrations?.webhookSecret;
-      tasks.push({
-        channel: 'webhook',
-        run: () =>
-          this.webhookProvider.sendAlert(payload, { webhookUrl: targetWebhookUrl, secret }),
-      });
-    }
-
-    if (tasks.length === 0) {
-      logger.info('No notification channels configured for job alert', {
-        jobId: payload.jobId,
-      });
-      return;
-    }
-
-    // Run all dispatches in parallel, capturing any failures without interrupting the engine
-    const results = await Promise.allSettled(tasks.map((t) => t.run()));
-
-    for (let i = 0; i < results.length; i++) {
-      const res = results[i];
-      const task = tasks[i];
-      if (res && res.status === 'rejected') {
-        const err = res.reason;
-        logger.warn(`Notification dispatch failed on channel "${task?.channel}"`, {
-          jobId: payload.jobId,
-          channel: task?.channel,
-          errorMessage: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    const results = await Promise.allSettled(
+      (await this.prepare(payload)).map((delivery) => this.deliver(delivery, randomUUID()))
+    );
+    const failures = results.filter((entry) => entry.status === 'rejected');
+    if (failures.length)
+      throw new AggregateError(
+        failures.map((entry) => entry.reason),
+        'Notification channels failed.'
+      );
   }
 }

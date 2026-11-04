@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { SemanticReviewSettings } from './SemanticReviewSettings';
+import type { SemanticPolicy } from '@/lib/extractionPlan';
 import { AlertTriangle, Check, HelpCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -30,6 +32,7 @@ export interface EditJobModalProps {
 
 export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobModalProps) {
   const updateJobMutation = useUpdateJobMutation();
+  const [semanticPolicy, setSemanticPolicy] = React.useState<SemanticPolicy | null>(null);
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
@@ -53,6 +56,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   React.useEffect(() => {
     if (job && isOpen) {
       setUrl(job.url);
+      setSemanticPolicy(job.semanticPolicy ?? null);
       setUserPrompt(job.userPrompt);
       const hasEmail = Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0);
       setSendEmailAlerts(hasEmail);
@@ -72,8 +76,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
         setUseCustomCron(true);
       }
 
-      setTriggerRules(job.extractionPlan?.triggerRules ? [...job.extractionPlan.triggerRules] : []);
-      setTriggerMatchMode(job.extractionPlan?.triggerMatchMode ?? TRIGGER_MATCH_MODE.All);
+      setTriggerRules(
+        job.extractionPlan?.intent.triggerRules ? [...job.extractionPlan.intent.triggerRules] : []
+      );
+      setTriggerMatchMode(job.extractionPlan?.intent.triggerMatchMode ?? TRIGGER_MATCH_MODE.All);
 
       setFieldErrors({});
       setGlobalError(null);
@@ -87,8 +93,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   );
 
   const rulesChanged = React.useMemo(() => {
-    const origRules = job?.extractionPlan?.triggerRules || [];
-    const origMode = job?.extractionPlan?.triggerMatchMode ?? TRIGGER_MATCH_MODE.All;
+    const origRules = job?.extractionPlan?.intent.triggerRules || [];
+    const origMode = job?.extractionPlan?.intent.triggerMatchMode ?? TRIGGER_MATCH_MODE.All;
     if (triggerMatchMode !== origMode) return true;
     if (triggerRules.length !== origRules.length) return true;
     return JSON.stringify(triggerRules) !== JSON.stringify(origRules);
@@ -105,7 +111,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
       captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
       effectiveCron.trim() !== job.cronExpression ||
-      rulesChanged)
+      rulesChanged ||
+      JSON.stringify(semanticPolicy) !== JSON.stringify(job.semanticPolicy ?? null))
   );
 
   const clearFieldError = (field: JobFormField) => {
@@ -175,6 +182,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
           webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
           cronExpression: effectiveCron.trim(),
           captureScreenshotOnChange,
+          semanticPolicy,
           triggerRules,
           triggerMatchMode,
         },
@@ -200,7 +208,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     }
   };
 
-  const availableExtractorFields = Object.keys(job?.extractionPlan?.fields || {});
+  const availableExtractorFields = Object.keys(job?.extractionPlan?.intent.fields || {});
 
   return (
     <Dialog
@@ -213,6 +221,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <SemanticReviewSettings value={semanticPolicy} onChange={setSemanticPolicy} />
         {willRecompile && (
           <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/60 p-3.5 text-xs sm:text-sm text-foreground">
             <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-foreground mt-0.5" />

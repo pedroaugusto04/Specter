@@ -25,29 +25,48 @@ export class CheerioScraperEngine implements IScraperEngine {
 
     try {
       const safeTargetUrl = await assertSafeUrl(targetUrl, 'targetUrl');
-      const cookieHeader = options?.storageState?.cookies?.length
-        ? options.storageState.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
-        : undefined;
-
-      const response = await this.fetchFn(safeTargetUrl, {
-        method: 'GET',
-        headers: {
-          'User-Agent': DEFAULT_USER_AGENT,
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'sec-ch-ua': '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Upgrade-Insecure-Requests': '1',
-          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        },
-        signal: controller.signal,
-      });
-
-      const finalUrl = response.url || targetUrl;
+      const originalOrigin = new URL(safeTargetUrl).origin;
+      let currentUrl = safeTargetUrl;
+      let response: Response | undefined;
+      const signal = options?.signal
+        ? AbortSignal.any([controller.signal, options.signal])
+        : controller.signal;
+      for (let redirect = 0; redirect <= 5; redirect++) {
+        const parsed = new URL(await assertSafeUrl(currentUrl, 'requestUrl'));
+        if (parsed.origin !== originalOrigin)
+          throw new Error('HTTP navigation escaped the original origin.');
+        const cookieHeader = options?.storageState?.cookies
+          ?.filter((cookie) => {
+            const domain = cookie.domain.replace(/^\./, '');
+            return (
+              (parsed.hostname === domain ||
+                (cookie.domain.startsWith('.') && parsed.hostname.endsWith('.' + domain))) &&
+              parsed.pathname.startsWith(cookie.path) &&
+              (!cookie.secure || parsed.protocol === 'https:') &&
+              (cookie.expires < 0 || cookie.expires > Date.now() / 1000)
+            );
+          })
+          .map((cookie) => cookie.name + '=' + cookie.value)
+          .join('; ');
+        response = await this.fetchFn(parsed.href, {
+          method: 'GET',
+          redirect: 'manual',
+          signal,
+          headers: {
+            'User-Agent': DEFAULT_USER_AGENT,
+            Accept: 'text/html,application/xhtml+xml,application/json',
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+        });
+        if (![301, 302, 303, 307, 308].includes(response.status)) break;
+        const location = response.headers.get('location');
+        await response.body?.cancel();
+        if (!location || redirect === 5) throw new Error('Invalid or excessive HTTP redirects.');
+        currentUrl = new URL(location, parsed).href;
+      }
+      if (!response) throw new Error('HTTP request produced no response.');
+      const finalUrl = response.url || currentUrl;
       await assertSafeUrl(finalUrl, 'redirectUrl');
-
       const httpStatus = response.status;
       const rawHtml = await response.text();
 

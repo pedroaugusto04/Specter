@@ -28,21 +28,24 @@ export class ResendNotificationProvider implements INotificationProvider {
       ? this.fromEmail
       : `Specter <${this.fromEmail}>`;
 
-    const response = await this.client.emails.send({
-      from: formattedFrom,
-      to: payload.to,
-      subject: payload.subject,
-      html,
-      text,
-      attachments: [
-        {
-          filename: 'specter-logo.png',
-          content: SPECTER_LOGO_PNG_BUFFER,
-          contentType: 'image/png',
-          inlineContentId: 'specter-logo',
-        },
-      ],
-    });
+    const response = await this.client.emails.send(
+      {
+        from: formattedFrom,
+        to: payload.to,
+        subject: payload.subject,
+        html,
+        text,
+        attachments: [
+          {
+            filename: 'specter-logo.png',
+            content: SPECTER_LOGO_PNG_BUFFER,
+            contentType: 'image/png',
+            inlineContentId: 'specter-logo',
+          },
+        ],
+      },
+      payload.deliveryId ? { idempotencyKey: payload.deliveryId } : undefined
+    );
 
     if (response.error) {
       logger.error('Failed to send email alert via Resend', {

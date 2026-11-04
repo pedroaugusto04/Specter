@@ -1,167 +1,248 @@
 import { z } from 'zod';
-import {
-  ExtractionMode,
-  ExtractionQuality,
-  ExtractionScope,
-  ExtractionSourceKind,
-  DOM_TEXT_ATTRIBUTE,
-  FieldValueType,
-  PaginationKind,
-  TriggerOperator,
-  TriggerMatchMode,
-} from './enums.js';
+import { ExtractionQuality, TriggerOperator } from './enums.js';
+export { ExtractionQuality, TriggerOperator };
+export type {
+  ExtractionPlan,
+  ExtractionIntent,
+  IntentField as ExtractionField,
+  TriggerRule,
+  SemanticPolicy,
+  ExtractionReport,
+} from '../extraction/contracts.js';
 
-export { ExtractionQuality, TriggerOperator } from './enums.js';
-
-const selector = z.string().trim().min(1);
-const source = z.discriminatedUnion('kind', [
+const text = z.string().trim().min(1);
+const path = z.array(z.union([z.string(), z.number().int().nonnegative()]));
+export const locatorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('css'), selector: text }).strict(),
+  z
+    .object({ kind: z.literal('role'), role: text, name: text, exact: z.boolean().optional() })
+    .strict(),
+]);
+const match = z.object({ urlPattern: text, method: text.optional() }).strict();
+export const conditionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exists'), locator: locatorSchema }).strict(),
+  z.object({ kind: z.literal('visible'), locator: locatorSchema }).strict(),
+  z.object({ kind: z.literal('absent'), locator: locatorSchema }).strict(),
+  z.object({ kind: z.literal('disabled'), locator: locatorSchema }).strict(),
   z
     .object({
-      kind: z.literal(ExtractionSourceKind.Dom),
-      selector,
-      attribute: z.string().default(DOM_TEXT_ATTRIBUTE),
+      kind: z.literal('attribute'),
+      locator: locatorSchema,
+      attribute: text,
+      value: z.string().optional(),
     })
     .strict(),
+  z.object({ kind: z.literal('field'), field: text }).strict(),
   z
     .object({
-      kind: z.literal(ExtractionSourceKind.JsonLd),
-      path: z.array(z.union([z.string(), z.number().int().nonnegative()])).min(1),
+      kind: z.literal('response'),
+      match,
+      path: path.optional(),
+      equals: z.union([z.string(), z.number().finite(), z.boolean()]).optional(),
     })
     .strict(),
 ]);
-const field = z
+export const discoveryActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('inspect'), selector: text }).strict(),
+  z.object({ kind: z.literal('click'), locator: locatorSchema }).strict(),
+  z.object({ kind: z.literal('scroll'), selector: text.optional() }).strict(),
+  z.object({ kind: z.literal('wait'), condition: conditionSchema }).strict(),
+]);
+const source = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('dom'),
+      selector: text,
+      attribute: text,
+      association: text.optional(),
+    })
+    .strict(),
+  z.object({ kind: z.literal('jsonld'), path: path.min(1), association: text.optional() }).strict(),
+  z.object({ kind: z.literal('response'), path, association: text.optional() }).strict(),
+]);
+export const semanticPolicySchema = z
   .object({
-    sources: z.array(source).min(1),
-    type: z.nativeEnum(FieldValueType),
-    required: z.boolean().default(true),
-    normalizeVolatileText: z.boolean().default(false),
-    locale: z.string().optional(),
-    booleanValues: z.record(z.boolean()).optional(),
+    enabled: z.boolean().optional(),
+    threshold: z.number().int().min(0).max(10).optional(),
   })
   .strict();
-const rule = z
+export const extractionIntentSchema = z
   .object({
-    field: selector,
-    operator: z.nativeEnum(TriggerOperator),
-    value: z.union([z.string(), z.number().finite(), z.boolean()]),
+    entity: text,
+    mode: z.enum(['single', 'collection']),
+    scope: z.enum(['page', 'collection']),
+    fields: z.record(
+      z.string().regex(/^[a-z][a-z0-9_]*$/),
+      z
+        .object({
+          description: text,
+          type: z.enum(['string', 'number', 'boolean', 'date', 'url']),
+          required: z.boolean(),
+          normalizeVolatileText: z.boolean().optional(),
+          locale: text.optional(),
+          booleanValues: z.record(z.boolean()).optional(),
+        })
+        .strict()
+    ),
+    identityFields: z.array(text),
+    filters: z.array(text),
+    triggerRules: z.array(
+      z
+        .object({
+          field: text,
+          operator: z.nativeEnum(TriggerOperator),
+          value: z.union([z.string(), z.number().finite(), z.boolean()]),
+        })
+        .strict()
+    ),
+    triggerMatchMode: z.enum(['all', 'any']),
   })
   .strict();
-export type TriggerRule = z.infer<typeof rule>;
-export const extractionPlanSchema = z
+export const executionStrategySchema = z
   .object({
-    version: z.literal(2),
-    mode: z.nativeEnum(ExtractionMode),
-    containerSelector: selector.optional(),
-    jsonLdType: selector.optional(),
-    fields: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/), field),
-    identityFields: z.array(selector).default([]),
-    readySelector: selector,
-    emptySelector: selector.optional(),
-    scope: z.nativeEnum(ExtractionScope).default(ExtractionScope.Page),
+    transport: z.enum(['http', 'browser']),
+    setup: z.array(discoveryActionSchema).optional(),
+    document: z.object({ frame: text.optional(), shadow: text.optional() }).strict().optional(),
+    records: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('dom'), selector: text }).strict(),
+      z.object({ kind: z.literal('jsonld'), type: text }).strict(),
+      z.object({ kind: z.literal('response'), match, path }).strict(),
+    ]),
+    filters: z
+      .array(
+        z
+          .object({
+            field: text,
+            operator: z.enum(['eq', 'neq', 'lt', 'lte', 'gt', 'gte', 'contains', 'not_contains']),
+            value: z.union([z.string(), z.number().finite(), z.boolean()]),
+          })
+          .strict()
+      )
+      .optional(),
+    associations: z
+      .record(
+        text,
+        z
+          .object({
+            localField: text,
+            foreignPath: path.min(1),
+            records: z.discriminatedUnion('kind', [
+              z.object({ kind: z.literal('jsonld'), type: text }).strict(),
+              z.object({ kind: z.literal('response'), match, path }).strict(),
+            ]),
+          })
+          .strict()
+      )
+      .optional(),
+    fields: z.record(text, z.array(source).min(1)),
+    ready: z.array(conditionSchema).min(1),
+    empty: z.array(conditionSchema),
     pagination: z
       .object({
-        kind: z.nativeEnum(PaginationKind),
-        nextSelector: selector.optional(),
-        endSelector: selector,
+        kind: z.enum(['link', 'click', 'scroll']),
+        next: locatorSchema.optional(),
+        scrollTarget: text.optional(),
+        end: z.array(conditionSchema).min(1),
       })
       .strict()
       .optional(),
-    triggerRules: z.array(rule).default([]),
-    triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
+  })
+  .strict();
+export const extractionPlanSchema = z
+  .object({
+    version: z.literal(3),
+    intent: extractionIntentSchema,
+    strategy: executionStrategySchema,
   })
   .strict()
   .superRefine((plan, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-    if (!Object.keys(plan.fields).length) issue('At least one field is required.');
+    const { intent, strategy: execution } = plan;
+    if (!Object.keys(intent.fields).length) issue('At least one field is required.');
     if (
-      plan.mode === ExtractionMode.Collection &&
-      (!plan.identityFields.length || (!plan.containerSelector && !plan.jsonLdType))
+      JSON.stringify(Object.keys(intent.fields).sort()) !==
+      JSON.stringify(Object.keys(execution.fields).sort())
     )
-      issue('Collections require an entity source and stable identity fields.');
-    if (
-      plan.mode === ExtractionMode.Collection &&
-      !plan.containerSelector &&
-      !plan.jsonLdType &&
-      Object.values(plan.fields).some((definition) =>
-        definition.sources.some((item) => item.kind === ExtractionSourceKind.JsonLd)
-      )
-    ) {
-      issue('JSON-LD collections require an explicit entity type.');
-    }
-    if (
-      plan.mode === ExtractionMode.Collection &&
-      plan.containerSelector &&
-      Object.values(plan.fields).some((definition) =>
-        definition.sources.some((item) => item.kind === ExtractionSourceKind.JsonLd)
-      )
-    ) {
-      issue(
-        'JSON-LD fields cannot be combined with DOM containers until entities can be associated safely.'
-      );
-    }
-    if (
-      plan.mode === ExtractionMode.Collection &&
-      !plan.containerSelector &&
-      Object.values(plan.fields).some((definition) =>
-        definition.sources.some((item) => item.kind === ExtractionSourceKind.Dom)
-      )
-    ) {
-      issue(
-        'DOM fields cannot be combined with JSON-LD collection entities until entities can be associated safely.'
-      );
-    }
-    for (const name of [...plan.identityFields, ...plan.triggerRules.map((r) => r.field)]) {
-      if (!plan.fields[name]?.required)
-        issue(`Referenced field '${name}' must exist and be required.`);
-    }
-    for (const [name, definition] of Object.entries(plan.fields)) {
-      if (definition.type === FieldValueType.Number && !definition.locale)
-        issue(`Numeric field '${name}' requires an explicit locale.`);
-      if (definition.locale) {
+      issue('Execution fields must exactly match intent fields.');
+    for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
+      if (!intent.fields[key]?.required)
+        issue(`Referenced field '${key}' must exist and be required.`);
+    for (const [key, field] of Object.entries(intent.fields)) {
+      if (field.type === 'number' && !field.locale)
+        issue(`Numeric field '${key}' requires an explicit locale.`);
+      if (field.locale) {
         try {
-          new Intl.NumberFormat(definition.locale);
+          new Intl.NumberFormat(field.locale);
         } catch {
-          issue(`Invalid locale for '${name}'.`);
+          issue(`Invalid locale for '${key}'.`);
         }
       }
-      if (
-        definition.type === FieldValueType.Boolean &&
-        !Object.keys(definition.booleanValues ?? {}).length
-      )
-        issue(`Boolean field '${name}' requires an explicit value mapping.`);
+      if (field.type === 'boolean' && !Object.keys(field.booleanValues ?? {}).length)
+        issue(`Boolean field '${key}' requires an explicit value mapping.`);
     }
-    if (
-      plan.scope === ExtractionScope.Collection &&
-      (!plan.pagination || plan.mode !== ExtractionMode.Collection)
-    )
+    if (intent.mode === 'collection' && !intent.identityFields.length)
+      issue('Collections require stable identity fields.');
+    if (intent.scope === 'collection' && (intent.mode !== 'collection' || !execution.pagination))
       issue('Full collection scope requires pagination and collection mode.');
-    if (plan.pagination && plan.scope !== ExtractionScope.Collection)
+    if (execution.pagination && intent.scope !== 'collection')
       issue('Pagination requires collection scope.');
     if (
-      plan.pagination &&
-      plan.pagination.kind !== PaginationKind.Scroll &&
-      !plan.pagination.nextSelector
+      execution.pagination &&
+      execution.pagination.kind !== 'scroll' &&
+      !execution.pagination.next
     )
-      issue('Link and click pagination require a next selector.');
-  });
-
-export function parseCompilerOutput(value: unknown): ExtractionPlan {
-  if (value && typeof value === 'object' && 'error' in value) {
-    const explanation = (value as { error?: unknown }).error;
-    if (typeof explanation === 'string' && explanation.trim()) {
-      throw new Error(explanation.trim());
+      issue('Link and click pagination require a next locator.');
+    for (const filter of execution.filters ?? [])
+      if (!intent.fields[filter.field]?.required)
+        issue('Record filters require a declared, required field.');
+    const sources = Object.values(execution.fields).flat();
+    if (sources.some((item) => item.kind !== execution.records.kind && !item.association))
+      issue(
+        'Field sources must belong to the selected record source or reference an explicit key association.'
+      );
+    for (const [name, association] of Object.entries(execution.associations ?? {})) {
+      if (
+        !intent.fields[association.localField]?.required ||
+        execution.fields[association.localField]?.some((source) => source.association)
+      )
+        issue(`Association '${name}' requires a required, directly extracted local key.`);
     }
-  }
-  return extractionPlanSchema.parse(value);
-}
-
-export type ExtractionPlan = z.infer<typeof extractionPlanSchema>;
-export type ExtractionField = ExtractionPlan['fields'][string];
-export interface ExtractionReport {
-  quality: ExtractionQuality;
-  scope: ExtractionScope;
-  pagesVisited: number;
-  issues: string[];
-  /** Counts successful extractions keyed as `${fieldName}#${sourceIndex}`. */
-  sourcesUsed: Record<string, number>;
-}
+    for (const source of sources)
+      if (
+        source.association &&
+        execution.associations?.[source.association]?.records.kind !== source.kind
+      )
+        issue('Association source kind must match its referenced records.');
+    if (
+      execution.setup?.some((action) => action.kind === 'wait' && action.condition.kind === 'field')
+    )
+      issue(
+        'Setup waits cannot reference fields before extraction; use a readiness field condition.'
+      );
+    const conditions = [
+      ...execution.ready,
+      ...execution.empty,
+      ...(execution.pagination?.end ?? []),
+    ];
+    for (const item of conditions)
+      if (item.kind === 'field' && !intent.fields[item.field])
+        issue(`Condition references missing field '${item.field}'.`);
+    if (
+      execution.transport === 'http' &&
+      (execution.setup?.length ||
+        execution.document ||
+        execution.records.kind === 'response' ||
+        Object.values(execution.associations ?? {}).some(
+          (association) => association.records.kind === 'response'
+        ) ||
+        execution.pagination?.kind === 'click' ||
+        execution.pagination?.kind === 'scroll' ||
+        conditions.some(
+          (item) =>
+            item.kind === 'visible' ||
+            item.kind === 'response' ||
+            ('locator' in item && item.locator.kind === 'role')
+        ))
+    )
+      issue('The selected strategy requires browser capabilities.');
+  });

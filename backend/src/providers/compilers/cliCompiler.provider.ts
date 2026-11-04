@@ -1,16 +1,11 @@
-import { parseCompilerOutput } from '../../types/extractionPlan.js';
+import type { IModelProvider, ModelInput } from '../../extraction/model.js';
 import { spawn, type SpawnOptions } from 'child_process';
 import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
 import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
-import {
-  buildCliCompilerPrompt,
-  type CompilerInput,
-  type ExtractionPlan,
-  type ICompilerProvider,
-} from './compiler.interface.js';
+import { buildCliCompilerPrompt } from './compilerPrompt.js';
 
 export interface CliCompilerOptions {
   providerName?: string;
@@ -22,7 +17,7 @@ export interface CliCompilerOptions {
   spawnFn?: typeof spawn;
 }
 
-export class CliCompilerProvider implements ICompilerProvider {
+export class CliCompilerProvider implements IModelProvider {
   public readonly name: string;
   private readonly cliCommand: string;
   private readonly cliArgsBuilder: (promptFile: string, outputFile: string) => string[];
@@ -48,14 +43,15 @@ export class CliCompilerProvider implements ICompilerProvider {
     this.promptBuilder = options.promptBuilder ?? buildCliCompilerPrompt;
   }
 
-  async compile(input: CompilerInput): Promise<ExtractionPlan> {
-    const { jobId, sanitizedHtml, userPrompt } = input;
+  async generate(input: ModelInput): Promise<unknown> {
+    const { jobId, evidence: sanitizedHtml, instructions: userPrompt } = input;
     const startTime = Date.now();
     const timeoutMs = Math.min(input.timeoutMs ?? this.timeoutMs, this.timeoutMs);
     const safeJobDirName = jobId.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const tempDir = path.resolve(this.tempBaseDir, safeJobDirName);
-
-    await fs.mkdir(tempDir, { recursive: true });
+    await fs.mkdir(this.tempBaseDir, { recursive: true });
+    const tempDir = await fs.mkdtemp(
+      path.join(path.resolve(this.tempBaseDir), safeJobDirName + '-')
+    );
 
     const promptFile = path.join(tempDir, 'prompt.md');
     const domFile = path.join(tempDir, 'dom.html');
@@ -64,7 +60,7 @@ export class CliCompilerProvider implements ICompilerProvider {
     await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
     await fs.writeFile(promptFile, this.promptBuilder(domFile, outputFile, userPrompt), 'utf-8');
 
-    return new Promise<ExtractionPlan>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       let settled = false;
       let watcherClosed = false;
       let fileWatcher: FSWatcher | null = null;
@@ -77,6 +73,10 @@ export class CliCompilerProvider implements ICompilerProvider {
       };
 
       const cliProcess = this.spawnFn(this.cliCommand, args, spawnOpts);
+      // Drain streams so a verbose CLI cannot deadlock on a full pipe.
+      cliProcess.stdout?.resume();
+      cliProcess.stderr?.resume();
+      const exited = new Promise<void>((resolve) => cliProcess.once('close', () => resolve()));
 
       const cleanup = async (): Promise<void> => {
         clearTimeout(timeoutTimer);
@@ -88,25 +88,45 @@ export class CliCompilerProvider implements ICompilerProvider {
           }
           watcherClosed = true;
         }
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        if (cliProcess.pid && cliProcess.exitCode === null && cliProcess.signalCode === null) {
+          const wait = async () => {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            await Promise.race([
+              exited,
+              new Promise<void>((resolve) => {
+                timer = setTimeout(resolve, 1000);
+              }),
+            ]);
+            clearTimeout(timer);
+          };
+          await wait();
+          if (cliProcess.exitCode === null && cliProcess.signalCode === null) {
+            cliProcess.kill('SIGKILL');
+            await wait();
+          }
+        }
+        await fs
+          .rm(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+          .catch((error) => {
+            logger.warn('Compiler temporary directory cleanup failed', {
+              jobId,
+              errorCode: (error as NodeJS.ErrnoException).code,
+            });
+          });
       };
 
-      const tryReadOutputFile = async (): Promise<ExtractionPlan | null> => {
+      const tryReadOutputFile = async (): Promise<unknown | null> => {
         try {
           const content = await fs.readFile(outputFile, 'utf-8');
           if (!content.trim()) return null;
-          const parsed = parseCompilerOutput(JSON.parse(content));
-          if (!parsed || typeof parsed !== 'object' || !parsed.fields) {
-            throw new CompilerValidationError(
-              'Compiled extractor.json is missing required "fields" property.'
-            );
-          }
+          const parsed: unknown = JSON.parse(content);
           return parsed;
         } catch (err) {
           if (err instanceof CompilerValidationError) {
             throw err;
           }
-          if (err instanceof SyntaxError) return null;
+          if (err instanceof SyntaxError || (err as NodeJS.ErrnoException).code === 'ENOENT')
+            return null;
           throw new CompilerValidationError(
             err instanceof Error ? err.message : 'Invalid extraction plan.'
           );

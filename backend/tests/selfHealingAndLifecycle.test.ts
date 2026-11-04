@@ -1,3 +1,6 @@
+import { NoopStorageProvider } from '../src/providers/storage/noopStorage.provider.js';
+import { fixtureExecutor, fixtureConfiguration } from './helpers/extractionFixtures.js';
+import { fixturePlan } from './helpers/extractionFixtures.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AntiBotBlockedError,
@@ -13,7 +16,6 @@ import {
   MockNotificationProvider,
   MockScraperEngine,
 } from './helpers/testDoubles.js';
-
 describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () => {
   let repository: InMemoryJobRepository;
   let scraper: MockScraperEngine;
@@ -22,32 +24,29 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
   let scheduler: MockJobScheduler;
   let compilationService: CompilationService;
   let scrapeService: ScrapeExecutionService;
-
   beforeEach(() => {
     repository = new InMemoryJobRepository();
     scraper = new MockScraperEngine();
     compiler = new MockCompilerProvider();
     notifier = new MockNotificationProvider();
     scheduler = new MockJobScheduler();
-
     compilationService = new CompilationService({
       jobRepository: repository,
-      scraperEngine: scraper,
-      compilerProvider: compiler,
-      notificationProvider: notifier,
+      configurationPipeline: fixtureConfiguration(compiler, scraper),
+      alertRouter: notifier,
+      storageProvider: new NoopStorageProvider(),
       jobScheduler: scheduler,
     });
-
     scrapeService = new ScrapeExecutionService({
       jobRepository: repository,
-      scraperEngine: scraper,
-      notificationProvider: notifier,
+      planExecutor: fixtureExecutor(scraper),
+      alertRouter: notifier,
+      storageProvider: new NoopStorageProvider(),
       jobScheduler: scheduler,
       consecutiveFailuresForHealing: 2,
       maxHealingRetries: 3,
     });
   });
-
   it('transitions job from PENDING_COMPILATION to ACTIVE after sanitizing DOM, compiling, and passing smoke-test', async () => {
     scraper.setHandler(async (url) => ({
       rawHtml: `
@@ -63,61 +62,52 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       url,
       durationMs: 35,
     }));
-
     const job = await repository.createJob({
       url: 'https://store.example.com/macbook',
       userPrompt: 'Monitor MacBook title and price',
       notificationEmail: 'dev@example.com',
       cronExpression: '0 */6 * * *',
     });
-
     expect(job.status).toBe('PENDING_COMPILATION');
-
     const compiledJob = await compilationService.compileJob(job.id);
-
     // Ensure compiler received sanitized HTML (no <script>)
     expect(compiler.calls).toHaveLength(1);
     expect(compiler.calls[0]?.sanitizedHtml).not.toContain('<script>');
-
     expect(compiledJob.status).toBe('ACTIVE');
     expect(compiledJob.failureCount).toBe(0);
     expect(compiledJob.extractionPlan).toBeDefined();
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(true);
-
     const runs = await repository.findRunsByJobId(job.id);
     expect(runs).toHaveLength(1);
     expect(runs[0]?.hasChanges).toBe('INITIAL');
     expect(runs[0]?.status).toBe('SUCCESS');
   });
-
   it('transitions job to FAILED if compiled selectors fail the pre-activation smoke-test', async () => {
-    compiler.setHandler(async () => ({
-      version: 2,
-      mode: 'single',
-      readySelector: 'body',
-      scope: 'page',
-      identityFields: [],
-      triggerRules: [],
-      triggerMatchMode: 'all',
-      fields: {
-        title: {
-          sources: [{ kind: 'dom', selector: '#non-existent-selector', attribute: 'text' }],
-          type: 'string',
-          required: true,
-          locale: 'en-US',
+    compiler.setHandler(async () =>
+      fixturePlan({
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+        fields: {
+          title: {
+            sources: [{ kind: 'dom', selector: '#non-existent-selector', attribute: 'text' }],
+            type: 'string',
+            required: true,
+            locale: 'en-US',
+          },
         },
-      },
-    }));
-
+      })
+    );
     const job = await repository.createJob({
       url: 'https://store.example.com/broken',
       userPrompt: 'Monitor title',
       notificationEmail: 'dev@example.com',
       cronExpression: '0 */6 * * *',
     });
-
     await expect(compilationService.compileJob(job.id)).rejects.toThrow(CompilerValidationError);
-
     const updated = await repository.findById(job.id);
     expect(updated?.status).toBe('FAILED');
     expect(updated?.lastError).toBe(
@@ -125,7 +115,6 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     );
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
   });
-
   it('dispatches notification email only when extracted data genuinely changes', async () => {
     const job = await repository.createJob({
       url: 'https://store.example.com/item',
@@ -133,10 +122,8 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       notificationEmail: 'alerts@example.com',
       cronExpression: '*/30 * * * *',
     });
-
     await compilationService.compileJob(job.id);
-    expect(notifier.sentAlerts).toHaveLength(0);
-
+    expect(repository.pendingDeliveries.map((delivery) => delivery.payload)).toHaveLength(0);
     // Run 1: Same extracted content.
     scraper.setHandler(async (url) => ({
       rawHtml: `<html><body><h1 data-testid="product-title">Notebook Pro</h1><span data-testid="product-price">$ 1,200.00</span></body></html>`,
@@ -144,11 +131,9 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       url,
       durationMs: 25,
     }));
-
     const runUnchanged = await scrapeService.executeScrape(job.id);
     expect(runUnchanged?.hasChanges).toBe('NO');
-    expect(notifier.sentAlerts).toHaveLength(0);
-
+    expect(repository.pendingDeliveries.map((delivery) => delivery.payload)).toHaveLength(0);
     // Run 2: Price drops -> must detect change and send alert
     scraper.setHandler(async (url) => ({
       rawHtml: `<html><body><h1 data-testid="product-title">Notebook Pro</h1><span data-testid="product-price">$ 999.00</span></body></html>`,
@@ -156,14 +141,17 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       url,
       durationMs: 28,
     }));
-
     const runChanged = await scrapeService.executeScrape(job.id);
     expect(runChanged?.hasChanges).toBe('YES');
-    expect(notifier.sentAlerts).toHaveLength(1);
-    expect(notifier.sentAlerts[0]?.to).toBe('alerts@example.com');
-    expect(notifier.sentAlerts[0]?.diffSummary.modified[0]?.field).toBe('price');
+    expect(repository.pendingDeliveries.map((delivery) => delivery.payload)).toHaveLength(1);
+    expect(repository.pendingDeliveries.map((delivery) => delivery.payload)[0]?.to).toBe(
+      'alerts@example.com'
+    );
+    expect(
+      repository.pendingDeliveries.map((delivery) => delivery.payload)[0]?.diffSummary.modified[0]
+        ?.field
+    ).toBe('price');
   });
-
   it('transitions to HEALING only after 2 consecutive SelectorMismatchErrors, and caps retries at maxHealingRetries', async () => {
     const job = await repository.createJob({
       url: 'https://store.example.com/item',
@@ -172,7 +160,6 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       cronExpression: '*/30 * * * *',
     });
     await compilationService.compileJob(job.id);
-
     // Website changes layout (HTTP 200 OK, but selectors return empty)
     scraper.setHandler(async (url) => ({
       rawHtml: `<html><body><div class="new-v2-title">Notebook Pro</div><div class="new-v2-price">$ 1,100.00</div></body></html>`,
@@ -180,14 +167,12 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       url,
       durationMs: 30,
     }));
-
     // 1st consecutive failure -> remains ACTIVE, failureCount = 1, no healing compilation yet
     await scrapeService.executeScrape(job.id);
     let currentJob = await repository.findById(job.id);
     expect(currentJob?.status).toBe('ACTIVE');
     expect(currentJob?.failureCount).toBe(1);
     expect(scheduler.compilationQueue).toHaveLength(0);
-
     // 2nd consecutive failure -> transitions to HEALING, failureCount = 2, enqueues healing compilation
     await scrapeService.executeScrape(job.id);
     currentJob = await repository.findById(job.id);
@@ -195,7 +180,6 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     expect(currentJob?.failureCount).toBe(2);
     expect(scheduler.compilationQueue).toHaveLength(1);
     expect(scheduler.compilationQueue[0]).toEqual({ jobId: job.id, reason: 'healing' });
-
     // Scheduled scraping must not run during recovery.
     await scrapeService.executeScrape(job.id);
     expect((await repository.findById(job.id))?.failureCount).toBe(2);
@@ -211,7 +195,6 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     expect((await repository.findById(job.id))?.status).toBe('FAILED');
     expect(scheduler.compilationQueue.length).toBe(queued);
   });
-
   it('does NOT trigger self-healing on AntiBotBlockedError (HTTP 403/429) or NavigationTimeoutError', async () => {
     const job = await repository.createJob({
       url: 'https://protected.example.com/item',
@@ -220,25 +203,20 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       cronExpression: '*/30 * * * *',
     });
     await compilationService.compileJob(job.id);
-
     // Simulate HTTP 403 Cloudflare block twice in a row
     scraper.setHandler(async () => {
       throw new AntiBotBlockedError('Cloudflare 403 Forbidden', 403);
     });
-
     await scrapeService.executeScrape(job.id);
     await scrapeService.executeScrape(job.id);
-
     let currentJob = await repository.findById(job.id);
     expect(currentJob?.status).toBe('ACTIVE');
     expect(currentJob?.failureCount).toBe(0);
     expect(scheduler.compilationQueue).toHaveLength(0);
-
     // Simulate NavigationTimeoutError -> should rethrow for BullMQ backoff without triggering healing
     scraper.setHandler(async () => {
       throw new NavigationTimeoutError('Navigation timeout after 30000ms');
     });
-
     await expect(scrapeService.executeScrape(job.id)).rejects.toThrow(NavigationTimeoutError);
     currentJob = await repository.findById(job.id);
     expect(currentJob?.status).toBe('ACTIVE');

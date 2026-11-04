@@ -1,3 +1,5 @@
+import { BrowserDocumentAdapter } from '../../extraction/adapters/browserDocument.adapter.js';
+import { executionPolicy } from '../../extraction/policy.js';
 import { env } from '../../config/env.js';
 import { CascadeScraperEngine } from './cascadeScraper.provider.js';
 import { CheerioScraperEngine } from './cheerioHttpScraper.provider.js';
@@ -14,7 +16,12 @@ export function createScraperEngine(
   engineName: 'playwright' | 'cheerio' = env.SCRAPER_ENGINE
 ): IScraperEngine {
   const localEngine =
-    engineName === 'cheerio' ? new CheerioScraperEngine() : new PlaywrightScraperEngine();
+    engineName === 'cheerio'
+      ? new CheerioScraperEngine()
+      : new PlaywrightScraperEngine(
+          new BrowserDocumentAdapter(executionPolicy(), env.HTTP_PROXY || undefined),
+          executionPolicy()
+        );
 
   const unblockers = [
     new ZenRowsUnblockerProvider(),

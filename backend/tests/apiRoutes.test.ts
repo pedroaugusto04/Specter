@@ -1,3 +1,4 @@
+import { fixturePlan } from './helpers/extractionFixtures.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
@@ -14,7 +15,6 @@ import {
   MockJobScheduler,
   MockScraperEngine,
 } from './helpers/testDoubles.js';
-
 function extractCookieHeader(setCookieHeader: string | string[] | undefined): string {
   if (!setCookieHeader) return '';
   const list = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
@@ -23,22 +23,18 @@ function extractCookieHeader(setCookieHeader: string | string[] | undefined): st
     .filter(Boolean)
     .join('; ');
 }
-
 describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
   let app: FastifyInstance;
   let repository: InMemoryJobRepository;
   let scheduler: MockJobScheduler;
   let scraperEngine: MockScraperEngine;
   let authCookie: string;
-
   beforeEach(async () => {
     repository = new InMemoryJobRepository();
     scheduler = new MockJobScheduler();
     scraperEngine = new MockScraperEngine();
-
     const userRepository = new InMemoryUserRepository();
     const integrationRepository = new InMemoryIntegrationRepository();
-
     const jobService = new JobService(repository, scheduler, scraperEngine);
     const authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
@@ -50,14 +46,12 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       telegramProvider,
       webhookProvider
     );
-
     app = await buildApp({
       jobService,
       authService,
       integrationService,
       enableLogger: false,
     });
-
     const regRes = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
@@ -65,11 +59,9 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     authCookie = extractCookieHeader(regRes.headers['set-cookie']);
   });
-
   afterEach(async () => {
     await app.close();
   });
-
   it('creates a new scraping job with valid input and enqueues initial compilation', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -82,7 +74,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         cronExpression: '*/30 * * * *',
       },
     });
-
     expect(response.statusCode).toBe(201);
     const body = response.json();
     expect(body.data).toMatchObject({
@@ -96,7 +87,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(scheduler.compilationQueue).toHaveLength(1);
     expect(scheduler.compilationQueue[0]?.reason).toBe('initial');
   });
-
   it('returns HTTP 400 when cron frequency violates the 15-minute minimum floor', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -109,7 +99,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         cronExpression: '*/5 * * * *',
       },
     });
-
     expect(response.statusCode).toBe(400);
     const body = response.json();
     expect(body.error).toBe('VALIDATION_ERROR');
@@ -117,7 +106,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(body.fields).toBeDefined();
     expect(body.fields.cronExpression).toContain('15 minutes');
   });
-
   it('returns HTTP 400 with standardized field errors for invalid input data', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -129,7 +117,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         notificationEmail: 'not-an-email',
       },
     });
-
     expect(response.statusCode).toBe(400);
     const body = response.json();
     expect(body.error).toBe('VALIDATION_ERROR');
@@ -139,7 +126,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(body.fields.userPrompt).toContain('5 characters');
     expect(body.fields.notificationEmail).toContain('email');
   });
-
   it('supports listing jobs, pausing/resuming, manual trigger, and deleting a job', async () => {
     const createRes = await app.inject({
       method: 'POST',
@@ -153,7 +139,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       },
     });
     const jobId = createRes.json().data.id as string;
-
     // Pause job
     const pauseRes = await app.inject({
       method: 'PATCH',
@@ -163,7 +148,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(pauseRes.statusCode).toBe(200);
     expect(pauseRes.json().data.status).toBe('PAUSED');
-
     // Resume job
     const resumeRes = await app.inject({
       method: 'PATCH',
@@ -172,7 +156,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       payload: { paused: false },
     });
     expect(resumeRes.statusCode).toBe(200);
-
     // Trigger manual scrape
     const triggerRes = await app.inject({
       method: 'POST',
@@ -180,7 +163,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       headers: { cookie: authCookie },
     });
     expect(triggerRes.statusCode).toBe(200);
-
     // List jobs
     const listRes = await app.inject({
       method: 'GET',
@@ -189,7 +171,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(listRes.statusCode).toBe(200);
     expect(listRes.json().data).toHaveLength(1);
-
     // Delete job
     const deleteRes = await app.inject({
       method: 'DELETE',
@@ -197,7 +178,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       headers: { cookie: authCookie },
     });
     expect(deleteRes.statusCode).toBe(204);
-
     const checkRes = await app.inject({
       method: 'GET',
       url: `/api/jobs/${jobId}`,
@@ -205,7 +185,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(checkRes.statusCode).toBe(404);
   });
-
   it('supports partial configuration update (PATCH /api/jobs/:id) and enqueues re-compilation on target changes', async () => {
     // 1. Create initial job
     const createRes = await app.inject({
@@ -221,12 +200,10 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(createRes.statusCode).toBe(201);
     const job = createRes.json().data;
-
     // Simulate compilation completing and job being ACTIVE with a scheduled repeatable
     await repository.updateJob(job.id, {
       status: 'ACTIVE',
-      extractionPlan: {
-        version: 2,
+      extractionPlan: fixturePlan({
         mode: 'single',
         readySelector: 'body',
         scope: 'page',
@@ -245,11 +222,10 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
             required: true,
           },
         },
-      },
+      }),
       bullmqRepeatableKey: 'repeat:fake-key',
     });
     scheduler.scheduledRepeatables.set(job.id, 'repeat:fake-key');
-
     // 2. Update cron expression only: should update schedule without triggering re-compilation
     const updateCronRes = await app.inject({
       method: 'PATCH',
@@ -265,7 +241,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(updatedData1.status).toBe('ACTIVE');
     expect(scheduler.scheduledRepeatables.get(job.id)).toBe(`repeat:${job.id}:0 */12 * * *`);
     expect(scheduler.compilationQueue).toHaveLength(1); // Only initial compilation, not re-queued
-
     // 3. Update prompt: should invalidate schema, reset repeatable, and re-enqueue compilation
     const updatePromptRes = await app.inject({
       method: 'PATCH',
@@ -284,7 +259,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
     expect(scheduler.compilationQueue).toHaveLength(2);
     expect(scheduler.compilationQueue[1]).toEqual({ jobId: job.id, reason: 'manual' });
-
     // 4. Validation error on invalid update payload
     const invalidRes = await app.inject({
       method: 'PATCH',
@@ -296,7 +270,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(invalidRes.statusCode).toBe(400);
     expect(invalidRes.json().error).toBe('VALIDATION_ERROR');
-
     // 5. 404 on non-existent job
     const notFoundRes = await app.inject({
       method: 'PATCH',
@@ -308,7 +281,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(notFoundRes.statusCode).toBe(404);
   });
-
   it('pre-flight probe endpoint (POST /api/jobs/probe) reports accessibility and blocks anti-bot protected sites', async () => {
     // 1. Accessible URL
     const okRes = await app.inject({
@@ -320,12 +292,10 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(okRes.statusCode).toBe(200);
     expect(okRes.json().data).toEqual({ accessible: true });
-
     // 2. Protected URL (e.g. Mercado Livre / Cloudflare anti-bot challenge)
     scraperEngine.setHandler(async () => {
       throw new AntiBotBlockedError('Cloudflare challenge detected', 403);
     });
-
     const blockedRes = await app.inject({
       method: 'POST',
       url: '/api/jobs/probe',
@@ -337,7 +307,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const blockedData = blockedRes.json().data;
     expect(blockedData.accessible).toBe(false);
     expect(blockedData.reason).toContain('Anti-Bot / CAPTCHA');
-
     // 3. SSRF Protection: Probe rejects internal loopback/metadata IP
     const ssrfProbeRes = await app.inject({
       method: 'POST',
@@ -349,7 +318,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(ssrfProbeRes.statusCode).toBe(200);
     expect(ssrfProbeRes.json().data.accessible).toBe(false);
     expect(ssrfProbeRes.json().data.reason).toMatch(/forbidden|SSRF/i);
-
     // 4. SSRF Protection: Creating a job with internal target URL is rejected with 400
     const ssrfCreateRes = await app.inject({
       method: 'POST',
@@ -362,7 +330,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       },
     });
     expect(ssrfCreateRes.statusCode).toBe(400);
-
     // 5. Creating a job delegates anti-bot resolution to the background compilation queue without blocking the form
     const createJobRes = await app.inject({
       method: 'POST',

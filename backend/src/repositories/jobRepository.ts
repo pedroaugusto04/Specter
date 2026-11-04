@@ -1,7 +1,9 @@
+import type { AlertDelivery } from '../notifications/contracts.js';
+import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
-import { jobRuns, scrapingJobs } from '../db/schema.js';
+import { jobRuns, scrapingJobs, alertDeliveries } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
@@ -16,6 +18,7 @@ export interface CreateJobInput {
   webhookUrl?: string | null;
   cronExpression: string;
   captureScreenshotOnChange?: boolean;
+  semanticPolicy?: SemanticPolicy | null;
 }
 
 export interface UpdateJobPatch {
@@ -26,6 +29,8 @@ export interface UpdateJobPatch {
   cronExpression?: string;
   bullmqRepeatableKey?: string | null;
   contractRevision?: string | null;
+  planRevision?: string | null;
+  semanticPolicy?: SemanticPolicy | null;
   extractionPlan?: ExtractionPlan | null;
   status?: JobStatus;
   lastError?: string | null;
@@ -67,6 +72,13 @@ export interface IJobRepository {
   updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null>;
   deleteJob(id: string): Promise<boolean>;
   createRun(input: CreateJobRunInput): Promise<JobRunEntity>;
+  commitRun(
+    input: CreateJobRunInput,
+    deliveries: AlertDelivery[],
+    patch?: UpdateJobPatch,
+    expectedUpdatedAt?: Date
+  ): Promise<JobRunEntity>;
+  purgeEvidence(cutoffDate: Date): Promise<void>;
   findRunsByJobId(jobId: string, limit?: number): Promise<JobRunEntity[]>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
@@ -91,6 +103,7 @@ export class DrizzleJobRepository implements IJobRepository {
         webhookUrl: input.webhookUrl ?? null,
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
+        semanticPolicy: input.semanticPolicy ?? null,
         status: JobStatus.PendingCompilation,
         failureCount: 0,
       })
@@ -185,6 +198,52 @@ export class DrizzleJobRepository implements IJobRepository {
     }
 
     return JobMapper.runRowToEntity(row);
+  }
+
+  async commitRun(
+    input: CreateJobRunInput,
+    deliveries: AlertDelivery[],
+    patch?: UpdateJobPatch,
+    expectedUpdatedAt?: Date
+  ): Promise<JobRunEntity> {
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ updatedAt: scrapingJobs.updatedAt, status: scrapingJobs.status })
+        .from(scrapingJobs)
+        .where(eq(scrapingJobs.id, input.jobId))
+        .for('update');
+      if (
+        !current ||
+        current.status === JobStatus.Paused ||
+        (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime())
+      )
+        throw new Error('Monitor changed during execution; stale snapshot discarded.');
+      const [row] = await tx
+        .insert(jobRuns)
+        .values({ ...input, extractionReport: input.extractionReport ?? null })
+        .returning();
+      if (!row) throw new Error('Failed to persist snapshot.');
+      if (patch)
+        await tx
+          .update(scrapingJobs)
+          .set({ ...patch, updatedAt: new Date() })
+          .where(eq(scrapingJobs.id, input.jobId));
+      if (deliveries.length)
+        await tx
+          .insert(alertDeliveries)
+          .values(
+            deliveries.map((delivery) => ({ ...delivery, runId: row.id, jobId: input.jobId }))
+          )
+          .onConflictDoNothing();
+      return JobMapper.runRowToEntity(row);
+    });
+  }
+
+  async purgeEvidence(cutoffDate: Date): Promise<void> {
+    await this.db
+      .update(jobRuns)
+      .set({ extractionReport: sql`extraction_report - 'evidence'` })
+      .where(lt(jobRuns.executedAt, cutoffDate));
   }
 
   async findRunsByJobId(jobId: string, limit = 50): Promise<JobRunEntity[]> {

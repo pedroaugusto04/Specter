@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { SemanticReviewSettings } from './SemanticReviewSettings';
+import type { SemanticPolicy } from '@/lib/extractionPlan';
 import { Camera, CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
@@ -38,6 +40,7 @@ export function CreateJobForm({
   isModal = false,
 }: CreateJobFormProps) {
   const [step, setStep] = React.useState<'form' | 'auth'>('form');
+  const [semanticPolicy, setSemanticPolicy] = React.useState<SemanticPolicy | null>(null);
   const [url, setUrl] = React.useState('');
   const [userPrompt, setUserPrompt] = React.useState('');
   const [sendEmailAlerts, setSendEmailAlerts] = React.useState(false);
@@ -79,6 +82,7 @@ export function CreateJobForm({
     (sendEmailAlerts && notificationEmail.trim().length > 0) ||
     (showCustomWebhook && webhookUrl.trim().length > 0) ||
     captureScreenshotOnChange ||
+    semanticPolicy !== null ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
 
@@ -168,6 +172,7 @@ export function CreateJobForm({
         webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
         cronExpression: effectiveCron.trim(),
         captureScreenshotOnChange,
+        semanticPolicy,
       });
 
       setUrl('');
@@ -177,6 +182,7 @@ export function CreateJobForm({
       setShowCustomWebhook(false);
       setWebhookUrl('');
       setCaptureScreenshotOnChange(false);
+      setSemanticPolicy(null);
       setCronPreset('0 */6 * * *');
       setCustomCron('0 */6 * * *');
       setUseCustomCron(false);
@@ -302,6 +308,7 @@ export function CreateJobForm({
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <SemanticReviewSettings value={semanticPolicy} onChange={setSemanticPolicy} />
       <FormField
         label="Target Website URL"
         htmlFor="target-url"

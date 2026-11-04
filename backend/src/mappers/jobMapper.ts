@@ -1,3 +1,5 @@
+import { env } from '../config/env.js';
+import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
@@ -14,7 +16,10 @@ export interface ScrapingJobDto {
   webhookUrl: string | null;
   cronExpression: string;
   contractRevision?: string | null;
+  planRevision?: string | null;
+  semanticPolicy?: SemanticPolicy | null;
   extractionPlan: ExtractionPlan | null;
+  effectiveSemanticPolicy: { enabled: boolean; threshold: number };
   status: JobStatus;
   lastError: string | null;
   healingAttempts?: number;
@@ -61,6 +66,8 @@ export const JobMapper = {
       cronExpression: row.cronExpression,
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       contractRevision: row.contractRevision,
+      planRevision: row.planRevision,
+      semanticPolicy: row.semanticPolicy,
       extractionPlan: row.extractionPlan ?? null,
       status: parseEnumValue(JobStatus, row.status, 'job status'),
       lastError: row.lastError ?? null,
@@ -83,7 +90,13 @@ export const JobMapper = {
       webhookUrl: entity.webhookUrl ?? null,
       cronExpression: entity.cronExpression,
       contractRevision: entity.contractRevision,
+      planRevision: entity.planRevision,
+      semanticPolicy: entity.semanticPolicy,
       extractionPlan: entity.extractionPlan,
+      effectiveSemanticPolicy: {
+        enabled: entity.semanticPolicy?.enabled ?? env.SEMANTIC_REVIEW_ENABLED,
+        threshold: entity.semanticPolicy?.threshold ?? env.SEMANTIC_REVIEW_THRESHOLD,
+      },
       status: entity.status,
       lastError: entity.lastError,
       failureCount: entity.failureCount,

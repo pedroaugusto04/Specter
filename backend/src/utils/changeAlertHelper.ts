@@ -1,69 +1,54 @@
-import { comparisonPayload } from './planExtraction.js';
-import type { INotificationProvider } from '../providers/notifications/notification.interface.js';
+import { compareSnapshots } from '../extraction/comparison.js';
+import type { AlertPayload } from '../providers/notifications/notification.interface.js';
 import type { ScrapingJobEntity } from '../types/domain.js';
 import type { TriggerRule } from '../types/extractionPlan.js';
 import type { TriggerMatchMode } from '../types/enums.js';
 import type { ExtractedPayload } from '../types/extractor.js';
-import { buildDiffSummary } from './diffHasher.js';
-import { logger } from './logger.js';
 import { evaluateTriggerRules } from './triggerEvaluator.js';
 
-export interface DispatchChangeAlertOptions {
+export interface BuildChangeAlertOptions {
   job: ScrapingJobEntity;
   currentData: ExtractedPayload;
   previousData: ExtractedPayload | null;
   triggerRules?: TriggerRule[];
   triggerMatchMode?: TriggerMatchMode;
-  notificationProvider: INotificationProvider;
   screenshotUrl?: string | null;
   subjectSuffix?: string; // e.g. ' (Self-healing)'
 }
 
 /**
- * Cohesive helper to compute diffs, evaluate trigger conditions, and dispatch change notifications.
+ * Pure alert construction: compute identity-aligned diffs and evaluate conditions.
  * Removes duplication across CompilationService and ScrapeExecutionService.
  */
-export async function evaluateAndDispatchChangeAlert(
-  options: DispatchChangeAlertOptions
-): Promise<void> {
+export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload | null {
   const {
     job,
     currentData,
     previousData,
     triggerRules,
     triggerMatchMode,
-    notificationProvider,
     screenshotUrl,
     subjectSuffix = '',
   } = options;
 
-  if (!previousData) return;
+  if (!previousData) return null;
 
-  const diffSummary = buildDiffSummary(
-    comparisonPayload(previousData, job.extractionPlan?.identityFields ?? []),
-    comparisonPayload(currentData, job.extractionPlan?.identityFields ?? []),
-    false
+  const diffSummary = compareSnapshots(
+    previousData,
+    currentData,
+    job.extractionPlan?.intent.identityFields ?? []
   );
-  if (!diffSummary.hasChanges) return;
+  if (!diffSummary.hasChanges) return null;
 
   const triggerResult = evaluateTriggerRules(
     currentData,
     triggerRules,
     triggerMatchMode,
     previousData,
-    job.extractionPlan?.identityFields ?? []
+    job.extractionPlan?.intent.identityFields ?? []
   );
 
-  if (!triggerResult.triggered) {
-    logger.info(
-      `Change detected${subjectSuffix ? subjectSuffix : ''} but notification suppressed because trigger conditions were not met`,
-      {
-        jobId: job.id,
-        reasons: triggerResult.reasons,
-      }
-    );
-    return;
-  }
+  if (!triggerResult.triggered) return null;
 
   const changeNoun =
     diffSummary.totalChanges === 1
@@ -72,25 +57,18 @@ export async function evaluateAndDispatchChangeAlert(
 
   const subject = `[Specter] ${changeNoun}${subjectSuffix}: ${job.url}`;
 
-  await notificationProvider
-    .sendAlert({
-      to: job.notificationEmail?.trim() || undefined,
-      subject,
-      jobId: job.id,
-      userId: job.userId,
-      targetUrl: job.url,
-      userPrompt: job.userPrompt,
-      webhookUrl: job.webhookUrl ?? undefined,
-      detectedAt: new Date(),
-      diffSummary,
-      data: currentData,
-      triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
-      screenshotUrl: screenshotUrl ?? undefined,
-    })
-    .catch((notifyErr) => {
-      logger.warn('Failed to send notification alert', {
-        jobId: job.id,
-        errorMessage: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
-      });
-    });
+  return {
+    to: job.notificationEmail?.trim() || undefined,
+    subject,
+    jobId: job.id,
+    userId: job.userId,
+    targetUrl: job.url,
+    userPrompt: job.userPrompt,
+    webhookUrl: job.webhookUrl ?? undefined,
+    detectedAt: new Date(),
+    diffSummary,
+    data: currentData,
+    triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
+    screenshotUrl: screenshotUrl ?? undefined,
+  };
 }

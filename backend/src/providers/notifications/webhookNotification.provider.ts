@@ -14,7 +14,7 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
   public readonly name = 'webhook';
 
   async sendAlert(payload: AlertPayload, options: WebhookSendOptions): Promise<void> {
-    const deliveryId = crypto.randomUUID();
+    const deliveryId = payload.deliveryId ?? crypto.randomUUID();
     const timestamp = new Date().toISOString();
 
     const bodyObj = {
@@ -24,7 +24,7 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
       jobId: payload.jobId,
       targetUrl: payload.targetUrl,
       userPrompt: payload.userPrompt ?? null,
-      detectedAt: payload.detectedAt ? payload.detectedAt.toISOString() : timestamp,
+      detectedAt: payload.detectedAt ? new Date(payload.detectedAt).toISOString() : timestamp,
       triggerReasons: payload.triggerReasons ?? [],
       diffSummary: payload.diffSummary,
       data: payload.data,
