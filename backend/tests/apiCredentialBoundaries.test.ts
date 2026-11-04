@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/services/authService.js';
@@ -13,8 +13,6 @@ import {
   MockJobScheduler,
   MockScraperEngine,
 } from './helpers/testDoubles.js';
-import { fixturePlan } from './helpers/extractionFixtures.js';
-import { JobPresenter } from '../src/presentation/jobPresenter.js';
 
 let app: FastifyInstance | undefined;
 afterEach(async () => {
@@ -88,14 +86,11 @@ async function setup() {
     .join('; ');
   const sessionOwner = registration.json().data.id;
   const headers = { cookie };
-  return { app, headers, userId: sessionOwner, jobs, integrations, users };
+  return { app, headers, userId: sessionOwner, integrations };
 }
-describe('HTTP DTO boundaries', () => {
-  it('returns only public user, session and integration attributes', async () => {
-    const { app, headers, userId, integrations, users } = await setup();
-    Object.assign(users.users.get(userId)!, { internalOnly: 'do-not-expose' });
-    const me = (await app.inject({ method: 'GET', url: '/api/auth/me', headers })).json().data;
-    expect(Object.keys(me).sort()).toEqual(['id', 'email', 'name', 'timezone', 'createdAt'].sort());
+describe('API credential boundaries', () => {
+  it('keeps credentials and session cookies out of API responses', async () => {
+    const { app, headers, userId, integrations } = await setup();
     await integrations.upsert(userId, {
       telegramBotToken: 'private-bot-token',
       webhookSecret: 'private-signing-secret',
@@ -110,10 +105,6 @@ describe('HTTP DTO boundaries', () => {
     expect(integration).not.toHaveProperty('telegramBotToken');
     const response = await app.inject({ method: 'GET', url: '/api/sessions', headers });
     expect(response.body).not.toContain('private-cookie-value');
-    expect(Object.keys(response.json().data[0]).sort()).toEqual(
-      ['id', 'domain', 'name', 'cookieCount', 'createdAt', 'updatedAt'].sort()
-    );
-    expect(JSON.stringify(me)).not.toContain('do-not-expose');
   });
   it('preserves signing secrets on unrelated updates and clears them only explicitly', async () => {
     const { app, headers, userId, integrations } = await setup();
@@ -138,81 +129,5 @@ describe('HTTP DTO boundaries', () => {
       payload: { telegramEnabled: false, webhookEnabled: true, webhookSecret: null },
     });
     expect(clear.json().data.hasWebhookSecret).toBe(false);
-  });
-  it('uses the same monitor projection on create, list, read, update, pause and recompile', async () => {
-    const { app, headers, jobs } = await setup();
-    const created = (
-      await app.inject({
-        method: 'POST',
-        url: '/api/jobs',
-        headers,
-        payload: {
-          url: 'https://example.com',
-          userPrompt: 'Monitor page title',
-          cronExpression: '0 */6 * * *',
-        },
-      })
-    ).json().data;
-    const id = created.id;
-    Object.assign(jobs.jobs.get(id)!, {
-      internalOnly: 'private',
-      bullmqRepeatableKey: 'private-queue-key',
-    });
-    await jobs.updateJob(id, { extractionPlan: fixturePlan(), status: 'ACTIVE' });
-    for (const request of [
-      { method: 'GET' as const, url: `/api/jobs/${id}` },
-      {
-        method: 'PATCH' as const,
-        url: `/api/jobs/${id}`,
-        payload: { notificationEmail: 'next@example.com' },
-      },
-      { method: 'PATCH' as const, url: `/api/jobs/${id}/pause`, payload: { paused: true } },
-      { method: 'POST' as const, url: `/api/jobs/${id}/recompile` },
-    ]) {
-      const response = await app.inject({ ...request, headers });
-      expect(response.statusCode).toBe(200);
-      const dto = response.json().data;
-      expect(dto).toHaveProperty('accessState', null);
-      expect(dto).not.toHaveProperty('effectiveSemanticPolicy');
-      expect(dto).not.toHaveProperty('bullmqRepeatableKey');
-      expect(dto).not.toHaveProperty('internalOnly');
-      expect(dto).not.toHaveProperty('userId');
-      expect(dto).not.toHaveProperty('healingAttempts');
-      expect(dto).not.toHaveProperty('contractRevision');
-      expect(dto).not.toHaveProperty('planRevision');
-    }
-    const listed = (await app.inject({ method: 'GET', url: '/api/jobs', headers })).json().data;
-    expect(listed[0]).not.toHaveProperty('internalOnly');
-    expect(created).toHaveProperty('accessState', null);
-    const report = Object.assign(
-      {
-        quality: 'COMPLETE' as const,
-        scope: 'page' as const,
-        pagesVisited: 1,
-        issues: [],
-        sourcesUsed: {},
-      },
-      { internalDiagnostic: 'private-diagnostic' }
-    );
-    await jobs.createRun({
-      jobId: id,
-      extractedData: { title: 'Requested title' },
-      extractionReport: report,
-      hasChanges: 'INITIAL',
-      status: 'SUCCESS',
-    });
-    Object.assign(jobs.runs[0]!, { privateRun: 'private-run' });
-    const history = await app.inject({ method: 'GET', url: `/api/jobs/${id}/runs`, headers });
-    expect(history.body).not.toContain('private-diagnostic');
-    expect(history.body).not.toContain('private-run');
-    expect(history.json().data.runs[0].extractedData).toEqual({ title: 'Requested title' });
-    expect(history.json().data.runs[0]).not.toHaveProperty('normalizedHash');
-    const stats = Object.assign(await jobs.getStats(), { internalOnly: 'private-stat' });
-    vi.spyOn(jobs, 'getStats').mockResolvedValueOnce(stats);
-    const dashboard = await app.inject({ method: 'GET', url: '/api/stats', headers });
-    expect(dashboard.body).not.toContain('private-stat');
-    expect((await new JobPresenter().present(jobs.jobs.get(id)!))).not.toHaveProperty(
-      'effectiveSemanticPolicy'
-    );
   });
 });

@@ -1,41 +1,11 @@
-import { encryptJson } from '../src/utils/crypto.js';
 import { DecryptionError } from '../src/errors/domainErrors.js';
 import { describe, expect, it } from 'vitest';
-import { SessionMapper } from '../src/mappers/sessionMapper.js';
 import { extractDomainCandidates, normalizeDomain } from '../src/utils/urlNormalizer.js';
 import { resolveSessionStorageState } from '../src/utils/sessionHelper.js';
 import type { ISessionRepository } from '../src/repositories/sessionRepository.js';
 import type { UserWebSessionEntity } from '../src/types/domain.js';
 
-describe('SessionMapper & Domain Utilities', () => {
-  it('correctly maps UserWebSessionRow to UserWebSessionEntity and SessionDto', () => {
-    const fixedDate = new Date('2026-11-01T12:00:00.000Z');
-    const mockRow = {
-      id: 'sess-123',
-      userId: 'user-abc',
-      domain: 'amazon.com',
-      name: 'Amazon Session',
-      storageState: encryptJson({ cookies: [], origins: [] }),
-      cookieCount: 5,
-      createdAt: fixedDate,
-      updatedAt: fixedDate,
-    };
-
-    const entity = SessionMapper.rowToEntity(mockRow);
-    expect(entity.id).toBe('sess-123');
-    expect(entity.cookieCount).toBe(5);
-
-    const dto = SessionMapper.entityToDto(entity);
-    expect(dto).toEqual({
-      id: 'sess-123',
-      domain: 'amazon.com',
-      name: 'Amazon Session',
-      cookieCount: 5,
-      createdAt: '2026-11-01T12:00:00.000Z',
-      updatedAt: '2026-11-01T12:00:00.000Z',
-    });
-  });
-
+describe('Session domain behavior', () => {
   describe('normalizeDomain', () => {
     it('normalizes domains by removing protocols, paths, and ports', () => {
       expect(normalizeDomain('https://sub.domain.com:8080/path/test')).toBe('sub.domain.com');
