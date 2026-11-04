@@ -13,7 +13,6 @@ import { TRIGGER_MATCH_MODE, TRIGGER_OPERATOR } from '@/lib/extractionPlan';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
 import { AlertTriangle, Check, HelpCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import * as React from 'react';
-import { SemanticReviewSettings } from './SemanticReviewSettings';
 
 export interface EditJobModalProps {
   job: ScrapingJobDto | null;
@@ -27,7 +26,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   const {
     values,
     reset: resetForm,
-    setSemanticPolicy,
     setUrl,
     setUserPrompt,
     setSendEmailAlerts,
@@ -39,7 +37,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     setTriggerMatchMode,
   } = useJobForm();
   const {
-    semanticPolicy,
     url,
     userPrompt,
     sendEmailAlerts,
@@ -94,8 +91,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
       captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
       effectiveCron.trim() !== job.cronExpression ||
-      rulesChanged ||
-      JSON.stringify(semanticPolicy) !== JSON.stringify(job.semanticPolicy ?? null))
+      rulesChanged)
   );
 
   const clearFieldError = (field: JobFormField) => {
@@ -189,7 +185,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <SemanticReviewSettings value={semanticPolicy} onChange={setSemanticPolicy} />
         {willRecompile && (
           <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/60 p-3.5 text-xs sm:text-sm text-foreground">
             <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-foreground mt-0.5" />

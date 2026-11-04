@@ -27,8 +27,6 @@ export function useJobForm() {
       setWebhookUrl: (value: SetStateAction<string>) => setField('webhookUrl', value),
       setCaptureScreenshotOnChange: (value: SetStateAction<boolean>) =>
         setField('captureScreenshotOnChange', value),
-      setSemanticPolicy: (value: SetStateAction<JobFormValues['semanticPolicy']>) =>
-        setField('semanticPolicy', value),
       setTriggerRules: (value: SetStateAction<JobFormValues['triggerRules']>) =>
         setField('triggerRules', value),
       setTriggerMatchMode: (value: SetStateAction<JobFormValues['triggerMatchMode']>) =>

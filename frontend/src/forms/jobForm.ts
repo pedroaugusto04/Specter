@@ -2,7 +2,6 @@ import { CRON_PRESETS } from '@/lib/cronPresets';
 import type {
   CreateJobRequest,
   ScrapingJobDto,
-  SemanticPolicy,
   TriggerMatchMode,
   TriggerRule,
   UpdateJobRequest,
@@ -17,7 +16,6 @@ export interface JobFormValues {
   showCustomWebhook: boolean;
   webhookUrl: string;
   captureScreenshotOnChange: boolean;
-  semanticPolicy: SemanticPolicy | null;
   cronPreset: string;
   customCron: string;
   useCustomCron: boolean;
@@ -33,7 +31,6 @@ export function emptyJobForm(): JobFormValues {
     showCustomWebhook: false,
     webhookUrl: '',
     captureScreenshotOnChange: false,
-    semanticPolicy: null,
     cronPreset: DEFAULT_JOB_CRON,
     customCron: DEFAULT_JOB_CRON,
     useCustomCron: false,
@@ -51,7 +48,6 @@ export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
     showCustomWebhook: Boolean(job.webhookUrl?.trim()),
     webhookUrl: job.webhookUrl ?? '',
     captureScreenshotOnChange: job.captureScreenshotOnChange,
-    semanticPolicy: job.semanticPolicy ?? null,
     cronPreset: preset ? job.cronExpression : DEFAULT_JOB_CRON,
     customCron: job.cronExpression,
     useCustomCron: !preset,
@@ -67,7 +63,6 @@ export function formToCreateJob(form: JobFormValues, fallbackEmail = ''): Create
     webhookUrl: form.showCustomWebhook ? form.webhookUrl.trim() || null : null,
     cronExpression: (form.useCustomCron ? form.customCron : form.cronPreset).trim(),
     captureScreenshotOnChange: form.captureScreenshotOnChange,
-    semanticPolicy: form.semanticPolicy,
   };
 }
 export function formToUpdateJob(form: JobFormValues): UpdateJobRequest {

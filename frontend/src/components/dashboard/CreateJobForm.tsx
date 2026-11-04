@@ -17,7 +17,6 @@ import { ApiError, type SessionDto, type UserDto } from '@/lib/api';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
-import { SemanticReviewSettings } from './SemanticReviewSettings';
 
 export const PENDING_JOB_STORAGE_KEY = 'specter_pending_job';
 
@@ -43,7 +42,6 @@ export function CreateJobForm({
   const {
     values,
     reset: resetForm,
-    setSemanticPolicy,
     setUrl,
     setUserPrompt,
     setSendEmailAlerts,
@@ -53,7 +51,6 @@ export function CreateJobForm({
     setCaptureScreenshotOnChange,
   } = useJobForm();
   const {
-    semanticPolicy,
     url,
     userPrompt,
     sendEmailAlerts,
@@ -97,7 +94,6 @@ export function CreateJobForm({
     (sendEmailAlerts && notificationEmail.trim().length > 0) ||
     (showCustomWebhook && webhookUrl.trim().length > 0) ||
     captureScreenshotOnChange ||
-    semanticPolicy !== null ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
 
@@ -300,7 +296,6 @@ export function CreateJobForm({
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <SemanticReviewSettings value={semanticPolicy} onChange={setSemanticPolicy} />
       <FormField
         label="Target Website URL"
         htmlFor="target-url"
