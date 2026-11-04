@@ -72,10 +72,11 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     });
 
     expect(capturedUrl).toBe('https://api.telegram.org/botserver-bot-token-env/sendMessage');
-    expect(capturedBody.chat_id).toBe('987654321');
-    expect(capturedBody.parse_mode).toBe('HTML');
-    expect(capturedBody.text).toContain('<b>[Specter] 1 change detected</b>');
-    expect(capturedBody.text).toContain('<s>$100</s> ➔ <b>$80</b>');
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody!.chat_id).toBe('987654321');
+    expect(capturedBody!.parse_mode).toBe('HTML');
+    expect(capturedBody!.text).toContain('<b>[Specter] 1 change detected</b>');
+    expect(capturedBody!.text).toContain('<s>$100</s> ➔ <b>$80</b>');
   });
 
   it('TelegramNotificationProvider sends a test message successfully', async () => {

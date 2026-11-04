@@ -36,7 +36,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(result.rawHtml).toContain('Product Title');
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      const calledUrl = new URL(mockFetch.mock.calls[0]![0]);
       expect(calledUrl.origin).toBe('https://api.zenrows.com');
       expect(calledUrl.searchParams.get('apikey')).toBe('test-zenrows-key');
       expect(calledUrl.searchParams.get('url')).toBe('https://example.com/product');
@@ -70,7 +70,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(result.screenshot).toBeDefined();
       expect(result.screenshot?.toString()).toBe('fake-screenshot-data');
 
-      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      const calledUrl = new URL(mockFetch.mock.calls[0]![0]);
       expect(calledUrl.searchParams.get('screenshot')).toBe('true');
       expect(calledUrl.searchParams.get('json_response')).toBe('true');
       expect(calledUrl.searchParams.get('screenshot_format')).toBe('jpeg');
@@ -125,7 +125,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(result.screenshot).toBeDefined();
       expect(result.screenshot?.toString()).toBe('scraperapi-screenshot-data');
 
-      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      const calledUrl = new URL(mockFetch.mock.calls[0]![0]);
       expect(calledUrl.searchParams.get('screenshot')).toBe('true');
     });
 
@@ -177,7 +177,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(result.screenshot).toBeDefined();
       expect(result.screenshot?.toString()).toBe('scrapingbee-screenshot-data');
 
-      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      const calledUrl = new URL(mockFetch.mock.calls[0]![0]);
       expect(calledUrl.searchParams.get('screenshot')).toBe('true');
       expect(calledUrl.searchParams.get('json_response')).toBe('true');
       expect(calledUrl.searchParams.get('screenshot_selector')).toBe('#price');
@@ -231,7 +231,7 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       expect(result.screenshot).toBeDefined();
       expect(result.screenshot?.toString()).toBe('crawlbase-screenshot-data');
 
-      const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+      const calledUrl = new URL(mockFetch.mock.calls[0]![0]);
       expect(calledUrl.searchParams.get('screenshot')).toBe('true');
     });
 

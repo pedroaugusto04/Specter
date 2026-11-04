@@ -3,6 +3,7 @@ import { getDb, type Database } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { UserMapper } from '../mappers/userMapper.js';
 import type { UserEntity } from '../types/domain.js';
+export type { UserEntity };
 
 export interface CreateUserInput {
   email: string;

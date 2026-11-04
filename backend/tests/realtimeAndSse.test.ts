@@ -72,12 +72,12 @@ describe('Realtime EventBus & SSE Streaming', () => {
       await realtimeService.notifyJobDeleted('user-999', 'job-abc');
 
       expect(captured).toHaveLength(4);
-      expect(captured[0].type).toBe('JOB_CREATED');
-      expect(captured[1].type).toBe('JOB_UPDATED');
-      expect(captured[2].type).toBe('JOB_RUN_COMPLETED');
-      expect(captured[2].hasChanges).toBe('YES');
-      expect(captured[3].type).toBe('JOB_DELETED');
-      expect(captured[0].timestamp).toBeDefined();
+      expect(captured[0]!.type).toBe('JOB_CREATED');
+      expect(captured[1]!.type).toBe('JOB_UPDATED');
+      expect(captured[2]!.type).toBe('JOB_RUN_COMPLETED');
+      expect(captured[2]!.hasChanges).toBe('YES');
+      expect(captured[3]!.type).toBe('JOB_DELETED');
+      expect(captured[0]!.timestamp).toBeDefined();
 
       await realtimeService.close();
     });

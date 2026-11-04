@@ -1,5 +1,5 @@
 import type { IModelProvider, ModelInput } from '../../extraction/model.js';
-import { spawn, type SpawnOptions } from 'child_process';
+import { spawn, type SpawnOptions, type ChildProcess } from 'child_process';
 import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
@@ -14,7 +14,7 @@ export interface CliCompilerOptions {
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
   tempBaseDir?: string;
   timeoutMs?: number;
-  spawnFn?: typeof spawn;
+  spawnFn?: ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess) | typeof spawn;
 }
 
 export class CliCompilerProvider implements IModelProvider {
@@ -23,7 +23,7 @@ export class CliCompilerProvider implements IModelProvider {
   private readonly cliArgsBuilder: (promptFile: string, outputFile: string) => string[];
   private readonly tempBaseDir: string;
   private readonly timeoutMs: number;
-  private readonly spawnFn: typeof spawn;
+  private readonly spawnFn: ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess) | typeof spawn;
   private readonly promptBuilder: NonNullable<CliCompilerOptions['promptBuilder']>;
 
   constructor(options: CliCompilerOptions = {}) {

@@ -84,7 +84,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     job &&
     (url.trim() !== job.url ||
       userPrompt.trim() !== job.userPrompt ||
-      (sendEmailAlerts ? notificationEmail.trim() : '') !== job.notificationEmail ||
+      (sendEmailAlerts ? notificationEmail.trim() : '') !== (job.notificationEmail || '') ||
       sendEmailAlerts !==
         Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
       (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||

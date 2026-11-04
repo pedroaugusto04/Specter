@@ -132,7 +132,7 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     const retentionService = new RetentionService(repository, 14);
     const job = await repository.createJob({
       url: 'https://example.com',
-      instructions: 'Monitor title',
+      userPrompt: 'Monitor title',
       notificationEmail: 'user@example.com',
       cronExpression: '0 */6 * * *',
     });

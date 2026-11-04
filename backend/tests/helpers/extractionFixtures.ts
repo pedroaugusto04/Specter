@@ -188,6 +188,7 @@ export function fixtureConfiguration(
             responses: [],
             screenshot: result.scrape.screenshot,
           },
+          durationMs: result.scrape.durationMs,
         },
         semanticReview: { status: 'SKIPPED', score: null, reasons: [], evidenceRefs: [] },
         trace: [],

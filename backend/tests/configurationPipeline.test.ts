@@ -112,6 +112,7 @@ describe('Semantic policy and pipeline stages', () => {
         sourcesUsed: {},
       },
       snapshot,
+      durationMs: 42,
     });
     await expect(fixture.pipeline.configure(request)).rejects.toThrow('Missing coverage');
     expect(fixture.calls).not.toContain('semantic');

@@ -43,7 +43,7 @@ export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
   return {
     url: job.url,
     userPrompt: job.userPrompt,
-    sendEmailAlerts: Boolean(job.notificationEmail.trim()),
+    sendEmailAlerts: Boolean(job.notificationEmail?.trim()),
     notificationEmail: job.notificationEmail || email,
     showCustomWebhook: Boolean(job.webhookUrl?.trim()),
     webhookUrl: job.webhookUrl ?? '',

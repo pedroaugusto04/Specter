@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, type SpawnOptions } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CodexCompilerProvider } from '../src/providers/compilers/codexCompiler.provider.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
@@ -28,8 +28,8 @@ describe('Codex transport', () => {
     );
     const provider = new CodexCompilerProvider({
       tempBaseDir: path.join(root, 'work'),
-      spawnFn: (_command, args, options) =>
-        spawn(process.execPath, [executable, ...args!], options!),
+      spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
+        spawn(process.execPath, [executable, ...args], options),
     });
     const result = await provider.generate({
       task: 'plan',

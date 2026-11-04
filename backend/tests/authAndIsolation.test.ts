@@ -337,7 +337,7 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     expect(regRes.statusCode).toBe(201);
 
     // Create an explicit token
-    const token = authService.verifyAccessToken ? 'valid-looking-token' : 'token';
+    const token = 'valid-looking-token';
 
     // Attempt to access profile via query string token
     const profileRes = await app.inject({

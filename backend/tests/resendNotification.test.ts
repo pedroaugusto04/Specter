@@ -148,8 +148,8 @@ describe('Specter Resend Notifications & Email Template', () => {
       await provider.sendAlert({ ...samplePayload, deliveryId: 'delivery-test' });
 
       expect(sendMock).toHaveBeenCalledTimes(1);
-      expect(sendMock.mock.calls[0][1]).toEqual({ idempotencyKey: 'delivery-test' });
-      const callArgs = sendMock.mock.calls[0][0];
+      expect(sendMock.mock.calls[0]![1]).toEqual({ idempotencyKey: 'delivery-test' });
+      const callArgs = sendMock.mock.calls[0]![0];
 
       expect(callArgs.to).toBe('user@example.com');
       expect(callArgs.from).toBe('Specter <onboarding@resend.dev>');

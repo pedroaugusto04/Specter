@@ -26,9 +26,9 @@ describe('Configuration evaluation corpus', () => {
     expect(report.falseAlerts).toBe(0);
     expect(report.missedAlerts).toBe(0);
     expect(report.modelCalls).toBe(13);
-    expect(report.stages.intent.calls).toBe(3);
-    expect(report.stages.discovery.calls).toBe(4);
-    expect(report.stages.plan.calls).toBe(3);
-    expect(report.stages.interaction.calls).toBe(1);
+    expect(report.stages.intent!.calls).toBe(3);
+    expect(report.stages.discovery!.calls).toBe(4);
+    expect(report.stages.plan!.calls).toBe(3);
+    expect(report.stages.interaction!.calls).toBe(1);
   });
 });
