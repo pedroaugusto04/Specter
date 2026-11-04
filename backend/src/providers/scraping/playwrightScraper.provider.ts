@@ -81,7 +81,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         userAgent: DEFAULT_USER_AGENT,
         storageState: options.storageState,
       });
-      const navigation: { origin?: string } = {};
+      const navigation = { origin: new URL(safeUrl).origin };
       await context.route('**/*', async (route) => {
         try {
           const url = await assertSafeUrl(route.request().url(), 'requestUrl');
@@ -99,17 +99,46 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       const page = await context.newPage();
       page.setDefaultTimeout(Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs));
       const response = await page.goto(safeUrl, { waitUntil: 'domcontentloaded' });
-      navigation.origin = new URL(page.url()).origin;
+      if (new URL(page.url()).origin !== navigation.origin)
+        throw new Error('Initial navigation redirected outside the original origin.');
       const records = new Map<string, ExtractedRecord>();
+      const sourcesUsed: Record<string, number> = {};
       let result: PlanExecutionResult | undefined;
       for (let action = 0; action <= env.EXTRACTION_MAX_ACTIONS; action++) {
-        await page.locator(plan.readySelector).first().waitFor({ state: 'attached' });
+        const readiness = page.locator(plan.readySelector).first();
+        await readiness.waitFor({ state: 'attached' });
+        await page
+          .waitForFunction(
+            `(selector) => {
+              const element = document.querySelector(selector);
+              if (!element) return false;
+              const visible = Boolean(
+                element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden'
+              );
+              const meaningful = Boolean(
+                element.textContent?.trim() ||
+                  ['content', 'href', 'src', 'alt', 'aria-label'].some((name) =>
+                    element.getAttribute(name)?.trim()
+                  )
+              );
+              return visible || meaningful;
+            }`,
+            plan.readySelector,
+            { timeout: Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs) }
+          )
+          .catch(() => {});
         const rawHtml = await page.content();
         detectAntiBotBlock(page.url(), rawHtml, response?.status() ?? 200);
         const extracted = extractPlanPage(rawHtml, page.url(), plan);
+        for (const [source, count] of Object.entries(extracted.report.sourcesUsed))
+          sourcesUsed[source] = (sourcesUsed[source] ?? 0) + count;
         result = {
           data: extracted.data,
-          report: { ...extracted.report, pagesVisited: action + 1 },
+          report: {
+            ...extracted.report,
+            pagesVisited: action + 1,
+            sourcesUsed: { ...sourcesUsed },
+          },
           scrape: {
             rawHtml,
             url: page.url(),
@@ -150,12 +179,32 @@ export class PlaywrightScraperEngine implements IScraperEngine {
           return result;
         }
         if (action === env.EXTRACTION_MAX_ACTIONS || action + 1 >= env.EXTRACTION_MAX_PAGES) break;
-        const previousBody = await page.locator('body').innerHTML();
+        const hasJsonLdSources = Object.values(plan.fields).some((field) =>
+          field.sources.some((source) => source.kind === 'jsonld')
+        );
+        const progressSelector =
+          plan.containerSelector ??
+          (hasJsonLdSources ? 'script[type="application/ld+json"]' : plan.readySelector);
+        const progressTarget = page.locator(progressSelector);
+        const previousProgress = await progressTarget.evaluateAll((elements) =>
+          elements.map((element) => element.innerHTML).join('\u0000')
+        );
+        const previousUrl = page.url();
         if (plan.pagination?.kind === PaginationKind.Scroll)
           await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
         else await page.locator(plan.pagination!.nextSelector!).first().click();
         await page
-          .waitForFunction('(previous) => document.body.innerHTML !== previous', previousBody)
+          .waitForFunction(
+            `({ selector, previous, previousUrl }) => {
+              if (location.href !== previousUrl) return true;
+              const current = Array.from(document.querySelectorAll(selector))
+                .map((element) => element.innerHTML)
+                .join('\u0000');
+              return current !== previous;
+            }`,
+            { selector: progressSelector, previous: previousProgress, previousUrl },
+            { timeout: Math.max(1, budgetMs - (Date.now() - started)) }
+          )
           .catch(() => {});
       }
       if (!result) throw new Error('Interactive extraction produced no document.');

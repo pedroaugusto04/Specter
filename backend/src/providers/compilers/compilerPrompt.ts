@@ -30,12 +30,12 @@ Requested fields and fields referenced in conditions or identity must be require
 Use normalizeVolatileText only when relative timestamps or tracking tokens are irrelevant to the requested field. Never remove requested timestamps or identifiers.
 Numbers require an explicit locale; booleans require a mapping of observed lowercase values.
 Dates must come from ISO date or timezone-qualified ISO timestamp sources; otherwise use string.
-Collections require stable identity fields and either a containerSelector or jsonLdType.
+Collections require stable identity fields and either a containerSelector or jsonLdType. DOM-container collections must use DOM field sources; JSON-LD entity collections must use JSON-LD field sources. Do not mix DOM containers and JSON-LD sources or use DOM sources for JSON-LD entities; those records cannot be safely associated.
 Never match DOM records to global JSON-LD by position. JSON-LD paths are relative to the selected entity.
 Use metadata when it is a reliable source. Each alternative source has its own attribute.
 Use stable semantic selectors observed in evidence; do not invent selectors, fields, or website-specific rules.
 Select exactly the requested entities. Do not use document title or navigation as substitute data.
-readySelector must prove the requested region has loaded, not merely that a document exists.
+readySelector must target a visible region or meaningful non-empty content in the requested region, not merely an empty document shell.
 Use scope page unless the user explicitly asks for the complete collection. Full collection scope requires pagination and positive endSelector evidence.
 A missing next button alone is not proof of completion. Empty results require explicit emptySelector evidence.
 Combine conditions within the same record. Default triggerMatchMode is all. Omit conditions by returning an empty array when none were requested.

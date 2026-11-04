@@ -44,6 +44,7 @@ export interface JobRunDto {
     scope: ExtractionScope;
     pagesVisited: number;
     issues: string[];
+    /** Successful extraction counts keyed by `${fieldName}#${sourceIndex}`. */
     sourcesUsed: Record<string, number>;
   } | null;
   id: string;

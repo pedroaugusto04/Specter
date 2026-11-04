@@ -88,6 +88,28 @@ export const extractionPlanSchema = z
     ) {
       issue('JSON-LD collections require an explicit entity type.');
     }
+    if (
+      plan.mode === ExtractionMode.Collection &&
+      plan.containerSelector &&
+      Object.values(plan.fields).some((definition) =>
+        definition.sources.some((item) => item.kind === ExtractionSourceKind.JsonLd)
+      )
+    ) {
+      issue(
+        'JSON-LD fields cannot be combined with DOM containers until entities can be associated safely.'
+      );
+    }
+    if (
+      plan.mode === ExtractionMode.Collection &&
+      !plan.containerSelector &&
+      Object.values(plan.fields).some((definition) =>
+        definition.sources.some((item) => item.kind === ExtractionSourceKind.Dom)
+      )
+    ) {
+      issue(
+        'DOM fields cannot be combined with JSON-LD collection entities until entities can be associated safely.'
+      );
+    }
     for (const name of [...plan.identityFields, ...plan.triggerRules.map((r) => r.field)]) {
       if (!plan.fields[name]?.required)
         issue(`Referenced field '${name}' must exist and be required.`);
@@ -140,5 +162,6 @@ export interface ExtractionReport {
   scope: ExtractionScope;
   pagesVisited: number;
   issues: string[];
+  /** Counts successful extractions keyed as `${fieldName}#${sourceIndex}`. */
   sourcesUsed: Record<string, number>;
 }

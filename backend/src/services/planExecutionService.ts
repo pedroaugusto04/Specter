@@ -46,8 +46,9 @@ export class PlanExecutionService implements IPlanExecutor {
     );
     const seen = new Set<string>();
     const records = new Map<string, ExtractedRecord>();
+    const sourcesUsed: Record<string, number> = {};
     let currentUrl = url;
-    let origin: string | undefined;
+    const origin = new URL(url).origin;
     let result: PlanExecutionResult | undefined;
     for (let page = 0; page < env.EXTRACTION_MAX_PAGES; page++) {
       if (seen.has(currentUrl) || Date.now() - started >= budgetMs) break;
@@ -60,13 +61,14 @@ export class PlanExecutionService implements IPlanExecutor {
         ),
         waitForSelector: plan.readySelector,
       });
-      origin ??= new URL(scrape.url).origin;
       if (new URL(scrape.url).origin !== origin)
         throw new Error('Pagination redirected outside the original origin.');
       const extracted = extractPlanPage(scrape.rawHtml, scrape.url, plan);
+      for (const [source, count] of Object.entries(extracted.report.sourcesUsed))
+        sourcesUsed[source] = (sourcesUsed[source] ?? 0) + count;
       result = {
         data: extracted.data,
-        report: { ...extracted.report, pagesVisited: page + 1 },
+        report: { ...extracted.report, pagesVisited: page + 1, sourcesUsed: { ...sourcesUsed } },
         scrape,
       };
       if (!isAcceptedExtractionQuality(result.report.quality)) return result;

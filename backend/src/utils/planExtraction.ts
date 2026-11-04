@@ -58,6 +58,25 @@ export function recordIdentity(record: ExtractedRecord, fields: string[]): strin
   return JSON.stringify(fields.map((field) => record[field]));
 }
 
+function normalizeJsonLdType(value: unknown): string[] {
+  return (Array.isArray(value) ? value : [value])
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim().replace(/^.*[#/]/, '').replace(/^schema:/i, '').toLowerCase());
+}
+
+function hasReadinessEvidence($: cheerio.CheerioAPI, selector: string): boolean {
+  const evidenceAttributes = ['content', 'href', 'src', 'alt', 'aria-label'];
+  return $(selector).toArray().some((node) => {
+    const element = $(node);
+    const tagName = (node as AnyNode & { tagName?: string }).tagName?.toLowerCase();
+    return Boolean(
+      element.text().trim() ||
+        (tagName === 'script' && element.html()?.trim()) ||
+        evidenceAttributes.some((attribute) => element.attr(attribute)?.trim())
+    );
+  });
+}
+
 export function extractPlanPage(
   html: string,
   url: string,
@@ -76,6 +95,7 @@ export function extractPlanPage(
     report.issues.push(message);
   };
   const nodes: Record<string, unknown>[] = [];
+  const visited = new Set<object>();
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
       value.forEach(visit);
@@ -83,8 +103,12 @@ export function extractPlanPage(
     }
     if (value && typeof value === 'object') {
       const node = value as Record<string, unknown>;
-      nodes.push(node);
-      if (node['@graph']) visit(node['@graph']);
+      if (visited.has(node)) return;
+      visited.add(node);
+      if (node['@type']) nodes.push(node);
+      for (const key of ['@graph', '@included', 'mainEntity']) {
+        if (node[key]) visit(node[key]);
+      }
     }
   };
   $('script[type="application/ld+json"]').each((_, element) => {
@@ -94,8 +118,9 @@ export function extractPlanPage(
       /* Invalid blocks cannot supply evidence. */
     }
   });
+  const requestedType = plan.jsonLdType ? normalizeJsonLdType(plan.jsonLdType)[0] : undefined;
   const typedEntities = nodes.filter(
-    (node) => !plan.jsonLdType || [node['@type']].flat().includes(plan.jsonLdType)
+    (node) => !requestedType || normalizeJsonLdType(node['@type']).includes(requestedType)
   );
   const jsonLdFields = Object.values(plan.fields).flatMap((field) =>
     field.sources.filter((source) => source.kind === ExtractionSourceKind.JsonLd)
@@ -123,9 +148,9 @@ export function extractPlanPage(
   }
   let scopes: Array<cheerio.Cheerio<AnyNode> | null> = [null];
   try {
-    if (!$(plan.readySelector).length) {
+    if (!hasReadinessEvidence($, plan.readySelector)) {
       report.quality = ExtractionQuality.Inconclusive;
-      report.issues.push('Readiness evidence is missing.');
+      report.issues.push('The readiness selector has no visible text or meaningful content.');
     }
     if (plan.mode === ExtractionMode.Collection)
       scopes = plan.containerSelector
@@ -161,7 +186,8 @@ export function extractPlanPage(
           }
           value = convertFieldValue(raw, field, url);
           if (value !== null) {
-            report.sourcesUsed[name] = sourceIndex;
+            const sourceKey = `${name}#${sourceIndex}`;
+            report.sourcesUsed[sourceKey] = (report.sourcesUsed[sourceKey] ?? 0) + 1;
             break;
           }
         }
