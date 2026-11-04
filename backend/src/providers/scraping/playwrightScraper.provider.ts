@@ -97,8 +97,13 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         }
       });
       const page = await context.newPage();
-      page.setDefaultTimeout(Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs));
-      const response = await page.goto(safeUrl, { waitUntil: 'domcontentloaded' });
+      const navigationTimeoutMs = Math.min(env.PLAYWRIGHT_TIMEOUT_MS, budgetMs);
+      page.setDefaultTimeout(navigationTimeoutMs);
+      page.setDefaultNavigationTimeout(navigationTimeoutMs);
+      const response = await page.goto(safeUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: navigationTimeoutMs,
+      });
       if (new URL(page.url()).origin !== navigation.origin)
         throw new Error('Initial navigation redirected outside the original origin.');
       const records = new Map<string, ExtractedRecord>();
@@ -179,13 +184,28 @@ export class PlaywrightScraperEngine implements IScraperEngine {
         }
         if (action === env.EXTRACTION_MAX_ACTIONS || action + 1 >= env.EXTRACTION_MAX_PAGES) break;
         const previousIdentities = new Set(records.keys());
-        if (plan.pagination?.kind === PaginationKind.Scroll)
-          await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
-        else await page.locator(plan.pagination!.nextSelector!).first().click();
+        const remainingBudgetMs = Math.max(1, budgetMs - (Date.now() - started));
+        const actionTimeoutMs = Math.min(env.PLAYWRIGHT_TIMEOUT_MS, remainingBudgetMs, 10_000);
+        try {
+          if (plan.pagination?.kind === PaginationKind.Scroll)
+            await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+          else
+            await page
+              .locator(plan.pagination!.nextSelector!)
+              .first()
+              .click({ timeout: actionTimeoutMs });
+        } catch (error) {
+          result.report.quality = ExtractionQuality.Partial;
+          result.report.issues.push(
+            `Pagination action failed: ${error instanceof Error ? error.message : String(error)}`
+          );
+          return result;
+        }
         const progressDeadline = Math.min(
           started + budgetMs,
-          Date.now() + env.PLAYWRIGHT_TIMEOUT_MS
+          Date.now() + actionTimeoutMs
         );
+        let progressed = false;
         while (Date.now() < progressDeadline) {
           const currentUrl = page.url();
           const currentHtml = await page.content().catch(() => '');
@@ -200,13 +220,23 @@ export class PlaywrightScraperEngine implements IScraperEngine {
               currentItems.some(
                 (item) => !previousIdentities.has(recordIdentity(item, plan.identityFields))
               );
-            if (hasNewIdentity || current.ended) break;
+            if (hasNewIdentity || current.ended) {
+              progressed = true;
+              break;
+            }
           }
           try {
             await page.waitForTimeout(200);
           } catch {
             break;
           }
+        }
+        if (!progressed) {
+          result.report.quality = ExtractionQuality.Partial;
+          result.report.issues.push(
+            'Pagination action did not produce a new record identity or completion evidence.'
+          );
+          return result;
         }
       }
       if (!result) throw new Error('Interactive extraction produced no document.');
