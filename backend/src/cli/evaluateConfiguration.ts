@@ -6,6 +6,8 @@ import type { ConfigurationEvaluationCase } from '../extraction/configurationEva
 process.env.ENCRYPTION_KEY ||= 'a'.repeat(64);
 // Keep stdout machine-readable; aggregate per-stage metrics are included in the report.
 process.env.LOG_LEVEL ||= 'silent';
+// Configuration evals never send notifications and must not require Resend credentials.
+process.env.NOTIFICATION_PROVIDER = 'console';
 
 const [
   { createFixtureModelProvider, evaluateConfigurationCorpus, validateConfigurationEvaluationCase },
