@@ -1,108 +1,97 @@
-SPECTER - AVALIACAO DE ROBUSTEZ E PLANO DE EVOLUCAO
-Atualizado em 2026-11-04
+SPECTER - PLANO ENXUTO DE ROBUSTEZ
+Revisao: 2026-11-04
 
-OBJETIVO DO PRODUTO
+OBJETIVO
 
-O usuario informa uma URL e descreve em linguagem natural o que deseja vigiar. O Specter deve configurar uma extracao, valida-la e executar o monitor periodicamente. A promessa adequada e: "o sistema tenta configurar e executar a coleta dentro das capacidades implementadas, valida o resultado e explica quando nao consegue". Nao e possivel prometer funcionamento em qualquer URL sem limites: sites variam em autenticacao, conteudo, interacao, politicas de acesso e estabilidade.
+O usuario informa uma URL e, em linguagem natural, descreve o que deseja monitorar. O Specter configura um plano de extracao, valida os dados e executa o plano periodicamente.
 
-AVALIACAO EXECUTIVA
+A arquitetura atual e adequada a esse produto e nao precisa ser reescrita. A separacao entre intencao, estrategia, aquisicao, extracao e validacao facilita evoluir o sistema. O foco recomendado e corrigir a politica de aquisicao e demonstrar a cobertura com dados reais, sem adicionar infraestrutura de crawling que o produto ainda nao precisa.
 
-A arquitetura atual e modular e tem boas fronteiras entre configuracao, plano, aquisicao, extracao, validacao, comparacao e notificacao. Nao e uma colecao de hacks nem precisa ser reescrita. Tem bons controles de prazo, paginas, acoes e itens; nao aceita varios resultados incompletos como baseline; usa leases para evitar trabalho obsoleto; registra entregas numa outbox transacional.
+O FLUXO ATUAL
 
-A principal lacuna de robustez esta na politica de aquisicao. HTTP e browser seguem rotas diferentes, os providers do Cascade sao chamados numa ordem que pode gastar cota sem necessidade, e o resultado do primeiro provider que retorna sem erro nao e validado antes do Cascade parar. Bloqueios repetidos tambem nao tem cooldown: o monitor pode encontrar o mesmo bloqueio em execucoes agendadas sucessivas. Essas sao lacunas concretas de produto, nao motivos para substituir toda a arquitetura.
+1. Configuracao: abre a URL, interpreta pedido e evidencia, descobre conteudo com acoes limitadas, gera um plano v3, executa uma validacao e pode aplicar revisao semantica. A IA nao participa de cada coleta agendada.
+2. O plano separa intencao (entidade, campos, identidade, filtros e escopo) de estrategia (transporte, fontes, condicoes, preparo e paginacao).
+3. Execucao: o plano escolhe HTTP ou browser. O executor extrai DOM, JSON-LD ou JSON observado; pode usar paginacao suportada, iframe e Shadow DOM aberto.
+4. Validacao: verifica campos obrigatorios, identidade, ambiguidades, duplicatas, prontidao e conclusao. Somente COMPLETE/EMPTY substitui a baseline valida.
+5. Comparacao e alerta: calcula mudancas e registra snapshot e entregas numa transacao. O outbox tenta enviar notificacoes com retries limitados.
 
-FLUXO ATUAL
+A arquitetura protege a baseline contra resultados incompletos, limita paginas, acoes, itens e tempo, e separa healing de seletores de erros de acesso. Essas partes devem ser mantidas.
 
-1. Na configuracao, o Specter abre a pagina com browser, interpreta pedido e evidencia, pode fazer acoes limitadas de descoberta, gera um plano v3 e executa uma validacao. A revisao semantica e opcional e ocorre na configuracao/recuperacao, nao a cada coleta.
-2. O plano separa intencao (entidade, campos, identidade, filtros e escopo) de estrategia (transporte, fontes, condicoes, preparo e paginacao). Recuperacao de seletores deve manter a intencao existente.
-3. Cada execucao agendada usa o executor deterministico. O plano pode escolher transporte HTTP ou browser. Sao suportados DOM, JSON-LD e JSON observado, paginacao por link/clique/rolagem, alem de iframe e Shadow DOM aberto no browser.
-4. Resultados passam por validacoes de campos obrigatorios, identidade, ambiguidades, associacoes, duplicatas, prontidao e fim da colecao. Somente COMPLETE/EMPTY atualiza a baseline.
-5. A comparacao gera alteracoes e grava snapshot e entregas do outbox transacionalmente. O envio e at-least-once; uma queda apos aceitacao externa pode duplicar uma notificacao.
+LACUNAS ATUAIS CONFIRMADAS
 
-POLITICA DE AQUISICAO ATUAL
+- HTTP e browser usam politicas de aquisicao diferentes.
+- O Cascade tenta primeiro todos os providers habilitados em ordem e retorna o primeiro que nao lanca excecao. Essa resposta ainda pode ser uma pagina de bloqueio ou ser inutil para a extracao; nesse caso, os providers seguintes nao sao tentados.
+- O caminho browser agendado nao usa o Cascade. Pode usar o proxy unico configurado em HTTP_PROXY.
+- No setup, browser bloqueado pode cair para HTML passivo pelo HTTP/Cascade. Esse fallback nao preserva clique, scroll ou observacao de respostas de rede.
+- Bloqueios reconhecidos nao ativam healing de seletores, corretamente, mas podem reaparecer a cada agendamento. Nao ha cooldown especifico para acesso bloqueado.
+- O corpus deterministico existente e pequeno e nao comprova a cobertura de sites reais.
 
-- O servidor cria o executor com CascadeScraperEngine local Cheerio para o adapter HTTP.
-- CascadeScraperEngine tenta providers habilitados (ZenRows, ScraperAPI, ScrapingBee, Crawlbase) antes do scraper local. Para no primeiro retorno sem excecao. Esse retorno ainda pode ser uma pagina de desafio ou conteudo que falhe na validacao da extracao; nesse caso, os proximos providers nao sao tentados automaticamente.
-- Um plano browser executado em rotina usa BrowserDocumentAdapter diretamente. HTTP_PROXY pode configurar um proxy unico para Playwright, mas esse caminho nao usa o Cascade.
-- Na configuracao, se browser falhar ao abrir a pagina por bloqueio/timeout, DiscoveryDocumentAdapter tenta o adapter HTTP/Cascade. E aquisicao passiva; nao mantem uma sessao browser para cliques, scroll ou observacao de respostas.
-- Bloqueio reconhecido e registrado sem healing de seletores, corretamente. Porem, o monitor permanece ACTIVE e o agendamento regular pode voltar a encontra-lo. O Cascade usa orcamento temporal, mas nao ha circuito de cooldown por dominio/monitor.
+AJUSTES QUE VALEM A PENA MANTER
 
-PLANO DE MELHORIAS PRIORIZADO
+P0 - Validar o resultado do Cascade
 
-P0 - Tornar aquisicao e escalonamento coerentes
+Tratar cada resposta de provider como candidata. Usar o executor e as validacoes existentes para verificar se ela atende ao plano antes de aceita-la. Se houver bloqueio conhecido, ausencia de dados validos ou resultado incompleto, tentar o proximo provider dentro do mesmo orcamento total. Um HTTP 200 ou uma chamada sem excecao nao e sinal suficiente de sucesso.
 
-1. Criar uma politica de aquisicao unica, injetada no executor, que receba URL, capacidades exigidas pelo plano, orcamento, estado de sessao e resultado de cada tentativa. Nao colocar essa decisao dentro do PageExtractor ou do compilador.
-2. Classificar cada tentativa como sucesso validado, bloqueio, erro transitorio, erro de plano ou resultado inconclusivo. HTTP 200 ou resposta sem excecao nao significa sucesso.
-3. Para HTTP, preferir scraper local primeiro se a prioridade for economizar cota; apos sinal explicito de bloqueio, escalar para providers em ordem configuravel. Se a prioridade de determinado dominio for acesso, permitir politica configuravel para provider primeiro.
-4. Passar todo resultado candidato pelo mesmo executor e validacao de intencao antes de aceitar. Se o provider retorna desafio, HTML vazio ou conteudo incompativel, continuar a cascata dentro de limites. Nunca usar a resposta do provider como baseline so porque houve transporte bem-sucedido.
-5. Para plano browser, permitir escalonamento para browser com outra sessao/proxy/provider quando a integracao oferecer uma sessao interativa compativel. HTML passivo so pode ser candidato quando o plano nao exige interacoes, respostas observadas, estado de browser ou capacidades ausentes. Rejeitar fallback incompativel de forma explicita.
-6. Definir orcamento total por execucao e sub-orcamento para cada tentativa/provider. Limitar tentativas; propagar cancelamento; registrar provider, motivo e duracao sem registrar credenciais.
+Implementar isso na fronteira de aquisicao/orquestracao. Nao duplicar regras de extracao dentro de cada provider e nao colocar chamadas de IA no fluxo rotineiro.
 
-P0 - Evitar insistir num bloqueio conhecido
+P0 - Fallback compativel com as capacidades do plano
 
-1. Manter status do monitor (ACTIVE/PAUSED/FAILED) separado do estado de acesso de uma tentativa. Nao criar um status de monitor para cada classe transitoria.
-2. Adicionar cooldown/circuit breaker apos bloqueios repetidos, usando Retry-After quando existir e backoff configuravel quando nao existir. Durante cooldown, nao consumir providers nem repetir tentativas inuteis.
-3. Limitar rotacao/uso de sessoes e providers por dominio; separar bloqueio definitivo daquela sessao de erro transitorio. Renovar proxy sem perder cookies/estado necessario quando a aquisicao exigir identidade consistente.
-4. Ao terminar tentativas, mostrar estado recuperavel e mensagem de usuario curta. Nao marcar como erro de seletor, nao atualizar baseline e nao apresentar detalhes de providers.
+Para planos HTTP, tentar o acesso local primeiro para evitar consumo de cota desnecessario; escalar para providers quando houver sinal de bloqueio ou falha de acesso. A ordem pode ser configuravel se houver um dominio que comprovadamente precise de provider primeiro.
 
-P1 - Tornar configuracao e recuperacao compreensiveis
+Para planos browser, manter Playwright e seu proxy configurado. HTML passivo so e um fallback valido se o plano nao depender de interacoes ou respostas de rede. Se depender, terminar como bloqueado/incompativel, sem tratar o HTML passivo como substituto de uma sessao browser.
 
-1. Persistir um registro estruturado por tentativa: etapa, tipo de aquisicao, provider/sessao identificados sem segredos, categoria de falha, tempo, custo/creditos se a API oferecer, qualidade resultante e decisao de retry.
-2. Usar codigos de erro tipados para bloqueio, timeout, transporte, validacao semantica e plano incompativel. Evitar que excecoes de bibliotecas, seletores CSS ou respostas de provider virem lastError visivel ao usuario. Inspecionar particularmente issues de extracao que hoje podem ser persistidos diretamente.
-3. Separar retries de transporte, recuperacao de acesso e healing de estrategia. Cada um tem contador, orcamento e motivo proprios. Falha de rede nao deve consumir tentativa de healing; bloqueio nao deve recompilar seletores; plano invalido pode justificar recovery limitado.
-4. Registrar transicoes com motivo e revisao do plano, para o suporte responder "o que tentou e por que parou?" sem inferir dos logs.
+Nao e necessario implementar agora pool de fingerprints ou uma plataforma generica de proxies para manter essa regra simples.
 
-P1 - Medir se o produto funciona fora das fixtures
+P0 - Limites de tentativas e bloqueio repetido
 
-1. Construir corpus representativo de paginas estaticas, JS, JSON-LD, paginacao, rolagem, sessao autenticada, bloqueio e mudancas de layout, com resultados esperados revisados.
-2. Medir sucesso validado por categoria, falso COMPLETE, falso alerta, custo por sucesso, numero de tentativas, taxa de bloqueio e recuperacao pelo healing. Separar metricas por metodo e provider.
-3. Avaliar a revisao semantica em dados rotulados. O score atual e uma rubrica, nao uma probabilidade nem prova de correcao.
-4. Fazer testes controlados em sites autorizados com orcamento/cota e redigir limitacoes. Sete fixtures deterministicas nao permitem afirmar cobertura ampla de sites reais.
+Aplicar um orcamento total de tempo e um limite pequeno de tentativas para cada execucao, incluindo providers. Separar erro transitorio, bloqueio, falha do plano e resultado incompleto.
 
-P2 - Preservar simplicidade do escopo
+Adicionar um cooldown simples para bloqueios repetidos, para nao repetir uma tentativa cara em cada agendamento. Preservar status do monitor e baseline; o cooldown pertence a politica de acesso, nao exige uma nova maquina de estados extensa.
 
-1. Manter o executor deterministico e contratos independentes. Adicionar capacidades como novos adapters/acoes tipadas apenas quando os casos medidos justificarem.
-2. Nao adicionar crawling profundo, submissao de formularios, automacao de login generica ou execucao de JavaScript gerado sem necessidade validada do produto.
-3. Nao adotar um framework completo de crawling apenas por parecer corporativo: o Specter monitora URLs fornecidas, nao precisa hoje de uma frontier de descoberta da web. Reutilizar ideias uteis de sessao, escalonamento, retry, throttling e observabilidade.
-4. Documentar a maquina de estados com transicoes permitidas; evitar sobrecarregar ACTIVE/HEALING com estados de transporte.
+P1 - Mensagens e evidencias seguras
 
-MAQUINA DE ESTADOS RECOMENDADA
+Apresentar ao usuario uma mensagem curta para bloqueio, timeout ou falha de extracao. Nao expor URL de provider, credenciais, detalhes internos nem excecoes de parser. Revisar issues da extracao que podem ser persistidos diretamente como lastError. Manter diagnosticos tecnicos nos logs protegidos.
 
-Estado persistente do monitor:
-PENDING_COMPILATION -> ACTIVE <-> PAUSED; ACTIVE -> HEALING -> ACTIVE; falhas esgotadas -> FAILED.
+P1 - Medir cobertura antes de ampliar
 
-Estado de uma tentativa (separado do monitor):
-QUEUED -> LOCAL_ACQUISITION -> VALIDATING.
-VALIDATING + dados validos -> SUCCEEDED.
-LOCAL_ACQUISITION + bloqueio -> PROVIDER_ESCALATION, se houver estrategia compativel e orcamento.
-Erro transitorio -> RETRY_WAIT -> aquisicao, dentro do limite.
-Plano invalido/incompativel -> PLAN_RECOVERY limitada ou FAILED.
-Tentativas/acesso esgotados -> BLOCKED/INCONCLUSIVE terminal da execucao + cooldown do proximo agendamento.
+Ampliar gradualmente o corpus com exemplos reais autorizados e resultados esperados revisados. Medir coleta validada, falsos COMPLETE, falsos alertas, bloqueios, recuperacoes e tentativas de provider. O corpus atual de sete fixtures valida logica deterministica, mas nao e representativo de toda a web.
 
-BLOCKED/INCONCLUSIVE de uma execucao nao deve sobrescrever monitor, baseline ou dados validos anteriores. A politica deve dizer explicitamente se e quando o proximo agendamento sai do cooldown.
+COMPORTAMENTO ESPERADO DEPOIS DOS AJUSTES
 
-O QUE PRESERVAR
+- Site acessivel diretamente: coleta local validada, sem consumir cota de provider.
+- Bloqueio no caminho HTTP: escalonamento limitado; cada resposta candidata precisa passar pela mesma validacao de extracao.
+- Bloqueio num plano browser: tentar apenas alternativas compativeis. Se o plano exige interacao que o provider nao fornece, informar bloqueio/falha de acesso de forma clara.
+- Nenhuma alternativa produz dados validos: preservar baseline, registrar a categoria da falha e respeitar o cooldown.
+- Healing continua reservado para estrategia/seletor que deixou de funcionar, nao para bloqueio ou timeout.
 
-- Separacao entre ExtractionIntent e ExecutionStrategy.
-- Executor compartilhado na configuracao e na rotina.
-- Validacao deterministica, evidencia/proveniencia, identidade estavel e baseline protegida.
-- Interfaces de adapters/readers e composicao explicita.
-- Outbox transacional, fencing por lease e limites de execucao.
-- Healing limitado apenas para falhas que indicam incompatibilidade da estrategia.
+O QUE ADIAR
 
-CRITERIO DE ACEITACAO PARA AS MUDANCAS
+- Pool sofisticado de sessoes, fingerprints e rotacao automatica de identidade.
+- Maquina de estados persistida para cada tentativa, tabela detalhada de todas as aquisicoes e painel de custo por provider.
+- Crawling profundo, descoberta de links fora da URL pedida, automacao generica de login/formularios ou JavaScript gerado.
+- Adocao de um framework completo de crawler ou reescrita do pipeline.
 
-Uma alteracao e melhoria se (a) nao aceita resposta bloqueada ou resultado parcial como sucesso, (b) mantem intencao e baseline quando recovery falha, (c) respeita limite total de tentativas/tempo/custo, (d) classifica motivo corretamente e (e) mostra mensagem compreensivel sem detalhe tecnico. Medir taxa de coleta validada e falsos alertas no corpus representativo antes de expandir capacidades.
+Esses itens so devem voltar ao plano quando metricas mostrarem uma necessidade concreta. O Specter monitora URLs fornecidas; nao precisa de uma frontier de descoberta da web para cumprir seu escopo atual.
 
-REFERENCIAS PUBLICAS DE PADROES
+CRITERIOS DE ACEITACAO
 
-Crawlee - gestao de sessoes, proxy, retirada de sessao bloqueada e escalonamento de tiers:
+1. Uma resposta bloqueada ou incompleta nunca atualiza baseline nem dispara alerta de dado valido.
+2. Providers so sao chamados conforme a politica de escalonamento e dentro de limites de tentativas/tempo.
+3. Um fallback passivo nao e aceito quando faltar uma capacidade exigida pelo plano.
+4. Falhas repetidas de acesso nao entram em loop caro a cada agendamento; cooldown e observavel.
+5. Falha de aquisicao nao aciona healing de seletores; healing nao altera a intencao do usuario.
+6. Mensagens ao usuario nao expoem detalhes tecnicos nem credenciais.
+7. A melhoria e avaliada com casos representativos, incluindo falsos sucessos e falsos alertas.
+
+REFERENCIAS DE PADROES PUBLICOS
+
+Crawlee documenta sessoes que associam proxy, cookies e identidade, aposentadoria de sessoes bloqueadas e escalonamento de tiers. Sao ideias para consultar se o uso justificar essa complexidade:
 https://crawlee.dev/js/docs/next/guides/session-management
 
-Scrapy - middleware de downloader para proxy/retry e pipelines de validacao dos itens:
+Scrapy documenta middleware de downloader para proxy/retry e pipelines para validar itens:
 https://docs.scrapy.org/en/latest/topics/concepts.html
 
-Playwright - isolamento e estado de BrowserContext:
+Playwright documenta contextos de browser isolados:
 https://playwright.dev/docs/browser-contexts
 
-Essas referencias mostram padroes publicos uteis, nao uma especificacao universal nem detalhes internos de sistemas empresariais fechados. Nao ha uma arquitetura unica que garanta sucesso para toda URL.
+Esses exemplos sao referencias publicas, nao uma arquitetura universal nem detalhes internos de sistemas corporativos fechados. Nenhum desenho garante sucesso para qualquer URL.
