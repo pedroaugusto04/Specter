@@ -14,7 +14,6 @@ import {
   DEFAULT_TIMEZONE,
   formatCompactDate,
   formatDateTime,
-  parseErrorMessage,
 } from '@/lib/utils';
 import {
   Clock,
@@ -27,7 +26,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  ShieldAlert,
   Trash2,
   Zap,
 } from 'lucide-react';
@@ -310,7 +308,6 @@ export function JobsTable({
                   job.status === JOB_STATUS.PendingCompilation || job.status === JOB_STATUS.Healing;
                 const isCompiling = isCompilingState || isRecompilingAction;
                 const isPaused = job.status === JOB_STATUS.Paused;
-                const parsedError = job.lastError ? parseErrorMessage(job.lastError) : null;
 
                 return (
                   <tr key={job.id} className="group hover:bg-muted/30 transition-colors">
@@ -334,15 +331,6 @@ export function JobsTable({
                       >
                         {job.userPrompt}
                       </p>
-                      {parsedError && (
-                        <div
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 max-w-[220px]"
-                          title={`${parsedError.title}: ${parsedError.description}`}
-                        >
-                          <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate block">{parsedError.title}</span>
-                        </div>
-                      )}
                     </td>
 
                     {/* Status Pill */}
