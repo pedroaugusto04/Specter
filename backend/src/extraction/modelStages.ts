@@ -12,6 +12,7 @@ import {
   extractionIntentSchema,
 } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
+import { logger } from '../utils/logger.js';
 const discoverySchema = z
   .object({
     action: discoveryActionSchema.nullable(),
@@ -24,14 +25,15 @@ const reviewSchema = z
     evidenceRefs: z.array(z.string().min(1)).min(1),
   })
   .strict();
-function task(
+async function task(
   model: IModelProvider,
   input: StageInput,
   kind: 'intent' | 'discovery' | 'plan' | 'semantic',
   instructions: string,
   extra: unknown = {}
 ) {
-  return model.generate({
+  const started = Date.now();
+  const request = {
     jobId: input.jobId,
     task: kind,
     timeoutMs: input.timeoutMs,
@@ -42,7 +44,31 @@ function task(
       pageEvidence: redactText(input.evidence, input.evidence.length),
       context: redactObject(extra),
     }),
-  });
+  } as const;
+  try {
+    const result = await model.generate(request);
+    logger.info('Model task completed', {
+      jobId: input.jobId,
+      provider: model.name,
+      task: kind,
+      durationMs: Date.now() - started,
+      status: 'SUCCESS',
+    });
+    return result;
+  } catch (error) {
+    logger.warn('Model task failed', {
+      jobId: input.jobId,
+      provider: model.name,
+      task: kind,
+      durationMs: Date.now() - started,
+      status: 'FAILED',
+      errorCode:
+        error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : 'MODEL_TASK_FAILED',
+    });
+    throw error;
+  }
 }
 /** Each stage can be replaced separately, even when they share the same model transport. */
 export function createModelStages(model: IModelProvider): ConfigurationStages {

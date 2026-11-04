@@ -39,6 +39,7 @@ RUN npx playwright install --with-deps chromium
 # Copy compiled files and migrations
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/tests/fixtures/configuration-evaluation-corpus.json ./tests/fixtures/configuration-evaluation-corpus.json
 COPY backend/drizzle.config.ts ./
 
 EXPOSE 3001

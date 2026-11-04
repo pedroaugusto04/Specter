@@ -63,6 +63,7 @@ env:
   COMPILATION_MAX_EVIDENCE_CHARS: ${{ vars.COMPILATION_MAX_EVIDENCE_CHARS || '200000' }}
   HEALING_WINDOW_MS: ${{ vars.HEALING_WINDOW_MS || '86400000' }}
   COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'agy' }}
+  EVALS_LIVE_MODELS_ENABLED: ${{ vars.EVALS_LIVE_MODELS_ENABLED || 'false' }}
   SCRAPER_ENGINE: ${{ vars.SCRAPER_ENGINE || 'playwright' }}
   SCRAPER_CONCURRENCY: ${{ vars.SCRAPER_CONCURRENCY || '3' }}
   PLAYWRIGHT_TIMEOUT_MS: ${{ vars.PLAYWRIGHT_TIMEOUT_MS || '120000' }}
@@ -150,10 +151,13 @@ jobs:
 
       - name: Check backend build and lint
         working-directory: backend
+        env:
+          EVALS_LIVE_MODELS_ENABLED: 'false'
         run: |
           npm run build
           npm run lint
           npm run evaluate:extraction
+          npm run evaluate:configuration
 
       - name: Run backend tests
         working-directory: backend
@@ -243,6 +247,7 @@ jobs:
           COMPILATION_MAX_EVIDENCE_CHARS: ${{ env.COMPILATION_MAX_EVIDENCE_CHARS }}
           HEALING_WINDOW_MS: ${{ env.HEALING_WINDOW_MS }}
           COMPILER_PROVIDER: ${{ env.COMPILER_PROVIDER }}
+          EVALS_LIVE_MODELS_ENABLED: ${{ env.EVALS_LIVE_MODELS_ENABLED }}
           NOTIFICATION_PROVIDER: ${{ vars.NOTIFICATION_PROVIDER || env.NOTIFICATION_PROVIDER }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}
           NOTIFICATION_FROM_EMAIL: ${{ vars.NOTIFICATION_FROM_EMAIL || env.NOTIFICATION_FROM_EMAIL }}

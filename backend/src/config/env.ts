@@ -22,6 +22,10 @@ export const envSchema = z.object({
 
   // AI Compiler Provider
   COMPILER_PROVIDER: z.enum(['agy', 'codex']).default('agy'),
+  EVALS_LIVE_MODELS_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   AGY_CLI_PATH: z.string().min(1).default('agy'),
   CODEX_CLI_PATH: z.string().min(1).default('codex'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),

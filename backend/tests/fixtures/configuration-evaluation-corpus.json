@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "main product title and price",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": { "description": "Main chair title", "type": "string", "required": true },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [{ "action": null }],
+        "plan": [
+          {
+            "transport": "http",
+            "records": { "kind": "dom", "selector": "main" },
+            "fields": {
+              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
+              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            },
+            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [{ "title": "Chair", "price": 100 }],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "previousRecords": [{ "title": "Chair", "price": 100 }],
+      "expectChange": false
+    },
+    {
+      "name": "Brazilian localized product price",
+      "prompt": "Track the main coffee price in Brazilian reais",
+      "snapshot": {
+        "html": "<main><h1>Café especial</h1><b class=\"current\">R$ 1.234,50</b></main>",
+        "url": "https://example.com/cafe",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main coffee product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main coffee product title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price in Brazilian reais",
+              "type": "number",
+              "required": true,
+              "locale": "pt-BR"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [{ "action": null }],
+        "plan": [
+          {
+            "transport": "http",
+            "records": { "kind": "dom", "selector": "main" },
+            "fields": {
+              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
+              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            },
+            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 9,
+          "reasons": ["The extracted product and localized price match the request."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [{ "title": "Café especial", "price": 1234.5 }],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED"
+    },
+    {
+      "name": "discovery reveals current price",
+      "prompt": "Open the details and track the main chair price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><button>Details</button></main>",
+        "url": "https://example.com/chair",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "discoverySnapshots": [
+        {
+          "html": "<main><h1>Chair</h1><button>Details</button><b class=\"current\">$90</b></main>",
+          "url": "https://example.com/chair",
+          "httpStatus": 200,
+          "responses": []
+        }
+      ],
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": { "description": "Main chair title", "type": "string", "required": true },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": {
+              "kind": "click",
+              "locator": { "kind": "role", "role": "button", "name": "Details" }
+            }
+          },
+          { "action": null }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": { "kind": "dom", "selector": "main" },
+            "fields": {
+              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
+              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            },
+            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The clicked detail state exposed the requested main product price."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [{ "title": "Chair", "price": 90 }],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED"
+    }
+  ]
+}

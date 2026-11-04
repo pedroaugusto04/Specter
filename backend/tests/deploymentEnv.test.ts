@@ -10,14 +10,23 @@ const tuning = {
   ACQUISITION_MAX_ATTEMPTS: '2',
   ACCESS_BLOCK_THRESHOLD: '3',
   ACCESS_BLOCK_COOLDOWN_MINUTES: '30',
+  EVALS_LIVE_MODELS_ENABLED: 'true',
 };
-describe('Acquisition environment configuration', () => {
+describe('Environment configuration', () => {
   it('uses documented defaults and rejects invalid tuning values', () => {
     expect(parseEnv({ ENCRYPTION_KEY: 'a'.repeat(64), NODE_ENV: 'test' })).toMatchObject({
       ACQUISITION_MAX_ATTEMPTS: 3,
       ACCESS_BLOCK_THRESHOLD: 2,
       ACCESS_BLOCK_COOLDOWN_MINUTES: 60,
+      EVALS_LIVE_MODELS_ENABLED: false,
     });
+    expect(
+      parseEnv({
+        ENCRYPTION_KEY: 'a'.repeat(64),
+        NODE_ENV: 'test',
+        EVALS_LIVE_MODELS_ENABLED: 'true',
+      }).EVALS_LIVE_MODELS_ENABLED
+    ).toBe(true);
     for (const key of Object.keys(tuning)) {
       for (const invalid of ['0', '-1', '1.5', 'invalid'])
         expect(() =>
@@ -65,6 +74,7 @@ describe('Acquisition environment configuration', () => {
       for (const example of ['../.env.example', '.env.example']) {
         const contents = await readFile(example, 'utf8');
         expect(contents).toContain('\nENCRYPTION_KEY=');
+        expect(contents).toContain('\nEVALS_LIVE_MODELS_ENABLED=false');
       }
       for (const key of Object.keys(tuning)) expect(workflow).toContain(`vars.${key}`);
     } finally {

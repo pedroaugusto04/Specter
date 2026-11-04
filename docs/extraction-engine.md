@@ -172,12 +172,27 @@ Run `npm run build`, `npm run lint`, `npm test` in the backend and frontend
 typecheck/build. Tests include real Chromium against isolated local fixtures
 and PostgreSQL-compatible PGlite for migration and transaction checks.
 
-`npm run evaluate:extraction` runs the versioned golden corpus and reports field
-accuracy, exact entity matches, quality classification, false alerts, duration
-and model calls. This corpus evaluates deterministic extraction behavior; it
-does not establish live-site coverage or semantic-model accuracy. Extend it
-with sanitized production failures and separately assess live compiler/provider
-quality before making broad coverage claims.
+`npm run evaluate:extraction` runs the versioned deterministic golden corpus.
+`npm run evaluate:configuration` runs recorded model responses through the
+fixture-backed configuration pipeline by default and reports field accuracy,
+exact entity matches, quality, alerts, stage durations and model calls. The
+versioned configuration corpus uses sanitized, local page snapshots and never
+contacts a live site. Run `npm run build` first so the compiled eval runner is
+available.
+
+Set `EVALS_LIVE_MODELS_ENABLED=true` to let the same configuration eval call the
+selected `COMPILER_PROVIDER`. This is opt-in, may incur provider usage, and does
+not change normal application calls or run during deployment. Keep the default
+false in `.env` and GitHub Actions Variables unless deliberately running a live
+eval. To run one explicitly, use
+`EVALS_LIVE_MODELS_ENABLED=true npm run evaluate:configuration`. Model-task and
+configuration-stage logs include provider/task or stage, status and duration,
+but never the prompt or evidence. Provider cost is not reported because the
+current model-provider contract does not expose usage metadata.
+
+Both corpora are regression evidence, not proof of live-site coverage. Extend
+them with sanitized production failures and assess live provider quality before
+making broad coverage claims.
 
 ### Shared vocabulary and maintenance
 

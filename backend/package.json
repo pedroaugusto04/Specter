@@ -20,7 +20,8 @@
     "db:generate": "node --import tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "evaluate:extraction": "tsx scripts/evaluate-extraction.ts"
+    "evaluate:extraction": "tsx scripts/evaluate-extraction.ts",
+    "evaluate:configuration": "node dist/cli/evaluateConfiguration.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",

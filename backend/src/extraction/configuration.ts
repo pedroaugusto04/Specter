@@ -26,6 +26,7 @@ import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
 import { sortObjectKeys } from '../utils/diffHasher.js';
+import { logger } from '../utils/logger.js';
 
 export interface ConfigurationRequest {
   jobId: string;
@@ -82,14 +83,32 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       const started = Date.now();
       try {
         const result = await action();
-        trace.push({ stage, durationMs: Date.now() - started, status: TraceStatus.Success });
+        const durationMs = Date.now() - started;
+        trace.push({ stage, durationMs, status: TraceStatus.Success });
+        logger.info('Configuration stage completed', {
+          jobId: request.jobId,
+          stage,
+          durationMs,
+          status: TraceStatus.Success,
+        });
         return result;
       } catch (error) {
+        const durationMs = Date.now() - started;
         trace.push({
           stage,
-          durationMs: Date.now() - started,
+          durationMs,
           status: TraceStatus.Failed,
           code: 'STAGE_ERROR',
+        });
+        logger.warn('Configuration stage failed', {
+          jobId: request.jobId,
+          stage,
+          durationMs,
+          status: TraceStatus.Failed,
+          errorCode:
+            error && typeof error === 'object' && 'code' in error
+              ? String(error.code)
+              : 'STAGE_ERROR',
         });
         throw error;
       }
