@@ -122,7 +122,6 @@ export class JobService {
       webhookUrl,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
-      semanticPolicy: request.semanticPolicy ?? null,
     });
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, CompilationReason.Initial);
@@ -211,7 +210,6 @@ export class JobService {
       }
     }
 
-    if (request.semanticPolicy !== undefined) patch.semanticPolicy = request.semanticPolicy;
     if (patch.extractionPlan) patch.contractRevision = randomUUID();
 
     const needsRecompile =

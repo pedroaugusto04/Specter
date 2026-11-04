@@ -1,5 +1,4 @@
 import type { AlertDelivery } from '../notifications/contracts.js';
-import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
@@ -18,7 +17,6 @@ export interface CreateJobInput {
   webhookUrl?: string | null;
   cronExpression: string;
   captureScreenshotOnChange?: boolean;
-  semanticPolicy?: SemanticPolicy | null;
 }
 
 export interface UpdateJobPatch {
@@ -30,7 +28,6 @@ export interface UpdateJobPatch {
   bullmqRepeatableKey?: string | null;
   contractRevision?: string | null;
   planRevision?: string | null;
-  semanticPolicy?: SemanticPolicy | null;
   extractionPlan?: ExtractionPlan | null;
   status?: JobStatus;
   lastError?: string | null;
@@ -103,7 +100,6 @@ export class DrizzleJobRepository implements IJobRepository {
         webhookUrl: input.webhookUrl ?? null,
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
-        semanticPolicy: input.semanticPolicy ?? null,
         status: JobStatus.PendingCompilation,
         failureCount: 0,
       })

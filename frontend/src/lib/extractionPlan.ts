@@ -11,7 +11,6 @@ export type {
   ExtractionPlan,
   ExtractionReport,
   FieldEvidence,
-  SemanticPolicy,
   SemanticReview,
   TriggerOperator,
   TriggerRule,

@@ -18,7 +18,6 @@ export const JobMapper = {
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       contractRevision: row.contractRevision,
       planRevision: row.planRevision,
-      semanticPolicy: row.semanticPolicy,
       extractionPlan: row.extractionPlan ?? null,
       status: parseEnumValue(JobStatus, row.status, 'job status'),
       lastError: row.lastError ?? null,
@@ -33,10 +32,7 @@ export const JobMapper = {
 
   entityToDto(
     entity: ScrapingJobEntity,
-    context: {
-      semanticDefaults: { enabled: boolean; threshold: number };
-      accessState: AccessState | null;
-    }
+    context: { accessState: AccessState | null }
   ): ScrapingJobDto {
     return {
       id: entity.id,
@@ -48,12 +44,7 @@ export const JobMapper = {
       cronExpression: entity.cronExpression,
       contractRevision: entity.contractRevision,
       planRevision: entity.planRevision,
-      semanticPolicy: entity.semanticPolicy,
       extractionPlan: entity.extractionPlan,
-      effectiveSemanticPolicy: {
-        enabled: entity.semanticPolicy?.enabled ?? context.semanticDefaults.enabled,
-        threshold: entity.semanticPolicy?.threshold ?? context.semanticDefaults.threshold,
-      },
       status: entity.status,
       accessState: context.accessState,
       lastError: entity.lastError,

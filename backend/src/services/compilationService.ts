@@ -68,7 +68,6 @@ export class CompilationService {
         url: job.url,
         prompt: job.userPrompt,
         intent: job.extractionPlan?.intent,
-        semanticPolicy: job.semanticPolicy ?? undefined,
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });

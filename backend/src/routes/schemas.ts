@@ -1,4 +1,3 @@
-import { semanticPolicySchema } from '../types/extractionPlan.js';
 import { z } from 'zod';
 import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js';
 import { env } from '../config/env.js';
@@ -73,7 +72,6 @@ export const jobInputSchema = z.object({
     .nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
   captureScreenshotOnChange: z.boolean().default(false),
-  semanticPolicy: semanticPolicySchema.nullable().optional(),
 });
 
 export const jobUpdateSchema = z.object({
@@ -110,7 +108,6 @@ export const jobUpdateSchema = z.object({
     .nullable(),
   cronExpression: cronExpressionSchema.optional(),
   captureScreenshotOnChange: z.boolean().optional(),
-  semanticPolicy: semanticPolicySchema.nullable().optional(),
   triggerRules: z.array(triggerRuleSchema).optional(),
   triggerMatchMode: triggerMatchModeSchema.optional(),
 });

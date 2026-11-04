@@ -1,4 +1,3 @@
-import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { ExtractionPlan, ExtractionReport } from './extractionPlan.js';
 import type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 import type { ExtractedPayload } from './extractor.js';
@@ -52,7 +51,6 @@ export interface ScrapingJobEntity {
   bullmqRepeatableKey: string | null;
   contractRevision?: string | null;
   planRevision?: string | null;
-  semanticPolicy?: SemanticPolicy | null;
   extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;

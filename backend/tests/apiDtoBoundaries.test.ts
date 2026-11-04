@@ -173,7 +173,7 @@ describe('HTTP DTO boundaries', () => {
       expect(response.statusCode).toBe(200);
       const dto = response.json().data;
       expect(dto).toHaveProperty('accessState', null);
-      expect(dto).toHaveProperty('effectiveSemanticPolicy');
+      expect(dto).not.toHaveProperty('effectiveSemanticPolicy');
       expect(dto).not.toHaveProperty('bullmqRepeatableKey');
       expect(dto).not.toHaveProperty('internalOnly');
     }
@@ -206,10 +206,8 @@ describe('HTTP DTO boundaries', () => {
     vi.spyOn(jobs, 'getStats').mockResolvedValueOnce(stats);
     const dashboard = await app.inject({ method: 'GET', url: '/api/stats', headers });
     expect(dashboard.body).not.toContain('private-stat');
-    const presenter = new JobPresenter(undefined, { enabled: false, threshold: 8 });
-    expect((await presenter.present(jobs.jobs.get(id)!)).effectiveSemanticPolicy).toEqual({
-      enabled: false,
-      threshold: 8,
-    });
+    expect((await new JobPresenter().present(jobs.jobs.get(id)!))).not.toHaveProperty(
+      'effectiveSemanticPolicy'
+    );
   });
 });

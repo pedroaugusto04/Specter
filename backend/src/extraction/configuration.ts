@@ -15,7 +15,6 @@ import type {
   DocumentSnapshot,
   ExtractionIntent,
   ExtractionPlan,
-  SemanticPolicy,
   SemanticReview,
   StageTrace,
 } from './contracts.js';
@@ -33,7 +32,6 @@ export interface ConfigurationRequest {
   url: string;
   prompt: string;
   intent?: ExtractionIntent;
-  semanticPolicy?: SemanticPolicy;
   storageState?: unknown;
   captureScreenshot?: boolean;
 }
@@ -189,8 +187,8 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           !execution.report.validatedSourceRecords
         )
           throw new Error('An initially empty collection cannot validate field sources.');
-        const enabled = request.semanticPolicy?.enabled ?? this.options.semanticEnabled;
-        const threshold = request.semanticPolicy?.threshold ?? this.options.semanticThreshold;
+        const enabled = this.options.semanticEnabled;
+        const threshold = this.options.semanticThreshold;
         let semanticReview: SemanticReview = {
           status: SemanticReviewStatus.Skipped,
           score: null,

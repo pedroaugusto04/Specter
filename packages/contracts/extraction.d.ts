@@ -120,11 +120,6 @@ export interface ExtractionPlan {
   strategy: ExecutionStrategy;
 }
 
-export interface SemanticPolicy {
-  enabled?: boolean;
-  threshold?: number;
-}
-
 export interface SemanticReview {
   status: SemanticReviewStatus;
   score: number | null;

@@ -32,23 +32,21 @@ describe('Form payload contracts', () => {
     expect(create).not.toHaveProperty('triggerRules');
     expect(formToUpdateJob(form)).toHaveProperty('triggerRules', []);
   });
-  it('initializes the editor from a DTO and preserves scheduling and semantic policy', async () => {
+  it('initializes the editor from a DTO and preserves scheduling', async () => {
     const repository = new InMemoryJobRepository();
     const job = await repository.createJob({
       url: 'https://example.com',
       userPrompt: 'title',
       notificationEmail: '',
       cronExpression: '0 12 * * MON',
-      semanticPolicy: { enabled: false },
     });
-    const updated = await repository.updateJob(job.id, { semanticPolicy: { enabled: false } });
+    const updated = await repository.updateJob(job.id, {});
     const dto = await new JobPresenter().present(updated!);
     const values = jobToForm(dto);
     expect(values.useCustomCron).toBe(true);
     expect(formToUpdateJob(values)).toMatchObject({
       url: dto.url,
       cronExpression: dto.cronExpression,
-      semanticPolicy: dto.semanticPolicy,
     });
   });
   it('keeps saved secrets write-only and distinguishes preservation, replacement and removal', () => {

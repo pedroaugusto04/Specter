@@ -1,5 +1,4 @@
 import type { EncryptedJsonEnvelope } from '../types/crypto.js';
-import type { SemanticPolicy } from '../extraction/contracts.js';
 import type { AlertPayload } from '../providers/notifications/notification.interface.js';
 import type { DeliveryChannel } from '../notifications/contracts.js';
 import type { ExtractionReport, ExtractionPlan } from '../types/extractionPlan.js';
@@ -76,7 +75,6 @@ export const scrapingJobs = pgTable(
     // Compiled AI Extractor Configuration
     contractRevision: text('contract_revision'),
     planRevision: text('plan_revision'),
-    semanticPolicy: jsonb('semantic_policy').$type<SemanticPolicy>(),
     extractionPlan: jsonb('extractor_config').$type<ExtractionPlan>(),
 
     status: text('status', {

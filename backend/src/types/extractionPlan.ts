@@ -16,7 +16,6 @@ export type {
   ExtractionIntent,
   IntentField as ExtractionField,
   TriggerRule,
-  SemanticPolicy,
   ExtractionReport,
 } from '../extraction/contracts.js';
 
@@ -72,12 +71,6 @@ const source = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal(SourceKind.Response), path, association: text.optional() }).strict(),
 ]);
-export const semanticPolicySchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    threshold: z.number().int().min(0).max(10).optional(),
-  })
-  .strict();
 export const extractionIntentSchema = z
   .object({
     entity: text,

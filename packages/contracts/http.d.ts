@@ -1,4 +1,4 @@
-import type { SemanticPolicy, ExtractionPlan, ExtractionReport } from './extraction.js';
+import type { ExtractionPlan, ExtractionReport } from './extraction.js';
 import type { JobStatus, RunStatus, ChangeStatus, AccessFailure } from './vocabulary.js';
 import type { ExtractedPayload } from './payload.js';
 import type { DiffSummary } from './diff.js';
@@ -46,9 +46,7 @@ export interface ScrapingJobDto {
   cronExpression: string;
   contractRevision?: string | null;
   planRevision?: string | null;
-  semanticPolicy?: SemanticPolicy | null;
   extractionPlan: ExtractionPlan | null;
-  effectiveSemanticPolicy: { enabled: boolean; threshold: number };
   status: JobStatus;
   accessState?: AccessState | null;
   lastError: string | null;
@@ -91,7 +89,6 @@ export interface CreateJobRequest {
   webhookUrl?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
-  semanticPolicy?: SemanticPolicy | null;
 }
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {
   triggerRules?: import('./extraction.js').TriggerRule[];

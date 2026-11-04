@@ -67,12 +67,9 @@ function setup(review: unknown, enabled = true) {
 }
 const request = { jobId: 'fixture', url: snapshot.url, prompt: 'Find the title' };
 describe('Semantic policy and pipeline stages', () => {
-  it('never calls reviewer and never gates when disabled per monitor', async () => {
-    const fixture = setup({ score: 0, reasons: ['Wrong entity'], evidenceRefs: ['title'] });
-    const result = await fixture.pipeline.configure({
-      ...request,
-      semanticPolicy: { enabled: false },
-    });
+  it('uses the global disabled policy without invoking the reviewer', async () => {
+    const fixture = setup({ score: 0, reasons: ['Wrong entity'], evidenceRefs: ['title'] }, false);
+    const result = await fixture.pipeline.configure(request);
     expect(result.semanticReview.status).toBe('SKIPPED');
     expect(fixture.calls).not.toContain('semantic');
     expect(result.execution.report.trace?.find((step) => step.stage === 'semantic')?.status).toBe(
@@ -96,22 +93,12 @@ describe('Semantic policy and pipeline stages', () => {
     const result = await setup(new Error('Unavailable')).pipeline.configure(request);
     expect(result.semanticReview.status).toBe('ERROR');
   });
-  it('honors per-monitor threshold and frozen recovery intent', async () => {
+  it('uses the global threshold and frozen recovery intent', async () => {
     const fixture = setup({ score: 6, reasons: ['Partly ambiguous'], evidenceRefs: ['title'] });
     await expect(
-      fixture.pipeline.configure({
-        ...request,
-        intent: plan.intent,
-        semanticPolicy: { threshold: 7 },
-      })
-    ).rejects.toThrow('rejected');
+      fixture.pipeline.configure({ ...request, intent: plan.intent })
+    ).resolves.toMatchObject({ semanticReview: { status: 'WARNING', score: 6 } });
     expect(fixture.calls).not.toContain('intent');
-  });
-  it('uses the global disabled policy without invoking the reviewer', async () => {
-    const fixture = setup({ score: 0, reasons: ['Wrong'], evidenceRefs: ['title'] }, false);
-    const result = await fixture.pipeline.configure(request);
-    expect(result.semanticReview.status).toBe('SKIPPED');
-    expect(fixture.calls).not.toContain('semantic');
   });
   it('does not semantically review incomplete data', async () => {
     const fixture = setup({ score: 10, reasons: ['Good'], evidenceRefs: ['title'] });

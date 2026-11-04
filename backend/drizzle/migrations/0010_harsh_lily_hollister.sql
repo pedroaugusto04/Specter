@@ -1,0 +1,1 @@
+ALTER TABLE "scraping_jobs" DROP COLUMN "semantic_policy";
