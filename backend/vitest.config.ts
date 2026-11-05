@@ -5,8 +5,9 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('../frontend/src', import.meta.url)) } },
   test: {
     globals: true,
-    // Keep tests independent of provider credentials configured in the shell.
+    // Keep tests independent of provider credentials and deployment tuning configured in the shell/.env.
     env: {
+      ACQUISITION_MAX_ATTEMPTS: '3',
       ENCRYPTION_KEY: 'a'.repeat(64),
       COMPILER_PROVIDER: 'agy',
       COMPILER_API_MODEL: '',
