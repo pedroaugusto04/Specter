@@ -21,7 +21,12 @@ function browserFixture() {
     locator: () => element,
     url: () => 'https://example.com',
   };
-  const context = { route: vi.fn(), newPage: async () => page, close: vi.fn(async () => {}) };
+  const context = {
+    route: vi.fn(),
+    addInitScript: vi.fn(async () => {}),
+    newPage: async () => page,
+    close: vi.fn(async () => {}),
+  };
   const browser = { newContext: async () => context, close: vi.fn(async () => {}) };
   return { browser, context };
 }
