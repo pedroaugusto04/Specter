@@ -110,14 +110,18 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       execution.check();
       // Mask automation fingerprint so anti-bot systems cannot detect headless Chromium.
       await context.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-        Object.defineProperty(navigator, 'languages', {
-          get: () => ['pt-BR', 'pt', 'en-US', 'en'],
-        });
-        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-        (
-          globalThis as unknown as { chrome?: Record<string, unknown> }
-        ).chrome = {
+        const g = globalThis as unknown as {
+          navigator?: Record<string, unknown>;
+          chrome?: Record<string, unknown>;
+        };
+        if (typeof g.navigator !== 'undefined') {
+          Object.defineProperty(g.navigator, 'webdriver', { get: () => undefined });
+          Object.defineProperty(g.navigator, 'languages', {
+            get: () => ['pt-BR', 'pt', 'en-US', 'en'],
+          });
+          Object.defineProperty(g.navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+        }
+        g.chrome = {
           runtime: {},
           loadTimes: () => {},
           csi: () => {},
