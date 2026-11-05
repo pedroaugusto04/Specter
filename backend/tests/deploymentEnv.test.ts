@@ -50,6 +50,22 @@ describe('Environment configuration', () => {
       }).ENCRYPTION_KEY
     ).toBe('a'.repeat(64));
   });
+  it('requires Gemini model and key only when the API provider is selected', () => {
+    const base = { NODE_ENV: 'test', ENCRYPTION_KEY: 'a'.repeat(64) };
+    expect(() => parseEnv({ ...base, COMPILER_PROVIDER: 'api' })).toThrow('COMPILER_API_MODEL');
+    expect(() =>
+      parseEnv({ ...base, COMPILER_PROVIDER: 'api', COMPILER_API_MODEL: 'gemini-test-model' })
+    ).toThrow('COMPILER_API_KEY');
+    expect(
+      parseEnv({
+        ...base,
+        COMPILER_PROVIDER: 'api',
+        COMPILER_API_MODEL: 'gemini-test-model',
+        COMPILER_API_KEY: 'test-secret',
+      }).COMPILER_PROVIDER
+    ).toBe('api');
+    expect(parseEnv(base).COMPILER_PROVIDER).toBe('agy');
+  });
   it('preserves custom values through the deployment environment generator', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'specter-env-'));
     try {
@@ -62,6 +78,9 @@ describe('Environment configuration', () => {
             ...process.env,
             ...tuning,
             ENCRYPTION_KEY: 'a'.repeat(64),
+            COMPILER_PROVIDER: 'api',
+            COMPILER_API_MODEL: 'gemini-test-model',
+            COMPILER_API_KEY: 'test-secret',
           },
         }
       );
@@ -69,6 +88,9 @@ describe('Environment configuration', () => {
       for (const [key, value] of Object.entries(tuning))
         expect(generated).toContain(`${key}=${value}\n`);
       expect(generated).toContain(`ENCRYPTION_KEY=${'a'.repeat(64)}\n`);
+      expect(generated).toContain('COMPILER_PROVIDER=api\n');
+      expect(generated).toContain('COMPILER_API_MODEL=gemini-test-model\n');
+      expect(generated).toContain('COMPILER_API_KEY=test-secret\n');
       const workflow = await readFile('../.github/workflows/deploy-fullstack.yml', 'utf8');
       expect(workflow).toContain('secrets.ENCRYPTION_KEY');
       for (const example of ['../.env.example', '.env.example']) {

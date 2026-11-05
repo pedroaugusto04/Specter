@@ -78,6 +78,20 @@ export class CompilerTimeoutError extends DomainError {
   }
 }
 
+/** Gemini API request failed. Transient HTTP failures may be retried by the queue. */
+export class CompilerApiRequestError extends DomainError {
+  constructor(statusCode: number | undefined, cause?: unknown) {
+    const retryable =
+      statusCode === undefined || statusCode === 408 || statusCode === 429 || statusCode >= 500;
+    super('Compiler API request failed', {
+      code: statusCode === undefined ? 'COMPILER_API_UNAVAILABLE' : 'COMPILER_API_REJECTED',
+      statusCode: statusCode && statusCode >= 400 && statusCode < 600 ? statusCode : 502,
+      isRetryable: retryable,
+      cause,
+    });
+  }
+}
+
 /**
  * Thrown when the AI Compiler produces an invalid schema or fails the pre-activation smoke test.
  */

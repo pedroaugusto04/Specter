@@ -27,7 +27,13 @@ export const envSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 
   // AI Compiler Provider
-  COMPILER_PROVIDER: z.enum(['agy', 'codex']).default('agy'),
+  COMPILER_PROVIDER: z.enum(['agy', 'codex', 'api']).default('agy'),
+  COMPILER_API_MODEL: z.string().trim().default(''),
+  COMPILER_API_KEY: z.string().default(''),
+  COMPILER_API_BASE_URL: z
+    .string()
+    .url()
+    .default('https://generativelanguage.googleapis.com/v1beta'),
   EVALS_LIVE_MODELS_ENABLED: z
     .enum(['true', 'false'])
     .default('false')
@@ -137,6 +143,17 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const parsed = result.data;
+
+  if (parsed.COMPILER_PROVIDER === 'api') {
+    const missing: string[] = [];
+    if (!parsed.COMPILER_API_MODEL) missing.push('COMPILER_API_MODEL');
+    if (!parsed.COMPILER_API_KEY) missing.push('COMPILER_API_KEY');
+    if (missing.length > 0) {
+      throw new Error(
+        `Invalid environment configuration:\n${missing.map((key) => `  - ${key}: Required when COMPILER_PROVIDER is set to "api"`).join('\n')}`
+      );
+    }
+  }
 
   if (
     parsed.NOTIFICATION_PROVIDER === 'resend' &&
