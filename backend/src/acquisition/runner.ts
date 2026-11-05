@@ -41,6 +41,21 @@ export async function acquire<T>(
       rejected = result;
     } catch (error) {
       const category = classifyAccessFailure(error);
+      logger.warn('Acquisition candidate failed', {
+        runId: context.runId,
+        provider: candidate.name,
+        category: category ?? AccessFailure.Provider,
+        errorCode:
+          error && typeof error === 'object' && 'code' in error
+            ? String(error.code)
+            : error instanceof Error
+              ? error.name
+              : 'UNKNOWN_ERROR',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        causeMessage:
+          error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
+        durationMs: Date.now() - started,
+      });
       if (!category && !candidate.external) throw error;
       // A provider quota/error does not erase a confirmed target block.
       failure =

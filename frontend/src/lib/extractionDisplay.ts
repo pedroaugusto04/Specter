@@ -1,6 +1,6 @@
 import type { IntentField } from '@specter/contracts';
 
-export type ExtractionFieldDefinitions = Record<string, IntentField>;
+export type ExtractionFieldDefinitions = Record<string, Pick<IntentField, 'displayName'>>;
 
 export function getExtractionFieldLabels(fields: ExtractionFieldDefinitions = {}) {
   return Object.fromEntries(

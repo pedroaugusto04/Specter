@@ -1,5 +1,4 @@
 import type { ScrapingJobDto, JobRunDto } from '@specter/contracts';
-import { presentExtractionReport } from '../utils/errorSanitizer.js';
 import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
@@ -41,7 +40,21 @@ export const JobMapper = {
       notificationEmail: entity.notificationEmail ?? '',
       webhookUrl: entity.webhookUrl ?? null,
       cronExpression: entity.cronExpression,
-      extractionPlan: entity.extractionPlan,
+      extractionPlan: entity.extractionPlan
+        ? {
+            intent: {
+              scope: entity.extractionPlan.intent.scope,
+              fields: Object.fromEntries(
+                Object.entries(entity.extractionPlan.intent.fields).map(([key, field]) => [
+                  key,
+                  { displayName: field.displayName },
+                ])
+              ),
+              triggerRules: entity.extractionPlan.intent.triggerRules,
+              triggerMatchMode: entity.extractionPlan.intent.triggerMatchMode,
+            },
+          }
+        : null,
       status: entity.status,
       accessState: context.accessState,
       lastError: entity.lastError,
@@ -75,7 +88,7 @@ export const JobMapper = {
       id: entity.id,
       jobId: entity.jobId,
       extractionReport: entity.extractionReport
-        ? presentExtractionReport(entity.extractionReport)
+        ? { quality: entity.extractionReport.quality }
         : entity.extractionReport,
       extractedData: entity.extractedData,
       hasChanges: entity.hasChanges,

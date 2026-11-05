@@ -283,6 +283,17 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
                     : SemanticReviewStatus.Passed,
             };
           } catch (error) {
+            logger.warn('Semantic review failed after deterministic validation', {
+              jobId: request.jobId,
+              attempt: attempt + 1,
+              errorCode:
+                error && typeof error === 'object' && 'code' in error
+                  ? String(error.code)
+                  : error instanceof Error && error.name === 'ZodError'
+                    ? 'MODEL_VALIDATION_ERROR'
+                    : 'SEMANTIC_REVIEW_ERROR',
+              errorMessage: error instanceof Error ? error.message : String(error),
+            });
             logger.diagnostic(
               'Semantic review failed; deterministic validation remains authoritative',
               {

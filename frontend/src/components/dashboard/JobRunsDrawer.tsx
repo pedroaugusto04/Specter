@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
@@ -15,7 +15,7 @@ import {
   AlertCircle,
   Camera,
   Clock,
-  Code2,
+  ListChecks,
   ExternalLink,
   GitCompare,
   ShieldAlert,
@@ -24,7 +24,20 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import * as React from 'react';
-import { ExtractionEvidence } from './ExtractionEvidence';
+
+const MONITOR_STATUS = {
+  [JOB_STATUS.PendingCompilation]: { label: 'Setting up', variant: 'secondary' },
+  [JOB_STATUS.Active]: { label: 'Ready to monitor', variant: 'success' },
+  [JOB_STATUS.Healing]: { label: 'Checking monitor', variant: 'warning' },
+  [JOB_STATUS.Paused]: { label: 'Paused', variant: 'secondary' },
+  [JOB_STATUS.Failed]: { label: 'Needs attention', variant: 'destructive' },
+} as const;
+
+function displayValue(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) return 'Not available';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
 
 export function JobRunsDrawer({
   job,
@@ -40,6 +53,18 @@ export function JobRunsDrawer({
   const latestDiff = data?.latestDiff || null;
   const extractionFields = job?.extractionPlan?.intent.fields ?? {};
   const fieldLabels = getExtractionFieldLabels(extractionFields);
+  const latestReading = runs.find(
+    (run) => run.status === RUN_STATUS.Success && run.extractedData !== null
+  );
+  const latestData = latestReading?.extractedData;
+  const latestRecord = latestData && !('items' in latestData) ? latestData : null;
+  const monitorStatus = MONITOR_STATUS[job?.status ?? JOB_STATUS.PendingCompilation];
+  const missingField = /Required field '([^']+)' is missing or invalid\./.exec(
+    job?.lastError ?? ''
+  )?.[1];
+  const issueMessage = missingField
+    ? `We couldn't find ${fieldLabels[missingField] ?? 'a requested field'} on this page.`
+    : parseErrorMessage(job?.lastError)?.description;
 
   const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
@@ -97,8 +122,8 @@ export function JobRunsDrawer({
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Code2 className="h-3.5 w-3.5" />
-            Schema
+            <ListChecks className="h-3.5 w-3.5" />
+            Monitored data
           </button>
         </div>
 
@@ -370,44 +395,92 @@ export function JobRunsDrawer({
           />
         )}
 
-        {/* TAB 3: SCHEMA */}
+        {/* TAB 3: MONITORED DATA */}
         {activeTab === 'schema' && (
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                <Code2 className="h-4 w-4" />
-                Compiled Extraction Schema
+                <ListChecks className="h-4 w-4" />
+                What this monitor tracks
               </div>
-              <Badge variant={job.extractionPlan ? 'success' : 'secondary'}>
-                {job.extractionPlan ? 'Compiled' : 'Pending'}
-              </Badge>
+              <Badge variant={monitorStatus.variant}>{monitorStatus.label}</Badge>
             </div>
 
             {job.extractionPlan ? (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Validated extraction plan. Scope:{' '}
-                  {job.extractionPlan.intent.scope === EXTRACTION_SCOPE.Collection
-                    ? 'Complete collection'
-                    : 'Current page'}
-                  . Fields: {Object.values(fieldLabels).join(', ')}.
-                </p>
-                <ExtractionEvidence
-                  fields={extractionFields}
-                  report={
-                    (runs.find((run) => run.id === selectedRunId) ?? runs[0])?.extractionReport
-                  }
-                />
-                <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted/50 p-3.5 font-mono text-xs text-foreground">
-                  {JSON.stringify(job.extractionPlan, null, 2)}
-                </pre>
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="text-sm font-semibold text-foreground">Information tracked</h3>
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {Object.values(fieldLabels).map((label, index) => (
+                      <li
+                        key={`${label}-${index}`}
+                        className="rounded-md bg-muted px-2.5 py-1 text-sm text-foreground"
+                      >
+                        {label}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    {job.extractionPlan.intent.scope === EXTRACTION_SCOPE.Collection
+                      ? 'Covers all pages in the list.'
+                      : 'Covers this page.'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="text-sm font-semibold text-foreground">Last successful reading</h3>
+                  {loading ? (
+                    <p className="mt-2 text-sm text-muted-foreground">Loading recent readings...</p>
+                  ) : latestReading && latestData ? (
+                    <>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDateTime(latestReading.executedAt, timeZone)}
+                      </p>
+                      {'items' in latestData ? (
+                        <p className="mt-3 text-sm text-foreground">
+                          {latestData.count} {latestData.count === 1 ? 'item' : 'items'} found.
+                        </p>
+                      ) : (
+                        <dl className="mt-3 space-y-2">
+                          {Object.keys(extractionFields).map((key) => (
+                            <div
+                              key={key}
+                              className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm"
+                            >
+                              <dt className="text-muted-foreground">{fieldLabels[key] ?? key}</dt>
+                              <dd className="max-w-full break-words text-right text-foreground">
+                                {displayValue(latestRecord?.[key])}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectRun(latestReading)}
+                        className="mt-4 text-xs font-medium text-primary hover:underline"
+                      >
+                        View run history
+                      </button>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No readings yet. Results will appear after the first successful check.
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="rounded-lg border border-border bg-muted/20 p-4 text-xs sm:text-sm text-muted-foreground">
-                Extraction schema has not been generated yet. It will compile on the first
-                execution.
+                We are setting up this monitor. The information it tracks will appear here when
+                setup is complete.
               </p>
             )}
+            {(job.status === JOB_STATUS.Failed || job.status === JOB_STATUS.Healing) &&
+              issueMessage && (
+                <p className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                  {issueMessage}
+                </p>
+              )}
           </section>
         )}
 

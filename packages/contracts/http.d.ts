@@ -1,4 +1,4 @@
-import type { ExtractionPlan, ExtractionReport } from './extraction.js';
+import type { ExtractionIntent, ExtractionReport, IntentField } from './extraction.js';
 import type { JobStatus, RunStatus, ChangeStatus, AccessFailure } from './vocabulary.js';
 import type { ExtractedPayload } from './payload.js';
 import type { DiffSummary } from './diff.js';
@@ -43,7 +43,11 @@ export interface ScrapingJobDto {
   notificationEmail: string;
   webhookUrl: string | null;
   cronExpression: string;
-  extractionPlan: ExtractionPlan | null;
+  extractionPlan: {
+    intent: Pick<ExtractionIntent, 'scope' | 'triggerRules' | 'triggerMatchMode'> & {
+      fields: Record<string, Pick<IntentField, 'displayName'>>;
+    };
+  } | null;
   status: JobStatus;
   accessState?: AccessState | null;
   lastError: string | null;
@@ -56,7 +60,7 @@ export interface ScrapingJobDto {
 export interface JobRunDto {
   id: string;
   jobId: string;
-  extractionReport?: ExtractionReport | null;
+  extractionReport?: Pick<ExtractionReport, 'quality'> | null;
   extractedData: ExtractedPayload | null;
   hasChanges: ChangeStatus;
   status: RunStatus;
