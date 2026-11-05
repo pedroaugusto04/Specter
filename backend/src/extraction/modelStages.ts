@@ -74,8 +74,16 @@ async function task(
 export function createModelStages(model: IModelProvider): ConfigurationStages {
   return {
     interpreter: {
-      interpret: async (input) =>
-        extractionIntentSchema.parse(await task(model, input, 'intent', intentInstructions)),
+      interpret: async (input) => {
+        const result = await task(model, input, 'intent', intentInstructions);
+        // Some providers wrap the requested object in a top-level `intent` key.
+        // Accept that shape while keeping the intent schema itself strict.
+        const candidate =
+          result && typeof result === 'object' && 'intent' in result
+            ? result.intent
+            : result;
+        return extractionIntentSchema.parse(candidate);
+      },
     },
     discovery: {
       next: async (input, intent) =>
