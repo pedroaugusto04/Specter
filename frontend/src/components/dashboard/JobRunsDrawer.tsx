@@ -85,7 +85,7 @@ export function JobRunsDrawer({
   if (!job) return null;
 
   return (
-    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.url} description={job.userPrompt}>
+    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name} description={job.url}>
       <div className="space-y-6">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
@@ -393,8 +393,6 @@ export function JobRunsDrawer({
             identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
-            onSelectRun={handleSelectRun}
-            onOpenScreenshot={(url) => setSelectedScreenshot(url)}
           />
         )}
 

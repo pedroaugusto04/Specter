@@ -53,6 +53,7 @@ afterAll(async () => {
 async function monitor() {
   const job = await repository.createJob({
     userId: owner,
+    name: `Monitor ${randomUUID()}`,
     url: 'https://example.com',
     userPrompt: 'Watch title',
     notificationEmail: 'test@example.com',

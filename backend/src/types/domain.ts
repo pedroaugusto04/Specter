@@ -43,6 +43,7 @@ export interface UserWebSessionEntity {
 export interface ScrapingJobEntity {
   id: string;
   userId: string;
+  name: string;
   url: string;
   userPrompt: string;
   notificationEmail: string | null;

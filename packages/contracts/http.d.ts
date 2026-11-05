@@ -38,6 +38,7 @@ export interface UserIntegrationsDto {
 
 export interface ScrapingJobDto {
   id: string;
+  name: string;
   url: string;
   userPrompt: string;
   notificationEmail: string;
@@ -86,6 +87,7 @@ export interface DashboardStatsDto {
 }
 
 export interface CreateJobRequest {
+  name?: string;
   url: string;
   userPrompt: string;
   notificationEmail?: string | null;

@@ -71,6 +71,7 @@ export default function DashboardPage() {
         sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
         try {
           const draft = JSON.parse(rawPending) as {
+            name?: string;
             url: string;
             userPrompt: string;
             notificationEmail?: string;
@@ -78,6 +79,7 @@ export default function DashboardPage() {
           };
           void (async () => {
             await api.createJob({
+              name: draft.name,
               url: draft.url,
               userPrompt: draft.userPrompt,
               notificationEmail: draft.notificationEmail || user.email,

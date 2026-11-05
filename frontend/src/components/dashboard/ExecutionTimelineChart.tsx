@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { isCollectionPayload, FieldType, RunStatus, type JobRunDto } from '@specter/contracts';
+import { isCollectionPayload, FieldType, type JobRunDto } from '@specter/contracts';
 import {
   summarizeRuns,
   fieldObservations,
@@ -19,8 +19,6 @@ interface Props {
   revision: string | null;
   identityFields: string[];
   timeZone?: string;
-  onSelectRun?: (run: JobRunDto) => void;
-  onOpenScreenshot?: (url: string) => void;
 }
 export function ExecutionTimelineChart({
   runs,
@@ -28,8 +26,6 @@ export function ExecutionTimelineChart({
   revision,
   identityFields,
   timeZone = 'UTC',
-  onSelectRun,
-  onOpenScreenshot,
 }: Props) {
   const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
   const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);
@@ -86,7 +82,7 @@ export function ExecutionTimelineChart({
           <label className="flex gap-3 items-center">
             Monitored field
             <select
-              className="bg-card border rounded p-2"
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               value={selected}
               onChange={(e) => {
                 setField(e.target.value);
@@ -114,7 +110,7 @@ export function ExecutionTimelineChart({
                 <label className="flex gap-3">
                   Presentation
                   <select
-                    className="bg-card border rounded"
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     value={textMode}
                     onChange={(e) => setTextMode(e.target.value)}
                   >
@@ -146,32 +142,29 @@ export function ExecutionTimelineChart({
               )}
             </>
           )}
-          <div className="overflow-auto">
+          <div className="overflow-auto rounded-md border border-border">
             <table className="w-full text-left">
-              <caption className="text-left py-2">
-                Field readings, including unavailable observations
-              </caption>
-              <thead>
+              <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th>Collection</th>
-                  <th>Value</th>
-                  <th>Change since last valid reading</th>
+                  <th className="px-3 py-2">Collection</th>
+                  <th className="px-3 py-2">Value</th>
+                  <th className="px-3 py-2">Change since last valid reading</th>
                 </tr>
               </thead>
               <tbody>
                 {observations.map((p) => (
                   <tr key={p.run.id} className="border-t border-border">
-                    <td className="p-2">{formatTime(p.run.executedAt)}</td>
+                    <td className="px-3 py-2">{formatTime(p.run.executedAt)}</td>
                     <td
                       className={
                         definition.type === FieldType.Number
-                          ? 'p-2 whitespace-nowrap'
-                          : 'p-2 break-words'
+                          ? 'px-3 py-2 whitespace-nowrap'
+                          : 'px-3 py-2 break-words'
                       }
                     >
                       {p.value === null ? 'Unavailable' : String(p.value)}
                     </td>
-                    <td className="p-2">
+                    <td className="px-3 py-2">
                       {p.delta !== null
                         ? `${p.delta > 0 ? '+' : ''}${p.delta}${p.percent !== null ? ` (${p.percent.toPrecision(4)}%)` : ''}`
                         : p.changed
@@ -192,31 +185,6 @@ export function ExecutionTimelineChart({
       ) : (
         <p>No field contract available.</p>
       )}
-      <section className="space-y-2">
-        <h3>Execution history ({runs.length})</h3>
-        {[...chronological].reverse().map((run) => (
-          <article key={run.id} className="border border-border rounded p-3 space-y-2">
-            <div>
-              {formatTime(run.executedAt)} · {run.status}
-              {run.contractRevision !== revision ? ' · Different contract revision' : ''}
-            </div>
-            {run.status !== RunStatus.Success && <p>{run.errorMessage || 'Reading failed'}</p>}
-            <div className="flex gap-3">
-              <button className="underline" onClick={() => onSelectRun?.(run)}>
-                Inspect
-              </button>
-              {run.screenshotUrl && (
-                <button
-                  className="underline"
-                  onClick={() => onOpenScreenshot?.(run.screenshotUrl!)}
-                >
-                  Screenshot
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
     </div>
   );
 }

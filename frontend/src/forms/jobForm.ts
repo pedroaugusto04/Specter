@@ -9,6 +9,7 @@ import type {
 import { TriggerMatchMode as MatchMode } from '@specter/contracts';
 export const DEFAULT_JOB_CRON = '0 */6 * * *';
 export interface JobFormValues {
+  name: string;
   url: string;
   userPrompt: string;
   sendEmailAlerts: boolean;
@@ -25,6 +26,7 @@ export interface JobFormValues {
 export function emptyJobForm(): JobFormValues {
   return {
     url: '',
+    name: '',
     userPrompt: '',
     sendEmailAlerts: false,
     notificationEmail: '',
@@ -42,6 +44,7 @@ export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
   const preset = CRON_PRESETS.some((item) => item.value === job.cronExpression);
   return {
     url: job.url,
+    name: job.name,
     userPrompt: job.userPrompt,
     sendEmailAlerts: Boolean(job.notificationEmail?.trim()),
     notificationEmail: job.notificationEmail || email,
@@ -57,6 +60,7 @@ export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
 }
 export function formToCreateJob(form: JobFormValues, fallbackEmail = ''): CreateJobRequest {
   return {
+    name: form.name.trim(),
     url: form.url.trim(),
     userPrompt: form.userPrompt.trim(),
     notificationEmail: form.sendEmailAlerts ? form.notificationEmail.trim() || fallbackEmail : '',

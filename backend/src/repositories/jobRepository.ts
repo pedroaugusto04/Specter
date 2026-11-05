@@ -11,6 +11,7 @@ import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
 
 export interface CreateJobInput {
   userId?: string;
+  name?: string;
   url: string;
   userPrompt: string;
   notificationEmail?: string | null;
@@ -20,6 +21,7 @@ export interface CreateJobInput {
 }
 
 export interface UpdateJobPatch {
+  name?: string;
   url?: string;
   userPrompt?: string;
   notificationEmail?: string | null;
@@ -95,6 +97,7 @@ export class DrizzleJobRepository implements IJobRepository {
       .values({
         userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
         url: input.url,
+        name: input.name ?? 'Monitor 1',
         userPrompt: input.userPrompt,
         notificationEmail: input.notificationEmail ?? null,
         webhookUrl: input.webhookUrl ?? null,

@@ -12,6 +12,7 @@ import {
   useCheckSessionMutation,
   useCreateJobMutation,
   useProbeUrlMutation,
+  useJobsQuery,
 } from '@/hooks/useDashboardQueries';
 import { ApiError, type SessionDto, type UserDto } from '@/lib/api';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
@@ -43,6 +44,7 @@ export function CreateJobForm({
     values,
     reset: resetForm,
     setUrl,
+    setName,
     setUserPrompt,
     setSendEmailAlerts,
     setNotificationEmail,
@@ -52,6 +54,7 @@ export function CreateJobForm({
   } = useJobForm();
   const {
     url,
+    name,
     userPrompt,
     sendEmailAlerts,
     notificationEmail,
@@ -74,6 +77,7 @@ export function CreateJobForm({
   }, [user, sendEmailAlerts, notificationEmail]);
 
   const createJobMutation = useCreateJobMutation();
+  const { data: jobs = [], isSuccess: jobsLoaded } = useJobsQuery();
   const probeUrlMutation = useProbeUrlMutation();
   const checkSessionMutation = useCheckSessionMutation();
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -87,6 +91,14 @@ export function CreateJobForm({
   const [detectedSession, setDetectedSession] = React.useState<SessionDto | null>(null);
 
   const effectiveCron = useCustomCron ? customCron : cronPreset;
+
+  React.useEffect(() => {
+    if (!jobsLoaded || name.trim()) return;
+    const names = new Set(jobs.map((job) => job.name.trim().toLocaleLowerCase()));
+    let index = 1;
+    while (names.has(`monitor ${index}`)) index += 1;
+    setName(`Monitor ${index}`);
+  }, [jobs, jobsLoaded, name, setName]);
 
   const isDirty = Boolean(
     url.trim().length > 0 ||
@@ -117,6 +129,7 @@ export function CreateJobForm({
     const firstKey = errorKeys[0];
     const fieldIdMap: Record<JobFormField, string> = {
       url: 'target-url',
+      name: 'monitor-name',
       notificationEmail: 'notify-email',
       userPrompt: 'user-prompt',
       cronExpression: useCustomCron ? 'custom-cron' : 'cron-preset',
@@ -217,6 +230,7 @@ export function CreateJobForm({
     }
 
     const validation = validateJobForm({
+      name,
       url,
       userPrompt,
       notificationEmail: sendEmailAlerts ? notificationEmail : '',
@@ -261,6 +275,7 @@ export function CreateJobForm({
               sessionStorage.setItem(
                 PENDING_JOB_STORAGE_KEY,
                 JSON.stringify({
+                  name: name.trim(),
                   url: url.trim(),
                   userPrompt: userPrompt.trim(),
                   notificationEmail: sendEmailAlerts ? notificationEmail.trim() : '',
@@ -296,6 +311,25 @@ export function CreateJobForm({
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <FormField
+        label="Monitor name"
+        htmlFor="monitor-name"
+        required
+        error={fieldErrors.name}
+        hint="A unique name to identify this monitor."
+      >
+        <Input
+          id="monitor-name"
+          value={name}
+          hasError={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? 'monitor-name-error' : undefined}
+          onChange={(e) => {
+            setName(e.target.value);
+            clearFieldError('name');
+          }}
+        />
+      </FormField>
+
       <FormField
         label="Target Website URL"
         htmlFor="target-url"

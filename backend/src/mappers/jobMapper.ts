@@ -9,6 +9,7 @@ export const JobMapper = {
     return {
       id: row.id,
       userId: row.userId,
+      name: row.name,
       url: row.url,
       userPrompt: row.userPrompt,
       notificationEmail: row.notificationEmail ?? null,
@@ -35,6 +36,7 @@ export const JobMapper = {
   ): ScrapingJobDto {
     return {
       id: entity.id,
+      name: entity.name,
       url: entity.url,
       userPrompt: entity.userPrompt,
       notificationEmail: entity.notificationEmail ?? '',

@@ -28,6 +28,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     values,
     reset: resetForm,
     setUrl,
+    setName,
     setUserPrompt,
     setSendEmailAlerts,
     setNotificationEmail,
@@ -39,6 +40,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   } = useJobForm();
   const {
     url,
+    name,
     userPrompt,
     sendEmailAlerts,
     notificationEmail,
@@ -83,7 +85,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
 
   const isDirty = Boolean(
     job &&
-    (url.trim() !== job.url ||
+    (name.trim() !== job.name ||
+      url.trim() !== job.url ||
       userPrompt.trim() !== job.userPrompt ||
       (sendEmailAlerts ? notificationEmail.trim() : '') !== (job.notificationEmail || '') ||
       sendEmailAlerts !==
@@ -111,6 +114,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     const firstKey = errorKeys[0];
     const fieldIdMap: Record<JobFormField, string> = {
       url: 'edit-target-url',
+      name: 'edit-monitor-name',
       notificationEmail: 'edit-notify-email',
       userPrompt: 'edit-user-prompt',
       cronExpression: useCustomCron ? 'edit-custom-cron' : 'edit-cron-preset',
@@ -137,6 +141,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     }
 
     const validation = validateJobForm({
+      name,
       url,
       userPrompt,
       notificationEmail: sendEmailAlerts ? notificationEmail : '',
@@ -186,6 +191,25 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       confirmMessage="You have modified the monitor settings. Closing now will discard your changes. Are you sure you want to close?"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <FormField
+          label="Monitor name"
+          htmlFor="edit-monitor-name"
+          required
+          error={fieldErrors.name}
+          hint="Names must be unique across your monitors."
+        >
+          <Input
+            id="edit-monitor-name"
+            value={name}
+            hasError={Boolean(fieldErrors.name)}
+            aria-describedby={fieldErrors.name ? 'edit-monitor-name-error' : undefined}
+            onChange={(e) => {
+              setName(e.target.value);
+              clearFieldError('name');
+            }}
+          />
+        </FormField>
+
         {willRecompile && (
           <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/60 p-3.5 text-xs sm:text-sm text-foreground">
             <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-foreground mt-0.5" />

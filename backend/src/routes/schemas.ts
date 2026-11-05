@@ -39,6 +39,7 @@ export const jobProbeSchema = z.object({
 });
 
 export const jobInputSchema = z.object({
+  name: z.string().trim().min(1, 'Monitor name is required').max(80, 'Monitor name must be 80 characters or fewer').optional(),
   userId: z.string().trim().min(1).optional(),
   url: z
     .string({ required_error: 'Target URL is required' })
@@ -75,6 +76,7 @@ export const jobInputSchema = z.object({
 });
 
 export const jobUpdateSchema = z.object({
+  name: z.string().trim().min(1, 'Monitor name is required').max(80, 'Monitor name must be 80 characters or fewer').optional(),
   url: z
     .string()
     .trim()

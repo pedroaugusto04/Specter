@@ -170,9 +170,10 @@ export function JobsTable({
 
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
+        const matchesName = job.name.toLowerCase().includes(query);
         const matchesUrl = job.url.toLowerCase().includes(query);
         const matchesPrompt = job.userPrompt.toLowerCase().includes(query);
-        return matchesUrl || matchesPrompt;
+        return matchesName || matchesUrl || matchesPrompt;
       }
 
       return true;
@@ -311,26 +312,23 @@ export function JobsTable({
 
                 return (
                   <tr key={job.id} className="group hover:bg-muted/30 transition-colors">
-                    {/* Target & Prompt */}
+                    {/* Monitor name and target */}
                     <td className="py-3 px-3 sm:px-4 min-w-0">
-                      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
+                      <div className="truncate font-medium text-foreground min-w-0" title={job.name}>
+                        {job.name}
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <a
                           href={job.url}
                           target="_blank"
                           rel="noreferrer"
                           title={job.url}
-                          className="truncate hover:underline underline-offset-4 text-xs sm:text-sm font-medium inline-block max-w-[200px] sm:max-w-[280px] md:max-w-md"
+                          className="truncate hover:underline underline-offset-4 text-xs text-muted-foreground inline-block max-w-[200px] sm:max-w-[280px] md:max-w-md"
                         >
                           {formatDisplayUrl(job.url)}
                         </a>
                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-60 group-hover:opacity-100" />
                       </div>
-                      <p
-                        className="mt-0.5 truncate text-xs text-muted-foreground block max-w-[200px] sm:max-w-[280px] md:max-w-md"
-                        title={job.userPrompt}
-                      >
-                        {job.userPrompt}
-                      </p>
                     </td>
 
                     {/* Status Pill */}

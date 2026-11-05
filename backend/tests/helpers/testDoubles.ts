@@ -117,6 +117,7 @@ export class InMemoryJobRepository implements IJobRepository {
     const entity: ScrapingJobEntity = {
       id: crypto.randomUUID(),
       userId: input.userId ?? '00000000-0000-0000-0000-000000000000',
+      name: input.name ?? 'Monitor 1',
       url: input.url,
       userPrompt: input.userPrompt,
       notificationEmail: input.notificationEmail ?? null,

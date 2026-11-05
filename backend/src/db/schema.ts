@@ -14,6 +14,7 @@ import {
   boolean,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { ExtractedPayload } from '../types/extractor.js';
 
 export const users = pgTable(
@@ -64,6 +65,7 @@ export const scrapingJobs = pgTable(
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     url: text('url').notNull(),
+    name: text('name').notNull(),
     userPrompt: text('user_prompt').notNull(),
     notificationEmail: text('notification_email'),
     webhookUrl: text('webhook_url'),
@@ -98,6 +100,7 @@ export const scrapingJobs = pgTable(
   (table) => [
     index('idx_scraping_jobs_status').on(table.status),
     index('idx_scraping_jobs_user_id').on(table.userId),
+    uniqueIndex('uq_scraping_jobs_user_name').on(table.userId, sql`lower(${table.name})`),
   ]
 );
 

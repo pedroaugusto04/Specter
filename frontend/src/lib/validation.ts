@@ -1,6 +1,7 @@
 import { validateClientCron } from './utils';
 
 export interface JobFormData {
+  name: string;
   url: string;
   userPrompt: string;
   notificationEmail: string;
@@ -8,6 +9,13 @@ export interface JobFormData {
 }
 
 export type JobFormField = keyof JobFormData;
+
+export function validateMonitorName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Monitor name is required.';
+  if (trimmed.length > 80) return 'Monitor name must be 80 characters or fewer.';
+  return null;
+}
 
 export function validateUrl(url: string): string | null {
   const trimmed = url.trim();
@@ -83,6 +91,9 @@ export function validateJobForm(data: JobFormData): {
   errors: Partial<Record<JobFormField, string>>;
 } {
   const errors: Partial<Record<JobFormField, string>> = {};
+
+  const nameError = validateMonitorName(data.name);
+  if (nameError) errors.name = nameError;
 
   const urlError = validateUrl(data.url);
   if (urlError) errors.url = urlError;

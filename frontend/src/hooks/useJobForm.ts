@@ -19,6 +19,7 @@ export function useJobForm() {
   const setters = useMemo(
     () => ({
       setUrl: (value: SetStateAction<string>) => setField('url', value),
+      setName: (value: SetStateAction<string>) => setField('name', value),
       setUserPrompt: (value: SetStateAction<string>) => setField('userPrompt', value),
       setSendEmailAlerts: (value: SetStateAction<boolean>) => setField('sendEmailAlerts', value),
       setNotificationEmail: (value: SetStateAction<string>) => setField('notificationEmail', value),

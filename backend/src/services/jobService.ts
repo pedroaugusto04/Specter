@@ -114,8 +114,12 @@ export class JobService {
       throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
     }
 
+    const existingJobs = await this.jobRepository.findAll(undefined, request.userId);
+    const name = request.name?.trim() || this.nextMonitorName(existingJobs.map((job) => job.name));
+    this.assertUniqueMonitorName(name, existingJobs.map((job) => job.name));
     const createdEntity = await this.jobRepository.createJob({
       userId: request.userId,
+      name,
       url: normalizedUrl,
       userPrompt: request.userPrompt.trim(),
       notificationEmail: request.notificationEmail?.trim() || null,
@@ -165,6 +169,15 @@ export class JobService {
     }
 
     const patch: UpdateJobPatch = {};
+
+    if (request.name !== undefined) {
+      const name = request.name.trim();
+      const existingNames = (await this.jobRepository.findAll(undefined, existing.userId))
+        .filter((job) => job.id !== id)
+        .map((job) => job.name);
+      this.assertUniqueMonitorName(name, existingNames);
+      patch.name = name;
+    }
 
     if (request.url !== undefined) {
       patch.url = await assertSafeUrl(request.url, 'url');
@@ -259,6 +272,20 @@ export class JobService {
     const resultDto = await this.presenter.present(finalEntity ?? updated);
     await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
+  }
+
+  private nextMonitorName(existingNames: string[]): string {
+    const names = new Set(existingNames.map((name) => name.toLocaleLowerCase()));
+    let index = 1;
+    while (names.has(`monitor ${index}`)) index += 1;
+    return `Monitor ${index}`;
+  }
+
+  private assertUniqueMonitorName(name: string, existingNames: string[]): void {
+    if (existingNames.some((existing) => existing.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      const message = 'A monitor with this name already exists. Choose a unique name.';
+      throw new ValidationError(message, [{ field: 'name', message }]);
+    }
   }
 
   async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
