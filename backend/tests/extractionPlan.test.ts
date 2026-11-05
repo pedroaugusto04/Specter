@@ -91,6 +91,32 @@ describe('Version 3 extraction contract and integrity', () => {
     expect(extract('<main>' + row('a', 'none') + '</main>').quality).toBe('INVALID');
     expect(extract('<main>' + row('a') + row('a') + '</main>').quality).toBe('INVALID');
   });
+  it('accepts duplicate DOM matches when all non-empty values are identical and rejects distinct values', () => {
+    const singlePlan = fixturePlan({
+      mode: 'single',
+      containerSelector: 'main',
+      readySelector: 'main',
+      fields: {
+        price: {
+          type: 'number',
+          locale: 'pt-BR',
+          sources: [{ kind: 'dom', selector: '.price', attribute: 'textContent' }],
+        },
+      },
+    });
+    const identical = extract(
+      '<main><span class="price">R$ 4.549,00</span><span class="price">R$ 4.549,00</span></main>',
+      singlePlan
+    );
+    expect(identical.quality).toBe('COMPLETE');
+    expect(identical.records).toEqual([{ price: 4549 }]);
+
+    const conflicting = extract(
+      '<main><span class="price">R$ 4.549,00</span><span class="price">R$ 329,00</span></main>',
+      singlePlan
+    );
+    expect(conflicting.quality).toBe('INVALID');
+  });
   it('requires explicit empty and readiness evidence', () => {
     expect(extract('<main><p class="empty">No records</p></main>').quality).toBe('EMPTY');
     expect(extract('<main></main>').quality).toBe('INCONCLUSIVE');
