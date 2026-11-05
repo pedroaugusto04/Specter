@@ -46,6 +46,10 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('block_resources', 'false');
       endpoint.searchParams.set('block_ads', 'true');
 
+      if (targetUrl.includes('.com.br')) {
+        endpoint.searchParams.set('country_code', 'br');
+      }
+
       if (options?.waitForSelector) {
         const cleanWaitSelector = options.waitForSelector.split(',')[0]?.trim();
         if (cleanWaitSelector) {

@@ -44,6 +44,10 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('js_render', 'true');
       endpoint.searchParams.set('premium_proxy', 'true');
 
+      if (targetUrl.includes('.com.br')) {
+        endpoint.searchParams.set('proxy_country', 'br');
+      }
+
       if (options?.waitForSelector) {
         const cleanWaitSelector = options.waitForSelector.split(',')[0]?.trim();
         if (cleanWaitSelector) {
