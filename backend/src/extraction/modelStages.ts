@@ -5,6 +5,7 @@ import {
   semanticInstructions,
 } from './prompts.js';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ConfigurationStages, IModelProvider, StageInput } from './model.js';
 import {
   discoveryActionSchema,
@@ -25,6 +26,9 @@ const reviewSchema = z
     evidenceRefs: z.array(z.string().min(1)).min(1),
   })
   .strict();
+function outputInstructions(schema: z.ZodTypeAny, instructions: string): string {
+  return `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(zodToJsonSchema(schema, { $refStrategy: 'none' }))}`;
+}
 async function task(
   model: IModelProvider,
   input: StageInput,
@@ -74,36 +78,53 @@ async function task(
 export function createModelStages(model: IModelProvider): ConfigurationStages {
   return {
     interpreter: {
-      interpret: async (input) => {
-        const result = await task(model, input, 'intent', intentInstructions);
-        // Some providers wrap the requested object in a top-level `intent` key.
-        // Accept that shape while keeping the intent schema itself strict.
-        const candidate =
-          result && typeof result === 'object' && 'intent' in result
-            ? result.intent
-            : result;
-        return extractionIntentSchema.parse(candidate);
-      },
+      interpret: async (input) =>
+        extractionIntentSchema.parse(
+          await task(
+            model,
+            input,
+            'intent',
+            outputInstructions(extractionIntentSchema, intentInstructions)
+          )
+        ),
     },
     discovery: {
       next: async (input, intent) =>
         discoverySchema.parse(
-          await task(model, input, 'discovery', discoveryInstructions, { intent })
+          await task(
+            model,
+            input,
+            'discovery',
+            outputInstructions(discoverySchema, discoveryInstructions),
+            { intent }
+          )
         ).action,
     },
     generator: {
       generate: async (input, intent, feedback) =>
         executionStrategySchema.parse(
-          await task(model, input, 'plan', strategyInstructions, {
-            intent,
-            validationFeedback: feedback,
-          })
+          await task(
+            model,
+            input,
+            'plan',
+            outputInstructions(executionStrategySchema, strategyInstructions),
+            {
+              intent,
+              validationFeedback: feedback,
+            }
+          )
         ),
     },
     reviewer: {
       review: async (input, intent, result) =>
         reviewSchema.parse(
-          await task(model, input, 'semantic', semanticInstructions, { intent, result })
+          await task(
+            model,
+            input,
+            'semantic',
+            outputInstructions(reviewSchema, semanticInstructions),
+            { intent, result }
+          )
         ),
     },
   };
