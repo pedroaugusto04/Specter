@@ -30,11 +30,7 @@ export class DomSourceReader implements ISourceReader {
     const scope = record.value as cheerio.Cheerio<AnyNode>;
     const target = source.selector === ':scope' ? scope : scope.find(source.selector);
     const readSingle = (el: cheerio.Cheerio<AnyNode>) =>
-      source.attribute === 'text' ||
-      source.attribute === 'textContent' ||
-      source.attribute === 'innerText'
-        ? el.text()
-        : el.attr(source.attribute);
+      source.attribute === 'text' ? el.text() : el.attr(source.attribute);
     if (target.length <= 1) return readSingle(target);
     const distinctValues = new Set<string>();
     for (let i = 0; i < target.length; i++) {

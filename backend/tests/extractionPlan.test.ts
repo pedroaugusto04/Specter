@@ -100,7 +100,7 @@ describe('Version 3 extraction contract and integrity', () => {
         price: {
           type: 'number',
           locale: 'pt-BR',
-          sources: [{ kind: 'dom', selector: '.price', attribute: 'textContent' }],
+          sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
         },
       },
     });

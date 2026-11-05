@@ -62,7 +62,9 @@ const source = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal(SourceKind.Dom),
       selector: text,
-      attribute: text,
+      attribute: text.refine((attribute) => !['textContent', 'innerText'].includes(attribute), {
+        message: 'Use "text" to read DOM text.',
+      }),
       association: text.optional(),
     })
     .strict(),
