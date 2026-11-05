@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
+import type { IntentField } from '@specter/contracts';
 import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
+import { formatObservedNumber } from '@/lib/numberFormatting';
 import {
   AlertCircle,
   Camera,
@@ -33,9 +35,15 @@ const MONITOR_STATUS = {
   [JOB_STATUS.Failed]: { label: 'Needs attention', variant: 'destructive' },
 } as const;
 
-function displayValue(value: string | number | boolean | null | undefined): string {
+function displayValue(
+  value: string | number | boolean | null | undefined,
+  field?: IntentField
+): string {
   if (value === null || value === undefined) return 'Not available';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (field?.type === 'number') {
+    return String(formatObservedNumber(value, field.locale, field.displayName));
+  }
   return String(value);
 }
 
@@ -449,7 +457,7 @@ export function JobRunsDrawer({
                             >
                               <dt className="text-muted-foreground">{fieldLabels[key] ?? key}</dt>
                               <dd className="max-w-full break-words text-right text-foreground">
-                                {displayValue(latestRecord?.[key])}
+                                {displayValue(latestRecord?.[key], extractionFields[key])}
                               </dd>
                             </div>
                           ))}
