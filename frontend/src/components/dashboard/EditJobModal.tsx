@@ -90,7 +90,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       userPrompt.trim() !== job.userPrompt ||
       (sendEmailAlerts ? notificationEmail.trim() : '') !== (job.notificationEmail || '') ||
       sendEmailAlerts !==
-        Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
+      Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
       (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
       showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
       captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
@@ -196,7 +196,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
           htmlFor="edit-monitor-name"
           required
           error={fieldErrors.name}
-          hint="Names must be unique across your monitors."
+          hint=""
         >
           <Input
             id="edit-monitor-name"
@@ -458,7 +458,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                             operator: newOp,
                             value:
                               job?.extractionPlan?.intent.fields[rule.field]?.type ===
-                              FieldType.Boolean
+                                FieldType.Boolean
                                 ? false
                                 : '',
                           };

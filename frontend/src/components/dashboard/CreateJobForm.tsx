@@ -92,15 +92,20 @@ export function CreateJobForm({
 
   const effectiveCron = useCustomCron ? customCron : cronPreset;
 
-  React.useEffect(() => {
-    if (!jobsLoaded || name.trim()) return;
+  const suggestedName = React.useMemo(() => {
     const names = new Set(jobs.map((job) => job.name.trim().toLocaleLowerCase()));
     let index = 1;
     while (names.has(`monitor ${index}`)) index += 1;
-    setName(`Monitor ${index}`);
-  }, [jobs, jobsLoaded, name, setName]);
+    return `Monitor ${index}`;
+  }, [jobs]);
+
+  React.useEffect(() => {
+    if (!jobsLoaded || name.trim()) return;
+    setName(suggestedName);
+  }, [jobsLoaded, name, setName, suggestedName]);
 
   const isDirty = Boolean(
+    (name.trim().length > 0 && name.trim() !== suggestedName) ||
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
     (sendEmailAlerts && notificationEmail.trim().length > 0) ||
