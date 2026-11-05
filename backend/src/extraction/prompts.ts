@@ -17,9 +17,9 @@ Generate an execution strategy for the fixed intent. Return exactly the intent.f
 
 Shape:
 {transport:"http"|"browser", document?:{frame?,shadow?}, records:RecordSource, fields:Record<fieldId,Source[]>, ready:Condition[], empty:Condition[], setup?:Action[], filters?:RecordFilter[], associations?:Associations, pagination?:{kind:"link"|"click"|"scroll",next?:Locator,scrollTarget?,end:Condition[]}}
-RecordSource is {kind:"dom",selector} | {kind:"jsonld",type} | {kind:"response",match:{urlPattern,method?},path}.
-Source is {kind:"dom",selector,attribute:"text"|attributeName,association?} | {kind:"jsonld"|"response",path,association?}.
-Locator is {kind:"css",selector} | {kind:"role",role,name}. Condition is exists|visible|absent|disabled with locator; attribute with locator, attribute, value?; field with field ID; or response with match, path?, equals?. Conditions are arrays of ALL requirements.
+RecordSource is {kind:"dom",selector} | {kind:"jsonld",type} | {kind:"response",match:{urlPattern,method?},path:Array<string|number>}.
+Source is {kind:"dom",selector,attribute:"text"|attributeName,association?} | {kind:"jsonld"|"response",path:Array<string|number>,association?}. Every path is an array of segments, even for one key: use ["title"], never "title". For nested keys use ["offers","price"]; numeric array indexes are numbers, e.g. ["items",0,"name"].
+Locator is {kind:"css",selector} | {kind:"role",role,name}. Condition must use exactly one of these kinds: {kind:"exists"|"visible"|"absent"|"disabled",locator}, {kind:"attribute",locator,attribute,value?}, {kind:"field",field}, or {kind:"response",match,path?:Array<string|number>,equals?}. Do not use source kinds (such as "dom" or "jsonld") as condition kinds. Conditions are arrays of ALL requirements.
 Action is an observed inspect/click/scroll/wait action. Use setup only to replay needed content expansion; setup field waits are unsupported. Use browser for setup, dynamic content, responses, frames, or shadow DOM. HTTP is for static CSS-accessible content.
 
 Rules:
