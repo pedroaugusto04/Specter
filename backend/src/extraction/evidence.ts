@@ -19,10 +19,11 @@ export function evidenceValue(value: unknown): Scalar {
       : null;
 }
 
-export function redactObject(value: unknown, depth = 0): unknown {
+export function redactObject(value: unknown, depth = 0, stringLimit = 8000): unknown {
   if (depth > 16) return '[DEPTH LIMIT]';
-  if (typeof value === 'string') return redactText(value, 8000);
-  if (Array.isArray(value)) return value.slice(0, 500).map((item) => redactObject(item, depth + 1));
+  if (typeof value === 'string') return redactText(value, stringLimit);
+  if (Array.isArray(value))
+    return value.slice(0, 500).map((item) => redactObject(item, depth + 1, stringLimit));
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(
     Object.entries(value)
@@ -33,7 +34,7 @@ export function redactObject(value: unknown, depth = 0): unknown {
           key
         )
           ? '[REDACTED]'
-          : redactObject(item, depth + 1),
+          : redactObject(item, depth + 1, stringLimit),
       ])
   );
 }

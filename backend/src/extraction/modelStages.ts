@@ -6,7 +6,7 @@ import {
 } from './prompts.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { ConfigurationStages, IModelProvider, StageInput } from './model.js';
+import type { ConfigurationStages, IModelProvider, ModelInput, StageInput } from './model.js';
 import {
   discoveryActionSchema,
   executionStrategySchema,
@@ -56,8 +56,26 @@ async function task(
       context: redactObject(extra),
     }),
   } as const;
+  logger.diagnostic('Model task request', {
+    jobId: input.jobId,
+    provider: model.name,
+    task: kind,
+    timeoutMs: input.timeoutMs,
+    request: {
+      instructions: request.instructions,
+      outputSchema: request.outputSchema,
+      evidence: request.evidence,
+    },
+  });
   try {
     const result = await model.generate(request);
+    logger.diagnostic('Model task response', {
+      jobId: input.jobId,
+      provider: model.name,
+      task: kind,
+      durationMs: Date.now() - started,
+      response: result,
+    });
     logger.info('Model task completed', {
       jobId: input.jobId,
       provider: model.name,
@@ -67,6 +85,16 @@ async function task(
     });
     return result;
   } catch (error) {
+    logger.diagnostic('Model task error details', {
+      jobId: input.jobId,
+      provider: model.name,
+      task: kind,
+      durationMs: Date.now() - started,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorCode:
+        error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined,
+    });
     logger.warn('Model task failed', {
       jobId: input.jobId,
       provider: model.name,
@@ -81,55 +109,87 @@ async function task(
     throw error;
   }
 }
+function validateOutput<T>(
+  input: StageInput,
+  kind: ModelInput['task'],
+  output: unknown,
+  schema: z.ZodType<T>
+): T {
+  try {
+    const parsed = schema.parse(output);
+    logger.diagnostic('Model stage output validated', {
+      jobId: input.jobId,
+      task: kind,
+      output: parsed,
+    });
+    return parsed;
+  } catch (error) {
+    logger.diagnostic('Model stage output rejected', {
+      jobId: input.jobId,
+      task: kind,
+      output,
+      validationError: error instanceof Error ? error.message : String(error),
+      validationIssues:
+        error && typeof error === 'object' && 'issues' in error ? error.issues : undefined,
+    });
+    throw error;
+  }
+}
 /** Each stage can be replaced separately, even when they share the same model transport. */
 export function createModelStages(model: IModelProvider): ConfigurationStages {
   return {
     interpreter: {
-      interpret: async (input) =>
-        extractionIntentSchema.parse(
-          await task(
-            model,
-            input,
-            'intent',
-            outputContract(extractionIntentSchema, intentInstructions)
-          )
-        ),
+      interpret: async (input) => {
+        const output = await task(
+          model,
+          input,
+          'intent',
+          outputContract(extractionIntentSchema, intentInstructions)
+        );
+        return validateOutput(input, 'intent', output, extractionIntentSchema);
+      },
     },
     discovery: {
-      next: async (input, intent) =>
-        discoverySchema.parse(
-          await task(
-            model,
-            input,
-            'discovery',
-            outputContract(discoverySchema, discoveryInstructions),
-            { intent }
-          )
-        ).action,
+      next: async (input, intent) => {
+        const output = await task(
+          model,
+          input,
+          'discovery',
+          outputContract(discoverySchema, discoveryInstructions),
+          { intent }
+        );
+        return validateOutput(input, 'discovery', output, discoverySchema).action;
+      },
     },
     generator: {
-      generate: async (input, intent, feedback) =>
-        executionStrategySchema.parse(
-          await task(
-            model,
-            input,
-            'plan',
-            outputContract(executionStrategySchema, strategyInstructions),
-            {
-              intent,
-              validationFeedback: feedback,
-            }
-          )
-        ),
+      generate: async (input, intent, feedback) => {
+        const output = await task(
+          model,
+          input,
+          'plan',
+          outputContract(executionStrategySchema, strategyInstructions),
+          {
+            intent,
+            validationFeedback: feedback,
+          }
+        );
+        return validateOutput(input, 'plan', output, executionStrategySchema);
+      },
     },
     reviewer: {
-      review: async (input, intent, result) =>
-        reviewSchema.parse(
-          await task(model, input, 'semantic', outputContract(reviewSchema, semanticInstructions), {
+      review: async (input, intent, result) => {
+        const output = await task(
+          model,
+          input,
+          'semantic',
+          outputContract(reviewSchema, semanticInstructions),
+          {
             intent,
             result,
-          })
-        ),
+          }
+        );
+        return validateOutput(input, 'semantic', output, reviewSchema);
+      },
     },
   };
 }

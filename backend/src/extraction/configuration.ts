@@ -187,6 +187,12 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           strategy,
         });
         if (!parsedPlan.success) {
+          logger.diagnostic('Extraction plan rejected by schema', {
+            jobId: request.jobId,
+            attempt: attempt + 1,
+            strategy,
+            validationIssues: parsedPlan.error.issues,
+          });
           const expectedFields = Object.keys(fixedIntent.fields).sort();
           const actualFields =
             strategy &&
@@ -218,6 +224,11 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           );
         }
         const plan = parsedPlan.data;
+        logger.diagnostic('Extraction plan accepted by schema', {
+          jobId: request.jobId,
+          attempt: attempt + 1,
+          plan,
+        });
         const execution = await run('validation', () =>
           this.executor.execute(request.url, plan, {
             timeoutMs: context.remaining(),
@@ -226,6 +237,17 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             captureScreenshot: request.captureScreenshot,
           })
         );
+        logger.diagnostic('Extraction execution result', {
+          jobId: request.jobId,
+          attempt: attempt + 1,
+          data: execution.data,
+          report: execution.report,
+          snapshot: {
+            url: redactText(execution.snapshot.url),
+            transport: execution.snapshot.transport,
+            httpStatus: execution.snapshot.httpStatus,
+          },
+        });
         if (!isAcceptedExtractionQuality(execution.report.quality))
           throw new Error(execution.report.issues.join(' '));
         if (
@@ -260,7 +282,16 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
                     ? SemanticReviewStatus.Warning
                     : SemanticReviewStatus.Passed,
             };
-          } catch {
+          } catch (error) {
+            logger.diagnostic(
+              'Semantic review failed; deterministic validation remains authoritative',
+              {
+                jobId: request.jobId,
+                attempt: attempt + 1,
+                errorName: error instanceof Error ? error.name : 'UnknownError',
+                errorMessage: error instanceof Error ? error.message : String(error),
+              }
+            );
             semanticReview = {
               status: SemanticReviewStatus.Error,
               score: null,
@@ -285,6 +316,11 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             semanticReview.status +
             (semanticReview.score === null ? '' : '_' + semanticReview.score),
         });
+        logger.diagnostic('Semantic review policy result', {
+          jobId: request.jobId,
+          attempt: attempt + 1,
+          review: semanticReview,
+        });
         if (semanticReview.status === SemanticReviewStatus.Rejected)
           throw new Error(
             'Semantic review rejected candidate: ' + semanticReview.reasons.join(' ')
@@ -295,6 +331,14 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       } catch (error) {
         if (classifyAccessFailure(error)) throw error;
         feedback = error instanceof Error ? error.message : 'Candidate validation failed.';
+        logger.diagnostic('Extraction candidate rejected', {
+          jobId: request.jobId,
+          attempt: attempt + 1,
+          maxAttempts: this.options.maxAttempts,
+          feedback,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          trace: trace.slice(-8),
+        });
         if (
           attempt + 1 < this.options.maxAttempts &&
           discoveryActions < this.options.maxDiscoveryActions

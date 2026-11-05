@@ -34,12 +34,17 @@ function colorize(text: string, color: string, enabled: boolean): string {
   return enabled ? `${color}${text}${ANSI.reset}` : text;
 }
 
-function formatLog(level: LogLevel, message: string, context?: LogContext): string {
+function formatLog(
+  level: LogLevel,
+  message: string,
+  context?: LogContext,
+  stringLimit = 8000
+): string {
   const entry = {
     timestamp: new Date().toISOString(),
     level,
     message,
-    ...(redactObject(context) as LogContext),
+    ...(redactObject(context, 0, stringLimit) as LogContext),
   };
   const pretty = env.LOG_PRETTY_CONSOLE;
   if (process.env.NODE_ENV === 'production' && !pretty) return JSON.stringify(entry);
@@ -84,5 +89,9 @@ export const logger = {
   debug(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL !== 'debug' && env.LOG_LEVEL !== 'trace') return;
     console.debug(formatLog('debug', message, context));
+  },
+  diagnostic(message: string, context?: LogContext): void {
+    if (!env.COMPILATION_DIAGNOSTICS_ENABLED || env.LOG_LEVEL === 'silent') return;
+    console.log(formatLog('debug', message, context, env.COMPILATION_DIAGNOSTICS_MAX_CHARS));
   },
 };
