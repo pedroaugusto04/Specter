@@ -37,7 +37,7 @@ const MONITOR_STATUS = {
 
 function displayValue(
   value: string | number | boolean | null | undefined,
-  field?: IntentField
+  field?: Pick<IntentField, "type" | "displayName" | "locale">
 ): string {
   if (value === null || value === undefined) return 'Not available';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
