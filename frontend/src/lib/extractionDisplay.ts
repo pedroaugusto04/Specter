@@ -17,7 +17,9 @@ export function localizeExtractedPayload(
     if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
     return Object.fromEntries(
       Object.entries(record).map(([key, value]) => {
-        const field = fields[key];
+        const field = fields[key] ?? Object.values(fields).find(
+          (candidate) => candidate.displayName?.trim() === key
+        );
         if (field?.type !== 'number') return [labels[key] ?? key, value];
         const numericValue = typeof value === 'number'
           ? value
