@@ -8,6 +8,9 @@ process.env.ENCRYPTION_KEY ||= 'a'.repeat(64);
 process.env.LOG_LEVEL ||= 'silent';
 // Configuration evals never send notifications and must not require Resend credentials.
 process.env.NOTIFICATION_PROVIDER = 'console';
+// Fixture-backed evaluations do not use the configured compiler provider. Avoid
+// requiring live API credentials just because deployment config selects `api`.
+if (process.env.EVALS_LIVE_MODELS_ENABLED !== 'true') process.env.COMPILER_PROVIDER = 'agy';
 
 const [
   { createFixtureModelProvider, evaluateConfigurationCorpus, validateConfigurationEvaluationCase },
