@@ -37,10 +37,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
   async generate(input: ModelInput): Promise<unknown> {
     const timeoutMs = Math.min(input.timeoutMs, env.COMPILER_TIMEOUT_MS);
     let response: Response;
-    try {
-      response = await this.fetchFn(
-        `${this.baseUrl}/models/${encodeURIComponent(this.model)}:generateContent`,
-        {
+    const url = `${this.baseUrl}/models/${encodeURIComponent(this.model)}:generateContent`;
+    const init: RequestInit = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -70,12 +68,23 @@ export class GeminiApiCompilerProvider implements IModelProvider {
             },
           }),
           signal: AbortSignal.timeout(timeoutMs),
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        response = await this.fetchFn(url, init);
+      } catch (error) {
+        if (attempt >= env.COMPILER_API_MAX_RETRIES) {
+          if (error instanceof Error && error.name === 'TimeoutError')
+            throw new CompilerTimeoutError('Gemini API request timed out', error);
+          throw new CompilerApiRequestError(undefined, error);
         }
-      );
-    } catch (error) {
-      if (error instanceof Error && error.name === 'TimeoutError')
-        throw new CompilerTimeoutError('Gemini API request timed out', error);
-      throw new CompilerApiRequestError(undefined, error);
+        await this.waitBeforeRetry(attempt);
+        continue;
+      }
+      if (![408, 429].includes(response.status) && response.status < 500) break;
+      if (attempt >= env.COMPILER_API_MAX_RETRIES) break;
+      const retryAfter = response.headers.get('retry-after');
+      await this.waitBeforeRetry(attempt, retryAfter);
     }
 
     if (!response.ok) {
@@ -111,5 +120,18 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     } catch (error) {
       throw new CompilerValidationError('Gemini API result was not valid JSON', error);
     }
+  }
+
+  private async waitBeforeRetry(attempt: number, retryAfter?: string | null): Promise<void> {
+    const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN;
+    const exponential = Math.min(
+      env.COMPILER_API_RETRY_BASE_DELAY_MS * 2 ** attempt,
+      env.COMPILER_API_RETRY_MAX_DELAY_MS
+    );
+    const delay = Number.isFinite(retryAfterMs) && retryAfterMs >= 0
+      ? Math.min(retryAfterMs, env.COMPILER_API_RETRY_MAX_DELAY_MS)
+      : exponential;
+    const jittered = Math.floor(delay * (0.8 + Math.random() * 0.4));
+    await new Promise((resolve) => setTimeout(resolve, jittered));
   }
 }

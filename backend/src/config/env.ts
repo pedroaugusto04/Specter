@@ -34,6 +34,9 @@ export const envSchema = z.object({
     .string()
     .url()
     .default('https://generativelanguage.googleapis.com/v1beta'),
+  COMPILER_API_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(3),
+  COMPILER_API_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(100).max(30000).default(1000),
+  COMPILER_API_RETRY_MAX_DELAY_MS: z.coerce.number().int().min(100).max(120000).default(10000),
   EVALS_LIVE_MODELS_ENABLED: z
     .enum(['true', 'false'])
     .default('false')
