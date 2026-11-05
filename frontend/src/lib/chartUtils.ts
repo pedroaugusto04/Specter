@@ -1,259 +1,131 @@
-import type { JobRunDto } from '@/lib/api';
-import type { ChangeStatus, RunStatus } from './domainValues';
-import { CHANGE_STATUS, RUN_STATUS } from './domainValues';
-import { formatCompactDate, formatDateTime } from '@/lib/utils';
+import {
+  isCollectionPayload,
+  ChangeStatus,
+  FieldType,
+  RunStatus,
+  type JobRunDto,
+  type IntentField,
+} from '@specter/contracts';
 
-export interface NumericFieldCandidate {
-  key: string;
-  label: string;
-  sampleValue: string | number;
-  validCount: number;
-}
-
-export interface ChartDataPoint {
-  runId: string;
+export const SCALE_MODE = { Adjusted: 'adjusted', Zero: 'zero' } as const;
+export const TEXT_MODE = { Events: 'events', States: 'states' } as const;
+export type TimelineFields = Record<string, Pick<IntentField, 'type' | 'displayName' | 'locale'>>;
+export interface Observation {
+  run: JobRunDto;
   timestamp: number;
-  formattedTime: string;
-  formattedCompactTime: string;
-  rawValue: unknown;
-  numericValue: number | null;
-  displayValue: string;
-  hasChanges: ChangeStatus;
-  status: RunStatus;
-  durationMs: number | null;
-  httpStatus: number | null;
-  deltaFromPrev: number | null;
-  deltaPercentFromPrev: number | null;
+  value: string | number | boolean | null;
+  previous: Observation | null;
+  changed: boolean;
+  delta: number | null;
+  percent: number | null;
 }
-
-export interface RunMetricsSummary {
-  totalRuns: number;
-  successRuns: number;
-  failedRuns: number;
-  changeRuns: number;
-  changeRatePercent: number;
-  averageDurationMs: number | null;
-  lastChangeAt: string | null;
+export function orderedRuns(runs: JobRunDto[]): JobRunDto[] {
+  const timestamp = (run: JobRunDto) =>
+    Number.isFinite(Date.parse(run.executedAt)) ? Date.parse(run.executedAt) : Infinity;
+  return [...runs].sort((a, b) => timestamp(a) - timestamp(b) || a.id.localeCompare(b.id));
 }
-
-/**
- * Parses numeric/monetary tokens from primitive values, strings, or currencies.
- * Returns null if the value is non-numeric or purely qualitative text.
- */
-export function parseNumericValue(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'boolean') return null;
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-
-    if (/^(true|false|yes|no|active|inactive|null|undefined)$/i.test(trimmed)) {
-      return null;
-    }
-
-    const match = /[-+]?[\d.,]+/.exec(trimmed);
-    if (!match) return null;
-
-    let candidate = match[0].replace(/[.,]+$/, '');
-    if (!candidate || candidate === '-' || candidate === '+') return null;
-
-    const commaIdx = candidate.lastIndexOf(',');
-    const dotIdx = candidate.lastIndexOf('.');
-
-    if (commaIdx > -1 && dotIdx > -1) {
-      if (commaIdx > dotIdx) {
-        // European / Brazilian format (e.g. "1.250,50")
-        candidate = candidate.replace(/\./g, '').replace(',', '.');
-      } else {
-        // US / UK format (e.g. "1,250.50")
-        candidate = candidate.replace(/,/g, '');
-      }
-    } else if (commaIdx > -1) {
-      const afterComma = candidate.length - commaIdx - 1;
-      if (afterComma === 1 || afterComma === 2) {
-        candidate = candidate.replace(',', '.');
-      } else if (afterComma === 3 && candidate.indexOf(',') !== candidate.lastIndexOf(',')) {
-        candidate = candidate.replace(/,/g, '');
-      } else if (afterComma === 3) {
-        candidate = candidate.replace(',', '');
-      } else {
-        candidate = candidate.replace(',', '.');
-      }
-    } else if (dotIdx > -1) {
-      if (candidate.indexOf('.') !== dotIdx) {
-        candidate = candidate.replace(/\./g, '');
-      }
-    }
-
-    const parsed = parseFloat(candidate);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-/**
- * Formats a numeric value for chart axes and metrics labels.
- */
-export function formatNumericValue(value: number): string {
-  if (!Number.isFinite(value)) return '0';
-  if (Math.abs(value) >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (Math.abs(value) >= 10_000) {
-    return `${(value / 1_000).toFixed(1)}k`;
-  }
-  if (Number.isInteger(value)) {
-    return value.toLocaleString('en-US');
-  }
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+export function fieldObservations(
+  runs: JobRunDto[],
+  field: string,
+  type: IntentField['type'],
+  revision: string | null
+): Observation[] {
+  let previous: Observation | null = null;
+  return orderedRuns(runs).map((run) => {
+    const timestamp = Date.parse(run.executedAt);
+    const data = run.extractedData;
+    const raw = data && !isCollectionPayload(data) ? data[field] : null;
+    const validType =
+      type === FieldType.Number
+        ? typeof raw === 'number' && Number.isFinite(raw)
+        : type === FieldType.Boolean
+          ? typeof raw === 'boolean'
+          : typeof raw === 'string';
+    const value =
+      revision !== null &&
+      run.contractRevision === revision &&
+      run.status === RunStatus.Success &&
+      Number.isFinite(timestamp) &&
+      validType
+        ? raw!
+        : null;
+    const delta =
+      typeof value === 'number' && typeof previous?.value === 'number'
+        ? value - previous.value
+        : null;
+    const percent =
+      delta !== null &&
+      typeof previous?.value === 'number' &&
+      previous.value !== 0 &&
+      typeof value === 'number' &&
+      value * previous.value >= 0
+        ? (delta / Math.abs(previous.value)) * 100
+        : null;
+    const observation: Observation = {
+      run,
+      timestamp,
+      value,
+      previous,
+      changed: value !== null && previous !== null && value !== previous.value,
+      delta: delta !== null && Number.isFinite(delta) ? delta : null,
+      percent: percent !== null && Number.isFinite(percent) ? percent : null,
+    };
+    if (value !== null) previous = observation;
+    return observation;
   });
 }
-
-/**
- * Scans run payloads to identify object fields containing numeric values suitable for plotting.
- */
-export function detectNumericFields(
-  runs: JobRunDto[],
-  fieldLabels: Record<string, string> = {}
-): NumericFieldCandidate[] {
-  const counts = new Map<string, { count: number; sample: string | number }>();
-
-  for (const run of runs) {
-    if (!run.extractedData || typeof run.extractedData !== 'object') continue;
-    for (const [key, rawValue] of Object.entries(run.extractedData)) {
-      const parsed = parseNumericValue(rawValue);
-      if (parsed !== null) {
-        const existing = counts.get(key) || { count: 0, sample: '' };
-        counts.set(key, {
-          count: existing.count + 1,
-          sample: typeof rawValue === 'string' || typeof rawValue === 'number' ? rawValue : parsed,
-        });
-      }
-    }
+export function numericScale(values: number[], includeZero = false) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return { min: -1, max: 1, ticks: [-1, 0, 1] };
+  let min = Math.min(...finite),
+    max = Math.max(...finite);
+  const magnitude = Math.max(Math.abs(min), Math.abs(max)) || 1;
+  const spread = max / magnitude - min / magnitude;
+  const margin = spread === 0 ? (min === 0 ? 1 : 0.1) : spread * 0.1;
+  let low = min / magnitude - margin;
+  let high = max / magnitude + margin;
+  if (includeZero) {
+    low = Math.min(low, 0);
+    high = Math.max(high, 0);
   }
-
-  return Array.from(counts.entries())
-    .map(([key, data]) => ({
-      key,
-      label:
-        fieldLabels[key] ||
-        key
-          .replace(/([A-Z])/g, ' $1')
-          .replace(/[_-]/g, ' ')
-          .trim(),
-      sampleValue: data.sample,
-      validCount: data.count,
-    }))
-    .sort((a, b) => b.validCount - a.validCount);
+  const rawStep = (high - low) / 4;
+  const power = 10 ** Math.floor(Math.log10(rawStep));
+  const step = [1, 2, 5, 10].find((factor) => factor * power >= rawStep)! * power;
+  min = Math.max(-Number.MAX_VALUE, Math.floor(low / step) * step * magnitude);
+  max = Math.min(Number.MAX_VALUE, Math.ceil(high / step) * step * magnitude);
+  const ticks = Array.from(
+    { length: 5 },
+    (_, i) => (min / magnitude + ((max / magnitude - min / magnitude) * i) / 4) * magnitude
+  );
+  return { min, max, ticks };
+}
+/** Use the shortest precision that keeps adjacent scale labels distinguishable. */
+export function axisLabels(ticks: number[]): string[] {
+  for (let precision = 1; precision <= 17; precision++) {
+    const formatter = new Intl.NumberFormat(undefined, { maximumSignificantDigits: precision });
+    const labels = ticks.map((value) => formatter.format(value));
+    if (new Set(labels).size === ticks.length) return labels;
+  }
+  return ticks.map(String);
 }
 
-/**
- * Builds chronological time-series points (ordered from oldest to newest)
- * for a specific field across runs.
- */
-export function buildChartDataPoints(
-  runs: JobRunDto[],
-  fieldKey: string,
-  timeZone: string
-): ChartDataPoint[] {
-  // Runs arrive newest-first from the API; reverse to display chronologically (past -> present)
-  const chronological = [...runs].reverse();
-  const points: ChartDataPoint[] = [];
-
-  let previousNumeric: number | null = null;
-
-  for (const run of chronological) {
-    const rawVal =
-      run.extractedData && typeof run.extractedData === 'object'
-        ? (run.extractedData as Record<string, unknown>)[fieldKey]
-        : null;
-
-    const numVal = parseNumericValue(rawVal);
-    let deltaFromPrev: number | null = null;
-    let deltaPercentFromPrev: number | null = null;
-
-    if (numVal !== null && previousNumeric !== null) {
-      deltaFromPrev = numVal - previousNumeric;
-      if (previousNumeric !== 0) {
-        deltaPercentFromPrev = (deltaFromPrev / previousNumeric) * 100;
-      }
-    }
-
-    if (numVal !== null) {
-      previousNumeric = numVal;
-    }
-
-    const d = new Date(run.executedAt);
-    const ts = Number.isNaN(d.getTime()) ? Date.now() : d.getTime();
-
-    points.push({
-      runId: run.id,
-      timestamp: ts,
-      formattedTime: formatDateTime(run.executedAt, timeZone),
-      formattedCompactTime: formatCompactDate(run.executedAt, timeZone),
-      rawValue: rawVal,
-      numericValue: numVal,
-      displayValue:
-        rawVal !== null && rawVal !== undefined
-          ? String(rawVal)
-          : numVal !== null
-            ? formatNumericValue(numVal)
-            : '—',
-      hasChanges: run.hasChanges,
-      status: run.status,
-      durationMs: run.durationMs,
-      httpStatus: run.httpStatus,
-      deltaFromPrev,
-      deltaPercentFromPrev,
-    });
-  }
-
-  return points;
-}
-
-/**
- * Calculates high-level aggregate metrics for the execution history.
- */
-export function calculateRunMetrics(runs: JobRunDto[]): RunMetricsSummary {
-  const totalRuns = runs.length;
-  let successRuns = 0;
-  let failedRuns = 0;
-  let changeRuns = 0;
-  let totalDuration = 0;
-  let validDurationCount = 0;
-  let lastChangeAt: string | null = null;
-
-  for (const run of runs) {
-    if (run.status === RUN_STATUS.Success) successRuns++;
-    if (run.status === RUN_STATUS.Failed) failedRuns++;
-    if (run.hasChanges === CHANGE_STATUS.Changed) {
-      changeRuns++;
-      if (!lastChangeAt) {
-        // Runs are newest-first, so the first change encountered is the most recent
-        lastChangeAt = run.executedAt;
-      }
-    }
-    if (run.durationMs !== null && run.durationMs > 0) {
-      totalDuration += run.durationMs;
-      validDurationCount++;
-    }
-  }
-
+export function summarizeRuns(runs: JobRunDto[]) {
+  const changes = runs.filter((run) => run.hasChanges === ChangeStatus.Changed);
+  const durations = runs
+    .map((run) => run.durationMs)
+    .filter(
+      (duration): duration is number =>
+        duration !== null && Number.isFinite(duration) && duration >= 0
+    );
   return {
-    totalRuns,
-    successRuns,
-    failedRuns,
-    changeRuns,
-    changeRatePercent: totalRuns > 0 ? (changeRuns / totalRuns) * 100 : 0,
-    averageDurationMs:
-      validDurationCount > 0 ? Math.round(totalDuration / validDurationCount) : null,
-    lastChangeAt,
+    total: runs.length,
+    changes: changes.length,
+    lastChange:
+      orderedRuns(changes)
+        .filter((run) => Number.isFinite(Date.parse(run.executedAt)))
+        .at(-1)?.executedAt ?? null,
+    averageDuration: durations.length
+      ? Math.round(durations.reduce((sum, duration) => sum + duration, 0) / durations.length)
+      : null,
   };
 }

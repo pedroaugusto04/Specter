@@ -1,3 +1,4 @@
+import { finiteNumber as numericValue, sameRecord } from '@specter/contracts';
 import { payloadRecords } from '../extraction/comparison.js';
 import { recordIdentity } from '../extraction/values.js';
 import type { TriggerRule } from '../types/extractionPlan.js';
@@ -9,90 +10,6 @@ export interface TriggerEvaluationResult {
   hasRules: boolean;
   matchedRules: TriggerRule[];
   reasons: string[];
-}
-
-/**
- * Extracts a numeric value from numbers or formatted currency/percentage strings.
- * Examples:
- *   - "$ 1,299.99" -> 1299.99
- *   - "R$ 3.500,00" -> 3500.00
- *   - "150 €" -> 150.00
- *   - "12.5%" -> 12.5
- */
-export function parseNumericValue(val: unknown): number | null {
-  if (typeof val === 'number') {
-    return Number.isFinite(val) ? val : null;
-  }
-
-  if (typeof val !== 'string') {
-    return null;
-  }
-
-  const trimmed = val.replace(/\s+/g, ' ').trim();
-  if (!trimmed) return null;
-
-  // Keep only digits, dots, commas, minus signs
-  const cleaned = trimmed.replace(/[^\d,.-]/g, '');
-  if (!cleaned) return null;
-
-  let normalized = cleaned;
-  const lastComma = cleaned.lastIndexOf(',');
-  const lastDot = cleaned.lastIndexOf('.');
-
-  if (lastComma > lastDot) {
-    // European / Brazilian format: 1.234,56 -> 1234.56
-    normalized = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (lastDot > lastComma) {
-    // US / UK format: 1,234.56 -> 1234.56
-    normalized = cleaned.replace(/,/g, '');
-  }
-
-  const parsed = parseFloat(normalized);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-/**
- * Normalizes boolean strings or values.
- */
-export function parseBooleanValue(val: unknown): boolean | null {
-  if (typeof val === 'boolean') {
-    return val;
-  }
-
-  if (typeof val !== 'string') {
-    return null;
-  }
-
-  const lower = val.trim().toLowerCase();
-  const truthy = [
-    'true',
-    '1',
-    'yes',
-    'sim',
-    'in stock',
-    'disponível',
-    'available',
-    'ativo',
-    'active',
-    'in_stock',
-  ];
-  const falsy = [
-    'false',
-    '0',
-    'no',
-    'não',
-    'out of stock',
-    'esgotado',
-    'indisponível',
-    'unavailable',
-    'inativo',
-    'out_of_stock',
-  ];
-
-  if (truthy.includes(lower)) return true;
-  if (falsy.includes(lower)) return false;
-
-  return null;
 }
 
 /**
@@ -119,8 +36,8 @@ export function evaluateSingleRule(
       ] as TriggerOperator[]
     ).includes(operator)
   ) {
-    const actualNum = parseNumericValue(actualValue);
-    const targetNum = parseNumericValue(targetValue);
+    const actualNum = numericValue(actualValue);
+    const targetNum = numericValue(targetValue);
 
     if (actualNum === null || targetNum === null) {
       return {
@@ -163,9 +80,9 @@ export function evaluateSingleRule(
     operator === TriggerOperator.PercentageDrop ||
     operator === TriggerOperator.PercentageIncrease
   ) {
-    const actualNum = parseNumericValue(actualValue);
-    const prevNum = parseNumericValue(previousValue);
-    const targetPct = parseNumericValue(targetValue);
+    const actualNum = numericValue(actualValue);
+    const prevNum = numericValue(previousValue);
+    const targetPct = numericValue(targetValue);
 
     if (actualNum === null || prevNum === null || targetPct === null || prevNum <= 0) {
       return {
@@ -209,8 +126,8 @@ export function evaluateSingleRule(
 
   // 3. Simple relative changes: decreased, increased
   if (operator === TriggerOperator.Decreased || operator === TriggerOperator.Increased) {
-    const actualNum = parseNumericValue(actualValue);
-    const prevNum = parseNumericValue(previousValue);
+    const actualNum = numericValue(actualValue);
+    const prevNum = numericValue(previousValue);
 
     if (actualNum === null || prevNum === null) {
       return {
@@ -247,78 +164,34 @@ export function evaluateSingleRule(
       };
     }
 
-    const actualNum = typeof actualValue === 'number' ? actualValue : null;
-    const prevNum = typeof previousValue === 'number' ? previousValue : null;
-    if (actualNum !== null && prevNum !== null) {
-      const satisfied = actualNum !== prevNum;
-      return {
-        satisfied,
-        reason: satisfied
-          ? `${field} changed from ${prevNum} to ${actualNum}`
-          : `${field} remained unchanged at ${actualNum}`,
-      };
-    }
-
-    const actualStr = String(actualValue ?? '').trim();
-    const prevStr = String(previousValue ?? '').trim();
-    const satisfied = actualStr.toLowerCase() !== prevStr.toLowerCase();
-    return {
-      satisfied,
-      reason: satisfied
-        ? `${field} changed from "${prevStr}" to "${actualStr}"`
-        : `${field} remained unchanged ("${actualStr}")`,
-    };
+    const satisfied = actualValue !== previousValue;
+    return { satisfied, reason: satisfied ? `${field} changed.` : `${field} remained unchanged.` };
   }
 
-  // 5. Equality comparisons: eq, neq
   if (operator === TriggerOperator.Equal || operator === TriggerOperator.NotEqual) {
-    // Do not interpret identifiers or arbitrary text as numeric values.
-    const actualNum = typeof actualValue === 'number' ? actualValue : null;
-    const targetNum = typeof targetValue === 'number' ? targetValue : null;
-    if (actualNum !== null && targetNum !== null) {
-      const isEq = actualNum === targetNum;
-      const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
-      const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
-      return {
-        satisfied,
-        reason: `${field} (${actualNum}) ${symbol} ${targetNum}`,
-      };
+    if (
+      typeof actualValue !== typeof targetValue ||
+      (typeof actualValue === 'number' &&
+        (numericValue(actualValue) === null || numericValue(targetValue) === null))
+    ) {
+      return { satisfied: false, reason: `Field '${field}' has incompatible comparison types.` };
     }
-
-    // Try boolean equality
-    const actualBool = parseBooleanValue(actualValue);
-    const targetBool = parseBooleanValue(targetValue);
-    if (actualBool !== null && targetBool !== null) {
-      const isEq = actualBool === targetBool;
-      const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
-      const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
-      return {
-        satisfied,
-        reason: `${field} (${actualBool}) ${symbol} ${targetBool}`,
-      };
-    }
-
-    // Fallback to case-insensitive string equality
-    const actualStr = String(actualValue ?? '')
-      .trim()
-      .toLowerCase();
-    const targetStr = String(targetValue ?? '')
-      .trim()
-      .toLowerCase();
-    const isEq = actualStr === targetStr;
-    const satisfied = operator === TriggerOperator.Equal ? isEq : !isEq;
-    const symbol = operator === TriggerOperator.Equal ? '==' : '!=';
-
+    const equal =
+      typeof actualValue === 'string' && typeof targetValue === 'string'
+        ? actualValue.toLowerCase() === targetValue.toLowerCase()
+        : actualValue === targetValue;
     return {
-      satisfied,
-      reason: `${field} ("${String(actualValue ?? '')}") ${symbol} "${String(targetValue)}"`,
+      satisfied: operator === TriggerOperator.Equal ? equal : !equal,
+      reason: `${field} compared with ${String(targetValue)}.`,
     };
   }
 
   // 6. Substring checks: contains, not_contains
   if (operator === TriggerOperator.Contains || operator === TriggerOperator.NotContains) {
-    const actualStr = String(actualValue ?? '').toLowerCase();
-    const targetStr = String(targetValue ?? '').toLowerCase();
+    if (typeof actualValue !== 'string' || typeof targetValue !== 'string')
+      return { satisfied: false, reason: `Field '${field}' requires text values.` };
+    const actualStr = actualValue.toLowerCase();
+    const targetStr = targetValue.toLowerCase();
     const contains = actualStr.includes(targetStr);
     const satisfied = operator === TriggerOperator.Contains ? contains : !contains;
 
@@ -361,7 +234,7 @@ export function evaluateTriggerRules(
     const old = collection
       ? previousByIdentity.get(recordIdentity(record, identityFields))
       : previous[0];
-    if (old && JSON.stringify(old) === JSON.stringify(record)) continue;
+    if (old && sameRecord(old, record)) continue;
     const results = rules.map((rule) => ({
       rule,
       result: evaluateSingleRule(record[rule.field], rule, old?.[rule.field]),

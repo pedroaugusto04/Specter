@@ -1,3 +1,4 @@
+import { triggerOperatorsForType } from '@specter/contracts';
 import { requiresBrowser } from '../extraction/capabilities.js';
 import {
   ExtractionMode,
@@ -185,8 +186,38 @@ export const extractionPlanSchema = z
     for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
       if (!intent.fields[key]?.required)
         issue(`Referenced field '${key}' must exist and be required.`);
+    for (const rule of intent.triggerRules) {
+      const field = intent.fields[rule.field];
+      if (!field) continue;
+      if (!triggerOperatorsForType(field.type).includes(rule.operator))
+        issue(`Operator '${rule.operator}' is incompatible with field '${rule.field}'.`);
+      if (
+        field.type === FieldType.Number &&
+        rule.operator !== TriggerOperator.Changes &&
+        rule.operator !== TriggerOperator.Decreased &&
+        rule.operator !== TriggerOperator.Increased &&
+        (typeof rule.value !== 'number' || !Number.isFinite(rule.value))
+      )
+        issue(`Numeric rule '${rule.field}' requires a finite numeric threshold.`);
+      if (
+        (rule.operator === TriggerOperator.Contains ||
+          rule.operator === TriggerOperator.NotContains) &&
+        typeof rule.value !== 'string'
+      )
+        issue(`Text rule '${rule.field}' requires a string threshold.`);
+      if (rule.operator === TriggerOperator.Equal || rule.operator === TriggerOperator.NotEqual) {
+        const expected =
+          field.type === FieldType.Number
+            ? 'number'
+            : field.type === FieldType.Boolean
+              ? 'boolean'
+              : 'string';
+        if (typeof rule.value !== expected)
+          issue(`Rule '${rule.field}' has an incompatible threshold type.`);
+      }
+    }
     for (const [key, field] of Object.entries(intent.fields)) {
-      if (field.type === 'number' && !field.locale)
+      if (field.type === FieldType.Number && !field.locale)
         issue(`Numeric field '${key}' requires an explicit locale.`);
       if (field.locale) {
         try {
@@ -195,7 +226,7 @@ export const extractionPlanSchema = z
           issue(`Invalid locale for '${key}'.`);
         }
       }
-      if (field.type === 'boolean' && !Object.keys(field.booleanValues ?? {}).length)
+      if (field.type === FieldType.Boolean && !Object.keys(field.booleanValues ?? {}).length)
         issue(`Boolean field '${key}' requires an explicit value mapping.`);
     }
     if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length)

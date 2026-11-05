@@ -4,12 +4,7 @@ import { fixturePlan } from './helpers/extractionFixtures.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ScrapeExecutionService } from '../src/services/scrapeExecutionService.js';
 import type { ExtractionPlan, TriggerRule } from '../src/types/extractionPlan.js';
-import {
-  evaluateSingleRule,
-  evaluateTriggerRules,
-  parseBooleanValue,
-  parseNumericValue,
-} from '../src/utils/triggerEvaluator.js';
+import { evaluateSingleRule, evaluateTriggerRules } from '../src/utils/triggerEvaluator.js';
 import {
   InMemoryJobRepository,
   MockJobScheduler,
@@ -17,84 +12,31 @@ import {
   MockScraperEngine,
 } from './helpers/testDoubles.js';
 describe('Conditional Alert Triggers & Evaluator', () => {
-  describe('parseNumericValue', () => {
-    it('handles numeric primitives', () => {
-      expect(parseNumericValue(150)).toBe(150);
-      expect(parseNumericValue(3499.99)).toBe(3499.99);
-      expect(parseNumericValue(-42)).toBe(-42);
-      expect(parseNumericValue(NaN)).toBeNull();
-      expect(parseNumericValue(Infinity)).toBeNull();
-    });
-    it('parses US currency strings correctly', () => {
-      expect(parseNumericValue('$ 1,299.99')).toBe(1299.99);
-      expect(parseNumericValue('$45')).toBe(45);
-      expect(parseNumericValue('USD 10,000.50')).toBe(10000.5);
-    });
-    it('parses European and Brazilian currency strings correctly', () => {
-      expect(parseNumericValue('R$ 3.500,00')).toBe(3500);
-      expect(parseNumericValue('1.250,50 €')).toBe(1250.5);
-      expect(parseNumericValue('€ 99,90')).toBe(99.9);
-    });
-    it('parses percentages correctly', () => {
-      expect(parseNumericValue('25%')).toBe(25);
-      expect(parseNumericValue('- 15.5 %')).toBe(-15.5);
-    });
-    it('returns null for non-numeric strings or empty values', () => {
-      expect(parseNumericValue('')).toBeNull();
-      expect(parseNumericValue('Out of stock')).toBeNull();
-      expect(parseNumericValue(null)).toBeNull();
-      expect(parseNumericValue(undefined)).toBeNull();
-    });
-  });
-  describe('parseBooleanValue', () => {
-    it('handles boolean primitives', () => {
-      expect(parseBooleanValue(true)).toBe(true);
-      expect(parseBooleanValue(false)).toBe(false);
-    });
-    it('identifies truthy stock / status keywords', () => {
-      expect(parseBooleanValue('in stock')).toBe(true);
-      expect(parseBooleanValue('Disponível')).toBe(true);
-      expect(parseBooleanValue('AVAILABLE')).toBe(true);
-      expect(parseBooleanValue('yes')).toBe(true);
-      expect(parseBooleanValue('1')).toBe(true);
-    });
-    it('identifies falsy stock / status keywords', () => {
-      expect(parseBooleanValue('out of stock')).toBe(false);
-      expect(parseBooleanValue('Esgotado')).toBe(false);
-      expect(parseBooleanValue('indisponível')).toBe(false);
-      expect(parseBooleanValue('no')).toBe(false);
-      expect(parseBooleanValue('0')).toBe(false);
-    });
-    it('returns null for arbitrary strings', () => {
-      expect(parseBooleanValue('iPhone 16 Pro')).toBeNull();
-      expect(parseBooleanValue('')).toBeNull();
-    });
-  });
   describe('evaluateSingleRule', () => {
     it('evaluates numeric comparisons (lt, lte, gt, gte)', () => {
       const ruleLt: TriggerRule = { field: 'price', operator: 'lt', value: 3500 };
-      expect(evaluateSingleRule('R$ 3.499,00', ruleLt).satisfied).toBe(true);
-      expect(evaluateSingleRule('R$ 3.500,00', ruleLt).satisfied).toBe(false);
+      expect(evaluateSingleRule(3499.0, ruleLt).satisfied).toBe(true);
+      expect(evaluateSingleRule(3500.0, ruleLt).satisfied).toBe(false);
       const ruleLte: TriggerRule = { field: 'price', operator: 'lte', value: 3500 };
-      expect(evaluateSingleRule('R$ 3.500,00', ruleLte).satisfied).toBe(true);
-      expect(evaluateSingleRule('R$ 3.501,00', ruleLte).satisfied).toBe(false);
+      expect(evaluateSingleRule(3500.0, ruleLte).satisfied).toBe(true);
+      expect(evaluateSingleRule(3501.0, ruleLte).satisfied).toBe(false);
       const ruleGt: TriggerRule = { field: 'discount', operator: 'gt', value: 20 };
-      expect(evaluateSingleRule('25%', ruleGt).satisfied).toBe(true);
-      expect(evaluateSingleRule('20%', ruleGt).satisfied).toBe(false);
+      expect(evaluateSingleRule(25, ruleGt).satisfied).toBe(true);
+      expect(evaluateSingleRule(20, ruleGt).satisfied).toBe(false);
       const ruleGte: TriggerRule = { field: 'discount', operator: 'gte', value: 20 };
-      expect(evaluateSingleRule('20%', ruleGte).satisfied).toBe(true);
+      expect(evaluateSingleRule(20, ruleGte).satisfied).toBe(true);
     });
     it('evaluates equality and boolean matches', () => {
       const ruleEqStatus: TriggerRule = { field: 'in_stock', operator: 'eq', value: true };
-      expect(evaluateSingleRule('In Stock', ruleEqStatus).satisfied).toBe(true);
-      expect(evaluateSingleRule('Out of Stock', ruleEqStatus).satisfied).toBe(false);
+      expect(evaluateSingleRule(true, ruleEqStatus).satisfied).toBe(true);
+      expect(evaluateSingleRule(false, ruleEqStatus).satisfied).toBe(false);
       const ruleNeqStatus: TriggerRule = {
         field: 'in_stock',
         operator: 'neq',
-        value: 'Out of Stock',
+        value: false,
       };
-      expect(evaluateSingleRule('In Stock', ruleNeqStatus).satisfied).toBe(true);
-      expect(evaluateSingleRule('out of stock', ruleNeqStatus).satisfied).toBe(false);
+      expect(evaluateSingleRule(true, ruleNeqStatus).satisfied).toBe(true);
+      expect(evaluateSingleRule(false, ruleNeqStatus).satisfied).toBe(false);
     });
     it('evaluates contains and not_contains string checks', () => {
       const ruleContains: TriggerRule = { field: 'title', operator: 'contains', value: 'Pro Max' };
@@ -113,11 +55,11 @@ describe('Conditional Alert Triggers & Evaluator', () => {
     it('evaluates relative percentage drops and increases against previous value', () => {
       const ruleDrop10: TriggerRule = { field: 'price', operator: 'percentage_drop', value: 10 };
       // Previous: 1000, Actual: 850 (15% drop >= 10%)
-      expect(evaluateSingleRule('R$ 850,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(true);
+      expect(evaluateSingleRule(850.0, ruleDrop10, 1000.0).satisfied).toBe(true);
       // Previous: 1000, Actual: 950 (5% drop < 10%)
-      expect(evaluateSingleRule('R$ 950,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(false);
+      expect(evaluateSingleRule(950.0, ruleDrop10, 1000.0).satisfied).toBe(false);
       // Price increased
-      expect(evaluateSingleRule('R$ 1.100,00', ruleDrop10, 'R$ 1.000,00').satisfied).toBe(false);
+      expect(evaluateSingleRule(1100.0, ruleDrop10, 1000.0).satisfied).toBe(false);
       const ruleInc15: TriggerRule = { field: 'price', operator: 'percentage_increase', value: 15 };
       // Previous: 100, Actual: 120 (20% increase >= 15%)
       expect(evaluateSingleRule(120, ruleInc15, 100).satisfied).toBe(true);
@@ -133,8 +75,8 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       expect(evaluateSingleRule(110, ruleInc, 100).satisfied).toBe(true);
       expect(evaluateSingleRule(90, ruleInc, 100).satisfied).toBe(false);
       const ruleChanges: TriggerRule = { field: 'status', operator: 'changes', value: '' };
-      expect(evaluateSingleRule('In Stock', ruleChanges, 'Out of Stock').satisfied).toBe(true);
-      expect(evaluateSingleRule('In Stock', ruleChanges, 'in stock').satisfied).toBe(false);
+      expect(evaluateSingleRule(true, ruleChanges, false).satisfied).toBe(true);
+      expect(evaluateSingleRule(true, ruleChanges, true).satisfied).toBe(false);
     });
   });
   describe('evaluateTriggerRules', () => {
@@ -149,7 +91,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
         { field: 'price', operator: 'lt', value: 3500 },
         { field: 'status', operator: 'eq', value: 'Available' },
       ];
-      const payload = { price: 'R$ 3.200,00', status: 'Available' };
+      const payload = { price: 3200.0, status: 'Available' };
       const result = evaluateTriggerRules(payload, rules, 'all');
       expect(result.triggered).toBe(true);
       expect(result.matchedRules).toHaveLength(2);
@@ -160,7 +102,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
         { field: 'price', operator: 'lt', value: 3500 },
         { field: 'status', operator: 'eq', value: 'Available' },
       ];
-      const payload = { price: 'R$ 3.800,00', status: 'Available' };
+      const payload = { price: 3800.0, status: 'Available' };
       const result = evaluateTriggerRules(payload, rules, 'all');
       expect(result.triggered).toBe(false);
       expect(result.matchedRules).toHaveLength(0);
@@ -171,7 +113,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
         { field: 'discount', operator: 'gte', value: 30 },
       ];
       // price is not < 3500, but discount is 35%
-      const payload = { price: 'R$ 4.000,00', discount: '35%' };
+      const payload = { price: 4000.0, discount: 35 };
       const result = evaluateTriggerRules(payload, rules, 'any');
       expect(result.triggered).toBe(true);
       expect(result.matchedRules).toHaveLength(1);
@@ -181,8 +123,8 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       const rules: TriggerRule[] = [{ field: 'price', operator: 'lt', value: 50 }];
       const payload = {
         items: [
-          { title: 'Item A', price: '$ 80.00' },
-          { title: 'Item B', price: '$ 45.00' },
+          { title: 'Item A', price: 80 },
+          { title: 'Item B', price: 45 },
         ],
         count: 2,
       };
@@ -227,9 +169,9 @@ describe('Conditional Alert Triggers & Evaluator', () => {
           },
           price: {
             sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
-            type: 'string',
+            type: 'number',
             required: true,
-            locale: 'en-US',
+            locale: 'pt-BR',
           },
         },
         triggerRules: [{ field: 'price', operator: 'lt', value: 3500 }],
@@ -247,7 +189,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       // Initial run: price was 4200
       await repository.createRun({
         jobId: job.id,
-        extractedData: { title: 'PlayStation 5', price: 'R$ 4.200,00' },
+        extractedData: { title: 'PlayStation 5', price: 4200.0 },
         normalizedHash: 'hash_initial',
         hasChanges: 'INITIAL',
         status: 'SUCCESS',
@@ -283,9 +225,9 @@ describe('Conditional Alert Triggers & Evaluator', () => {
           },
           price: {
             sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
-            type: 'string',
+            type: 'number',
             required: true,
-            locale: 'en-US',
+            locale: 'pt-BR',
           },
         },
         triggerRules: [{ field: 'price', operator: 'lt', value: 3500 }],
@@ -303,7 +245,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       // Initial run: price was 4200
       await repository.createRun({
         jobId: job.id,
-        extractedData: { title: 'PlayStation 5', price: 'R$ 4.200,00' },
+        extractedData: { title: 'PlayStation 5', price: 4200.0 },
         normalizedHash: 'hash_initial',
         hasChanges: 'INITIAL',
         status: 'SUCCESS',
@@ -343,9 +285,9 @@ describe('Conditional Alert Triggers & Evaluator', () => {
           },
           price: {
             sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
-            type: 'string',
+            type: 'number',
             required: true,
-            locale: 'en-US',
+            locale: 'pt-BR',
           },
         },
         triggerRules: [{ field: 'price', operator: 'percentage_drop', value: 10 }],
@@ -363,7 +305,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       // Prior run: price was 1000
       await repository.createRun({
         jobId: job.id,
-        extractedData: { title: 'Headphones', price: 'R$ 1.000,00' },
+        extractedData: { title: 'Headphones', price: 1000.0 },
         normalizedHash: 'hash_prior',
         hasChanges: 'INITIAL',
         status: 'SUCCESS',

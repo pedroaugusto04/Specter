@@ -1,5 +1,6 @@
 'use client';
 
+import { orderedRuns } from '@/lib/chartUtils';
 import * as React from 'react';
 import type { JobRunDto } from '@/lib/api';
 import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
@@ -29,20 +30,24 @@ export function ExecutionTimelineStrip({
 
   // Chronological order: oldest on left -> newest on right.
   // Take up to the most recent 40 runs to maintain clean visual density.
-  const chronologicalRuns = [...runs].reverse().slice(-40);
+  const chronologicalRuns = orderedRuns(runs).slice(-40);
 
-  const changeCount = runs.filter((r) => r.hasChanges === CHANGE_STATUS.Changed).length;
-  const unchangedCount = runs.filter(
+  const changeCount = chronologicalRuns.filter(
+    (r) => r.hasChanges === CHANGE_STATUS.Changed
+  ).length;
+  const unchangedCount = chronologicalRuns.filter(
     (r) => r.hasChanges === CHANGE_STATUS.Unchanged && r.status === RUN_STATUS.Success
   ).length;
-  const failedCount = runs.filter((r) => r.status === RUN_STATUS.Failed).length;
-  const initialCount = runs.filter((r) => r.hasChanges === CHANGE_STATUS.Initial).length;
+  const failedCount = chronologicalRuns.filter((r) => r.status === RUN_STATUS.Failed).length;
+  const initialCount = chronologicalRuns.filter(
+    (r) => r.hasChanges === CHANGE_STATUS.Initial
+  ).length;
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-          Execution Timeline (Recent {chronologicalRuns.length})
+          Execution sequence — equally spaced observations (Recent {chronologicalRuns.length})
         </span>
 
         {/* Legend */}

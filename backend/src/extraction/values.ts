@@ -11,7 +11,9 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
     case FieldType.String:
       return field.normalizeVolatileText ? sanitizeVolatileString(text) : text;
     case FieldType.Boolean:
-      return field.booleanValues?.[text.toLowerCase()] ?? null;
+      return typeof value === 'boolean'
+        ? value
+        : (field.booleanValues?.[text.toLowerCase()] ?? null);
     case FieldType.Url:
       try {
         const url = new URL(text, baseUrl);
@@ -39,9 +41,7 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
   }
 }
 
-export function recordIdentity(record: Record<string, Scalar>, fields: string[]): string {
-  return JSON.stringify(fields.map((field) => record[field]));
-}
+export { recordIdentity } from '@specter/contracts';
 
 export function compareIdentityText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;

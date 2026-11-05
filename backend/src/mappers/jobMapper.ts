@@ -44,10 +44,11 @@ export const JobMapper = {
         ? {
             intent: {
               scope: entity.extractionPlan.intent.scope,
+              identityFields: entity.extractionPlan.intent.identityFields,
               fields: Object.fromEntries(
                 Object.entries(entity.extractionPlan.intent.fields).map(([key, field]) => [
                   key,
-                  { displayName: field.displayName },
+                  { displayName: field.displayName, type: field.type, locale: field.locale },
                 ])
               ),
               triggerRules: entity.extractionPlan.intent.triggerRules,
@@ -55,6 +56,7 @@ export const JobMapper = {
             },
           }
         : null,
+      contractRevision: entity.contractRevision ?? null,
       status: entity.status,
       accessState: context.accessState,
       lastError: entity.lastError,
@@ -88,10 +90,11 @@ export const JobMapper = {
       id: entity.id,
       jobId: entity.jobId,
       extractionReport: entity.extractionReport
-        ? { quality: entity.extractionReport.quality }
+        ? { quality: entity.extractionReport.quality, coverage: entity.extractionReport.coverage }
         : entity.extractionReport,
       extractedData: entity.extractedData,
       hasChanges: entity.hasChanges,
+      contractRevision: entity.contractRevision ?? null,
       status: entity.status,
       errorMessage: entity.errorMessage,
       httpStatus: entity.httpStatus,

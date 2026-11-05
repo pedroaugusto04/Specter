@@ -210,7 +210,16 @@ export class JobService {
       }
     }
 
-    if (patch.extractionPlan) patch.contractRevision = randomUUID();
+    if (patch.extractionPlan) {
+      const validated = extractionPlanSchema.safeParse(patch.extractionPlan);
+      if (!validated.success)
+        throw new ValidationError(
+          'Invalid trigger configuration.',
+          validated.error.issues.map((issue) => ({ field: 'triggerRules', message: issue.message }))
+        );
+      patch.extractionPlan = validated.data;
+      patch.contractRevision = randomUUID();
+    }
 
     const needsRecompile =
       (patch.url !== undefined && patch.url !== existing.url) ||

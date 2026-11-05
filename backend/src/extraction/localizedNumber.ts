@@ -5,6 +5,20 @@ interface NumberNotation {
   secondary: number;
   digits: Array<[string, string]>;
 }
+const CURRENCY_MARKERS = [
+  'R$',
+  'USD',
+  'BRL',
+  'EUR',
+  'GBP',
+  'JPY',
+  'INR',
+  '$',
+  '€',
+  '£',
+  '¥',
+  '₹',
+] as const;
 const notations = new Map<string, NumberNotation>();
 function notation(locale: string): NumberNotation {
   const cached = notations.get(locale);
@@ -40,9 +54,16 @@ export function parseLocalizedNumber(input: string, locale: string): number | nu
   if (/\([^)]*\d[^)]*\)/.test(text)) return null;
   const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const characters = [...new Set(['.', ',', decimal, group])].map(escape).join('');
-  const tokens = text.match(new RegExp('[+-]?\\d[\\d' + characters + '\\s]*', 'gu'));
-  if (!tokens || tokens.length !== 1) return null;
-  const token = tokens[0]!.trim();
+  text = text.trim();
+  const prefix = CURRENCY_MARKERS.find((marker) => text.startsWith(marker));
+  const suffix = CURRENCY_MARKERS.find((marker) => text.endsWith(marker));
+  if (prefix && suffix) return null;
+  if (prefix) text = text.slice(prefix.length).trim();
+  else if (suffix) text = text.slice(0, -suffix.length).trim();
+  else if (text.endsWith('%')) text = text.slice(0, -1).trim();
+  const pattern = new RegExp('^[+-]?\\d[\\d' + characters + ']*$', 'u');
+  if (!pattern.test(text)) return null;
+  const token = text;
   const pieces = token.replace(/^[+-]/, '').split(decimal);
   if (pieces.length > 2) return null;
   const integer = pieces[0]!;

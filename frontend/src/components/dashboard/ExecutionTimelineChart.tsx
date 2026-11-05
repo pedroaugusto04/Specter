@@ -1,624 +1,222 @@
 'use client';
-
-import { Badge } from '@/components/ui/badge';
-import type { JobRunDto } from '@/lib/api';
-import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
-import type { ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
-import {
-  buildChartDataPoints,
-  calculateRunMetrics,
-  detectNumericFields,
-  formatNumericValue,
-} from '@/lib/chartUtils';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
-import { formatCompactDate, formatDateTime, parseErrorMessage } from '@/lib/utils';
-import {
-  Activity,
-  ArrowDownRight,
-  ArrowUpRight,
-  Camera,
-  Clock,
-  GitCompare,
-  TrendingUp,
-} from 'lucide-react';
 import * as React from 'react';
+import { isCollectionPayload, FieldType, RunStatus, type JobRunDto } from '@specter/contracts';
+import {
+  summarizeRuns,
+  fieldObservations,
+  orderedRuns,
+  TEXT_MODE,
+  type TimelineFields,
+} from '@/lib/chartUtils';
+import { formatDateTime } from '@/lib/utils';
+import { NumericObservations } from './NumericObservations';
+import { StateObservations } from './StateObservations';
+import { CollectionHistory } from './CollectionHistory';
 
-interface ExecutionTimelineChartProps {
+interface Props {
   runs: JobRunDto[];
-  fields?: ExtractionFieldDefinitions;
+  fields: TimelineFields;
+  revision: string | null;
+  identityFields: string[];
   timeZone?: string;
   onSelectRun?: (run: JobRunDto) => void;
   onOpenScreenshot?: (url: string) => void;
 }
-
 export function ExecutionTimelineChart({
   runs,
-  fields = {},
+  fields,
+  revision,
+  identityFields,
   timeZone = 'UTC',
   onSelectRun,
   onOpenScreenshot,
-}: ExecutionTimelineChartProps) {
-  const metrics = React.useMemo(() => calculateRunMetrics(runs), [runs]);
-  const fieldLabels = React.useMemo(() => getExtractionFieldLabels(fields), [fields]);
-  const numericFields = React.useMemo(
-    () => detectNumericFields(runs, fieldLabels),
-    [runs, fieldLabels]
+}: Props) {
+  const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
+  const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);
+  const selected = fields[field] ? field : Object.keys(fields)[0];
+  const definition = fields[selected];
+  const observations = definition
+    ? fieldObservations(runs, selected, definition.type, revision)
+    : [];
+  const formatTime = (date: string) =>
+    Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
+  const summary = summarizeRuns(runs);
+  const chronological = orderedRuns(runs);
+  const dated = chronological.filter((run) => Number.isFinite(Date.parse(run.executedAt)));
+  const collection = runs.some(
+    (run) =>
+      run.contractRevision === revision &&
+      run.extractedData &&
+      isCollectionPayload(run.extractedData)
   );
-
-  const [selectedField, setSelectedField] = React.useState<string>(() => {
-    return numericFields[0]?.key || '';
-  });
-
-  // Keep selectedField in sync if fields change
-  React.useEffect(() => {
-    if (numericFields.length > 0 && !numericFields.some((f) => f.key === selectedField)) {
-      setSelectedField(numericFields[0].key);
-    }
-  }, [numericFields, selectedField]);
-
-  const chartPoints = React.useMemo(() => {
-    if (!selectedField) return [];
-    return buildChartDataPoints(runs, selectedField, timeZone);
-  }, [runs, selectedField, timeZone]);
-
-  // Points that have valid numeric values
-  const validPoints = React.useMemo(() => {
-    return chartPoints.filter((p) => p.numericValue !== null);
-  }, [chartPoints]);
-
-  // Runs that had detected changes or failures
-  const changeRuns = React.useMemo(() => {
-    return runs.filter(
-      (r) =>
-        r.hasChanges === CHANGE_STATUS.Changed ||
-        r.hasChanges === CHANGE_STATUS.Initial ||
-        r.status === RUN_STATUS.Failed
-    );
-  }, [runs]);
-
-  // SVG Chart Geometry
-  const width = 640;
-  const height = 220;
-  const padTop = 20;
-  const padBottom = 32;
-  const padLeft = 60;
-  const padRight = 24;
-  const plotWidth = width - padLeft - padRight;
-  const plotHeight = height - padTop - padBottom;
-
-  const { minVal, maxVal } = React.useMemo(() => {
-    if (validPoints.length === 0) return { minVal: 0, maxVal: 100 };
-    let min = Infinity;
-    let max = -Infinity;
-    for (const p of validPoints) {
-      if (p.numericValue !== null) {
-        if (p.numericValue < min) min = p.numericValue;
-        if (p.numericValue > max) max = p.numericValue;
-      }
-    }
-    if (min === max) {
-      const pad = min === 0 ? 1 : Math.abs(min) * 0.1;
-      return { minVal: min - pad, maxVal: max + pad };
-    }
-    const delta = max - min;
-    const pad = delta * 0.1;
-    return { minVal: min - pad, maxVal: max + pad };
-  }, [validPoints]);
-
-  const getY = React.useCallback(
-    (val: number) => {
-      const range = maxVal - minVal;
-      if (range <= 0) return padTop + plotHeight / 2;
-      return padTop + plotHeight - ((val - minVal) / range) * plotHeight;
-    },
-    [maxVal, minVal, plotHeight]
-  );
-
-  const getX = React.useCallback(
-    (index: number) => {
-      if (validPoints.length <= 1) return padLeft + plotWidth / 2;
-      return padLeft + (index / (validPoints.length - 1)) * plotWidth;
-    },
-    [validPoints.length, plotWidth]
-  );
-
-  // Build Step-After SVG Path
-  const { linePath, areaPath } = React.useMemo(() => {
-    if (validPoints.length === 0) return { linePath: '', areaPath: '' };
-
-    const coords = validPoints.map((p, idx) => ({
-      x: getX(idx),
-      y: getY(p.numericValue!),
-    }));
-
-    // Step-after line: M x0 y0 L x1 y0 L x1 y1 ...
-    let lineD = `M ${coords[0].x} ${coords[0].y}`;
-    for (let i = 1; i < coords.length; i++) {
-      const prev = coords[i - 1];
-      const curr = coords[i];
-      lineD += ` L ${curr.x} ${prev.y} L ${curr.x} ${curr.y}`;
-    }
-
-    const baselineY = padTop + plotHeight;
-    const lastCoord = coords[coords.length - 1];
-    const firstCoord = coords[0];
-    const areaD = `${lineD} L ${lastCoord.x} ${baselineY} L ${firstCoord.x} ${baselineY} Z`;
-
-    return { linePath: lineD, areaPath: areaD };
-  }, [validPoints, getX, getY, plotHeight]);
-
-  // Interactive Hover State
-  const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
-  const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number; align: 'left' | 'center' | 'right' } | null>(null);
-  const activePoint = hoverIndex !== null ? validPoints[hoverIndex] : null;
-  const activePointCoords =
-    hoverIndex !== null
-      ? {
-          x: getX(hoverIndex),
-          y: getY(validPoints[hoverIndex].numericValue!),
-        }
-      : null;
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (validPoints.length === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = ((e.clientX - rect.left) / rect.width) * width;
-    const align = e.clientX < window.innerWidth * 0.25 ? 'left' : e.clientX > window.innerWidth * 0.75 ? 'right' : 'center';
-    setTooltipPosition({ x: e.clientX, y: rect.top + 16, align });
-
-    // Find nearest point
-    let closestIdx = 0;
-    let closestDist = Infinity;
-    for (let i = 0; i < validPoints.length; i++) {
-      const px = getX(i);
-      const dist = Math.abs(px - mouseX);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestIdx = i;
-      }
-    }
-    setHoverIndex(closestIdx);
-  };
-
-  if (runs.length === 0) {
-    return (
-      <div className="rounded-lg border border-border bg-muted/20 p-8 text-center text-xs sm:text-sm text-muted-foreground">
-        No execution data available to build timeline charts.
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Metrics Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="rounded-lg border border-border bg-card p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono font-medium uppercase tracking-wider">
-              Total Runs
-            </span>
-            <Activity className="h-3.5 w-3.5" />
+    <div className="space-y-5 text-sm">
+      <p>
+        {runs.length} recent executions loaded
+        {dated.length
+          ? ` · ${formatTime(dated[0].executedAt)} — ${formatTime(dated[dated.length - 1].executedAt)}`
+          : ''}
+        . All summaries refer to this loaded history.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          ['Total runs', summary.total],
+          ['Changed runs', summary.changes],
+          ['Last observed change', summary.lastChange ? formatTime(summary.lastChange) : 'None'],
+          [
+            'Average execution duration',
+            summary.averageDuration === null ? 'Unavailable' : `${summary.averageDuration} ms`,
+          ],
+        ].map(([label, value]) => (
+          <div key={label} className="border border-border rounded p-3">
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div>{value}</div>
           </div>
-          <div className="font-mono text-xl font-semibold text-foreground">{metrics.totalRuns}</div>
-          <div className="text-[11px] font-mono text-muted-foreground">
-            {metrics.successRuns} succeeded • {metrics.failedRuns} failed
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono font-medium uppercase tracking-wider">
-              Detected Changes
-            </span>
-            <GitCompare className="h-3.5 w-3.5 text-amber-500" />
-          </div>
-          <div className="font-mono text-xl font-semibold text-amber-500">{metrics.changeRuns}</div>
-          <div className="text-[11px] font-mono text-muted-foreground">
-            {metrics.changeRatePercent.toFixed(1)}% change frequency
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono font-medium uppercase tracking-wider">
-              Latest Change
-            </span>
-            <Clock className="h-3.5 w-3.5" />
-          </div>
-          <div className="font-mono text-xs font-semibold text-foreground truncate">
-            {metrics.lastChangeAt ? formatCompactDate(metrics.lastChangeAt, timeZone) : 'None'}
-          </div>
-          <div className="text-[11px] font-mono text-muted-foreground">
-            {metrics.lastChangeAt ? 'State transition' : 'Stable baseline'}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono font-medium uppercase tracking-wider">
-              Avg Latency
-            </span>
-            <TrendingUp className="h-3.5 w-3.5" />
-          </div>
-          <div className="font-mono text-xl font-semibold text-foreground">
-            {metrics.averageDurationMs !== null ? `${metrics.averageDurationMs}ms` : '—'}
-          </div>
-          <div className="text-[11px] font-mono text-muted-foreground">Scraper response time</div>
-        </div>
+        ))}
       </div>
-
-      {/* Value Evolution Section */}
-      {numericFields.length > 0 ? (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                Value Evolution (Step-Line Trend)
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Temporal value progression plotted over chronological executions.
-              </p>
-            </div>
-
-            {/* Field Selector */}
-            {numericFields.length > 1 && (
-              <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
-                {numericFields.map((field) => (
-                  <button
-                    key={field.key}
-                    type="button"
-                    onClick={() => setSelectedField(field.key)}
-                    className={`rounded px-2.5 py-1 text-xs font-mono font-medium transition-colors cursor-pointer ${
-                      selectedField === field.key
-                        ? 'bg-card text-foreground shadow-2xs border border-border'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {field.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SVG Chart Container */}
-          <div className="relative overflow-hidden rounded-md border border-border/80 bg-muted/15 p-2">
-            <svg
-              viewBox={`0 0 ${width} ${height}`}
-              className="w-full h-56 sm:h-64 overflow-visible select-none"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={() => { setHoverIndex(null); setTooltipPosition(null); }}
+      {collection ? (
+        <CollectionHistory
+          runs={runs}
+          revision={revision}
+          identityFields={identityFields}
+          formatTime={formatTime}
+        />
+      ) : definition ? (
+        <section className="rounded-lg border border-border p-4 space-y-4">
+          <label className="flex gap-3 items-center">
+            Monitored field
+            <select
+              className="bg-card border rounded p-2"
+              value={selected}
+              onChange={(e) => {
+                setField(e.target.value);
+                setTextMode(TEXT_MODE.Events);
+              }}
             >
-              <defs>
-                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor="currentColor"
-                    className="text-primary"
-                    stopOpacity="0.18"
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="currentColor"
-                    className="text-primary"
-                    stopOpacity="0.0"
-                  />
-                </linearGradient>
-              </defs>
-
-              {/* Horizontal Grid lines */}
-              {[0, 0.33, 0.66, 1].map((pct) => {
-                const y = padTop + plotHeight * pct;
-                const valueLabel = formatNumericValue(maxVal - pct * (maxVal - minVal));
-                return (
-                  <g key={pct}>
-                    <line
-                      x1={padLeft}
-                      y1={y}
-                      x2={width - padRight}
-                      y2={y}
-                      stroke="currentColor"
-                      className="text-border"
-                      strokeDasharray="3 3"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x={padLeft - 8}
-                      y={y + 3}
-                      textAnchor="end"
-                      className="fill-muted-foreground font-mono text-[10px]"
-                    >
-                      {valueLabel}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Area & Line */}
-              {areaPath && <path d={areaPath} fill="url(#areaGradient)" />}
-              {linePath && (
-                <path
-                  d={linePath}
-                  fill="none"
-                  stroke="currentColor"
-                  className="text-primary"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                />
-              )}
-
-              {/* Data points */}
-              {validPoints.map((point, idx) => {
-                const cx = getX(idx);
-                const cy = getY(point.numericValue!);
-                const isChange = point.hasChanges === CHANGE_STATUS.Changed;
-                const isInitial = point.hasChanges === CHANGE_STATUS.Initial;
-
-                if (isChange) {
-                  return (
-                    <g key={point.runId}>
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r="7"
-                        fill="none"
-                        stroke="#f59e0b"
-                        strokeWidth="2"
-                        opacity="0.8"
-                      />
-                      <circle cx={cx} cy={cy} r="3.5" fill="#f59e0b" />
-                    </g>
-                  );
-                }
-
-                if (isInitial) {
-                  return (
-                    <circle
-                      key={point.runId}
-                      cx={cx}
-                      cy={cy}
-                      r="4"
-                      fill="currentColor"
-                      className="text-foreground"
-                    />
-                  );
-                }
-
-                return (
-                  <circle
-                    key={point.runId}
-                    cx={cx}
-                    cy={cy}
-                    r="2.5"
-                    fill="currentColor"
-                    className="text-muted-foreground/60"
-                  />
-                );
-              })}
-
-              {/* Active Hover Crosshair */}
-              {activePointCoords && (
-                <g>
-                  <line
-                    x1={activePointCoords.x}
-                    y1={padTop}
-                    x2={activePointCoords.x}
-                    y2={padTop + plotHeight}
-                    stroke="currentColor"
-                    className="text-primary/70"
-                    strokeDasharray="2 2"
-                    strokeWidth="1"
-                  />
-                  <circle
-                    cx={activePointCoords.x}
-                    cy={activePointCoords.y}
-                    r="7"
-                    fill="none"
-                    stroke="currentColor"
-                    className="text-primary"
-                    strokeWidth="2"
-                  />
-                  <circle
-                    cx={activePointCoords.x}
-                    cy={activePointCoords.y}
-                    r="3.5"
-                    fill="currentColor"
-                    className="text-foreground"
-                  />
-                </g>
-              )}
-
-              {/* X-axis date labels */}
-              {validPoints.length > 0 && (
-                <g>
-                  <text
-                    x={padLeft}
-                    y={height - 8}
-                    textAnchor="start"
-                    className="fill-muted-foreground font-mono text-[10px]"
+              {Object.entries(fields).map(([key, value]) => (
+                <option key={key} value={key}>
+                  {value.displayName || key}
+                </option>
+              ))}
+            </select>
+          </label>
+          {definition.type === FieldType.Number ? (
+            <NumericObservations
+              key={selected}
+              observations={observations}
+              formatTime={formatTime}
+            />
+          ) : definition.type === FieldType.Boolean ? (
+            <StateObservations observations={observations} formatTime={formatTime} boolean />
+          ) : (
+            <>
+              {definition.type === FieldType.String && (
+                <label className="flex gap-3">
+                  Presentation
+                  <select
+                    className="bg-card border rounded"
+                    value={textMode}
+                    onChange={(e) => setTextMode(e.target.value)}
                   >
-                    {validPoints[0].formattedCompactTime}
-                  </text>
-                  {validPoints.length > 2 && (
-                    <text
-                      x={padLeft + plotWidth / 2}
-                      y={height - 8}
-                      textAnchor="middle"
-                      className="fill-muted-foreground font-mono text-[10px]"
-                    >
-                      {validPoints[Math.floor(validPoints.length / 2)].formattedCompactTime}
-                    </text>
-                  )}
-                  <text
-                    x={width - padRight}
-                    y={height - 8}
-                    textAnchor="end"
-                    className="fill-muted-foreground font-mono text-[10px]"
-                  >
-                    {validPoints[validPoints.length - 1].formattedCompactTime}
-                  </text>
-                </g>
+                    <option value={TEXT_MODE.Events}>Events</option>
+                    <option value={TEXT_MODE.States}>States</option>
+                  </select>
+                </label>
               )}
-            </svg>
-
-            {/* Hover Floating Tooltip */}
-            {activePoint && activePointCoords && tooltipPosition && (
-              <div
-                className={`pointer-events-none fixed z-100 rounded-md border border-border bg-card p-3 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border ${tooltipPosition.align === 'left' ? '' : tooltipPosition.align === 'right' ? '-translate-x-full' : '-translate-x-1/2'}`}
-                style={{
-                  left: `${tooltipPosition.x}px`,
-                  top: `${tooltipPosition.y}px`,
-                }}
-              >
-                <div className="flex items-center justify-between gap-3 text-muted-foreground text-[11px]">
-                  <span>{activePoint.formattedTime}</span>
-                  <Badge
-                    variant={
-                      activePoint.hasChanges === CHANGE_STATUS.Changed
-                        ? 'warning'
-                        : activePoint.hasChanges === CHANGE_STATUS.Initial
-                          ? 'default'
-                          : 'secondary'
-                    }
-                  >
-                    {activePoint.hasChanges === CHANGE_STATUS.Changed
-                      ? 'Change'
-                      : activePoint.hasChanges === CHANGE_STATUS.Initial
-                        ? 'Initial'
-                        : 'Unchanged'}
-                  </Badge>
-                </div>
-
-                <div className="mt-1.5 flex items-baseline gap-2">
-                  <span className="text-base font-semibold text-foreground">
-                    {activePoint.displayValue}
-                  </span>
-                  {activePoint.deltaFromPrev !== null && activePoint.deltaFromPrev !== 0 && (
-                    <span
-                      className={`inline-flex items-center text-xs font-medium ${
-                        activePoint.deltaFromPrev > 0 ? 'text-amber-500' : 'text-emerald-500'
-                      }`}
-                    >
-                      {activePoint.deltaFromPrev > 0 ? (
-                        <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                      ) : (
-                        <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                      )}
-                      {activePoint.deltaFromPrev > 0 ? '+' : ''}
-                      {formatNumericValue(activePoint.deltaFromPrev)}
-                      {activePoint.deltaPercentFromPrev !== null && (
-                        <span className="opacity-80 ml-1">
-                          ({activePoint.deltaPercentFromPrev > 0 ? '+' : ''}
-                          {activePoint.deltaPercentFromPrev.toFixed(1)}%)
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground border-t border-border/60 pt-1">
-                  {activePoint.durationMs !== null && <span>{activePoint.durationMs}ms</span>}
-                  {activePoint.httpStatus && <span>HTTP {activePoint.httpStatus}</span>}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-border bg-card p-5 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-            <Activity className="h-4 w-4" />
-            Qualitative Monitor (Textual / Structural)
-          </div>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            This monitor extracts non-numeric or unstructured data (e.g. headlines, paragraphs, or
-            status strings). Discrete state transitions and detected content changes are recorded in
-            the event log below.
-          </p>
-        </div>
-      )}
-
-      {/* Change Events Log Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-            Change Events Log ({changeRuns.length})
-          </h4>
-          <span className="text-xs font-mono text-muted-foreground">
-            Displaying state changes & failures
-          </span>
-        </div>
-
-        {changeRuns.length === 0 ? (
-          <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs font-mono text-muted-foreground text-center">
-            No change events recorded yet. Target has maintained steady state.
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {changeRuns.map((run) => {
-              const isFailed = run.status === RUN_STATUS.Failed;
-              const isInitial = run.hasChanges === CHANGE_STATUS.Initial;
-
-              return (
-                <div
-                  key={run.id}
-                  className="rounded-lg border border-border bg-card p-3.5 transition-colors hover:border-foreground/30"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={isFailed ? 'destructive' : isInitial ? 'default' : 'warning'}>
-                        {isFailed ? RUN_STATUS.Failed : isInitial ? 'BASELINE' : 'CHANGE DETECTED'}
-                      </Badge>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {formatDateTime(run.executedAt, timeZone)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {run.screenshotUrl && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenScreenshot?.(run.screenshotUrl!)}
-                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer"
-                        >
-                          <Camera className="h-3 w-3 text-primary" />
-                          Snapshot
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onSelectRun?.(run)}
-                        className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs font-mono text-primary hover:bg-muted cursor-pointer"
-                      >
-                        Inspect
-                      </button>
-                    </div>
-                  </div>
-
-                  {run.extractedData && typeof run.extractedData === 'object' && (
-                    <div className="mt-2 rounded border border-border/70 bg-muted/30 p-2 font-mono text-xs text-foreground max-h-36 overflow-auto">
-                      <pre>
-                        {JSON.stringify(
-                          localizeExtractedPayload(run.extractedData, fields),
-                          null,
-                          2
+              {textMode === TEXT_MODE.States ? (
+                <StateObservations observations={observations} formatTime={formatTime} />
+              ) : (
+                <ul className="space-y-2">
+                  {observations
+                    .filter((p) => p.value !== null && (!p.previous || p.changed))
+                    .map((p) => (
+                      <li key={p.run.id} className="break-words">
+                        {formatTime(p.run.executedAt)}:{' '}
+                        {p.previous ? `${String(p.previous.value)} → ` : 'Initial: '}
+                        {String(p.value)}
+                        {p.previous && (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            (previous reading: {formatTime(p.previous.run.executedAt)})
+                          </span>
                         )}
-                      </pre>
-                    </div>
-                  )}
-
-                  {run.errorMessage && (
-                    <div className="mt-2 text-xs font-mono text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
-                      {parseErrorMessage(run.errorMessage)?.description}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </>
+          )}
+          <div className="overflow-auto">
+            <table className="w-full text-left">
+              <caption className="text-left py-2">
+                Field readings, including unavailable observations
+              </caption>
+              <thead>
+                <tr>
+                  <th>Collection</th>
+                  <th>Value</th>
+                  <th>Change since last valid reading</th>
+                </tr>
+              </thead>
+              <tbody>
+                {observations.map((p) => (
+                  <tr key={p.run.id} className="border-t border-border">
+                    <td className="p-2">{formatTime(p.run.executedAt)}</td>
+                    <td
+                      className={
+                        definition.type === FieldType.Number
+                          ? 'p-2 whitespace-nowrap'
+                          : 'p-2 break-words'
+                      }
+                    >
+                      {p.value === null ? 'Unavailable' : String(p.value)}
+                    </td>
+                    <td className="p-2">
+                      {p.delta !== null
+                        ? `${p.delta > 0 ? '+' : ''}${p.delta}${p.percent !== null ? ` (${p.percent.toPrecision(4)}%)` : ''}`
+                        : p.changed
+                          ? 'Changed'
+                          : '—'}
+                      {p.value !== null && p.previous && (
+                        <div className="text-xs text-muted-foreground">
+                          Reference: {formatTime(p.previous.run.executedAt)}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </section>
+      ) : (
+        <p>No field contract available.</p>
+      )}
+      <section className="space-y-2">
+        <h3>Execution history ({runs.length})</h3>
+        {[...chronological].reverse().map((run) => (
+          <article key={run.id} className="border border-border rounded p-3 space-y-2">
+            <div>
+              {formatTime(run.executedAt)} · {run.status}
+              {run.contractRevision !== revision ? ' · Different contract revision' : ''}
+            </div>
+            {run.status !== RunStatus.Success && <p>{run.errorMessage || 'Reading failed'}</p>}
+            <div className="flex gap-3">
+              <button className="underline" onClick={() => onSelectRun?.(run)}>
+                Inspect
+              </button>
+              {run.screenshotUrl && (
+                <button
+                  className="underline"
+                  onClick={() => onOpenScreenshot?.(run.screenshotUrl!)}
+                >
+                  Screenshot
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+      </section>
     </div>
   );
 }

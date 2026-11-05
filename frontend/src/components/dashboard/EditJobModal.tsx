@@ -1,4 +1,5 @@
 'use client';
+import { FieldType, triggerOperatorsForType } from '@specter/contracts';
 import { formToUpdateJob, jobToForm } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
 import { JobScheduleFields } from './JobScheduleFields';
@@ -356,10 +357,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => {
-                    const defaultField = availableExtractorFields[0] || 'price';
+                    const defaultField = availableExtractorFields[0];
+                    if (!defaultField) return;
                     setTriggerRules([
                       ...triggerRules,
-                      { field: defaultField, operator: TRIGGER_OPERATOR.LessThan, value: '' },
+                      { field: defaultField, operator: TRIGGER_OPERATOR.Changes, value: '' },
                     ]);
                   }}
                 >
@@ -370,134 +372,239 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
             </div>
           ) : (
             <div className="space-y-2">
-              {triggerRules.map((rule, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2"
-                >
-                  {/* Field */}
-                  <div className="w-full sm:w-1/3">
-                    {availableExtractorFields.length > 0 ? (
+              {triggerRules.map((rule, idx) => {
+                const fieldType = job?.extractionPlan?.intent.fields[rule.field]?.type;
+                const allowedOperators = fieldType ? triggerOperatorsForType(fieldType) : [];
+                return (
+                  <div
+                    key={idx}
+                    className="flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2"
+                  >
+                    {/* Field */}
+                    <div className="w-full sm:w-1/3">
+                      {availableExtractorFields.length > 0 ? (
+                        <select
+                          value={rule.field}
+                          onChange={(e) => {
+                            const updated = [...triggerRules];
+                            updated[idx] = {
+                              ...rule,
+                              field: e.target.value,
+                              operator: TRIGGER_OPERATOR.Changes,
+                              value: '',
+                            };
+                            setTriggerRules(updated);
+                          }}
+                          className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
+                        >
+                          {availableExtractorFields.map((f) => (
+                            <option key={f} value={f}>
+                              {f}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          placeholder="field (e.g. price)"
+                          value={rule.field}
+                          className="h-8 text-xs"
+                          onChange={(e) => {
+                            const updated = [...triggerRules];
+                            updated[idx] = {
+                              ...rule,
+                              field: e.target.value,
+                              operator: TRIGGER_OPERATOR.Changes,
+                              value: '',
+                            };
+                            setTriggerRules(updated);
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Operator */}
+                    <div className="w-full sm:w-1/3">
                       <select
-                        value={rule.field}
+                        value={rule.operator}
                         onChange={(e) => {
                           const updated = [...triggerRules];
-                          updated[idx] = { ...rule, field: e.target.value };
+                          const newOp = e.target.value as TriggerOperator;
+                          updated[idx] = {
+                            ...rule,
+                            operator: newOp,
+                            value:
+                              job?.extractionPlan?.intent.fields[rule.field]?.type ===
+                              FieldType.Boolean
+                                ? false
+                                : '',
+                          };
                           setTriggerRules(updated);
                         }}
                         className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
                       >
-                        {availableExtractorFields.map((f) => (
-                          <option key={f} value={f}>
-                            {f}
+                        <optgroup label="Relative Changes (vs Previous Check)">
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.PercentageDrop)}
+                            value={TRIGGER_OPERATOR.PercentageDrop}
+                          >
+                            Drops by % or more
                           </option>
-                        ))}
+                          <option
+                            disabled={
+                              !allowedOperators.includes(TRIGGER_OPERATOR.PercentageIncrease)
+                            }
+                            value={TRIGGER_OPERATOR.PercentageIncrease}
+                          >
+                            Increases by % or more
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Decreased)}
+                            value={TRIGGER_OPERATOR.Decreased}
+                          >
+                            Decreased (any drop)
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Increased)}
+                            value={TRIGGER_OPERATOR.Increased}
+                          >
+                            Increased (any rise)
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Changes)}
+                            value={TRIGGER_OPERATOR.Changes}
+                          >
+                            Changed (any text or value)
+                          </option>
+                        </optgroup>
+                        <optgroup label="Fixed Thresholds & Matches">
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.LessThan)}
+                            value={TRIGGER_OPERATOR.LessThan}
+                          >
+                            &lt; Less than
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.LessThanOrEqual)}
+                            value={TRIGGER_OPERATOR.LessThanOrEqual}
+                          >
+                            &le; Less or equal
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.GreaterThan)}
+                            value={TRIGGER_OPERATOR.GreaterThan}
+                          >
+                            &gt; Greater than
+                          </option>
+                          <option
+                            disabled={
+                              !allowedOperators.includes(TRIGGER_OPERATOR.GreaterThanOrEqual)
+                            }
+                            value={TRIGGER_OPERATOR.GreaterThanOrEqual}
+                          >
+                            &ge; Greater or equal
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Equal)}
+                            value={TRIGGER_OPERATOR.Equal}
+                          >
+                            == Equals
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.NotEqual)}
+                            value={TRIGGER_OPERATOR.NotEqual}
+                          >
+                            != Not equals
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Contains)}
+                            value={TRIGGER_OPERATOR.Contains}
+                          >
+                            Contains text
+                          </option>
+                          <option
+                            disabled={!allowedOperators.includes(TRIGGER_OPERATOR.NotContains)}
+                            value={TRIGGER_OPERATOR.NotContains}
+                          >
+                            Does not contain
+                          </option>
+                        </optgroup>
                       </select>
-                    ) : (
-                      <Input
-                        placeholder="field (e.g. price)"
-                        value={rule.field}
-                        className="h-8 text-xs"
-                        onChange={(e) => {
-                          const updated = [...triggerRules];
-                          updated[idx] = { ...rule, field: e.target.value };
-                          setTriggerRules(updated);
-                        }}
-                      />
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Operator */}
-                  <div className="w-full sm:w-1/3">
-                    <select
-                      value={rule.operator}
-                      onChange={(e) => {
-                        const updated = [...triggerRules];
-                        const newOp = e.target.value as TriggerOperator;
-                        updated[idx] = { ...rule, operator: newOp };
-                        setTriggerRules(updated);
+                    {/* Value */}
+                    <div className="w-full sm:w-1/3">
+                      {(
+                        [
+                          TRIGGER_OPERATOR.Decreased,
+                          TRIGGER_OPERATOR.Increased,
+                          TRIGGER_OPERATOR.Changes,
+                        ] as TriggerOperator[]
+                      ).includes(rule.operator) ? (
+                        <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
+                          Any change detected
+                        </div>
+                      ) : job?.extractionPlan?.intent.fields[rule.field]?.type ===
+                        FieldType.Boolean ? (
+                        <select
+                          className="h-8 w-full rounded border border-input bg-background px-2 text-xs"
+                          value={String(rule.value)}
+                          onChange={(e) => {
+                            const updated = [...triggerRules];
+                            updated[idx] = { ...rule, value: e.target.value === 'true' };
+                            setTriggerRules(updated);
+                          }}
+                        >
+                          <option value="false">False</option>
+                          <option value="true">True</option>
+                        </select>
+                      ) : (
+                        <Input
+                          type={fieldType === FieldType.Number ? 'number' : 'text'}
+                          step={fieldType === FieldType.Number ? 'any' : undefined}
+                          placeholder={
+                            (
+                              [
+                                TRIGGER_OPERATOR.PercentageDrop,
+                                TRIGGER_OPERATOR.PercentageIncrease,
+                              ] as TriggerOperator[]
+                            ).includes(rule.operator)
+                              ? 'Percentage (e.g. 10)'
+                              : 'Target value (e.g. 150)'
+                          }
+                          value={String(rule.value ?? '')}
+                          className="h-8 text-xs"
+                          onChange={(e) => {
+                            const updated = [...triggerRules];
+                            const raw = e.target.value;
+                            const numeric =
+                              job?.extractionPlan?.intent.fields[rule.field]?.type ===
+                              FieldType.Number;
+                            const num = Number(raw);
+                            const val =
+                              numeric && raw.trim() !== '' && Number.isFinite(num) ? num : raw;
+                            updated[idx] = { ...rule, value: val };
+                            setTriggerRules(updated);
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Delete Button */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                      onClick={() => {
+                        setTriggerRules(triggerRules.filter((_, i) => i !== idx));
                       }}
-                      className="h-8 w-full rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none"
+                      title="Remove rule"
                     >
-                      <optgroup label="Relative Changes (vs Previous Check)">
-                        <option value={TRIGGER_OPERATOR.PercentageDrop}>Drops by % or more</option>
-                        <option value={TRIGGER_OPERATOR.PercentageIncrease}>
-                          Increases by % or more
-                        </option>
-                        <option value={TRIGGER_OPERATOR.Decreased}>Decreased (any drop)</option>
-                        <option value={TRIGGER_OPERATOR.Increased}>Increased (any rise)</option>
-                        <option value={TRIGGER_OPERATOR.Changes}>
-                          Changed (any text or value)
-                        </option>
-                      </optgroup>
-                      <optgroup label="Fixed Thresholds & Matches">
-                        <option value={TRIGGER_OPERATOR.LessThan}>&lt; Less than</option>
-                        <option value={TRIGGER_OPERATOR.LessThanOrEqual}>&le; Less or equal</option>
-                        <option value={TRIGGER_OPERATOR.GreaterThan}>&gt; Greater than</option>
-                        <option value={TRIGGER_OPERATOR.GreaterThanOrEqual}>
-                          &ge; Greater or equal
-                        </option>
-                        <option value={TRIGGER_OPERATOR.Equal}>== Equals</option>
-                        <option value={TRIGGER_OPERATOR.NotEqual}>!= Not equals</option>
-                        <option value={TRIGGER_OPERATOR.Contains}>Contains text</option>
-                        <option value={TRIGGER_OPERATOR.NotContains}>Does not contain</option>
-                      </optgroup>
-                    </select>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-
-                  {/* Value */}
-                  <div className="w-full sm:w-1/3">
-                    {(
-                      [
-                        TRIGGER_OPERATOR.Decreased,
-                        TRIGGER_OPERATOR.Increased,
-                        TRIGGER_OPERATOR.Changes,
-                      ] as TriggerOperator[]
-                    ).includes(rule.operator) ? (
-                      <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
-                        Any change detected
-                      </div>
-                    ) : (
-                      <Input
-                        placeholder={
-                          (
-                            [
-                              TRIGGER_OPERATOR.PercentageDrop,
-                              TRIGGER_OPERATOR.PercentageIncrease,
-                            ] as TriggerOperator[]
-                          ).includes(rule.operator)
-                            ? 'Percentage (e.g. 10)'
-                            : 'Target value (e.g. 150)'
-                        }
-                        value={String(rule.value ?? '')}
-                        className="h-8 text-xs"
-                        onChange={(e) => {
-                          const updated = [...triggerRules];
-                          const raw = e.target.value;
-                          const num = Number(raw);
-                          const val = raw !== '' && !isNaN(num) ? num : raw;
-                          updated[idx] = { ...rule, value: val };
-                          setTriggerRules(updated);
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Delete Button */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
-                    onClick={() => {
-                      setTriggerRules(triggerRules.filter((_, i) => i !== idx));
-                    }}
-                    title="Remove rule"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="flex justify-start pt-1">
                 <Button
@@ -506,10 +613,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => {
-                    const defaultField = availableExtractorFields[0] || 'price';
+                    const defaultField = availableExtractorFields[0];
+                    if (!defaultField) return;
                     setTriggerRules([
                       ...triggerRules,
-                      { field: defaultField, operator: TRIGGER_OPERATOR.LessThan, value: '' },
+                      { field: defaultField, operator: TRIGGER_OPERATOR.Changes, value: '' },
                     ]);
                   }}
                 >

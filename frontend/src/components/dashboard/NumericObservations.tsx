@@ -1,0 +1,90 @@
+'use client';
+import * as React from 'react';
+import { numericScale, axisLabels, SCALE_MODE, type Observation } from '@/lib/chartUtils';
+
+export function NumericObservations({
+  observations,
+  formatTime,
+}: {
+  observations: Observation[];
+  formatTime: (date: string) => string;
+}) {
+  const [mode, setMode] = React.useState<string>(SCALE_MODE.Adjusted);
+  const points = observations.filter((p) => typeof p.value === 'number');
+  const { min, max, ticks } = numericScale(
+    points.map((p) => p.value as number),
+    mode === SCALE_MODE.Zero
+  );
+  const labels = axisLabels(ticks);
+  const times = observations.map((p) => p.timestamp).filter(Number.isFinite);
+  if (!points.length) return <p>No valid numeric readings.</p>;
+  const start = Math.min(...times),
+    end = Math.max(...times);
+  const magnitude = Math.max(Math.abs(min), Math.abs(max));
+  const y = (value: number) =>
+    180 - ((value / magnitude - min / magnitude) / (max / magnitude - min / magnitude)) * 155;
+  return (
+    <div className="space-y-3">
+      <label className="flex gap-2">
+        <input
+          type="checkbox"
+          checked={mode === SCALE_MODE.Zero}
+          onChange={(e) => setMode(e.target.checked ? SCALE_MODE.Zero : SCALE_MODE.Adjusted)}
+        />
+        Include zero
+      </label>
+      <p className="text-muted-foreground">
+        {mode === SCALE_MODE.Adjusted ? 'Scale adjusted to observed values' : 'Scale includes zero'}
+        . Points represent collection times; values between collections are unknown.
+      </p>
+      <div className="overflow-x-auto">
+        <svg
+          viewBox="0 0 640 225"
+          className="w-full min-w-[32rem]"
+          role="img"
+          aria-label="Observed numeric values over collection time. Exact readings in the table below."
+        >
+          {ticks.map((tick, index) => (
+            <g key={index}>
+              <line
+                x1="110"
+                x2="620"
+                y1={y(tick)}
+                y2={y(tick)}
+                stroke="currentColor"
+                opacity="0.15"
+              />
+              <text x="102" y={y(tick) + 4} textAnchor="end" fill="currentColor" fontSize="11">
+                {labels[index]}
+              </text>
+            </g>
+          ))}
+          {points.map((point) => (
+            <circle
+              key={point.run.id}
+              cx={end === start ? 365 : 110 + ((point.timestamp - start) / (end - start)) * 510}
+              cy={y(point.value as number)}
+              r="4"
+              fill="currentColor"
+            >
+              <title>
+                {formatTime(point.run.executedAt)}: {String(point.value)}
+              </title>
+            </circle>
+          ))}
+          <text x="110" y="215" fill="currentColor" fontSize="10">
+            {formatTime(new Date(start).toISOString())}
+          </text>
+          <text x="620" y="215" textAnchor="end" fill="currentColor" fontSize="10">
+            {formatTime(new Date(end).toISOString())}
+          </text>
+        </svg>
+      </div>
+      {points.length === 1 ? (
+        <p>Insufficient history for a trend.</p>
+      ) : (
+        points.every((p) => p.value === points[0].value) && <p>No observed variation.</p>
+      )}
+    </div>
+  );
+}

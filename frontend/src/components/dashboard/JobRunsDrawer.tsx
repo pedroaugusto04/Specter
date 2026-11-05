@@ -387,7 +387,10 @@ export function JobRunsDrawer({
         {/* TAB 2: TIMELINE & TRENDS */}
         {activeTab === 'timeline' && (
           <ExecutionTimelineChart
+            key={job.id}
             runs={runs}
+            revision={job.contractRevision}
+            identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
             onSelectRun={handleSelectRun}

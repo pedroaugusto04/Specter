@@ -1,3 +1,4 @@
+import { sameRecord } from '@specter/contracts';
 import { EntityChangeKind } from './constants.js';
 import type { EntityChange } from './contracts.js';
 import type { ExtractedPayload, ExtractedRecord } from '../types/extractor.js';
@@ -19,7 +20,7 @@ export function compareSnapshots(
   for (const identity of [...new Set([...old.keys(), ...next.keys()])].sort()) {
     const before = old.get(identity) ?? null;
     const after = next.get(identity) ?? null;
-    if (JSON.stringify(before) === JSON.stringify(after)) continue;
+    if (before && after && sameRecord(before, after)) continue;
     entityChanges.push({
       identity,
       kind:

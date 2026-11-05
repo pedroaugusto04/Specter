@@ -44,10 +44,14 @@ export interface ScrapingJobDto {
   webhookUrl: string | null;
   cronExpression: string;
   extractionPlan: {
-    intent: Pick<ExtractionIntent, 'scope' | 'triggerRules' | 'triggerMatchMode'> & {
-      fields: Record<string, Pick<IntentField, 'displayName'>>;
+    intent: Pick<
+      ExtractionIntent,
+      'scope' | 'identityFields' | 'triggerRules' | 'triggerMatchMode'
+    > & {
+      fields: Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
     };
   } | null;
+  contractRevision: string | null;
   status: JobStatus;
   accessState?: AccessState | null;
   lastError: string | null;
@@ -60,7 +64,8 @@ export interface ScrapingJobDto {
 export interface JobRunDto {
   id: string;
   jobId: string;
-  extractionReport?: Pick<ExtractionReport, 'quality'> | null;
+  contractRevision: string | null;
+  extractionReport?: Pick<ExtractionReport, 'quality' | 'coverage'> | null;
   extractedData: ExtractedPayload | null;
   hasChanges: ChangeStatus;
   status: RunStatus;
