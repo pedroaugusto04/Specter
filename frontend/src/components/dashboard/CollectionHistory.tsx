@@ -1,15 +1,18 @@
 import type { JobRunDto } from '@specter/contracts';
 import { collectionEvents } from '@/lib/collectionHistory';
+import { localizeExtractedPayload, type ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
 export function CollectionHistory({
   runs,
   revision,
   identityFields,
   formatTime,
+  fields,
 }: {
   runs: JobRunDto[];
   revision: string | null;
   identityFields: string[];
   formatTime: (date: string) => string;
+  fields: ExtractionFieldDefinitions;
 }) {
   return (
     <section className="space-y-3">
@@ -29,11 +32,17 @@ export function CollectionHistory({
                 {!change.before ? 'Added' : !change.after ? 'Removed' : 'Modified'}
               </p>
               <pre className="overflow-auto">
-                {JSON.stringify({ previous: change.before, current: change.after }, null, 2)}
+                {JSON.stringify(
+                  localizeExtractedPayload({ previous: change.before, current: change.after }, fields),
+                  null,
+                  2
+                )}
               </pre>
             </div>
           ))}
-          <pre className="overflow-auto">{JSON.stringify(run.extractedData, null, 2)}</pre>
+          <pre className="overflow-auto">
+            {JSON.stringify(localizeExtractedPayload(run.extractedData, fields), null, 2)}
+          </pre>
         </details>
       ))}
     </section>

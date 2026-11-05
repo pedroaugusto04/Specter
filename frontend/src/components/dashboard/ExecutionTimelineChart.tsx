@@ -81,6 +81,7 @@ export function ExecutionTimelineChart({
           revision={revision}
           identityFields={identityFields}
           formatTime={formatTime}
+          fields={fields}
         />
       ) : definition ? (
         <section className="rounded-lg border border-border p-4 space-y-4">

@@ -21,16 +21,18 @@ export function localizeExtractedPayload(
         const field = fields[key] ?? Object.values(fields).find(
           (candidate) => candidate.displayName?.trim() === key
         );
-        if (field?.type !== 'number') return [labels[key] ?? key, value];
+        if (field?.type !== 'number') return [labels[key] ?? key, localizeNested(value)];
         const formatted = formatObservedNumber(value, field.locale, field.displayName || key);
         return [labels[key] ?? key, formatted];
       })
     );
   };
+  const localizeNested = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(localizeNested);
+    if (value && typeof value === 'object') return localizeRecord(value);
+    return value;
+  };
 
   if (!payload || typeof payload !== 'object') return payload;
-  if ('items' in payload && Array.isArray(payload.items)) {
-    return { ...payload, items: payload.items.map(localizeRecord) };
-  }
-  return localizeRecord(payload);
+  return localizeNested(payload);
 }
