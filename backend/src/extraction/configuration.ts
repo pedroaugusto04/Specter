@@ -106,7 +106,18 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           errorCode:
             error && typeof error === 'object' && 'code' in error
               ? String(error.code)
-              : 'STAGE_ERROR',
+              : error instanceof Error && error.name === 'ZodError'
+                ? 'MODEL_VALIDATION_ERROR'
+                : 'STAGE_ERROR',
+          errorMessage: error instanceof Error ? error.message : String(error),
+          validationIssues:
+            error && typeof error === 'object' && 'issues' in error && Array.isArray(error.issues)
+              ? error.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path,
+                  message: issue.message,
+                }))
+              : undefined,
         });
         throw error;
       }

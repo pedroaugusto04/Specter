@@ -11,20 +11,61 @@ export interface LogContext {
   [key: string]: unknown;
 }
 
-function formatLog(level: string, message: string, context?: LogContext): string {
-  const payload = {
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+const ANSI = {
+  reset: '\u001b[0m',
+  dim: '\u001b[2m',
+  red: '\u001b[31m',
+  green: '\u001b[32m',
+  yellow: '\u001b[33m',
+  cyan: '\u001b[36m',
+  white: '\u001b[37m',
+} as const;
+
+const LEVEL_LABELS: Record<LogLevel, string> = {
+  debug: 'DEBUG',
+  info: 'INFO',
+  warn: 'WARN',
+  error: 'ERROR',
+};
+
+function colorize(text: string, color: string, enabled: boolean): string {
+  return enabled ? `${color}${text}${ANSI.reset}` : text;
+}
+
+function formatLog(level: LogLevel, message: string, context?: LogContext): string {
+  const entry = {
     timestamp: new Date().toISOString(),
     level,
     message,
     ...(redactObject(context) as LogContext),
   };
-  return JSON.stringify(payload);
-}
+  const pretty = env.LOG_PRETTY_CONSOLE;
+  if (process.env.NODE_ENV === 'production' && !pretty) return JSON.stringify(entry);
 
-function colorizeLog(level: 'warn' | 'error', output: string): string {
-  if (!env.LOG_PRETTY_CONSOLE || process.env.NO_COLOR !== undefined) return output;
-  const color = level === 'warn' ? '\u001b[33m' : '\u001b[31m';
-  return `${color}${output}\u001b[0m`;
+  const colorEnabled = pretty && process.env.NO_COLOR === undefined;
+  const levelColor =
+    level === 'error'
+      ? ANSI.red
+      : level === 'warn'
+        ? ANSI.yellow
+        : level === 'info'
+          ? ANSI.green
+          : ANSI.cyan;
+  const extras = Object.fromEntries(
+    Object.entries(entry).filter(
+      ([key, value]) => !['timestamp', 'level', 'message'].includes(key) && value !== undefined
+    )
+  );
+  const line = [
+    entry.timestamp,
+    colorize(LEVEL_LABELS[level], levelColor, colorEnabled),
+    colorize(message, ANSI.white, colorEnabled),
+  ];
+  if (Object.keys(extras).length)
+    line.push(colorize(JSON.stringify(extras), ANSI.dim, colorEnabled));
+  return line.join(' | ');
 }
 
 export const logger = {
@@ -34,11 +75,11 @@ export const logger = {
   },
   warn(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL === 'silent') return;
-    console.warn(colorizeLog('warn', formatLog('warn', message, context)));
+    console.warn(formatLog('warn', message, context));
   },
   error(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL === 'silent') return;
-    console.error(colorizeLog('error', formatLog('error', message, context)));
+    console.error(formatLog('error', message, context));
   },
   debug(message: string, context?: LogContext): void {
     if (env.LOG_LEVEL !== 'debug' && env.LOG_LEVEL !== 'trace') return;

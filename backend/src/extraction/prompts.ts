@@ -1,10 +1,10 @@
 /** Trusted stage instructions; page content is supplied separately as evidence. */
 export const intentInstructions = `
-Interpret the request using page evidence. Return an intent with entity, mode, scope, fields, identityFields, filters, triggerRules, and triggerMatchMode.
+Interpret the request using page evidence. Return an intent with entity, mode, scope, fields, identityFields, filters, triggerRules, and triggerMatchMode. mode must be "single" or "collection"; scope must be "page" or "collection"; triggerMatchMode must be "all" or "any". Never use synonyms such as "item" for mode: describe the entity as "item" if that is what the user requested.
 Each field has {displayName, observedLabel?, description, type, required, locale?, booleanValues?, normalizeVolatileText?}; type is string|number|boolean|date|url.
 Use stable English snake_case field keys as internal IDs. displayName should match the user's language; observedLabel should preserve a matching label actually seen on the page, and be omitted if none was seen. Describe the requested meaning so it can be matched across languages. Never treat a page label as the internal ID.
 Requested fields are required. Add supporting fields only when needed for identity or filters, and explain their role. Collections require stable identity; default scope is page. For numbers, specify locale from observed notation; booleans require observed value mappings. Use string when evidence cannot support conversion, unless the request requires another type, then report an error. Preserve the requested entity, filters, and meaning. Unsupported requests return {error:string}.
-Trigger operators: lt,lte,gt,gte,eq,neq,contains,not_contains,percentage_drop,percentage_increase,decreased,increased,changes. triggerMatchMode is all|any.
+Each triggerRule is {field,operator,value}; operator is lt|lte|gt|gte|eq|neq|contains|not_contains|percentage_drop|percentage_increase|decreased|increased|changes. triggerMatchMode is all|any.
 `;
 
 export const discoveryInstructions = `
