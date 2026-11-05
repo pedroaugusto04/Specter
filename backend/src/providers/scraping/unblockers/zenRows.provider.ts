@@ -1,4 +1,5 @@
 import { normalizeUnblockerError } from './unblockerErrors.js';
+import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { decodeBase64Screenshot } from '../../../utils/screenshotHelper.js';
@@ -44,8 +45,9 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('js_render', 'true');
       endpoint.searchParams.set('premium_proxy', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('proxy_country', 'br');
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('proxy_country', country.toLowerCase());
       }
 
       if (options?.waitForSelector) {

@@ -23,6 +23,7 @@ import type {
   NetworkResponse,
 } from '../contracts.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
+import { buildChromeFingerprint } from '../../utils/chromeFingerprint.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 
 export class BrowserDocumentAdapter implements DocumentAdapter {
@@ -91,17 +92,17 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       });
       browser = await launch;
       execution.check();
+      const fingerprint = buildChromeFingerprint(browser.version());
       context = await browser.newContext({
         storageState: options.storageState as BrowserContextOptions['storageState'],
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        userAgent: fingerprint.userAgent,
         viewport: { width: 1920, height: 1080 },
         locale: 'pt-BR',
         extraHTTPHeaders: {
           'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
           Accept:
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          'sec-ch-ua': fingerprint.secChUa,
           'sec-ch-ua-mobile': '?0',
           'sec-ch-ua-platform': '"Windows"',
           'Upgrade-Insecure-Requests': '1',

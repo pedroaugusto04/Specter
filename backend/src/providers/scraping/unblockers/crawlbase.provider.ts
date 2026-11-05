@@ -1,4 +1,5 @@
 import { normalizeUnblockerError } from './unblockerErrors.js';
+import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
@@ -43,8 +44,9 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('url', targetUrl);
       endpoint.searchParams.set('javascript', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('country', 'BR');
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('country', country.toUpperCase());
       }
 
       if (options?.captureScreenshot) {

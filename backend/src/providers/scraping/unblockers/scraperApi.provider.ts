@@ -1,4 +1,5 @@
 import { normalizeUnblockerError } from './unblockerErrors.js';
+import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
@@ -44,8 +45,9 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('render', 'true');
       endpoint.searchParams.set('premium', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('country_code', 'br');
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('country_code', country.toLowerCase());
       }
 
       if (options?.captureScreenshot) {

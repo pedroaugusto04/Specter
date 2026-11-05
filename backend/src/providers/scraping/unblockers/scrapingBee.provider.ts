@@ -1,4 +1,5 @@
 import { normalizeUnblockerError } from './unblockerErrors.js';
+import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { decodeBase64Screenshot } from '../../../utils/screenshotHelper.js';
@@ -46,8 +47,9 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
       endpoint.searchParams.set('block_resources', 'false');
       endpoint.searchParams.set('block_ads', 'true');
 
-      if (targetUrl.includes('.com.br')) {
-        endpoint.searchParams.set('country_code', 'br');
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('country_code', country.toLowerCase());
       }
 
       if (options?.waitForSelector) {

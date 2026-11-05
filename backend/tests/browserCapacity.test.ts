@@ -27,7 +27,11 @@ function browserFixture() {
     newPage: async () => page,
     close: vi.fn(async () => {}),
   };
-  const browser = { newContext: async () => context, close: vi.fn(async () => {}) };
+  const browser = {
+    version: () => '131.0.6778.33',
+    newContext: async () => context,
+    close: vi.fn(async () => {}),
+  };
   return { browser, context };
 }
 beforeEach(() => launch.mockReset());
