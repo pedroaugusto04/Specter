@@ -9,6 +9,7 @@ import {
   type TimelineFields,
 } from '@/lib/chartUtils';
 import { formatDateTime } from '@/lib/utils';
+import { formatObservedNumber } from '@/lib/numberFormatting';
 import { NumericObservations } from './NumericObservations';
 import { StateObservations } from './StateObservations';
 import { CollectionHistory } from './CollectionHistory';
@@ -37,11 +38,8 @@ export function ExecutionTimelineChart({
   const formatTime = (date: string) =>
     Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
   const formatValue = (value: string | number | boolean | null) =>
-    definition?.type === FieldType.Number && typeof value === 'number'
-      ? new Intl.NumberFormat(definition.locale || 'pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(value)
+    definition?.type === FieldType.Number
+      ? String(formatObservedNumber(value, definition.locale, definition.displayName || selected))
       : String(value);
   const summary = summarizeRuns(runs);
   const chronological = orderedRuns(runs);
@@ -108,6 +106,7 @@ export function ExecutionTimelineChart({
               key={selected}
               observations={observations}
               formatTime={formatTime}
+              formatValue={(value) => formatValue(value)}
             />
           ) : definition.type === FieldType.Boolean ? (
             <StateObservations observations={observations} formatTime={formatTime} boolean />
@@ -135,8 +134,8 @@ export function ExecutionTimelineChart({
                     .map((p) => (
                       <li key={p.run.id} className="break-words">
                         {formatTime(p.run.executedAt)}:{' '}
-                        {p.previous ? `${String(p.previous.value)} → ` : 'Initial: '}
-                        {String(p.value)}
+                        {p.previous ? `${formatValue(p.previous.value)} → ` : 'Initial: '}
+                        {formatValue(p.value)}
                         {p.previous && (
                           <span className="text-muted-foreground">
                             {' '}

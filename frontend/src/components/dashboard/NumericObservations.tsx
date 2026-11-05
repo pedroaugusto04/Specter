@@ -5,9 +5,11 @@ import { numericScale, axisLabels, SCALE_MODE, type Observation } from '@/lib/ch
 export function NumericObservations({
   observations,
   formatTime,
+  formatValue,
 }: {
   observations: Observation[];
   formatTime: (date: string) => string;
+  formatValue: (value: number) => string;
 }) {
   const [mode, setMode] = React.useState<string>(SCALE_MODE.Adjusted);
   const points = observations.filter((p) => typeof p.value === 'number');
@@ -68,7 +70,7 @@ export function NumericObservations({
               fill="currentColor"
             >
               <title>
-                {formatTime(point.run.executedAt)}: {String(point.value)}
+                {formatTime(point.run.executedAt)}: {formatValue(point.value as number)}
               </title>
             </circle>
           ))}
