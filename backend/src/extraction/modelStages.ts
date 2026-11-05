@@ -26,14 +26,20 @@ const reviewSchema = z
     evidenceRefs: z.array(z.string().min(1)).min(1),
   })
   .strict();
-function outputInstructions(schema: z.ZodTypeAny, instructions: string): string {
-  return `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(zodToJsonSchema(schema, { $refStrategy: 'none' }))}`;
+function outputContract(schema: z.ZodTypeAny, instructions: string) {
+  const { $schema: _schemaVersion, ...outputSchema } = zodToJsonSchema(schema, {
+    $refStrategy: 'none',
+  });
+  return {
+    instructions: `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(outputSchema)}`,
+    outputSchema: outputSchema as Record<string, unknown>,
+  };
 }
 async function task(
   model: IModelProvider,
   input: StageInput,
   kind: 'intent' | 'discovery' | 'plan' | 'semantic',
-  instructions: string,
+  contract: ReturnType<typeof outputContract>,
   extra: unknown = {}
 ) {
   const started = Date.now();
@@ -41,7 +47,8 @@ async function task(
     jobId: input.jobId,
     task: kind,
     timeoutMs: input.timeoutMs,
-    instructions,
+    instructions: contract.instructions,
+    outputSchema: contract.outputSchema,
     evidence: JSON.stringify({
       userRequest: redactText(input.prompt, 10000),
       url: redactText(input.url),
@@ -84,7 +91,7 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
             model,
             input,
             'intent',
-            outputInstructions(extractionIntentSchema, intentInstructions)
+            outputContract(extractionIntentSchema, intentInstructions)
           )
         ),
     },
@@ -95,7 +102,7 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
             model,
             input,
             'discovery',
-            outputInstructions(discoverySchema, discoveryInstructions),
+            outputContract(discoverySchema, discoveryInstructions),
             { intent }
           )
         ).action,
@@ -107,7 +114,7 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
             model,
             input,
             'plan',
-            outputInstructions(executionStrategySchema, strategyInstructions),
+            outputContract(executionStrategySchema, strategyInstructions),
             {
               intent,
               validationFeedback: feedback,
@@ -118,13 +125,10 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
     reviewer: {
       review: async (input, intent, result) =>
         reviewSchema.parse(
-          await task(
-            model,
-            input,
-            'semantic',
-            outputInstructions(reviewSchema, semanticInstructions),
-            { intent, result }
-          )
+          await task(model, input, 'semantic', outputContract(reviewSchema, semanticInstructions), {
+            intent,
+            result,
+          })
         ),
     },
   };

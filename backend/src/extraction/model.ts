@@ -4,6 +4,7 @@ export interface ModelInput {
   jobId: string;
   task: 'intent' | 'discovery' | 'plan' | 'semantic';
   instructions: string;
+  outputSchema?: Record<string, unknown>;
   evidence: string;
   timeoutMs: number;
 }
