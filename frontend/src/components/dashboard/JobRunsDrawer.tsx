@@ -85,7 +85,7 @@ export function JobRunsDrawer({
   if (!job) return null;
 
   return (
-    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name} description={job.url}>
+    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
       <div className="space-y-6">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">

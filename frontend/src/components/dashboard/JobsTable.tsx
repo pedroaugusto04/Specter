@@ -412,7 +412,7 @@ export function JobsTable({
                           onClick={async () => {
                             const confirmed = await modal.confirm({
                               title: 'Run Immediate Extraction',
-                              message: `Are you sure you want to run an immediate extraction for this monitor?\n${job.url}`,
+                              message: `Are you sure you want to run an immediate extraction for "${job.name}"?`,
                               confirmLabel: 'Run Extraction',
                               cancelLabel: 'Cancel',
                               variant: 'default',
@@ -461,7 +461,7 @@ export function JobsTable({
                           onClick={async () => {
                             const confirmed = await modal.confirm({
                               title: 'Recompile Selectors',
-                              message: `Are you sure you want to recompile the AI extraction selectors for this monitor?\n${job.url}`,
+                              message: `Are you sure you want to recompile the AI extraction selectors for "${job.name}"?`,
                               confirmLabel: 'Recompile',
                               cancelLabel: 'Cancel',
                               variant: 'default',
@@ -501,7 +501,7 @@ export function JobsTable({
                             const actionVerb = isPaused ? 'resume' : 'pause';
                             const confirmed = await modal.confirm({
                               title: actionTitle,
-                              message: `Are you sure you want to ${actionVerb} the extraction schedule for this monitor?\n${job.url}`,
+                              message: `Are you sure you want to ${actionVerb} the extraction schedule for "${job.name}"?`,
                               confirmLabel: actionTitle,
                               cancelLabel: 'Cancel',
                               variant: 'default',
@@ -542,7 +542,7 @@ export function JobsTable({
                           onClick={async () => {
                             const confirmed = await modal.confirm({
                               title: 'Delete Monitor',
-                              message: `Are you sure you want to permanently delete this monitor?\n${job.url}`,
+                              message: `Are you sure you want to permanently delete "${job.name}"?`,
                               confirmLabel: 'Delete',
                               cancelLabel: 'Cancel',
                               variant: 'destructive',
