@@ -80,10 +80,11 @@ export class CompilerTimeoutError extends DomainError {
 
 /** Gemini API request failed. Transient HTTP failures may be retried by the queue. */
 export class CompilerApiRequestError extends DomainError {
-  constructor(statusCode: number | undefined, cause?: unknown) {
+  constructor(statusCode: number | undefined, cause?: unknown, details?: string) {
     const retryable =
       statusCode === undefined || statusCode === 408 || statusCode === 429 || statusCode >= 500;
-    super('Compiler API request failed', {
+    const suffix = details ? `: ${details}` : statusCode ? ` (HTTP ${statusCode})` : '';
+    super(`Compiler API request failed${suffix}`, {
       code: statusCode === undefined ? 'COMPILER_API_UNAVAILABLE' : 'COMPILER_API_REJECTED',
       statusCode: statusCode && statusCode >= 400 && statusCode < 600 ? statusCode : 502,
       isRetryable: retryable,

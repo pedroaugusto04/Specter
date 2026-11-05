@@ -29,7 +29,10 @@ export class DomSourceReader implements ISourceReader {
       throw new Error('DOM source requires a matching record context.');
     const scope = record.value as cheerio.Cheerio<AnyNode>;
     const target = source.selector === ':scope' ? scope : scope.find(source.selector);
-    if (target.length > 1) throw new Error('Ambiguous DOM field source.');
+    if (target.length > 1)
+      throw new Error(
+        `Ambiguous DOM field source: selector '${source.selector}' matched ${target.length} elements. Scope the record or field selector to match a single element.`
+      );
     return source.attribute === 'text' ? target.text() : target.attr(source.attribute);
   }
 }

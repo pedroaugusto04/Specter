@@ -78,7 +78,17 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       throw new CompilerApiRequestError(undefined, error);
     }
 
-    if (!response.ok) throw new CompilerApiRequestError(response.status);
+    if (!response.ok) {
+      const errorText = await response
+        .text()
+        .then((text) => text.replace(/\s+/g, ' ').trim().slice(0, 300))
+        .catch(() => '');
+      throw new CompilerApiRequestError(
+        response.status,
+        undefined,
+        `HTTP ${response.status}${errorText ? ` - ${errorText}` : ''}`
+      );
+    }
 
     let data: GeminiResponse;
     try {
