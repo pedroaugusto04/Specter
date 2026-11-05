@@ -8,6 +8,7 @@ export default defineConfig({
     // Keep tests independent of provider credentials and deployment tuning configured in the shell/.env.
     env: {
       ACQUISITION_MAX_ATTEMPTS: '3',
+      MIN_CRON_INTERVAL_MINUTES: '15',
       ENCRYPTION_KEY: 'a'.repeat(64),
       COMPILER_PROVIDER: 'agy',
       COMPILER_API_MODEL: '',
