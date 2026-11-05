@@ -36,6 +36,13 @@ export function ExecutionTimelineChart({
     : [];
   const formatTime = (date: string) =>
     Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
+  const formatValue = (value: string | number | boolean | null) =>
+    definition?.type === FieldType.Number && typeof value === 'number'
+      ? new Intl.NumberFormat(definition.locale || 'pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value)
+      : String(value);
   const summary = summarizeRuns(runs);
   const chronological = orderedRuns(runs);
   const dated = chronological.filter((run) => Number.isFinite(Date.parse(run.executedAt)));
@@ -152,7 +159,7 @@ export function ExecutionTimelineChart({
                 </tr>
               </thead>
               <tbody>
-                {observations.map((p) => (
+                {[...observations].reverse().map((p) => (
                   <tr key={p.run.id} className="border-t border-border">
                     <td className="px-3 py-2">{formatTime(p.run.executedAt)}</td>
                     <td
@@ -162,11 +169,11 @@ export function ExecutionTimelineChart({
                           : 'px-3 py-2 break-words'
                       }
                     >
-                      {p.value === null ? 'Unavailable' : String(p.value)}
+                      {p.value === null ? 'Unavailable' : formatValue(p.value)}
                     </td>
                     <td className="px-3 py-2">
                       {p.delta !== null
-                        ? `${p.delta > 0 ? '+' : ''}${p.delta}${p.percent !== null ? ` (${p.percent.toPrecision(4)}%)` : ''}`
+                        ? `${p.delta > 0 ? '+' : ''}${formatValue(p.delta)}${p.percent !== null ? ` (${p.percent.toPrecision(4)}%)` : ''}`
                         : p.changed
                           ? 'Changed'
                           : '—'}

@@ -12,8 +12,8 @@ export function StateObservations({
   const categories: (string | number | boolean | null)[] = boolean
     ? [false, true]
     : [
-        ...new Set(valid.map((p) => p.value)).values(),
-      ].sort((a, b) => String(a).localeCompare(String(b)));
+      ...new Set(valid.map((p) => p.value)).values(),
+    ].sort((a, b) => String(a).localeCompare(String(b)));
   if (observations.some((p) => p.value === null)) categories.push(null);
   const times = observations.map((p) => p.timestamp).filter(Number.isFinite);
   if (!observations.length) return <p>No state observations.</p>;
@@ -21,7 +21,6 @@ export function StateObservations({
   const end = times.length ? Math.max(...times) : 0;
   return (
     <div className="max-h-80 overflow-auto">
-      <p>States observed at collection times; duration between collections is unknown.</p>
       {categories.map((category) => (
         <div key={category === null ? 'unavailable' : String(category)} className="grid grid-cols-[10rem_1fr] items-center gap-2 py-2">
           <span className="break-words">{category === null ? 'Unavailable' : String(category)}</span>
