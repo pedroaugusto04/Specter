@@ -149,6 +149,7 @@ export function ExecutionTimelineChart({
 
   // Interactive Hover State
   const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
+  const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number; align: 'left' | 'center' | 'right' } | null>(null);
   const activePoint = hoverIndex !== null ? validPoints[hoverIndex] : null;
   const activePointCoords =
     hoverIndex !== null
@@ -162,6 +163,8 @@ export function ExecutionTimelineChart({
     if (validPoints.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = ((e.clientX - rect.left) / rect.width) * width;
+    const align = e.clientX < window.innerWidth * 0.25 ? 'left' : e.clientX > window.innerWidth * 0.75 ? 'right' : 'center';
+    setTooltipPosition({ x: e.clientX, y: rect.top + 16, align });
 
     // Find nearest point
     let closestIdx = 0;
@@ -285,7 +288,7 @@ export function ExecutionTimelineChart({
               viewBox={`0 0 ${width} ${height}`}
               className="w-full h-56 sm:h-64 overflow-visible select-none"
               onMouseMove={handleMouseMove}
-              onMouseLeave={() => setHoverIndex(null)}
+              onMouseLeave={() => { setHoverIndex(null); setTooltipPosition(null); }}
             >
               <defs>
                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -460,12 +463,12 @@ export function ExecutionTimelineChart({
             </svg>
 
             {/* Hover Floating Tooltip */}
-            {activePoint && activePointCoords && (
+            {activePoint && activePointCoords && tooltipPosition && (
               <div
-                className="pointer-events-none absolute top-4 z-50 rounded-md border border-border bg-card p-3 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border"
+                className={`pointer-events-none fixed z-100 rounded-md border border-border bg-card p-3 text-xs font-mono shadow-2xl opacity-100 ring-1 ring-border ${tooltipPosition.align === 'left' ? '' : tooltipPosition.align === 'right' ? '-translate-x-full' : '-translate-x-1/2'}`}
                 style={{
-                  left: `${Math.min(Math.max((activePointCoords.x / width) * 100, 15), 85)}%`,
-                  transform: 'translateX(-50%)',
+                  left: `${tooltipPosition.x}px`,
+                  top: `${tooltipPosition.y}px`,
                 }}
               >
                 <div className="flex items-center justify-between gap-3 text-muted-foreground text-[11px]">
