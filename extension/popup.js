@@ -72,6 +72,20 @@ async function clearStoredConfig() {
   });
 }
 
+function hostPattern(url) {
+  const parsed = new URL(url);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only HTTP and HTTPS sites are supported.');
+  }
+  return `${parsed.protocol}//${parsed.hostname}/*`;
+}
+
+async function requestHostAccess(urls) {
+  const origins = [...new Set(urls.map(hostPattern))];
+  const granted = await chrome.permissions.request({ origins });
+  if (!granted) throw new Error('Site access was not granted.');
+}
+
 // Verify Token or Session with Backend
 async function verifySession(apiUrl, token) {
   try {
@@ -185,14 +199,7 @@ async function init() {
     authenticatedUser = await verifySession(currentApiUrl, currentToken);
   }
 
-  // 2. If no valid stored token, check if user is already logged in on Specter's web app!
-  if (!authenticatedUser) {
-    const autoConn = await tryAutoConnectSpecterSession(currentApiUrl);
-    if (autoConn) {
-      authenticatedUser = autoConn.user;
-      currentToken = autoConn.token;
-    }
-  }
+  // Cookie access is requested only after an explicit sign-in action.
 
   if (authenticatedUser) {
     renderConnected(authenticatedUser.email);
@@ -297,6 +304,7 @@ if (btnGoogle) {
     btnGoogle.innerHTML = '<span class="spinner"></span> <span>Opening Google Sign-In...</span>';
 
     try {
+      await requestHostAccess([apiUrl]);
       // Open Google OAuth flow in a new browser tab
       const authTab = await chrome.tabs.create({ url: `${apiUrl}/api/auth/google` });
 
@@ -370,6 +378,7 @@ btnLogin.addEventListener('click', async () => {
   btnLogin.innerHTML = '<span class="spinner"></span> <span>Signing in...</span>';
 
   try {
+    await requestHostAccess([apiUrl]);
     const res = await fetch(`${apiUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -433,6 +442,7 @@ btnSync.addEventListener('click', async () => {
   btnSync.innerHTML = '<span class="spinner"></span> <span>Syncing...</span>';
 
   try {
+    await requestHostAccess([currentTab.url, currentApiUrl]);
     // Re-extract cookies strictly for the active tab domain
     activeCookies = await extractActiveTabCookies(currentTab);
 
