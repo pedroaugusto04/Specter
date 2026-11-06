@@ -12,6 +12,7 @@ export function NumericObservations({
   formatValue: (value: number) => string;
 }) {
   const [mode, setMode] = React.useState<string>(SCALE_MODE.Adjusted);
+  const [hovered, setHovered] = React.useState<Observation | null>(null);
   const points = observations.filter((p) => typeof p.value === 'number');
   const { min, max, ticks } = numericScale(
     points.map((p) => p.value as number),
@@ -68,10 +69,14 @@ export function NumericObservations({
               cy={y(point.value as number)}
               r="4"
               fill="currentColor"
+              className="cursor-pointer focus:outline-none focus-visible:stroke-primary"
+              tabIndex={0}
+              onMouseEnter={() => setHovered(point)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(point)}
+              onBlur={() => setHovered(null)}
+              aria-label={`${formatTime(point.run.executedAt)}: ${formatValue(point.value as number)}`}
             >
-              <title>
-                {formatTime(point.run.executedAt)}: {formatValue(point.value as number)}
-              </title>
             </circle>
           ))}
           <text x="110" y="215" fill="currentColor" fontSize="10">
@@ -82,6 +87,11 @@ export function NumericObservations({
           </text>
         </svg>
       </div>
+      {hovered && (
+        <div role="status" className="inline-block rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+          <span className="font-medium">{formatTime(hovered.run.executedAt)}</span>: {formatValue(hovered.value as number)}
+        </div>
+      )}
       {points.length === 1 ? (
         <p>Insufficient history for a trend.</p>
       ) : (
