@@ -1,9 +1,9 @@
+export function isMonetaryField(label: string): boolean {
+  return /price|preço|preco|valor|cost|amount|salary|salário|salario/i.test(label);
+}
+
 /** Format a numeric observation using its declared locale and field meaning. */
-export function formatObservedNumber(
-  value: unknown,
-  locale = 'pt-BR',
-  label = ''
-): unknown {
+export function formatObservedNumber(value: unknown, locale = 'pt-BR', label = ''): unknown {
   let number: number;
   if (typeof value === 'number') number = value;
   else if (typeof value === 'string') {
@@ -17,7 +17,7 @@ export function formatObservedNumber(
     number = Number(raw.split(group).join('').replace(decimal, '.').replace(/\.$/, ''));
   } else return value;
   if (!Number.isFinite(number)) return value;
-  const monetary = /price|preço|preco|valor|cost|amount|salary|salário|salario/i.test(label);
+  const monetary = isMonetaryField(label);
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: monetary ? 2 : 0,
     maximumFractionDigits: monetary ? 2 : 20,

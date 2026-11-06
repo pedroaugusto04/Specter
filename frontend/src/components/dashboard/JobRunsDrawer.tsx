@@ -12,7 +12,7 @@ import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
-import { formatObservedNumber } from '@/lib/numberFormatting';
+import { formatObservedNumber, isMonetaryField } from '@/lib/numberFormatting';
 import {
   AlertCircle,
   Camera,
@@ -41,7 +41,7 @@ function displayValue(
 ): string {
   if (value === null || value === undefined) return 'Not available';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (field?.type === 'number') {
+  if (field?.type === 'number' || isMonetaryField(field?.displayName ?? '')) {
     return String(formatObservedNumber(value, field.locale, field.displayName));
   }
   return String(value);
