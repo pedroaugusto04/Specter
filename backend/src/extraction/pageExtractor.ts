@@ -4,7 +4,7 @@ import * as cheerio from 'cheerio';
 import type { DocumentSnapshot, ExtractionPlan, PageExtraction, Scalar } from './contracts.js';
 import { evaluateCondition, readPath } from './conditions.js';
 import { convertFieldValue, recordIdentity } from './values.js';
-import { evidenceValue, redactText } from './evidence.js';
+import { evidenceValue, redactObject, redactText } from './evidence.js';
 import type { SourceReaders } from './sources.js';
 
 export interface IPageExtractor {
@@ -45,7 +45,7 @@ export class PageExtractor implements IPageExtractor {
       };
     const fail = (message: string) => {
       result.quality = ExtractionQuality.Invalid;
-      result.issues.push(message);
+      if (!result.issues.includes(message)) result.issues.push(message);
     };
     try {
       const contexts = this.readers[strategy.records.kind].select(snapshot, strategy.records);
@@ -66,6 +66,7 @@ export class PageExtractor implements IPageExtractor {
       const candidates: Record<string, Scalar>[] = [];
       for (const context of contexts) {
         const record: Record<string, Scalar> = {};
+        const failures = new Map<string, unknown[]>();
         const evidence: PageExtraction['evidence'] = [];
         for (const [name, field] of definitions) {
           let value: Scalar = null;
@@ -99,6 +100,16 @@ export class PageExtractor implements IPageExtractor {
             }
             const raw = this.readers[source.kind].read(snapshot, source, sourceRecord);
             value = convertFieldValue(raw, field, snapshot.url);
+            if (value === null) {
+              const readings = failures.get(name) ?? [];
+              readings.push({
+                source,
+                raw: evidenceValue(raw),
+                reason:
+                  raw == null ? 'No value at source' : 'Value cannot be converted to ' + field.type,
+              });
+              failures.set(name, readings);
+            }
             if (value !== null) {
               const key = name + '#' + index;
               result.sourcesUsed[key] = (result.sourcesUsed[key] ?? 0) + 1;
@@ -135,7 +146,9 @@ export class PageExtractor implements IPageExtractor {
         if (!matchesRecord(record, filters)) continue;
         for (const [name, field] of definitions)
           if (record[name] === null && field.required)
-            fail(`Required field '${name}' is missing or invalid.`);
+            fail(
+              `Required field '${name}' is missing or invalid. Failed sources: ${JSON.stringify(redactObject(failures.get(name) ?? []))}`
+            );
         const identity = recordIdentity(record, intent.identityFields);
         evidence.forEach((entry) => {
           entry.recordIdentity = redactText(identity);

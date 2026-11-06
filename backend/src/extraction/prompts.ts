@@ -18,6 +18,7 @@ Rules:
 - When intent.scope is collection, intent.mode must be collection and pagination must include positive end evidence. A missing next control alone is not end evidence. A disabled control during loading is not terminal; require loading to finish and final-state evidence. Empty results also require positive evidence. Use visible checks for UI markers that may be hidden. ready conditions must positively establish that extraction can proceed.
 - Use associations only when observed evidence supports an exact key match. localField must be required and sourced directly from the primary record. Each foreign record must match exactly once. Do not mix collection sources without an explicit association.
 - Optional filters apply after field conversion. Filter fields must be declared and required.
+- When validation feedback reports a failed source, use its observed raw value and failure reason to correct the source or readiness conditions. Do not repeat a rejected strategy unchanged. A matching field meaning does not imply a matching page label; choose observed data by meaning and entity context.
 - If validation feedback names expected and actual keys, return the expected keys exactly and correct the strategy.
 `;
 

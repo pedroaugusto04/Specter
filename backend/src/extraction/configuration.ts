@@ -174,6 +174,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
     }
     const fixedIntent = intent;
     let feedback = '';
+    const rejectedStrategies = new Set<string>();
     let lastReview: SemanticReview | undefined;
     for (let attempt = 0; attempt < this.options.maxAttempts; attempt++) {
       context.check();
@@ -181,6 +182,13 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         const strategy = await run('plan', () =>
           this.stages.generator.generate(input(), fixedIntent, feedback)
         );
+        const strategyKey = JSON.stringify(sortObjectKeys(strategy));
+        if (rejectedStrategies.has(strategyKey))
+          throw new ConfigurationFailure(
+            'Repeated rejected extraction strategy. Previous failure: ' + feedback,
+            trace,
+            lastReview
+          );
         const parsedPlan = extractionPlanSchema.safeParse({
           version: 3,
           intent: fixedIntent,
@@ -219,6 +227,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             missingFields.length || unexpectedFields.length
               ? ` Field keys must exactly match the fixed intent. Expected keys: ${JSON.stringify(expectedFields)}. Actual keys: ${JSON.stringify(actualFields)}. Keep the expected keys unchanged; map them to matching page content regardless of page language.`
               : '';
+          rejectedStrategies.add(strategyKey);
           throw new Error(
             parsedPlan.error.issues.map((issue) => issue.message).join(' ') + fieldFeedback
           );
@@ -248,8 +257,11 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             httpStatus: execution.snapshot.httpStatus,
           },
         });
-        if (!isAcceptedExtractionQuality(execution.report.quality))
+        if (!isAcceptedExtractionQuality(execution.report.quality)) {
+          if (execution.report.quality === ExtractionQuality.Invalid)
+            rejectedStrategies.add(strategyKey);
           throw new Error(execution.report.issues.join(' '));
+        }
         if (
           !request.intent &&
           execution.report.quality === ExtractionQuality.Empty &&
@@ -332,15 +344,17 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           attempt: attempt + 1,
           review: semanticReview,
         });
-        if (semanticReview.status === SemanticReviewStatus.Rejected)
+        if (semanticReview.status === SemanticReviewStatus.Rejected) {
+          rejectedStrategies.add(strategyKey);
           throw new Error(
             'Semantic review rejected candidate: ' + semanticReview.reasons.join(' ')
           );
+        }
         execution.report.semanticReview = semanticReview;
         execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
         return { plan, execution, semanticReview, trace };
       } catch (error) {
-        if (classifyAccessFailure(error)) throw error;
+        if (error instanceof ConfigurationFailure || classifyAccessFailure(error)) throw error;
         feedback = error instanceof Error ? error.message : 'Candidate validation failed.';
         logger.diagnostic('Extraction candidate rejected', {
           jobId: request.jobId,

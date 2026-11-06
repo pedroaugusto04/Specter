@@ -1,0 +1,62 @@
+{
+  "description": "Reduced synthetic reproductions of production failures from 2026-11-06; not full production page captures.",
+  "cases": [
+    {
+      "name": "product offer path without price",
+      "html": "<script type=\"application/ld+json\">{\"@type\":\"Product\",\"name\":\"Smartphone\",\"offers\":{\"price\":\"944.10\"}}</script><main><h1>Smartphone</h1><b class=\"price\">R$ 944,10</b></main>",
+      "source": {
+        "kind": "jsonld",
+        "path": ["offers", 0, "price"]
+      },
+      "records": {
+        "kind": "jsonld",
+        "type": "Product"
+      },
+      "quality": "INVALID"
+    },
+    {
+      "name": "stock quote placeholder",
+      "html": "<main><article><span class=\"symbol\">PETR4</span><span class=\"js-symbol-last\"></span></article></main>",
+      "source": {
+        "kind": "dom",
+        "selector": ".js-symbol-last",
+        "attribute": "text"
+      },
+      "records": {
+        "kind": "dom",
+        "selector": "article"
+      },
+      "quality": "INVALID"
+    },
+    {
+      "name": "localized quote value",
+      "html": "<main><article><span class=\"js-symbol-last\">R$ 38,50</span></article></main>",
+      "source": {
+        "kind": "dom",
+        "selector": ".js-symbol-last",
+        "attribute": "text"
+      },
+      "records": {
+        "kind": "dom",
+        "selector": "article"
+      },
+      "quality": "COMPLETE",
+      "price": 38.5
+    },
+    {
+      "name": "blocked response",
+      "html": "<main>Security checkpoint</main>",
+      "httpStatus": 403,
+      "source": {
+        "kind": "dom",
+        "selector": ".price",
+        "attribute": "text"
+      },
+      "records": {
+        "kind": "dom",
+        "selector": "main"
+      },
+      "quality": "BLOCKED"
+    }
+  ]
+}

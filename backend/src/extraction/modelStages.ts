@@ -163,17 +163,21 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
     },
     generator: {
       generate: async (input, intent, feedback) => {
+        const schema =
+          intent.scope === 'page'
+            ? executionStrategySchema.omit({ pagination: true })
+            : executionStrategySchema;
         const output = await task(
           model,
           input,
           'plan',
-          outputContract(executionStrategySchema, strategyInstructions),
+          outputContract(schema, strategyInstructions),
           {
             intent,
             validationFeedback: feedback,
           }
         );
-        return validateOutput(input, 'plan', output, executionStrategySchema);
+        return validateOutput(input, 'plan', output, schema);
       },
     },
     reviewer: {

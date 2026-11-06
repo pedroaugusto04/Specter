@@ -130,6 +130,17 @@ cooldown, browser e persistência estão na suíte Vitest. Esse corpus não demo
 cobertura geral da web: a próxima ampliação deve incorporar capturas autorizadas,
 anonimizadas e com expectativas revisadas, registrando sua origem e autorização.
 
+A compilação restringe o schema do plano ao escopo: planos de página não oferecem
+paginação. Falhas de campos obrigatórios incluem a fonte e uma amostra redigida do
+valor observado no feedback; repetir uma estratégia rejeitada sem alterações encerra
+a compilação atual. A política de retries da API e da fila permanece independente.
+
+`npm run --prefix backend test -- tests/compilationReliability.test.ts` reproduz
+falhas de fontes JSON-LD, placeholders de cotações, valores localizados, bloqueio
+HTTP, correção por feedback e incompatibilidade de escopo. As fixtures são
+reproduções sintéticas reduzidas dos sintomas observados em produção em 06/11/2026,
+sem capturas completas, credenciais, chamadas a modelos ou acesso aos sites.
+
 ### Capacidade de browser e webhooks
 
 O lock de monitor impede execuções concorrentes sobre o mesmo monitor. A capacidade
