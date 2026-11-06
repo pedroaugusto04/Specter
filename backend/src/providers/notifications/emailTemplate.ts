@@ -72,7 +72,7 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
 
   const promptBlockHtml = payload.userPrompt
     ? `<tr>
-        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Instruction / Prompt:</td>
+        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Instruction:</td>
         <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${escapeHtml(payload.userPrompt)}</td>
        </tr>`
     : '';
@@ -141,7 +141,8 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Monitored Target:</td>
-                        <td style="padding:6px 0;font-size:13px;word-break:break-all;">
+                        <td style="padding:6px 0;font-size:13px;word-break:break-word;">
+                          ${payload.monitorName ? `${escapeHtml(payload.monitorName)}<br>` : ''}
                           <a href="${escapeHtml(payload.targetUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:none;">
                             ${escapeHtml(payload.targetUrl)}
                           </a>
@@ -234,7 +235,8 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     `[SPECTER] ${totalChanges} ${changeNoun.toUpperCase()} ON MONITORED TARGET`,
     `============================================================`,
     ``,
-    `Target: ${payload.targetUrl}`,
+    `Monitor: ${payload.monitorName ?? payload.targetUrl}`,
+    `Target URL: ${payload.targetUrl}`,
     payload.userPrompt ? `Instruction: ${payload.userPrompt}` : null,
     `Date: ${formattedDate}`,
     ``,

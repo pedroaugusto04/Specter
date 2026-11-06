@@ -9,7 +9,7 @@ import { evaluateTriggerRules } from './triggerEvaluator.js';
 export interface BuildChangeAlertOptions {
   job: Pick<
     ScrapingJobEntity,
-    'id' | 'userId' | 'url' | 'userPrompt' | 'notificationEmail' | 'webhookUrl' | 'extractionPlan'
+    'id' | 'userId' | 'name' | 'url' | 'userPrompt' | 'notificationEmail' | 'webhookUrl' | 'extractionPlan'
   >;
   currentData: ExtractedPayload;
   previousData: ExtractedPayload | null;
@@ -58,7 +58,8 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
       ? '1 change detected'
       : `${diffSummary.totalChanges} changes detected`;
 
-  const subject = `[Specter] ${changeNoun}${subjectSuffix}: ${job.url}`;
+  const monitorName = job.name?.trim() || job.url;
+  const subject = `[Specter] ${changeNoun}${subjectSuffix}: ${monitorName}`;
 
   return {
     to: job.notificationEmail?.trim() || undefined,
@@ -66,6 +67,7 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
     jobId: job.id,
     userId: job.userId,
     targetUrl: job.url,
+    monitorName,
     userPrompt: job.userPrompt,
     webhookUrl: job.webhookUrl ?? undefined,
     detectedAt: new Date(),
