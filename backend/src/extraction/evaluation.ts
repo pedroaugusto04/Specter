@@ -52,6 +52,7 @@ export function evaluateCorpus(cases: EvaluationCase[], extractor: IPageExtracto
           job: {
             id: item.name,
             userId: 'corpus',
+            name: item.name,
             url: item.snapshot.url,
             userPrompt: item.plan.intent.entity,
             notificationEmail: '',

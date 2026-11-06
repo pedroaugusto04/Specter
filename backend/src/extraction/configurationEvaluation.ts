@@ -158,6 +158,7 @@ function alertFor(
         job: {
           id: item.name,
           userId: 'eval',
+          name: item.name,
           url: item.snapshot.url,
           userPrompt: item.prompt,
           notificationEmail: '',
