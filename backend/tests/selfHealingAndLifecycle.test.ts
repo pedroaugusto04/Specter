@@ -4,11 +4,13 @@ import { fixturePlan } from './helpers/extractionFixtures.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AntiBotBlockedError,
+  CompilerApiRequestError,
   CompilerValidationError,
   NavigationTimeoutError,
 } from '../src/errors/domainErrors.js';
 import { CompilationService } from '../src/services/compilationService.js';
 import { ScrapeExecutionService } from '../src/services/scrapeExecutionService.js';
+import { CompilationReason } from '../src/queues/scheduler.interface.js';
 import {
   InMemoryJobRepository,
   MockCompilerProvider,
@@ -114,6 +116,27 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       'The requested information could not be verified on the page. Check the instructions and try again.'
     );
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
+  });
+  it('keeps a rate-limited recompilation pending until retries are exhausted', async () => {
+    const job = await repository.createJob({
+      url: 'https://store.example.com/item',
+      userPrompt: 'Monitor price',
+      notificationEmail: 'alerts@example.com',
+      cronExpression: '*/30 * * * *',
+    });
+    await compilationService.compileJob(job.id);
+    await repository.updateJob(job.id, { status: 'PENDING_COMPILATION' });
+    compiler.setHandler(async () => {
+      throw new CompilerApiRequestError(429);
+    });
+    await expect(
+      compilationService.compileJob(job.id, CompilationReason.Manual, true)
+    ).rejects.toThrow(CompilerApiRequestError);
+    expect((await repository.findById(job.id))?.status).toBe('PENDING_COMPILATION');
+    await expect(
+      compilationService.compileJob(job.id, CompilationReason.Manual, false)
+    ).rejects.toThrow(CompilerApiRequestError);
+    expect((await repository.findById(job.id))?.status).toBe('ACTIVE');
   });
   it('dispatches notification email only when extracted data genuinely changes', async () => {
     const job = await repository.createJob({

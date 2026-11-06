@@ -2,6 +2,7 @@ import { Queue, type ConnectionOptions } from 'bullmq';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { CompilationReason, type IJobScheduler } from './scheduler.interface.js';
+import { COMPILATION_BACKOFF_TYPE } from './compilationBackoff.js';
 
 export const COMPILATION_QUEUE_NAME = 'compilation-queue';
 export const SCRAPE_EXECUTION_QUEUE_NAME = 'scrape-execution-queue';
@@ -48,7 +49,7 @@ export class BullMqJobScheduler implements IJobScheduler {
       defaultJobOptions: {
         attempts: env.COMPILATION_QUEUE_MAX_ATTEMPTS,
         backoff: {
-          type: 'exponential',
+          type: COMPILATION_BACKOFF_TYPE,
           delay: 5000,
         },
         removeOnComplete: 100,

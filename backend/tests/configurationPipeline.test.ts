@@ -5,6 +5,7 @@ import type { IModelProvider } from '../src/extraction/model.js';
 import type { DocumentAdapter } from '../src/extraction/contracts.js';
 import type { ExecutionResult } from '../src/extraction/executor.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
+import { CompilerApiRequestError } from '../src/errors/domainErrors.js';
 const snapshot = {
   html: '<h1>Main product</h1><b>100</b>',
   url: 'https://example.com',
@@ -67,6 +68,46 @@ function setup(review: unknown, enabled = true) {
 }
 const request = { jobId: 'fixture', url: snapshot.url, prompt: 'Find the title' };
 describe('Semantic policy and pipeline stages', () => {
+  it('propagates a rate limit during plan generation without trying another model call', async () => {
+    const error = new CompilerApiRequestError(429, undefined, undefined, 180000);
+    const calls: string[] = [];
+    const model: IModelProvider = {
+      name: 'fixture',
+      generate: async (input) => {
+        calls.push(input.task);
+        if (input.task === 'intent') return plan.intent;
+        if (input.task === 'discovery') return { action: null };
+        throw error;
+      },
+    };
+    const close = vi.fn(async () => {});
+    const adapter: DocumentAdapter = {
+      open: async () => ({
+        snapshot: async () => snapshot,
+        check: async () => undefined,
+        advance: async () => {},
+        discover: async () => snapshot,
+        screenshot: async () => undefined,
+        close,
+      }),
+    };
+    const pipeline = new ConfigurationPipeline(
+      createModelStages(model),
+      adapter,
+      { execute: vi.fn() },
+      {
+        budgetMs: 5000,
+        maxAttempts: 3,
+        maxDiscoveryActions: 2,
+        evidenceLimit: 10000,
+        semanticEnabled: false,
+        semanticThreshold: 4,
+      }
+    );
+    await expect(pipeline.configure(request)).rejects.toBe(error);
+    expect(calls).toEqual(['intent', 'discovery', 'plan']);
+    expect(close).toHaveBeenCalledOnce();
+  });
   it('uses the global disabled policy without invoking the reviewer', async () => {
     const fixture = setup({ score: 0, reasons: ['Wrong entity'], evidenceRefs: ['title'] }, false);
     const result = await fixture.pipeline.configure(request);

@@ -1,6 +1,7 @@
 import { MODEL_SYSTEM_INSTRUCTIONS } from './compilerPrompt.js';
 import type { IModelProvider, ModelInput } from '../../extraction/model.js';
 import { env } from '../../config/env.js';
+import { parseRetryAfter, parseRetryInfo } from '../../utils/retryAfter.js';
 import {
   CompilerApiRequestError,
   CompilerTimeoutError,
@@ -81,21 +82,23 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         await this.waitBeforeRetry(attempt);
         continue;
       }
-      if (![408, 429].includes(response.status) && response.status < 500) break;
+      if (response.status === 429) break;
+      if (response.status !== 408 && response.status < 500) break;
       if (attempt >= env.COMPILER_API_MAX_RETRIES) break;
       const retryAfter = response.headers.get('retry-after');
       await this.waitBeforeRetry(attempt, retryAfter);
     }
 
     if (!response.ok) {
-      const errorText = await response
-        .text()
-        .then((text) => text.replace(/\s+/g, ' ').trim().slice(0, 300))
-        .catch(() => '');
+      const body = await response.text().catch(() => '');
+      const errorText = body.replace(/\s+/g, ' ').trim().slice(0, 300);
+      const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
+      const retryInfo = response.status === 429 ? parseRetryInfo(body) : undefined;
       throw new CompilerApiRequestError(
         response.status,
         undefined,
-        `HTTP ${response.status}${errorText ? ` - ${errorText}` : ''}`
+        `HTTP ${response.status}${errorText ? ` - ${errorText}` : ''}`,
+        response.status === 429 ? Math.max(retryAfter ?? 0, retryInfo ?? 0) : undefined
       );
     }
 

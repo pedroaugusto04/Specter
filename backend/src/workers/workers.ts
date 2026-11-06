@@ -1,5 +1,6 @@
 import { DomainError } from '../errors/domainErrors.js';
 import { ExecutionLease } from '../queues/executionLease.js';
+import { compilationBackoff } from '../queues/compilationBackoff.js';
 import { Worker, UnrecoverableError, type Job } from 'bullmq';
 import { env } from '../config/env.js';
 import {
@@ -38,12 +39,22 @@ export class WorkerManager {
       COMPILATION_QUEUE_NAME,
       async (job: Job<{ jobId: string; reason?: CompilationReason }>) => {
         const { jobId, reason } = job.data;
-        await this.runMonitor(jobId, () => this.deps.compilationService.compileJob(jobId, reason));
+        await this.runMonitor(jobId, () =>
+          this.deps.compilationService.compileJob(
+            jobId,
+            reason,
+            job.attemptsMade + 1 < (job.opts.attempts ?? 1)
+          )
+        );
       },
       {
         concurrency: env.COMPILER_CONCURRENCY,
         connection,
         lockDuration: env.COMPILER_TIMEOUT_MS,
+        settings: {
+          backoffStrategy: (attemptsMade, _type, error) =>
+            compilationBackoff(attemptsMade, error, env.COMPILER_RATE_LIMIT_RETRY_DELAY_MS),
+        },
       }
     );
 

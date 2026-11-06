@@ -23,7 +23,7 @@ import { createStorageProvider } from './providers/storage/index.js';
 import { createRealtimeEventBus } from './providers/realtime/realtime.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
 import { CompilationReason } from './queues/scheduler.interface.js';
-import { reconcileRepeatableJobs } from './queues/reconciler.js';
+import { reconcilePendingCompilations, reconcileRepeatableJobs } from './queues/reconciler.js';
 import { DrizzleIntegrationRepository } from './repositories/integrationRepository.js';
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
 import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
@@ -142,9 +142,11 @@ async function bootstrap(): Promise<void> {
   // Reconcile PostgreSQL active jobs with BullMQ repeatable schedules on startup
   try {
     await reconcileRepeatableJobs(jobScheduler.scrapeQueue, await schedules.activeSchedules());
-    for (const job of await jobRepository.findAll(JobStatus.PendingCompilation)) {
-      await jobScheduler.enqueueCompilation(job.id, CompilationReason.Initial);
-    }
+    await reconcilePendingCompilations(
+      jobScheduler.compilationQueue,
+      (await jobRepository.findAll(JobStatus.PendingCompilation)).map((job) => job.id),
+      (jobId) => jobScheduler.enqueueCompilation(jobId, CompilationReason.Initial)
+    );
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {
     logger.warn(

@@ -6,9 +6,7 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   HOST: z.string().min(1).default('0.0.0.0'),
   CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   LOG_PRETTY_CONSOLE: z
     .enum(['true', 'false'])
     .default('true')
@@ -37,6 +35,12 @@ export const envSchema = z.object({
   COMPILER_API_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(3),
   COMPILER_API_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(100).max(30000).default(1000),
   COMPILER_API_RETRY_MAX_DELAY_MS: z.coerce.number().int().min(100).max(120000).default(10000),
+  COMPILER_RATE_LIMIT_RETRY_DELAY_MS: z.coerce
+    .number()
+    .int()
+    .min(120000)
+    .max(86400000)
+    .default(120000),
   EVALS_LIVE_MODELS_ENABLED: z
     .enum(['true', 'false'])
     .default('false')

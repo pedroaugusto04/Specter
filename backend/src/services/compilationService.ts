@@ -5,7 +5,12 @@ import type { IAlertRouter } from '../notifications/contracts.js';
 import type { IConfigurationPipeline } from '../extraction/configuration.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
 import { randomUUID } from 'crypto';
-import { DomainError, NotFoundError, CompilerValidationError } from '../errors/domainErrors.js';
+import {
+  CompilerApiRequestError,
+  DomainError,
+  NotFoundError,
+  CompilerValidationError,
+} from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import { CompilationReason } from '../queues/scheduler.interface.js';
@@ -31,7 +36,11 @@ export interface CompilationServiceDeps {
 export class CompilationService {
   constructor(private readonly deps: CompilationServiceDeps) {}
 
-  async compileJob(jobId: string, reason?: CompilationReason): Promise<ScrapingJobEntity> {
+  async compileJob(
+    jobId: string,
+    reason?: CompilationReason,
+    willRetry = false
+  ): Promise<ScrapingJobEntity> {
     const startTime = Date.now();
     const job = await this.deps.jobRepository.findById(jobId);
 
@@ -197,9 +206,11 @@ export class CompilationService {
           ? retryableHealingFailure
             ? JobStatus.Healing
             : JobStatus.Failed
-          : job.extractionPlan
-            ? JobStatus.Active
-            : JobStatus.Failed;
+          : willRetry && error instanceof CompilerApiRequestError && error.statusCode === 429
+            ? JobStatus.PendingCompilation
+            : job.extractionPlan
+              ? JobStatus.Active
+              : JobStatus.Failed;
       await this.deps.jobRepository.updateJob(job.id, {
         status: failureStatus,
         lastError: userMessage,

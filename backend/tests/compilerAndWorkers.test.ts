@@ -6,10 +6,18 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { CompilerTimeoutError } from '../src/errors/domainErrors.js';
 import { AgyCliCompilerProvider } from '../src/providers/compilers/agyCliCompiler.provider.js';
-import { reconcileRepeatableJobs } from '../src/queues/reconciler.js';
+import { reconcilePendingCompilations, reconcileRepeatableJobs } from '../src/queues/reconciler.js';
 import { RetentionService } from '../src/services/retentionService.js';
 import { InMemoryJobRepository } from './helpers/testDoubles.js';
 describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', () => {
+  it('preserves delayed compilation retries when reconciling pending jobs on startup', async () => {
+    const queue = { getJobs: async () => [{ data: { jobId: 'delayed' } }] };
+    const enqueued: string[] = [];
+    await reconcilePendingCompilations(queue as never, ['delayed', 'missing'], async (id) => {
+      enqueued.push(id);
+    });
+    expect(enqueued).toEqual(['missing']);
+  });
   it('reactively resolves when CLI writes extractor.json and cleans up temp directory', async () => {
     const tempBaseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scraper-test-ok-'));
     const jobId = 'job-reactive-123';

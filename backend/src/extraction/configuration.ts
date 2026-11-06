@@ -9,7 +9,7 @@ import {
   Transport,
   isAcceptedExtractionQuality,
 } from './constants.js';
-import { DomainError } from '../errors/domainErrors.js';
+import { CompilerApiRequestError, DomainError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
   DocumentSnapshot,
@@ -354,6 +354,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
         return { plan, execution, semanticReview, trace };
       } catch (error) {
+        if (error instanceof CompilerApiRequestError && error.statusCode === 429) throw error;
         if (error instanceof ConfigurationFailure || classifyAccessFailure(error)) throw error;
         feedback = error instanceof Error ? error.message : 'Candidate validation failed.';
         logger.diagnostic('Extraction candidate rejected', {

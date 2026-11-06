@@ -2,6 +2,26 @@ import type { Queue } from 'bullmq';
 import { logger } from '../utils/logger.js';
 import { buildRepeatableJobId } from './queues.js';
 
+/** Recover missing pending jobs without bypassing existing delayed retries. */
+export async function reconcilePendingCompilations(
+  queue: Pick<Queue, 'getJobs'>,
+  pendingJobIds: string[],
+  enqueue: (jobId: string) => Promise<void>
+): Promise<void> {
+  const missing = new Set(pendingJobIds);
+  const pageSize = 100;
+  for (let start = 0; missing.size; start += pageSize) {
+    const jobs = await queue.getJobs(
+      ['wait', 'active', 'delayed', 'prioritized', 'waiting-children'],
+      start,
+      start + pageSize - 1
+    );
+    for (const job of jobs) if (typeof job.data?.jobId === 'string') missing.delete(job.data.jobId);
+    if (jobs.length < pageSize) break;
+  }
+  for (const jobId of missing) await enqueue(jobId);
+}
+
 export interface ReconcilableJob {
   id: string;
   cronExpression: string;

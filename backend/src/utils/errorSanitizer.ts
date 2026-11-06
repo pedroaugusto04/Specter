@@ -6,6 +6,7 @@ import {
   AntiBotBlockedError,
   BrowserCapacityError,
   CompilerTimeoutError,
+  CompilerApiRequestError,
   CompilerValidationError,
   DomainError,
   NavigationTimeoutError,
@@ -20,6 +21,7 @@ const USER_ERROR_MESSAGES = {
   requestedDataUnavailable:
     'The requested information could not be verified on the page. Check the instructions and try again.',
   setupTimedOut: 'Monitor setup took too long to complete. Please try again.',
+  compilerRateLimited: 'The AI provider rate limit was reached. Please try again later.',
   optionalEvidenceUnavailable: 'Optional extraction evidence unavailable.',
   requestFailed: 'We could not complete this request. Please try again later.',
 } as const;
@@ -35,6 +37,8 @@ export function formatUserErrorMessage(error: unknown): string {
   if (error instanceof SelectorMismatchError || error instanceof CompilerValidationError)
     return USER_ERROR_MESSAGES.requestedDataUnavailable;
   if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
+  if (error instanceof CompilerApiRequestError && error.statusCode === 429)
+    return USER_ERROR_MESSAGES.compilerRateLimited;
   if (error instanceof DomainError) return USER_ERROR_MESSAGES.requestFailed;
   return USER_ERROR_MESSAGES.requestFailed;
 }

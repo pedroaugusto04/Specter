@@ -85,11 +85,15 @@ describe('Gemini API compiler transport', () => {
       CompilerTimeoutError
     );
 
-    const rejectedFetch = vi.fn<typeof fetch>(async () => new Response(null, { status: 429 }));
+    const rejectedFetch = vi.fn<typeof fetch>(
+      async () => new Response(null, { status: 429, headers: { 'retry-after': '180' } })
+    );
     await expect(provider(rejectedFetch).generate(input)).rejects.toMatchObject({
-      code: 'COMPILER_API_REJECTED',
+      code: 'COMPILER_API_RATE_LIMITED',
       isRetryable: true,
+      retryAfterMs: 180000,
     } satisfies Partial<CompilerApiRequestError>);
+    expect(rejectedFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects missing, truncated, and malformed model output', async () => {
