@@ -9,7 +9,7 @@ import {
   type TimelineFields,
 } from '@/lib/chartUtils';
 import { formatDateTime } from '@/lib/utils';
-import { formatObservedNumber, isMonetaryField } from '@/lib/numberFormatting';
+import { formatObservedNumber } from '@/lib/numberFormatting';
 import { NumericObservations } from './NumericObservations';
 import { StateObservations } from './StateObservations';
 import { CollectionHistory } from './CollectionHistory';
@@ -38,7 +38,7 @@ export function ExecutionTimelineChart({
   const formatTime = (date: string) =>
     Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
   const formatValue = (value: string | number | boolean | null) =>
-    definition?.type === FieldType.Number || isMonetaryField(definition?.displayName || selected)
+    definition?.type === FieldType.Number
       ? String(formatObservedNumber(value, definition.locale, definition.displayName || selected))
       : String(value);
   const summary = summarizeRuns(runs);

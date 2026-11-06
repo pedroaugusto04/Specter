@@ -1,5 +1,5 @@
 import type { IntentField } from '@specter/contracts';
-import { formatObservedNumber, isMonetaryField } from './numberFormatting';
+import { formatObservedNumber } from './numberFormatting';
 
 export type ExtractionFieldDefinitions = Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
 
@@ -22,7 +22,7 @@ export function localizeExtractedPayload(
           (candidate) => candidate.displayName?.trim() === key
         );
         const displayLabel = field?.displayName || key;
-        if (field?.type !== 'number' && !isMonetaryField(displayLabel)) {
+        if (field?.type !== 'number') {
           return [labels[key] ?? key, localizeNested(value)];
         }
         const formatted = formatObservedNumber(value, field?.locale, displayLabel);
