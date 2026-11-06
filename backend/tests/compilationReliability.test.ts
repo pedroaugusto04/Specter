@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { ConfigurationPipeline } from '../src/extraction/configuration.js';
 import { createModelStages } from '../src/extraction/modelStages.js';
+import { modelDiscoverySchema, modelStrategySchema } from '../src/extraction/modelOutputSchemas.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { ExtractionExecutor } from '../src/extraction/executor.js';
@@ -35,6 +36,53 @@ const pricePlan = () =>
   });
 
 describe('Compilation reliability regressions', () => {
+  it('guides discovery with a flat contract while rejecting invalid actions', async () => {
+    const plan = pricePlan();
+    const input = {
+      jobId: 'contract',
+      url: 'https://example.com',
+      prompt: 'prices',
+      evidence: '',
+      timeoutMs: 1000,
+    };
+    let request: ModelInput | undefined;
+    let response: unknown = {
+      action: { kind: 'wait', condition: { kind: 'network', match: { urlPattern: '*' } } },
+    };
+    const stages = createModelStages({
+      name: 'fixture',
+      generate: async (value) => {
+        request = value;
+        return response;
+      },
+    });
+    await expect(stages.discovery.next(input, plan.intent)).rejects.toThrow();
+    expect(request!.instructions).toContain('Use response, never network');
+    expect(request!.outputSchema).toHaveProperty('properties.action.anyOf');
+    const validAction = {
+      kind: 'wait',
+      condition: { kind: 'response', match: { urlPattern: '/api/items' } },
+    };
+    response = { action: validAction };
+    await expect(stages.discovery.next(input, plan.intent)).resolves.toEqual(validAction);
+    response = { action: { kind: 'wait', condition: { kind: 'visible' } } };
+    await expect(stages.discovery.next(input, plan.intent)).rejects.toThrow();
+    response = { action: { kind: 'wait', condition: { kind: 'field', field: 'price' } } };
+    await expect(stages.discovery.next(input, plan.intent)).rejects.toThrow();
+  });
+
+  it('offers field conditions for extracted data but not discovery or setup waits', () => {
+    const field = { kind: 'field', field: 'price' };
+    const wait = { kind: 'wait', condition: field };
+    expect(modelDiscoverySchema.safeParse({ action: wait }).success).toBe(false);
+    expect(modelStrategySchema.safeParse({ ...pricePlan().strategy, setup: [wait] }).success).toBe(
+      false
+    );
+    expect(modelStrategySchema.safeParse({ ...pricePlan().strategy, ready: [field] }).success).toBe(
+      true
+    );
+  });
+
   for (const item of corpus.cases)
     it(item.name, () => {
       const plan = pricePlan();

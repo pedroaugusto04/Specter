@@ -14,11 +14,20 @@ import {
 } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { logger } from '../utils/logger.js';
+import { modelDiscoverySchema, modelStrategySchema } from './modelOutputSchemas.js';
 const discoverySchema = z
   .object({
     action: discoveryActionSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine(({ action }, context) => {
+    if (action?.kind === 'wait' && action.condition.kind === 'field')
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['action', 'condition'],
+        message: 'Discovery waits cannot reference fields before extraction.',
+      });
+  });
 const reviewSchema = z
   .object({
     score: z.number().int().min(0).max(10),
@@ -155,7 +164,7 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
           model,
           input,
           'discovery',
-          outputContract(discoverySchema, discoveryInstructions),
+          outputContract(modelDiscoverySchema, discoveryInstructions),
           { intent }
         );
         return validateOutput(input, 'discovery', output, discoverySchema).action;
@@ -167,11 +176,15 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
           intent.scope === 'page'
             ? executionStrategySchema.omit({ pagination: true })
             : executionStrategySchema;
+        const modelSchema =
+          intent.scope === 'page'
+            ? modelStrategySchema.omit({ pagination: true })
+            : modelStrategySchema;
         const output = await task(
           model,
           input,
           'plan',
-          outputContract(schema, strategyInstructions),
+          outputContract(modelSchema, strategyInstructions),
           {
             intent,
             validationFeedback: feedback,

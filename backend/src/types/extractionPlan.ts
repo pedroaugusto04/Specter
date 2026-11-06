@@ -58,7 +58,7 @@ export const discoveryActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('scroll'), selector: text.optional() }).strict(),
   z.object({ kind: z.literal('wait'), condition: conditionSchema }).strict(),
 ]);
-const source = z.discriminatedUnion('kind', [
+export const sourceSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal(SourceKind.Dom),
@@ -153,7 +153,7 @@ export const executionStrategySchema = z
           .strict()
       )
       .optional(),
-    fields: z.record(text, z.array(source).min(1)),
+    fields: z.record(text, z.array(sourceSchema).min(1)),
     ready: z.array(conditionSchema).min(1),
     empty: z.array(conditionSchema),
     pagination: z
