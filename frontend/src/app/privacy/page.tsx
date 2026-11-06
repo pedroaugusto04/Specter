@@ -139,10 +139,6 @@ export default function PrivacyPage() {
                 user during explicit sync actions.
               </div>
               <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-                <strong className="text-foreground">activeTab:</strong> Used solely to identify the
-                hostname of the active browser tab when the extension popup is opened.
-              </div>
-              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
                 <strong className="text-foreground">storage:</strong> Used locally on your device (
                 <code className="text-foreground font-mono">chrome.storage.local</code>) to remember
                 your API endpoint and login session between browser restarts.
