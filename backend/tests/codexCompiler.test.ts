@@ -24,6 +24,9 @@ describe('Codex transport', () => {
       if(!expected.every((value,index)=>args[index]===value))process.exit(11);
       const index=args.indexOf('--output-last-message');if(index<0)process.exit(12);
       const prompt=fs.readFileSync('prompt.md','utf8');if(!prompt.includes('Find the page title'))process.exit(13);
+      const schema=${JSON.stringify(JSON.stringify({ type: 'object', properties: { version: { type: 'number' } }, required: ['version'] }))};
+      if(prompt.split(schema).length!==2)process.exit(14);
+      if(!prompt.includes('untrusted data'))process.exit(15);
       fs.writeFileSync(args[index+1],${JSON.stringify(JSON.stringify(output))});`
     );
     const provider = new CodexCompilerProvider({
@@ -37,6 +40,11 @@ describe('Codex transport', () => {
       jobId: 'local',
       evidence: '<h1>Example</h1>',
       instructions: 'Find the page title',
+      outputSchema: {
+        type: 'object',
+        properties: { version: { type: 'number' } },
+        required: ['version'],
+      },
     });
     expect(result).toEqual(output);
     expect(await readdir(path.join(root, 'work'))).toEqual([]);

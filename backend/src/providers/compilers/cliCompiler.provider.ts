@@ -14,7 +14,9 @@ export interface CliCompilerOptions {
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
   tempBaseDir?: string;
   timeoutMs?: number;
-  spawnFn?: ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess) | typeof spawn;
+  spawnFn?:
+    | ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess)
+    | typeof spawn;
 }
 
 export class CliCompilerProvider implements IModelProvider {
@@ -23,7 +25,9 @@ export class CliCompilerProvider implements IModelProvider {
   private readonly cliArgsBuilder: (promptFile: string, outputFile: string) => string[];
   private readonly tempBaseDir: string;
   private readonly timeoutMs: number;
-  private readonly spawnFn: ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess) | typeof spawn;
+  private readonly spawnFn:
+    | ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess)
+    | typeof spawn;
   private readonly promptBuilder: NonNullable<CliCompilerOptions['promptBuilder']>;
 
   constructor(options: CliCompilerOptions = {}) {
@@ -45,6 +49,9 @@ export class CliCompilerProvider implements IModelProvider {
 
   async generate(input: ModelInput): Promise<unknown> {
     const { jobId, evidence: sanitizedHtml, instructions: userPrompt } = input;
+    const taskInstructions = input.outputSchema
+      ? `${userPrompt}\nReturn only a JSON object matching this schema: ${JSON.stringify(input.outputSchema)}`
+      : userPrompt;
     const startTime = Date.now();
     const timeoutMs = Math.min(input.timeoutMs ?? this.timeoutMs, this.timeoutMs);
     const safeJobDirName = jobId.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -58,7 +65,11 @@ export class CliCompilerProvider implements IModelProvider {
     const outputFile = path.join(tempDir, 'extractor.json');
 
     await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
-    await fs.writeFile(promptFile, this.promptBuilder(domFile, outputFile, userPrompt), 'utf-8');
+    await fs.writeFile(
+      promptFile,
+      this.promptBuilder(domFile, outputFile, taskInstructions),
+      'utf-8'
+    );
 
     return new Promise<unknown>((resolve, reject) => {
       let settled = false;

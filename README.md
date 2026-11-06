@@ -134,6 +134,9 @@ A compilação restringe o schema do plano ao escopo: planos de página não ofe
 paginação. Falhas de campos obrigatórios incluem a fonte e uma amostra redigida do
 valor observado no feedback; repetir uma estratégia rejeitada sem alterações encerra
 a compilação atual. A política de retries da API e da fila permanece independente.
+As regras comuns de segurança ficam nos adaptadores. A API recebe o schema apenas
+no contrato de saída estruturada; os adaptadores CLI o acrescentam ao prompt.
+O Gemini usa seus parâmetros padrão de amostragem, sem temperatura fixa.
 
 `npm run --prefix backend test -- tests/compilationReliability.test.ts` reproduz
 falhas de fontes JSON-LD, placeholders de cotações, valores localizados, bloqueio

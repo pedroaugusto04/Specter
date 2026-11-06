@@ -31,7 +31,7 @@ function outputContract(schema: z.ZodTypeAny, instructions: string) {
     $refStrategy: 'none',
   });
   return {
-    instructions: `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(outputSchema)}`,
+    instructions: instructions.trim(),
     outputSchema: outputSchema as Record<string, unknown>,
   };
 }
