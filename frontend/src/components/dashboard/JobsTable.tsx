@@ -88,6 +88,7 @@ function renderStatusPill(status: JobStatus) {
 
 export function JobsTable({
   jobs,
+  runningJobIds = new Set(),
   onRefresh,
   isRefreshing = false,
   onSelectJobForHistory,
@@ -96,6 +97,7 @@ export function JobsTable({
   timeZone = DEFAULT_TIMEZONE,
 }: {
   jobs: ScrapingJobDto[];
+  runningJobIds?: Set<string>;
   onRefresh: () => void;
   isRefreshing?: boolean;
   onSelectJobForHistory: (job: ScrapingJobDto) => void;
@@ -333,7 +335,11 @@ export function JobsTable({
 
                     {/* Status Pill */}
                     <td className="whitespace-nowrap px-2.5 py-3">
-                      {renderStatusPill(job.status)}
+                      {runningJobIds.has(job.id) && job.status === JOB_STATUS.Active ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-primary">
+                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> RUNNING
+                        </span>
+                      ) : renderStatusPill(job.status)}
                       {job.accessState && (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Access blocked. New attempts allowed after{' '}

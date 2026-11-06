@@ -85,6 +85,8 @@ export class ScrapeExecutionService {
       return null;
     }
 
+    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, 'RUNNING');
+
     let httpStatus: number | null = null;
     let extractionReport: ExtractionReport | undefined;
 

@@ -128,25 +128,7 @@ export function ExecutionTimelineChart({
               )}
               {textMode === TEXT_MODE.States ? (
                 <StateObservations observations={observations} formatTime={formatTime} />
-              ) : (
-                <ul className="space-y-2">
-                  {observations
-                    .filter((p) => p.value !== null && (!p.previous || p.changed))
-                    .map((p) => (
-                      <li key={p.run.id} className="break-words">
-                        {formatTime(p.run.executedAt)}:{' '}
-                        {p.previous ? `${formatValue(p.previous.value)} → ` : 'Initial: '}
-                        {formatValue(p.value)}
-                        {p.previous && (
-                          <span className="text-muted-foreground">
-                            {' '}
-                            (previous reading: {formatTime(p.previous.run.executedAt)})
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                </ul>
-              )}
+              ) : null}
             </>
           )}
           <div className="overflow-auto rounded-md border border-border">

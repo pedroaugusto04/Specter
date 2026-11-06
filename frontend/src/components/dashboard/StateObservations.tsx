@@ -1,4 +1,5 @@
 import type { Observation } from '@/lib/chartUtils';
+import * as React from 'react';
 export function StateObservations({
   observations,
   formatTime,
@@ -8,6 +9,7 @@ export function StateObservations({
   formatTime: (date: string) => string;
   boolean?: boolean;
 }) {
+  const [hovered, setHovered] = React.useState<Observation | null>(null);
   const valid = observations.filter((p) => p.value !== null);
   const categories: (string | number | boolean | null)[] = boolean
     ? [false, true]
@@ -46,18 +48,22 @@ export function StateObservations({
                   fill={category === null ? 'none' : 'currentColor'}
                   stroke="currentColor"
                   strokeDasharray={category === null ? '2 1' : undefined}
-                  className="cursor-help focus:outline-none"
+                  className="cursor-pointer focus:outline-none focus-visible:stroke-primary"
                   tabIndex={0}
+                  onMouseEnter={() => setHovered(p)}
+                  onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(p)}
+                  onBlur={() => setHovered(null)}
                   aria-label={`${formatTime(p.run.executedAt)}: ${category === null ? 'Unavailable observation' : String(category)}`}
                 >
-                  <title>
-                    {formatTime(p.run.executedAt)}: {category === null ? 'Unavailable observation' : String(category)}
-                  </title>
                 </circle>
               ))}
           </svg>
         </div>
       ))}
+      {hovered && <div role="status" className="mt-2 inline-block rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+        <span className="font-medium">{formatTime(hovered.run.executedAt)}</span>: {hovered.value === null ? 'Unavailable observation' : String(hovered.value)}
+      </div>}
     </div>
   );
 }

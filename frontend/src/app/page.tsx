@@ -51,14 +51,38 @@ export default function DashboardPage() {
 
   const isRefreshing = isJobsLoading || isJobsFetching || isStatsFetching;
   const connectionError = jobsError || statsError;
+  const [runningJobIds, setRunningJobIds] = React.useState<Set<string>>(() => new Set());
+  const runningTimers = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  React.useEffect(() => () => {
+    for (const timer of runningTimers.current.values()) clearTimeout(timer);
+    runningTimers.current.clear();
+  }, []);
 
   // Real-time server-sent events with auto-invalidation
   const { connectionMode } = useRealtimeEvents({
     enabled: Boolean(user),
-    onJobEvent: React.useCallback(() => {
+    onJobEvent: React.useCallback((event) => {
+      if (event.type === 'JOB_UPDATED' && event.status === 'RUNNING') {
+        const old = runningTimers.current.get(event.jobId);
+        if (old) clearTimeout(old);
+        setRunningJobIds((current) => new Set(current).add(event.jobId));
+        runningTimers.current.set(event.jobId, setTimeout(() => {
+          runningTimers.current.delete(event.jobId);
+          setRunningJobIds((current) => { const next = new Set(current); next.delete(event.jobId); return next; });
+          void invalidateJobsAndStats();
+        }, 120_000));
+      } else if (event.jobId) {
+        const old = runningTimers.current.get(event.jobId);
+        if (old) clearTimeout(old);
+        runningTimers.current.delete(event.jobId);
+        setRunningJobIds((current) => { const next = new Set(current); next.delete(event.jobId); return next; });
+      }
       void invalidateJobsAndStats();
     }, [invalidateJobsAndStats]),
     onReconnect: React.useCallback(() => {
+      for (const timer of runningTimers.current.values()) clearTimeout(timer);
+      runningTimers.current.clear();
+      setRunningJobIds(new Set());
       void invalidateJobsAndStats();
     }, [invalidateJobsAndStats]),
   });
@@ -205,6 +229,7 @@ export default function DashboardPage() {
         {/* Central Monitoring Table */}
         <JobsTable
           jobs={jobs}
+            runningJobIds={runningJobIds}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing}
           onSelectJobForHistory={modals.openJobHistory}
