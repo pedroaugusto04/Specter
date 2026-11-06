@@ -27,6 +27,7 @@ export interface AuthServiceOptions {
   googleClientSecret?: string;
   googleCallbackUrl?: string;
   frontendUrl?: string;
+  onTimezoneChanged?: (userId: string) => Promise<void>;
 }
 
 export class AuthService {
@@ -39,9 +40,11 @@ export class AuthService {
   private readonly googleClientSecret: string;
   private readonly googleCallbackUrl: string;
   public readonly frontendUrl: string;
+  private readonly onTimezoneChanged?: (userId: string) => Promise<void>;
 
   constructor(userRepository: IUserRepository, options: AuthServiceOptions = {}) {
     this.userRepository = userRepository;
+    this.onTimezoneChanged = options.onTimezoneChanged;
     this.jwtSecret = options.jwtSecret ?? env.JWT_SECRET;
     this.accessExpiresSeconds = options.accessExpiresSeconds ?? env.JWT_ACCESS_EXPIRES_SECONDS;
     this.refreshExpiresSeconds = options.refreshExpiresSeconds ?? env.JWT_REFRESH_EXPIRES_SECONDS;
@@ -207,6 +210,7 @@ export class AuthService {
     if (!updated) {
       throw new NotFoundError('User account not found.');
     }
+    if (input.timezone !== undefined) await this.onTimezoneChanged?.(userId);
     return UserMapper.entityToDto(updated);
   }
 

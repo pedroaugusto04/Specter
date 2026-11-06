@@ -127,6 +127,40 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     expect(result.scheduledMissingJobIds).toEqual(['active-2']);
     expect(addedJobs).toHaveLength(1);
   });
+  it('replaces schedules when their timezone changes', async () => {
+    const removed: string[] = [];
+    const added: unknown[] = [];
+    const queue = {
+      async getRepeatableJobs() {
+        return [
+          {
+            key: 'old',
+            id: 'job-cron-1',
+            name: 'scrape-job',
+            endDate: null,
+            tz: 'UTC',
+            pattern: '0 9 * * *',
+            next: Date.now(),
+          },
+        ];
+      },
+      async removeRepeatableByKey(key: string) {
+        removed.push(key);
+        return true;
+      },
+      async add(_name: string, _data: unknown, options: unknown) {
+        added.push(options);
+        return {} as never;
+      },
+    };
+    await reconcileRepeatableJobs(queue, [
+      { id: '1', cronExpression: '0 9 * * *', timezone: 'America/Sao_Paulo' },
+    ]);
+    expect(removed).toEqual(['old']);
+    expect(added).toEqual([
+      expect.objectContaining({ repeat: { pattern: '0 9 * * *', tz: 'America/Sao_Paulo' } }),
+    ]);
+  });
   it('prunes only unchanged snapshots (hasChanges = NO) older than the retention window', async () => {
     const repository = new InMemoryJobRepository();
     const retentionService = new RetentionService(repository, 14);

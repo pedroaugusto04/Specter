@@ -147,7 +147,7 @@ export function ProfileModal({
           <FormField
             label="Preferred Timezone"
             htmlFor="profile-timezone"
-            hint="All dates, check timestamps, and change histories will render in this timezone."
+            hint="Scheduled times, dates, check timestamps, and change histories use this timezone. Changing it updates your schedules."
           >
             <select
               id="profile-timezone"

@@ -39,7 +39,10 @@ export class BullMqJobScheduler implements IJobScheduler {
   public readonly scrapeQueue: Queue;
   public readonly maintenanceQueue: Queue;
 
-  constructor(connection: ConnectionOptions = getRedisConnectionOptions()) {
+  constructor(
+    connection: ConnectionOptions = getRedisConnectionOptions(),
+    private readonly resolveTimezone?: (jobId: string) => Promise<string>
+  ) {
     this.compilationQueue = new Queue(COMPILATION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
@@ -99,6 +102,7 @@ export class BullMqJobScheduler implements IJobScheduler {
 
   async scheduleRepeatableJob(jobId: string, cronExpression: string): Promise<string | null> {
     const repeatableJobId = buildRepeatableJobId(jobId);
+    const timezone = await this.resolveTimezone?.(jobId);
 
     const job = await this.scrapeQueue.add(
       'scrape-job',
@@ -107,6 +111,7 @@ export class BullMqJobScheduler implements IJobScheduler {
         jobId: repeatableJobId,
         repeat: {
           pattern: cronExpression,
+          ...(timezone ? { tz: timezone } : {}),
         },
       }
     );

@@ -5,6 +5,7 @@ import { buildRepeatableJobId } from './queues.js';
 export interface ReconcilableJob {
   id: string;
   cronExpression: string;
+  timezone?: string;
 }
 
 export interface ReconciliationResult {
@@ -35,7 +36,11 @@ export async function reconcileRepeatableJobs(
     const repId = repeatable.id ?? '';
     const matchingDbJob = expectedMap.get(repId);
 
-    if (!matchingDbJob || repeatable.pattern !== matchingDbJob.cronExpression) {
+    if (
+      !matchingDbJob ||
+      repeatable.pattern !== matchingDbJob.cronExpression ||
+      (repeatable.tz ?? undefined) !== matchingDbJob.timezone
+    ) {
       await queue.removeRepeatableByKey(repeatable.key);
       removedOrphanKeys.push(repeatable.key);
     } else {
@@ -54,6 +59,7 @@ export async function reconcileRepeatableJobs(
           jobId: repId,
           repeat: {
             pattern: dbJob.cronExpression,
+            ...(dbJob.timezone ? { tz: dbJob.timezone } : {}),
           },
         }
       );

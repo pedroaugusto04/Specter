@@ -26,6 +26,7 @@ export function JobScheduleFields({
     <>
       <FormField
         label={label}
+        hint="Scheduled times use the timezone in your profile."
         htmlFor={presetId}
         required
         error={!value.useCustomCron ? error : undefined}
