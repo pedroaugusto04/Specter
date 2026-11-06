@@ -16,7 +16,7 @@ import type {
   Condition,
   DocumentAdapter,
   DocumentSession,
-  ExtractionPlan,
+  DocumentRequest,
   ExecutionContext,
   ExecutionPolicy,
   Locator,
@@ -34,7 +34,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
   ) {}
   async open(
     url: string,
-    plan: ExtractionPlan,
+    request: DocumentRequest,
     execution: ExecutionContext,
     options: { storageState?: unknown }
   ): Promise<DocumentSession> {
@@ -198,17 +198,19 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       });
       httpStatus = response?.status() ?? 200;
       const documentRoot = () =>
-        plan.strategy.document?.frame ? page.frameLocator(plan.strategy.document.frame) : page;
+        request.strategy?.document?.frame
+          ? page.frameLocator(request.strategy?.document.frame)
+          : page;
       const rootLocator = (selector: string) => {
         const root = documentRoot();
-        return plan.strategy.document?.shadow
-          ? root.locator(plan.strategy.document.shadow).locator(selector)
+        return request.strategy?.document?.shadow
+          ? root.locator(request.strategy?.document.shadow).locator(selector)
           : root.locator(selector);
       };
       const locate = (locator: Locator): BrowserLocator => {
         if (locator.kind === 'css') return rootLocator(locator.selector);
-        const root = plan.strategy.document?.shadow
-          ? documentRoot().locator(plan.strategy.document.shadow)
+        const root = request.strategy?.document?.shadow
+          ? documentRoot().locator(request.strategy?.document.shadow)
           : documentRoot();
         return root.getByRole(locator.role as Parameters<Page['getByRole']>[0], {
           name: locator.name,
@@ -218,8 +220,8 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       const snapshot = async () => {
         execution.check();
         // Browser projection includes open shadow trees, which page.content() cannot serialize.
-        const documentElement = plan.strategy.document?.shadow
-          ? documentRoot().locator(plan.strategy.document.shadow)
+        const documentElement = request.strategy?.document?.shadow
+          ? documentRoot().locator(request.strategy?.document.shadow)
           : documentRoot().locator('html');
         const html = await documentElement.first().evaluate((element) => {
           const cloneTree = (node: typeof element): typeof element => {

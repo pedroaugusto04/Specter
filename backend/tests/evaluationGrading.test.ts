@@ -40,10 +40,10 @@ describe('Evaluation graders detect regressions', () => {
   it('fails on a missed alert and on exceeding a model call budget', async () => {
     const item = await fixture();
     item.expectChange = true;
-    item.maxModelCalls = { plan: 0 };
+    item.maxModelCalls = { configure: 0 };
     const report = await evaluate(item);
     expect(report.missedAlerts).toBe(1);
-    expect(report.results[0]!.checks['budget:plan']).toBe(false);
+    expect(report.results[0]!.checks['budget:configure']).toBe(false);
     expect(report.results[0]!.checks.alerts).toBe(false);
   });
 
@@ -60,22 +60,25 @@ describe('Evaluation graders detect regressions', () => {
     expect(report.results[0]!.passed).toBe(false);
   });
 
-  it('isolates plan generation from an incorrect interpreter result', async () => {
+  it('grades the reviewer independently of an incorrect configurator', async () => {
     const item = await fixture();
     item.isolated = true;
     const report = await evaluateIsolatedStages([item], (entry) => {
       const recorded = createFixtureModelProvider(entry.responses);
       return {
-        name: 'wrong-interpreter',
+        name: 'wrong-configurator',
         generate: async (input) => {
-          if (input.task === 'intent') return { ...entry.expectedIntent, entity: 'Wrong entity' };
-          return recorded.generate(input);
+          const output = await recorded.generate(input);
+          if (input.task === 'configure') {
+            const decision = output as { plan: { intent: { entity: string } } };
+            decision.plan.intent.entity = 'Wrong entity';
+          }
+          return output;
         },
       };
     });
-    expect(report.results.find((result) => result.stage === 'intent')!.passed).toBe(false);
-    expect(report.results.find((result) => result.stage === 'plan')!.passed).toBe(true);
-    expect(report.passed).toBe(false);
+    expect(report.results.find((result) => result.stage === 'configure')!.passed).toBe(false);
+    expect(report.results.find((result) => result.stage === 'semantic')!.passed).toBe(true);
   });
 
   it('requires nonempty corpora and unique case names', async () => {

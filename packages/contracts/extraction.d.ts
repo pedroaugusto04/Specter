@@ -119,7 +119,6 @@ export interface ExecutionStrategy {
 }
 
 export interface ExtractionPlan {
-  version: 3;
   intent: ExtractionIntent;
   strategy: ExecutionStrategy;
 }

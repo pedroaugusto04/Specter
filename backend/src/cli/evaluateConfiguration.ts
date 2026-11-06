@@ -26,7 +26,7 @@ const corpus = JSON.parse(
   await readFile(resolve('tests/fixtures/configuration-evaluation-corpus.json'), 'utf8')
 ) as { version: number; cases: ConfigurationEvaluationCase[] };
 
-if (corpus.version !== 1) throw new Error('Unsupported configuration evaluation corpus.');
+if (corpus.version !== 2) throw new Error('Unsupported configuration evaluation corpus.');
 for (const item of corpus.cases) validateConfigurationEvaluationCase(item);
 
 const liveModelsEnabled = env.EVALS_LIVE_MODELS_ENABLED;

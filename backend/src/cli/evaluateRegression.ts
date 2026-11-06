@@ -38,7 +38,7 @@ const configurationCorpus = JSON.parse(configurationJson) as {
   cases: ConfigurationEvaluationCase[];
 };
 const extractionCorpus = JSON.parse(extractionJson) as { version: number; cases: EvaluationCase[] };
-if (configurationCorpus.version !== 1 || extractionCorpus.version !== 1)
+if (configurationCorpus.version !== 2 || extractionCorpus.version !== 1)
   throw new Error('Unsupported evaluation corpus version.');
 configurationCorpus.cases.forEach(configuration.validateConfigurationEvaluationCase);
 extractionCorpus.cases.forEach((item) => extractionPlanSchema.parse(item.plan));

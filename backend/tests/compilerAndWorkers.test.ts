@@ -36,7 +36,7 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
       spawnFn: spawn,
     });
     const schema = await provider.generate({
-      task: 'plan',
+      task: 'configure',
       timeoutMs: 10000,
       jobId,
       evidence: '<html><body><h1>Hello</h1></body></html>',
@@ -77,7 +77,7 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     });
     await expect(
       provider.generate({
-        task: 'plan',
+        task: 'configure',
         timeoutMs: 10000,
         jobId,
         evidence: '<html><body><h1>Hanging</h1></body></html>',

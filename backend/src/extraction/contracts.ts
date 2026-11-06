@@ -3,7 +3,6 @@ import type {
   ExecutionStrategy,
   Condition,
   DocumentSnapshot,
-  ExtractionPlan,
   DiscoveryAction,
 } from '@specter/contracts/extraction';
 export interface ExecutionPolicy {
@@ -40,10 +39,15 @@ export interface DocumentSession {
   close(): Promise<void>;
 }
 
+/** Acquisition can inspect a document before an extraction strategy exists. */
+export interface DocumentRequest {
+  strategy?: ExecutionStrategy;
+}
+
 export interface DocumentAdapter {
   open(
     url: string,
-    plan: ExtractionPlan,
+    request: DocumentRequest,
     context: ExecutionContext,
     options: { storageState?: unknown; captureScreenshot?: boolean }
   ): Promise<DocumentSession>;

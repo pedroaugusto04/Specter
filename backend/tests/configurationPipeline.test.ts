@@ -1,161 +1,232 @@
-import { createModelStages } from '../src/extraction/modelStages.js';
 import { describe, it, expect, vi } from 'vitest';
 import { ConfigurationPipeline } from '../src/extraction/configuration.js';
-import type { IModelProvider } from '../src/extraction/model.js';
-import type { DocumentAdapter } from '../src/extraction/contracts.js';
-import type { ExecutionResult } from '../src/extraction/executor.js';
+
+import { createConfigurationModel } from '../src/extraction/configurationModel.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
+import type { ConfigurationDecision, IModelProvider } from '../src/extraction/model.js';
+import type { DocumentAdapter } from '../src/extraction/contracts.js';
+import type { IExtractionExecutor, ExecutionResult } from '../src/extraction/executor.js';
 import { CompilerApiRequestError } from '../src/errors/domainErrors.js';
+const plan = fixturePlan();
 const snapshot = {
-  html: '<h1>Main product</h1><b>100</b>',
+  html: '<h1>Product</h1>',
   url: 'https://example.com',
   httpStatus: 200,
   responses: [],
 };
-const plan = fixturePlan();
-function setup(review: unknown, enabled = true) {
+const request = { jobId: 'fixture', url: snapshot.url, prompt: 'Track title' };
+function setup(
+  options: {
+    decisions?: unknown[];
+    review?: unknown;
+    enabled?: boolean;
+    maxDecisions?: number;
+    maxAttempts?: number;
+    budgetMs?: number;
+    decisionDelayMs?: number;
+  } = {}
+) {
   const calls: string[] = [];
+  const inputs: string[] = [];
+  const decisions = [...(options.decisions ?? [{ kind: 'candidate', plan }])];
   const model: IModelProvider = {
     name: 'fixture',
     generate: async (input) => {
+      if (input.task === 'configure' && options.decisionDelayMs)
+        await new Promise((resolve) => setTimeout(resolve, options.decisionDelayMs));
       calls.push(input.task);
-      if (input.task === 'intent') return plan.intent;
-      if (input.task === 'discovery') return { action: null };
-      if (input.task === 'plan') return plan.strategy;
-      if (review instanceof Error) throw review;
-      return review;
+      inputs.push(input.evidence);
+      const output =
+        input.task === 'configure'
+          ? decisions.shift()
+          : (options.review ?? { score: 8, reasons: ['Matched'], evidenceRefs: ['title'] });
+      if (output instanceof Error) throw output;
+      return output;
     },
   };
+  const close = vi.fn(async () => {});
   const discover = vi.fn(async () => snapshot);
-  const adapter: DocumentAdapter = {
-    open: async () => ({
-      snapshot: async () => snapshot,
-      check: async () => undefined,
-      advance: async () => {},
-      discover,
-      screenshot: async () => undefined,
-      close: async () => {},
-    }),
-  };
+  const open = vi.fn(async () => ({
+    snapshot: async () => snapshot,
+    check: async () => undefined,
+    advance: async () => {},
+    discover,
+    screenshot: async () => undefined,
+    close,
+    capabilities: { interactions: true, networkResponses: true, scopedDocuments: true },
+  }));
+  const adapter: DocumentAdapter = { open };
   const execution: ExecutionResult = {
-    data: { title: 'Main product' },
+    data: { title: 'Product' },
     report: {
       quality: 'COMPLETE',
       scope: 'page',
       pagesVisited: 1,
       issues: [],
-      sourcesUsed: { 'title#0': 1 },
+      sourcesUsed: {},
       evidence: [],
     },
-    snapshot,
+    snapshot: { ...snapshot, html: '<h1>Validated product</h1>' },
     durationMs: 0,
   };
-  const execute = vi.fn(async () => structuredClone(execution));
+  const execute = vi.fn<IExtractionExecutor['execute']>(async () => structuredClone(execution));
   const pipeline = new ConfigurationPipeline(
-    createModelStages(model),
+    createConfigurationModel(model),
     adapter,
     { execute },
     {
-      budgetMs: 5000,
-      maxAttempts: 1,
-      maxDiscoveryActions: 2,
-      evidenceLimit: 10000,
-      semanticEnabled: enabled,
+      budgetMs: options.budgetMs ?? 5000,
+      maxAttempts: options.maxAttempts ?? 3,
+      maxDecisions: options.maxDecisions ?? 6,
+      reviewReserveMs: Math.min(500, (options.budgetMs ?? 5000) / 4),
+      evidenceLimit: 20000,
+      semanticEnabled: options.enabled ?? true,
       semanticThreshold: 4,
     }
   );
-  return { pipeline, calls, execute, discover };
+  return { pipeline, calls, inputs, execute, close, open, discover };
 }
-const request = { jobId: 'fixture', url: snapshot.url, prompt: 'Find the title' };
-describe('Semantic policy and pipeline stages', () => {
-  it('propagates a rate limit during plan generation without trying another model call', async () => {
-    const error = new CompilerApiRequestError(429, undefined, undefined, 180000);
-    const calls: string[] = [];
-    const model: IModelProvider = {
-      name: 'fixture',
-      generate: async (input) => {
-        calls.push(input.task);
-        if (input.task === 'intent') return plan.intent;
-        if (input.task === 'discovery') return { action: null };
-        throw error;
+describe('Bounded configuration with tools', () => {
+  it('configures directly with one decision and one review using validation evidence', async () => {
+    const fixture = setup();
+    await expect(fixture.pipeline.configure(request)).resolves.toMatchObject({
+      semanticReview: { status: 'PASSED' },
+    });
+    expect(fixture.calls).toEqual(['configure', 'semantic']);
+    expect(fixture.inputs[1]).toContain('Validated product');
+    expect(fixture.close).toHaveBeenCalledOnce();
+  });
+  it('treats the total configuration deadline as final rather than a queue retry', async () => {
+    const fixture = setup({ budgetMs: 60, decisionDelayMs: 90 });
+    await expect(fixture.pipeline.configure(request)).rejects.toMatchObject({
+      code: 'CONFIGURATION_REJECTED',
+      isRetryable: false,
+      message: 'Configuration deadline exhausted.',
+    });
+    expect(fixture.execute).not.toHaveBeenCalled();
+    expect(fixture.close).toHaveBeenCalledOnce();
+  });
+
+  it('skips the reviewer only when explicitly disabled', async () => {
+    const fixture = setup({ enabled: false });
+    expect((await fixture.pipeline.configure(request)).semanticReview.status).toBe('SKIPPED');
+    expect(fixture.calls).toEqual(['configure']);
+  });
+  for (const review of [
+    new Error('Unavailable'),
+    { score: 'bad' },
+    { score: 2, reasons: ['Wrong entity'], evidenceRefs: ['title'] },
+  ])
+    it('does not activate on rejected or unavailable semantic review', async () => {
+      const fixture = setup({ review });
+      await expect(fixture.pipeline.configure(request)).rejects.toThrow(/Semantic review/);
+      expect(fixture.calls.filter((call) => call === 'semantic')).toHaveLength(1);
+    });
+  it('does not recompile on a provider rate limit', async () => {
+    const error = new CompilerApiRequestError(429);
+    const fixture = setup({ decisions: [error] });
+    await expect(fixture.pipeline.configure(request)).rejects.toBe(error);
+    expect(fixture.close).toHaveBeenCalledOnce();
+    expect(fixture.calls).toHaveLength(1);
+  });
+  it('rejects a modified recovery contract', async () => {
+    const fixture = setup({
+      decisions: [
+        {
+          kind: 'candidate',
+          plan: { ...plan, intent: { ...plan.intent, entity: 'Another product' } },
+        },
+      ],
+    });
+    await expect(fixture.pipeline.configure({ ...request, intent: plan.intent })).rejects.toThrow(
+      'cannot change'
+    );
+    expect(fixture.execute).not.toHaveBeenCalled();
+  });
+  it('returns invalid-output feedback and limits decisions', async () => {
+    const fixture = setup({ decisions: [{ nonsense: true }, { nonsense: true }], maxDecisions: 2 });
+    await expect(fixture.pipeline.configure(request)).rejects.toThrow();
+    expect(fixture.calls).toHaveLength(2);
+    expect(fixture.execute).not.toHaveBeenCalled();
+  });
+  it('counts invalid candidates against the candidate budget', async () => {
+    const fixture = setup({ decisions: [{ kind: 'candidate', plan: {} }], maxAttempts: 1 });
+    await expect(fixture.pipeline.configure(request)).rejects.toThrow();
+    expect(fixture.calls).toHaveLength(1);
+  });
+  it('stops repeating a rejected candidate without executing it again', async () => {
+    const candidate = { kind: 'candidate', plan };
+    const fixture = setup({ decisions: [candidate, candidate] });
+    fixture.execute.mockResolvedValue({
+      data: {},
+      report: {
+        quality: 'INVALID',
+        scope: 'page',
+        pagesVisited: 1,
+        issues: ['Missing required title'],
+        sourcesUsed: {},
       },
+      snapshot,
+      durationMs: 0,
+    });
+    await expect(fixture.pipeline.configure(request)).rejects.toThrow('Repeated rejected');
+    expect(fixture.execute).toHaveBeenCalledOnce();
+    expect(fixture.inputs[1]).toContain('Missing required title');
+  });
+  it('replays interactions when reopening investigation after validation failure', async () => {
+    const action = {
+      kind: 'click' as const,
+      locator: { kind: 'css' as const, selector: '.details' },
     };
-    const close = vi.fn(async () => {});
-    const adapter: DocumentAdapter = {
-      open: async () => ({
-        snapshot: async () => snapshot,
-        check: async () => undefined,
-        advance: async () => {},
-        discover: async () => snapshot,
-        screenshot: async () => undefined,
-        close,
-      }),
+    const corrected = {
+      ...plan,
+      strategy: { ...plan.strategy, transport: 'browser', setup: [action] },
     };
-    const pipeline = new ConfigurationPipeline(
-      createModelStages(model),
-      adapter,
-      { execute: vi.fn() },
-      {
-        budgetMs: 5000,
-        maxAttempts: 3,
-        maxDiscoveryActions: 2,
-        evidenceLimit: 10000,
-        semanticEnabled: false,
-        semanticThreshold: 4,
-      }
-    );
-    await expect(pipeline.configure(request)).rejects.toBe(error);
-    expect(calls).toEqual(['intent', 'discovery', 'plan']);
-    expect(close).toHaveBeenCalledOnce();
+    const decisions: ConfigurationDecision[] = [
+      { kind: 'tool', tool: { kind: 'interact', action } },
+      { kind: 'candidate', plan },
+      { kind: 'candidate', plan: corrected },
+    ];
+    const fixture = setup({ decisions });
+    fixture.execute.mockResolvedValueOnce({
+      data: {},
+      report: {
+        quality: 'INVALID',
+        scope: 'page',
+        pagesVisited: 1,
+        issues: ['Preparation required'],
+        sourcesUsed: {},
+      },
+      snapshot,
+      durationMs: 0,
+    });
+    await fixture.pipeline.configure(request);
+    expect(fixture.open).toHaveBeenCalledTimes(2);
+    expect(fixture.discover).toHaveBeenCalledTimes(2);
+    expect(fixture.execute.mock.calls[1]![1]).toMatchObject({ strategy: { setup: [action] } });
   });
-  it('uses the global disabled policy without invoking the reviewer', async () => {
-    const fixture = setup({ score: 0, reasons: ['Wrong entity'], evidenceRefs: ['title'] }, false);
-    const result = await fixture.pipeline.configure(request);
-    expect(result.semanticReview.status).toBe('SKIPPED');
-    expect(fixture.calls).not.toContain('semantic');
-    expect(result.execution.report.trace?.find((step) => step.stage === 'semantic')?.status).toBe(
-      'SKIPPED'
-    );
+  it('stops a repeated tool without progress', async () => {
+    const tool = { kind: 'tool', tool: { kind: 'query', selector: 'h1', attribute: 'text' } };
+    const fixture = setup({ decisions: [tool, tool, tool, tool] });
+    await expect(fixture.pipeline.configure(request)).rejects.toThrow('without progress');
+    expect(fixture.calls).toHaveLength(3);
+    expect(fixture.close).toHaveBeenCalledOnce();
   });
-  it('blocks score three, accepts four, records uncertainties', async () => {
-    await expect(
-      setup({ score: 3, reasons: ['Wrong product'], evidenceRefs: ['title'] }).pipeline.configure(
-        request
-      )
-    ).rejects.toThrow('rejected');
-    const result = await setup({
-      score: 4,
-      reasons: ['Uncertain context'],
-      evidenceRefs: ['title'],
-    }).pipeline.configure(request);
-    expect(result.semanticReview).toMatchObject({ status: 'WARNING', score: 4 });
-  });
-  it('records reviewer outage without blocking validated data', async () => {
-    const result = await setup(new Error('Unavailable')).pipeline.configure(request);
-    expect(result.semanticReview.status).toBe('ERROR');
-  });
-  it('uses the global threshold and frozen recovery intent', async () => {
-    const fixture = setup({ score: 6, reasons: ['Partly ambiguous'], evidenceRefs: ['title'] });
-    await expect(
-      fixture.pipeline.configure({ ...request, intent: plan.intent })
-    ).resolves.toMatchObject({ semanticReview: { status: 'WARNING', score: 6 } });
-    expect(fixture.calls).not.toContain('intent');
-  });
-  it('does not semantically review incomplete data', async () => {
-    const fixture = setup({ score: 10, reasons: ['Good'], evidenceRefs: ['title'] });
+  it('rejects partial extraction before review', async () => {
+    const fixture = setup({ maxAttempts: 1 });
     fixture.execute.mockResolvedValue({
       data: {},
       report: {
         quality: 'PARTIAL',
         scope: 'page',
         pagesVisited: 1,
-        issues: ['Missing coverage'],
+        issues: ['Incomplete collection'],
         sourcesUsed: {},
       },
       snapshot,
-      durationMs: 42,
+      durationMs: 0,
     });
-    await expect(fixture.pipeline.configure(request)).rejects.toThrow('Missing coverage');
-    expect(fixture.calls).not.toContain('semantic');
+    await expect(fixture.pipeline.configure(request)).rejects.toThrow('Incomplete collection');
+    expect(fixture.calls).toEqual(['configure']);
   });
 });

@@ -52,7 +52,6 @@ export function fixturePlan(input: FixtureInput = {}): ExtractionPlan {
     title: { type: 'string', sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }] },
   };
   return {
-    version: 3,
     intent: {
       entity: 'Requested entity',
       mode: input.mode ?? 'single',

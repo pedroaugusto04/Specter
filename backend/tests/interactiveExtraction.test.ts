@@ -1,3 +1,6 @@
+import { ConfigurationPipeline } from '../src/extraction/configuration.js';
+
+import { createConfigurationModel } from '../src/extraction/configurationModel.js';
 import { BrowserCapacity } from '../src/resources/browserCapacity.js';
 import { InMemoryLeaseStore } from './helpers/resourceFixtures.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
@@ -168,4 +171,49 @@ describe('Browser adapter with common executor', () => {
       expect(result.data).toEqual({ title: expected });
     }
   }, 20000);
+});
+
+describe('Configurator with real browser and deterministic replay', () => {
+  it('investigates an expansion and validates setup in a fresh browser session', async () => {
+    const plan = fixturePlan({ containerSelector: 'main', readySelector: 'h1' });
+    const action = {
+      kind: 'click' as const,
+      locator: { kind: 'role' as const, role: 'button', name: 'Details' },
+    };
+    plan.strategy.transport = 'browser';
+    plan.strategy.setup = [action];
+    let calls = 0;
+    const model = createConfigurationModel({
+      name: 'recorded-browser',
+      generate: async (input) => {
+        if (input.task === 'semantic') {
+          expect(input.evidence).toContain('Expanded title');
+          return { score: 9, reasons: ['Requested expanded title'], evidenceRefs: ['title'] };
+        }
+        return calls++ === 0
+          ? { kind: 'tool', tool: { kind: 'interact', action } }
+          : { kind: 'candidate', plan };
+      },
+    });
+    const pipeline = new ConfigurationPipeline(model, adapter, executor(), {
+      budgetMs: 12000,
+      maxAttempts: 3,
+      maxDecisions: 6,
+      reviewReserveMs: 1000,
+      evidenceLimit: 30000,
+      semanticEnabled: true,
+      semanticThreshold: 4,
+    });
+    const result = await pipeline.configure({
+      jobId: 'browser-configuration',
+      url: base + '/expand',
+      prompt: 'Open details and track title',
+    });
+    expect(result.execution.data).toEqual({ title: 'Expanded title' });
+    expect(result.semanticReview.status).toBe('PASSED');
+    expect(calls).toBe(2);
+    const routine = await executor().execute(base + '/expand', result.plan);
+    expect(routine.data).toEqual(result.execution.data);
+    expect(calls).toBe(2);
+  });
 });

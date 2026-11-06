@@ -72,7 +72,10 @@ export const envSchema = z.object({
   EXTRACTION_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(250),
   EXTRACTION_MAX_EVIDENCE: z.coerce.number().int().positive().default(200),
   EXTRACTION_EVIDENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
-  DISCOVERY_MAX_ACTIONS: z.coerce.number().int().min(0).max(30).default(6),
+  CONFIGURATION_MAX_DECISIONS: z.coerce.number().int().min(1).max(30).default(6),
+  CONFIGURATION_REVIEW_RESERVE_MS: z.coerce.number().int().positive().default(30000),
+  COMPILER_MAX_OUTPUT_CHARS: z.coerce.number().int().min(1000).default(30000),
+  COMPILER_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(8192),
   NOTIFICATION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(240000).default(30000),
   NOTIFICATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   EXTRACTION_MAX_PAGES: z.coerce.number().int().positive().default(10),
@@ -85,7 +88,7 @@ export const envSchema = z.object({
   COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(300000),
   COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   COMPILATION_QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
-  COMPILATION_MAX_EVIDENCE_CHARS: z.coerce.number().int().positive().default(200000),
+  CONFIGURATION_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(30000),
   // Detailed prompts and model outputs may contain customer-provided text and page content.
   COMPILATION_DIAGNOSTICS_ENABLED: z
     .enum(['true', 'false'])
@@ -156,6 +159,13 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const parsed = result.data;
+  if (
+    parsed.SEMANTIC_REVIEW_ENABLED &&
+    parsed.CONFIGURATION_REVIEW_RESERVE_MS >= parsed.COMPILATION_BUDGET_MS
+  )
+    throw new Error(
+      'Invalid environment configuration: CONFIGURATION_REVIEW_RESERVE_MS must be smaller than COMPILATION_BUDGET_MS.'
+    );
 
   if (parsed.COMPILER_PROVIDER === 'api') {
     const missing: string[] = [];

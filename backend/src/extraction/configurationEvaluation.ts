@@ -1,12 +1,14 @@
-import { buildChangeAlert } from '../utils/changeAlertHelper.js';
-import { computeExtractionHash, sortObjectKeys } from '../utils/diffHasher.js';
-import { ConfigurationFailure, ConfigurationPipeline } from './configuration.js';
+import { ConfigurationDecisionKind } from './configurationConstants.js';
+import { evaluationWouldAlert } from './evaluationAlerts.js';
+import { canonicalJson } from '../utils/diffHasher.js';
+import { ConfigurationPipeline } from './configuration.js';
+import { ConfigurationFailure } from './configurationFailure.js';
 import { evaluateCondition } from './conditions.js';
 import { ExtractionExecutor } from './executor.js';
 import { PageExtractor } from './pageExtractor.js';
 import { standardSourceReaders } from './sources.js';
-import { createModelStages } from './modelStages.js';
-import { extractionIntentSchema } from '../types/extractionPlan.js';
+import { createConfigurationModel } from './configurationModel.js';
+import { extractionIntentSchema, extractionPlanSchema } from '../types/extractionPlan.js';
 import type {
   DocumentAdapter,
   DocumentSnapshot,
@@ -25,12 +27,7 @@ export interface ConfigurationEvaluationCase {
   name: string;
   prompt: string;
   snapshot: DocumentSnapshot;
-  responses: {
-    intent: unknown;
-    discovery: unknown | unknown[];
-    plan: unknown | unknown[];
-    semantic: unknown;
-  };
+  responses: { configure: unknown[]; semantic: unknown };
   expectedRecords: Record<string, Scalar>[];
   expectedQuality: 'COMPLETE' | 'EMPTY' | 'FAILED';
   category?: string;
@@ -155,7 +152,7 @@ function fixtureAdapter(
         },
         discover: async (action) => {
           const transition = interactions[offset];
-          if (!transition || serialize(transition.action) !== serialize(action))
+          if (!transition || canonicalJson(transition.action) !== canonicalJson(action))
             throw new Error('No fixture transition matches the requested action.');
           offset++;
           captured = structuredClone(transition.snapshot);
@@ -174,8 +171,8 @@ function recordsEqual(
   collection: boolean
 ) {
   const canonical = (records: Record<string, Scalar>[]) =>
-    collection ? records.map(serialize).sort() : records;
-  return serialize(canonical(actual)) === serialize(canonical(expected));
+    collection ? records.map(canonicalJson).sort() : records;
+  return canonicalJson(canonical(actual)) === canonicalJson(canonical(expected));
 }
 
 export function fixtureExecutor(
@@ -197,42 +194,19 @@ function asRecords(data: ExtractedPayload): Record<string, Scalar>[] {
   return Object.keys(data).length ? [data as Record<string, Scalar>] : [];
 }
 
-function serialize(value: unknown): string {
-  return JSON.stringify(sortObjectKeys(value));
-}
-
 function alertFor(
   item: ConfigurationEvaluationCase,
   plan: ExtractionPlan,
   currentRecords: Record<string, Scalar>[]
 ): boolean {
-  if (!item.previousRecords) return false;
-  const payload = (records: Record<string, Scalar>[]): ExtractedPayload =>
-    plan.intent.mode === ExtractionMode.Single
-      ? (records[0] ?? {})
-      : { items: records, count: records.length };
-  const current = payload(currentRecords);
-  const previous = payload(item.previousRecords);
-  return (
-    computeExtractionHash(previous) !== computeExtractionHash(current) &&
-    Boolean(
-      buildChangeAlert({
-        job: {
-          id: item.name,
-          userId: 'eval',
-          name: item.name,
-          url: item.snapshot.url,
-          userPrompt: item.prompt,
-          notificationEmail: '',
-          extractionPlan: plan,
-        },
-        currentData: current,
-        previousData: previous,
-        triggerRules: plan.intent.triggerRules,
-        triggerMatchMode: plan.intent.triggerMatchMode,
-      })
-    )
-  );
+  return evaluationWouldAlert({
+    name: item.name,
+    url: item.snapshot.url,
+    prompt: item.prompt,
+    plan,
+    currentRecords,
+    previousRecords: item.previousRecords,
+  });
 }
 
 export async function evaluateConfigurationCorpus(
@@ -272,13 +246,19 @@ export async function evaluateConfigurationCorpus(
     let semanticStatus: string | undefined;
     let errorName: string | undefined;
     try {
-      const stages = createModelStages(countedProvider);
-      const interpret = stages.interpreter.interpret.bind(stages.interpreter);
-      stages.interpreter.interpret = async (input) => {
-        const intent = await interpret(input);
-        if (item.expectedIntent)
-          check('intent', serialize(intent) === serialize(item.expectedIntent));
-        return intent;
+      const stages = createConfigurationModel(countedProvider);
+      const decide = stages.decide.bind(stages);
+      stages.decide = async (input, intent) => {
+        const decision = await decide(input, intent);
+        if (decision.kind === ConfigurationDecisionKind.Candidate && item.expectedIntent) {
+          const candidate = extractionPlanSchema.safeParse(decision.plan);
+          if (candidate.success)
+            check(
+              'intent',
+              canonicalJson(candidate.data.intent) === canonicalJson(item.expectedIntent)
+            );
+        }
+        return decision;
       };
       const pipeline = new ConfigurationPipeline(
         stages,
@@ -287,7 +267,8 @@ export async function evaluateConfigurationCorpus(
         {
           budgetMs: 30000,
           maxAttempts: 2,
-          maxDiscoveryActions: 2,
+          maxDecisions: 6,
+          reviewReserveMs: 1000,
           evidenceLimit: 5000,
           semanticEnabled: true,
           semanticThreshold: 4,
@@ -366,6 +347,7 @@ export async function evaluateConfigurationCorpus(
       errorName = error instanceof Error ? error.name : 'UnknownError';
       if (error instanceof ConfigurationFailure) semanticStatus = error.semanticReview?.status;
       const expectedFailure =
+        Boolean(item.expectedErrorCode && item.expectedErrorIncludes) &&
         item.expectedQuality === 'FAILED' &&
         error instanceof ConfigurationFailure &&
         (!item.expectedErrorCode || error.code === item.expectedErrorCode) &&

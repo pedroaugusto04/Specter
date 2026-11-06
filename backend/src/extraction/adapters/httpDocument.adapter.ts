@@ -6,7 +6,7 @@ import { Transport } from '../constants.js';
 import type {
   DocumentAdapter,
   DocumentSession,
-  ExtractionPlan,
+  DocumentRequest,
   ExecutionContext,
 } from '../contracts.js';
 import type { IScraperEngine } from '../../providers/scraping/scraper.interface.js';
@@ -19,7 +19,7 @@ export class HttpDocumentAdapter implements DocumentAdapter {
   ) {}
   async open(
     url: string,
-    plan: ExtractionPlan,
+    _request: DocumentRequest,
     context: ExecutionContext,
     options: { storageState?: unknown; captureScreenshot?: boolean }
   ): Promise<DocumentSession> {

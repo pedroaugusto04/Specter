@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "name": "main product title and price",
@@ -11,108 +11,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -160,9 +178,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "isolated": true
@@ -177,108 +193,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main coffee product",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main coffee product title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price in Brazilian reais",
-              "type": "number",
-              "required": true,
-              "locale": "pt-BR"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main coffee product",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main coffee product title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price in Brazilian reais",
+                    "type": "number",
+                    "required": true,
+                    "locale": "pt-BR"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main coffee product",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main coffee product title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price in Brazilian reais",
+                    "type": "number",
+                    "required": true,
+                    "locale": "pt-BR"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -319,9 +353,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "isolated": true
@@ -336,87 +368,12 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
-            }
-          },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
+        "configure": [
           {
-            "action": {
-              "kind": "click",
-              "locator": {
-                "kind": "role",
-                "role": "button",
-                "name": "Details"
-              }
-            }
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "browser",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": [],
-            "setup": [
-              {
+            "kind": "tool",
+            "tool": {
+              "kind": "interact",
+              "action": {
                 "kind": "click",
                 "locator": {
                   "kind": "role",
@@ -424,50 +381,147 @@
                   "name": "Details"
                 }
               }
-            ]
+            }
           },
           {
-            "transport": "browser",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "browser",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": [],
+                "setup": [
+                  {
+                    "kind": "click",
+                    "locator": {
+                      "kind": "role",
+                      "role": "button",
+                      "name": "Details"
+                    }
+                  }
+                ]
               }
-            ],
-            "empty": [],
-            "setup": [
-              {
-                "kind": "click",
-                "locator": {
-                  "kind": "role",
-                  "role": "button",
-                  "name": "Details"
-                }
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "browser",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": [],
+                "setup": [
+                  {
+                    "kind": "click",
+                    "locator": {
+                      "kind": "role",
+                      "role": "button",
+                      "name": "Details"
+                    }
+                  }
+                ]
               }
-            ]
+            }
           }
         ],
         "semantic": {
@@ -508,9 +562,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "interactions": [
@@ -543,108 +595,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -685,9 +755,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "routine": [
@@ -749,78 +817,96 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "unsupported"
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "unsupported"
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -861,9 +947,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       }
     },
@@ -877,111 +961,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".missing",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".missing",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1022,9 +1121,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       }
     },
@@ -1038,108 +1135,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "aside"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "aside"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
+                  "selector": "aside"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "aside"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1177,16 +1292,14 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "expectedErrorCode": "CONFIGURATION_REJECTED",
       "expectedErrorIncludes": "Semantic review rejected"
     },
     {
-      "name": "invalid semantic response records degradation",
+      "name": "invalid semantic response prevents activation",
       "prompt": "Track the main chair title and current price",
       "snapshot": {
         "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
@@ -1195,121 +1308,134 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
           "score": "bad"
         }
       },
-      "expectedRecords": [
-        {
-          "title": "Chair",
-          "price": 100
-        }
-      ],
-      "expectedQuality": "COMPLETE",
+      "expectedRecords": [],
+      "expectedQuality": "FAILED",
       "expectedSemanticStatus": "ERROR",
       "category": "semantic-degraded",
       "expectedIntent": {
@@ -1335,12 +1461,12 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
-      "isolated": true
+      "isolated": false,
+      "expectedErrorCode": "CONFIGURATION_REJECTED",
+      "expectedErrorIncludes": "Semantic reviewer unavailable"
     },
     {
       "name": "ambiguous prices cannot activate",
@@ -1352,108 +1478,126 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1488,10 +1632,8 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
-        "semantic": 0
+        "configure": 6,
+        "semantic": 1
       },
       "expectedErrorCode": "CONFIGURATION_REJECTED",
       "expectedErrorIncludes": "Ambiguous DOM field source"
@@ -1506,118 +1648,140 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
-            }
-          },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
+        "configure": [
           {
-            "action": {
-              "kind": "click",
-              "locator": {
-                "kind": "role",
-                "role": "button",
-                "name": "Details"
+            "kind": "tool",
+            "tool": {
+              "kind": "interact",
+              "action": {
+                "kind": "click",
+                "locator": {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Details"
+                }
               }
             }
           },
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "browser",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "browser",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
+            }
           },
           {
-            "transport": "browser",
-            "records": {
-              "kind": "dom",
-              "selector": "main"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "browser",
+                "records": {
                   "kind": "dom",
-                  "selector": "h1",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
                   "selector": "main"
-                }
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1652,10 +1816,8 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
-        "semantic": 0
+        "configure": 6,
+        "semantic": 1
       },
       "interactions": [
         {
@@ -1688,104 +1850,122 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Main chair",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
+        "configure": [
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "jsonld",
+                  "type": "Product"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["offers", "price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
             }
           },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "jsonld",
-              "type": "Product"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "jsonld",
-                  "path": ["name"]
-                }
-              ],
-              "price": [
-                {
-                  "kind": "jsonld",
-                  "path": ["offers", "price"]
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
+                  "type": "Product"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["offers", "price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
-          },
-          {
-            "transport": "http",
-            "records": {
-              "kind": "jsonld",
-              "type": "Product"
-            },
-            "fields": {
-              "title": [
-                {
-                  "kind": "jsonld",
-                  "path": ["name"]
-                }
-              ],
-              "price": [
-                {
-                  "kind": "jsonld",
-                  "path": ["offers", "price"]
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
-              }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1826,9 +2006,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "isolated": true
@@ -1853,76 +2031,67 @@
         ]
       },
       "responses": {
-        "intent": {
-          "entity": "Main product",
-          "mode": "single",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Title of main product",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current main product price excluding shipping",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
-            }
-          },
-          "identityFields": [],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
+        "configure": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "browser",
-            "records": {
-              "kind": "response",
-              "match": {
-                "urlPattern": "/api/product"
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main product",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Title of main product",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current main product price excluding shipping",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
               },
-              "path": []
-            },
-            "fields": {
-              "title": [
-                {
+              "strategy": {
+                "transport": "browser",
+                "records": {
                   "kind": "response",
-                  "path": ["name"]
-                }
-              ],
-              "price": [
-                {
-                  "kind": "response",
-                  "path": ["price"]
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
+                  "match": {
+                    "urlPattern": "/api/product"
+                  },
+                  "path": []
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "response",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "response",
+                      "path": ["price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -1970,9 +2139,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "isolated": true
@@ -1987,87 +2154,78 @@
         "responses": []
       },
       "responses": {
-        "intent": {
-          "entity": "Catalog products",
-          "mode": "collection",
-          "scope": "page",
-          "fields": {
-            "title": {
-              "description": "Main chair title",
-              "type": "string",
-              "required": true
-            },
-            "price": {
-              "description": "Current price",
-              "type": "number",
-              "required": true,
-              "locale": "en-US"
-            },
-            "id": {
-              "description": "Stable product ID",
-              "type": "string",
-              "required": true
-            }
-          },
-          "identityFields": ["id"],
-          "filters": [],
-          "triggerRules": [],
-          "triggerMatchMode": "all"
-        },
-        "discovery": [
+        "configure": [
           {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          },
-          {
-            "action": null
-          }
-        ],
-        "plan": [
-          {
-            "transport": "http",
-            "records": {
-              "kind": "dom",
-              "selector": "main article"
-            },
-            "fields": {
-              "title": [
-                {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Catalog products",
+                "mode": "collection",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  },
+                  "id": {
+                    "description": "Stable product ID",
+                    "type": "string",
+                    "required": true
+                  }
+                },
+                "identityFields": ["id"],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
                   "kind": "dom",
-                  "selector": "h2",
-                  "attribute": "text"
-                }
-              ],
-              "price": [
-                {
-                  "kind": "dom",
-                  "selector": ".current",
-                  "attribute": "text"
-                }
-              ],
-              "id": [
-                {
-                  "kind": "dom",
-                  "selector": ":scope",
-                  "attribute": "data-id"
-                }
-              ]
-            },
-            "ready": [
-              {
-                "kind": "exists",
-                "locator": {
-                  "kind": "css",
-                  "selector": "main"
-                }
+                  "selector": "main article"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h2",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ],
+                  "id": [
+                    {
+                      "kind": "dom",
+                      "selector": ":scope",
+                      "attribute": "data-id"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
               }
-            ],
-            "empty": []
+            }
           }
         ],
         "semantic": {
@@ -2132,9 +2290,7 @@
         "triggerMatchMode": "all"
       },
       "maxModelCalls": {
-        "intent": 1,
-        "discovery": 3,
-        "plan": 2,
+        "configure": 6,
         "semantic": 1
       },
       "isolated": true,
@@ -2191,6 +2347,513 @@
           "expectChange": true
         }
       ]
+    },
+    {
+      "name": "query selector before proposal",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "configure": [
+          {
+            "kind": "tool",
+            "tool": {
+              "kind": "query",
+              "selector": ".current",
+              "attribute": "text"
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "dom",
+                  "selector": "main"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "dom",
+                      "selector": "h1",
+                      "attribute": "text"
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "dom",
+                      "selector": ".current",
+                      "attribute": "text"
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
+            }
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false,
+      "category": "product-dom",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "configure": 6,
+        "semantic": 1
+      },
+      "isolated": true
+    },
+    {
+      "name": "inspect structured sources before proposal",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1></main><script type=\"application/ld+json\">{\"@type\":\"Product\",\"name\":\"Chair\",\"offers\":{\"price\":\"100\"}}</script>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "configure": [
+          {
+            "kind": "tool",
+            "tool": {
+              "kind": "structured"
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "jsonld",
+                  "type": "Product"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["offers", "price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main chair",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Main chair title",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current price",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "http",
+                "records": {
+                  "kind": "jsonld",
+                  "type": "Product"
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "jsonld",
+                      "path": ["offers", "price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
+            }
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "category": "jsonld",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "configure": 6,
+        "semantic": 1
+      },
+      "isolated": true
+    },
+    {
+      "name": "inspect observed response before proposal",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": [
+          {
+            "url": "https://example.com/api/product",
+            "method": "GET",
+            "status": 200,
+            "body": {
+              "name": "Chair",
+              "price": 100
+            }
+          }
+        ]
+      },
+      "responses": {
+        "configure": [
+          {
+            "kind": "tool",
+            "tool": {
+              "kind": "responses",
+              "urlPattern": "/api/product"
+            }
+          },
+          {
+            "kind": "candidate",
+            "plan": {
+              "intent": {
+                "entity": "Main product",
+                "mode": "single",
+                "scope": "page",
+                "fields": {
+                  "title": {
+                    "description": "Title of main product",
+                    "type": "string",
+                    "required": true
+                  },
+                  "price": {
+                    "description": "Current main product price excluding shipping",
+                    "type": "number",
+                    "required": true,
+                    "locale": "en-US"
+                  }
+                },
+                "identityFields": [],
+                "filters": [],
+                "triggerRules": [],
+                "triggerMatchMode": "all"
+              },
+              "strategy": {
+                "transport": "browser",
+                "records": {
+                  "kind": "response",
+                  "match": {
+                    "urlPattern": "/api/product"
+                  },
+                  "path": []
+                },
+                "fields": {
+                  "title": [
+                    {
+                      "kind": "response",
+                      "path": ["name"]
+                    }
+                  ],
+                  "price": [
+                    {
+                      "kind": "response",
+                      "path": ["price"]
+                    }
+                  ]
+                },
+                "ready": [
+                  {
+                    "kind": "exists",
+                    "locator": {
+                      "kind": "css",
+                      "selector": "main"
+                    }
+                  }
+                ],
+                "empty": []
+              }
+            }
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false,
+      "category": "network",
+      "expectedIntent": {
+        "entity": "Main product",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Title of main product",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current main product price excluding shipping",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "configure": 6,
+        "semantic": 1
+      },
+      "isolated": true
     }
   ],
   "origin": "Synthetic local fixtures; not captures or evidence of live-site coverage."

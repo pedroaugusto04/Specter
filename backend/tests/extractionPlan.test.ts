@@ -30,7 +30,7 @@ const extract = (html: string, input = plan) =>
     { html, url: 'https://example.com', httpStatus: 200, responses: [] },
     input
   );
-describe('Version 3 extraction contract and integrity', () => {
+describe('Extraction contract and integrity', () => {
   it('captures final records after live terminal checks', async () => {
     const input = structuredClone(plan);
     input.intent.scope = 'collection';

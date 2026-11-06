@@ -1,8 +1,4 @@
-import type {
-  DocumentAdapter,
-  ExecutionPolicy,
-  ExtractionPlan,
-} from '../../extraction/contracts.js';
+import type { DocumentAdapter, ExecutionPolicy } from '../../extraction/contracts.js';
 import { createExecutionContext, waitForPoll } from '../../extraction/context.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 import { snapshotToScrapeResult } from '../../extraction/scrapeResultMapper.js';
@@ -19,27 +15,7 @@ export class PlaywrightScraperEngine implements IScraperEngine {
       Math.min(options.timeoutMs ?? this.policy.timeoutMs, this.policy.timeoutMs),
       options.signal
     );
-    const plan: ExtractionPlan = {
-      version: 3,
-      intent: {
-        entity: 'Page acquisition',
-        mode: 'single',
-        scope: 'page',
-        fields: {},
-        filters: [],
-        identityFields: [],
-        triggerRules: [],
-        triggerMatchMode: 'all',
-      },
-      strategy: {
-        transport: 'browser',
-        records: { kind: 'dom', selector: 'body' },
-        fields: {},
-        ready: [],
-        empty: [],
-      },
-    };
-    const session = await this.adapter.open(targetUrl, plan, context, options);
+    const session = await this.adapter.open(targetUrl, {}, context, options);
     try {
       if (options.waitForSelector) {
         const condition = {

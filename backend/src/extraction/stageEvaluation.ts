@@ -1,25 +1,15 @@
-import type { DocumentSnapshot } from './contracts.js';
+import { semanticReviewStatus } from './configurationReview.js';
+import { ConfigurationDecisionKind, ConfigurationStage } from './configurationConstants.js';
 import type { ConfigurationEvaluationCase } from './configurationEvaluation.js';
 import { fixtureExecutor } from './configurationEvaluation.js';
 import type { IModelProvider, StageInput } from './model.js';
-import { createModelStages } from './modelStages.js';
+import { createConfigurationModel } from './configurationModel.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
-import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
-import { redactObject } from './evidence.js';
-import { sortObjectKeys } from '../utils/diffHasher.js';
+import { observation } from './configurationTools.js';
+import { canonicalJson } from '../utils/diffHasher.js';
 
-const equal = (a: unknown, b: unknown) =>
-  JSON.stringify(sortObjectKeys(a)) === JSON.stringify(sortObjectKeys(b));
-
-function evidence(snapshot: DocumentSnapshot) {
-  return (
-    buildCompilerEvidence(snapshot.html, 5000) +
-    '\nObserved responses: ' +
-    JSON.stringify(redactObject(snapshot.responses))
-  );
-}
-
-/** Gold inputs isolate errors: generator/reviewer do not consume interpreter output. */
+const equal = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
+/** Configurator and reviewer receive independent gold inputs, never the other stage's prediction. */
 export async function evaluateIsolatedStages(
   cases: ConfigurationEvaluationCase[],
   provider: (item: ConfigurationEvaluationCase) => IModelProvider
@@ -33,15 +23,14 @@ export async function evaluateIsolatedStages(
   }> = [];
   for (const item of cases.filter((entry) => entry.isolated)) {
     if (!item.expectedIntent) throw new Error('Isolated stages require a gold intent.');
-    const intent = item.expectedIntent;
     const input: StageInput = {
       jobId: 'isolated-' + item.name,
       url: item.snapshot.url,
       prompt: item.prompt,
-      evidence: evidence(item.snapshot),
+      evidence: observation(item.snapshot, 5000),
       timeoutMs: 10000,
     };
-    const evaluate = async (stage: string, action: () => Promise<boolean>) => {
+    const grade = async (stage: string, action: () => Promise<boolean>) => {
       const started = Date.now();
       try {
         results.push({
@@ -60,56 +49,46 @@ export async function evaluateIsolatedStages(
         });
       }
     };
-    // Each call receives a fresh provider, independent of preceding stage results.
-    await evaluate('intent', async () =>
-      equal(await createModelStages(provider(item)).interpreter.interpret(input), intent)
-    );
-    await evaluate('discovery', async () =>
-      equal(
-        await createModelStages(provider(item)).discovery.next(input, intent),
-        item.interactions?.[0]?.action ?? null
-      )
-    );
-    const observed = item.interactions?.at(-1)?.snapshot ?? item.snapshot;
-    const discoveredInput = {
-      ...input,
-      evidence: evidence(observed),
-    };
-    await evaluate('plan', async () => {
-      const strategy = await createModelStages(provider(item)).generator.generate(
-        discoveredInput,
-        intent,
-        ''
-      );
-      const plan = extractionPlanSchema.parse({ version: 3, intent, strategy });
+    await grade(ConfigurationStage.Configure, async () => {
+      const decision = await createConfigurationModel(provider(item)).decide(input);
+      const expected = item.responses.configure[0];
+      if (decision.kind === ConfigurationDecisionKind.Tool) return equal(decision, expected);
+      const plan = extractionPlanSchema.parse(decision.plan);
+      if (!equal(plan.intent, item.expectedIntent)) return false;
       const execution = await fixtureExecutor(item.snapshot, item.interactions).execute(
         item.snapshot.url,
         plan
       );
-      const records =
-        intent.mode === 'single'
-          ? [execution.data]
-          : 'items' in execution.data
-            ? execution.data.items
-            : [];
+      const records = plan.intent.mode === 'single' ? [execution.data] : execution.data.items;
       return (
         execution.report.quality === item.expectedQuality && equal(records, item.expectedRecords)
       );
     });
-    await evaluate('semantic', async () => {
-      let status: string;
-      try {
-        const review = await createModelStages(provider(item)).reviewer.review(
-          discoveredInput,
-          intent,
-          {
-            records: item.expectedRecords,
-          }
-        );
-        status = review.score < 4 ? 'REJECTED' : review.score < 7 ? 'WARNING' : 'PASSED';
-      } catch {
-        status = 'ERROR';
-      }
+    await grade(ConfigurationStage.Semantic, async () => {
+      const gold = item.responses.configure.find(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          'kind' in entry &&
+          entry.kind === ConfigurationDecisionKind.Candidate
+      ) as { plan: unknown } | undefined;
+      if (!gold) return false;
+      const plan = extractionPlanSchema.parse(gold.plan);
+      const execution = await fixtureExecutor(item.snapshot, item.interactions).execute(
+        item.snapshot.url,
+        plan
+      );
+      const reviewInput = { ...input, evidence: observation(execution.snapshot, 5000) };
+      const review = await createConfigurationModel(provider(item)).review(
+        reviewInput,
+        item.expectedIntent!,
+        {
+          data: execution.data,
+          provenance: execution.report.evidence,
+          coverage: execution.report.coverage,
+        }
+      );
+      const status = semanticReviewStatus(review.score, 4);
       return status === item.expectedSemanticStatus;
     });
   }

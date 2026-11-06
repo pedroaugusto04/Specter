@@ -1,4 +1,4 @@
-import { createModelStages } from '../src/extraction/modelStages.js';
+import { createConfigurationModel } from '../src/extraction/configurationModel.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
 import { describe, expect, it, vi } from 'vitest';
 import { GeminiApiCompilerProvider } from '../src/providers/compilers/geminiApiCompiler.provider.js';
@@ -10,7 +10,7 @@ import {
 
 const input = {
   jobId: 'gemini-test',
-  task: 'plan' as const,
+  task: 'configure' as const,
   instructions: 'Return a plan as JSON',
   evidence: '{"title":"Example"}',
   outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
@@ -52,29 +52,26 @@ describe('Gemini API compiler transport', () => {
     const plan = fixturePlan();
     const fetchFn = vi.fn<typeof fetch>(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      expect(body.generationConfig.responseJsonSchema.type).toBe('object');
-      expect(body.generationConfig.responseJsonSchema.properties).toHaveProperty('fields');
-      expect(body.generationConfig.responseJsonSchema.properties).not.toHaveProperty('pagination');
+      expect(body.generationConfig.responseJsonSchema.anyOf).toHaveLength(2);
+      expect(JSON.stringify(body.generationConfig.responseJsonSchema)).toContain('intent');
       const prompt = body.contents[0].parts[0].text;
       expect(prompt).not.toContain(JSON.stringify(body.generationConfig.responseJsonSchema));
       expect(prompt).not.toContain('matching this schema:');
       return Response.json({
-        candidates: [{ content: { parts: [{ text: JSON.stringify(plan.strategy) }] } }],
+        candidates: [
+          { content: { parts: [{ text: JSON.stringify({ kind: 'candidate', plan }) }] } },
+        ],
       });
     });
     await expect(
-      createModelStages(provider(fetchFn)).generator.generate(
-        {
-          jobId: 'contract',
-          url: 'https://example.com',
-          prompt: 'Title',
-          evidence: '<h1>Title</h1>',
-          timeoutMs: 1000,
-        },
-        plan.intent,
-        ''
-      )
-    ).resolves.toEqual(plan.strategy);
+      createConfigurationModel(provider(fetchFn)).decide({
+        jobId: 'contract',
+        url: 'https://example.com',
+        prompt: 'Title',
+        evidence: '<h1>Title</h1>',
+        timeoutMs: 1000,
+      })
+    ).resolves.toEqual({ kind: 'candidate', plan });
   });
 
   it('maps timeouts and transient HTTP failures to retryable domain errors', async () => {

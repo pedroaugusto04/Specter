@@ -1,7 +1,7 @@
 import type {
   DocumentAdapter,
   DocumentSession,
-  ExtractionPlan,
+  DocumentRequest,
   ExecutionContext,
 } from '../contracts.js';
 import type { DocumentCandidate } from '../../acquisition/coordinatedExecutor.js';
@@ -15,19 +15,19 @@ export class DiscoveryDocumentAdapter implements DocumentAdapter {
   ) {}
   async open(
     url: string,
-    plan: ExtractionPlan,
+    request: DocumentRequest,
     context: ExecutionContext,
     options: { storageState?: unknown }
   ): Promise<DocumentSession> {
     const candidates = [
       { name: 'browser', external: false, adapter: this.browser },
-      ...(requiresBrowser(plan.strategy) ? [] : this.passive),
+      ...(request.strategy && requiresBrowser(request.strategy) ? [] : this.passive),
     ];
     return acquire(
       candidates.map((candidate) => ({
         ...candidate,
         run: async () => {
-          const session = await candidate.adapter.open(url, plan, context, {
+          const session = await candidate.adapter.open(url, request, context, {
             ...options,
             storageState: candidate.external ? undefined : options.storageState,
           });

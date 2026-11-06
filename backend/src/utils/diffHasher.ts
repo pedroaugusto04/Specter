@@ -35,6 +35,11 @@ export function sanitizeVolatileString(input: string): string {
 /**
  * Recursively sorts object keys without altering string values.
  */
+/** Canonical JSON for structural comparison; preserves array order. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(sortObjectKeys(value));
+}
+
 export function sortObjectKeys(value: unknown): unknown {
   if (value === null || value === undefined || typeof value !== 'object') {
     return value;
@@ -222,8 +227,5 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
 
 /** Hash validated fields without silently deleting requested data. */
 export function computeExtractionHash(payload: unknown): string {
-  return crypto
-    .createHash('sha256')
-    .update(JSON.stringify(sortObjectKeys(payload)))
-    .digest('hex');
+  return crypto.createHash('sha256').update(canonicalJson(payload)).digest('hex');
 }

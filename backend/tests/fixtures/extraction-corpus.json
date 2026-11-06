@@ -10,7 +10,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -91,7 +90,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -167,7 +165,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -248,7 +245,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -322,7 +318,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -403,7 +398,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "collection",
@@ -480,7 +474,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "collection",
@@ -557,7 +550,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -626,7 +618,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -695,7 +686,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -777,7 +767,6 @@
         "responses": []
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",
@@ -859,7 +848,6 @@
         ]
       },
       "plan": {
-        "version": 3,
         "intent": {
           "entity": "Main product",
           "mode": "single",

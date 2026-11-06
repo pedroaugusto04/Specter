@@ -1,6 +1,6 @@
 # Specter — Scraper & Monitor Autônomo com IA
 
-Plataforma autônoma de extração e monitoramento web que combina **geração pontual de seletores via IA** (`ICompilerProvider`: AGY CLI / Codex) com **execução determinística contínua** (BullMQ + Playwright + Cheerio + Fastify + Drizzle ORM + Next.js), operando com **0 consumo de tokens de LLM** nas checagens rotineiras e **Auto-Cura (_Self-Healing_)** em caso de alterações de layout.
+Plataforma autônoma de extração e monitoramento web que combina **configuração adaptativa com ferramentas tipadas via IA** (`IModelProvider`: AGY CLI / Codex / API) com **execução determinística contínua** (BullMQ + Playwright + Cheerio + Fastify + Drizzle ORM + Next.js), operando com **0 consumo de tokens de LLM** nas checagens rotineiras e **Auto-Cura (_Self-Healing_)** em caso de alterações de layout.
 
 ---
 
@@ -130,11 +130,10 @@ cooldown, browser e persistência estão na suíte Vitest. Esse corpus não demo
 cobertura geral da web: a próxima ampliação deve incorporar capturas autorizadas,
 anonimizadas e com expectativas revisadas, registrando sua origem e autorização.
 
-A compilação restringe o schema do plano ao escopo: planos de página não oferecem
-paginação. Falhas de campos obrigatórios incluem a fonte e uma amostra redigida do
+O schema do plano valida o escopo: planos de página não aceitam paginação. Falhas de campos obrigatórios incluem a fonte e uma amostra redigida do
 valor observado no feedback; repetir uma estratégia rejeitada sem alterações encerra
-a compilação atual. A política de retries da API e da fila permanece independente.
-As regras comuns de segurança ficam nos adaptadores. A API recebe o schema apenas
+a compilação atual. O configurador possui orçamento único de decisões e candidatos; retries transitórios da API e da fila continuam limitados.
+As regras comuns de segurança ficam nos adaptadores. A revisão semântica habilitada deve concluir antes de ativar um plano. A API recebe o schema apenas
 no contrato de saída estruturada; os adaptadores CLI o acrescentam ao prompt.
 O Gemini usa seus parâmetros padrão de amostragem, sem temperatura fixa.
 
@@ -195,3 +194,5 @@ e o pacote de contratos. Mudanças nesse pacote disparam a validação dos dois
 consumidores no workflow. O endpoint SSE exige autenticação e não possui usuário
 padrão compartilhado. O histórico de migrações permanece necessário para reconstruir
 o schema; compatibilidades de leitura de dados antigos foram removidas do runtime.
+
+O fluxo atual de configuração, ferramentas, limites e evals está descrito em [docs/extraction-engine.md](docs/extraction-engine.md).

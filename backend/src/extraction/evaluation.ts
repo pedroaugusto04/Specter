@@ -1,9 +1,8 @@
-import { ExtractionMode, isAcceptedExtractionQuality } from './constants.js';
+import { isAcceptedExtractionQuality } from './constants.js';
 import type { DocumentSnapshot, ExtractionPlan, Scalar } from './contracts.js';
 import type { IPageExtractor } from './pageExtractor.js';
-import { buildChangeAlert } from '../utils/changeAlertHelper.js';
-import type { ExtractedPayload } from '../types/extractor.js';
-import { computeExtractionHash, sortObjectKeys } from '../utils/diffHasher.js';
+import { evaluationWouldAlert } from './evaluationAlerts.js';
+import { canonicalJson } from '../utils/diffHasher.js';
 
 export interface EvaluationCase {
   name: string;
@@ -24,11 +23,10 @@ export function evaluateCorpus(cases: EvaluationCase[], extractor: IPageExtracto
     falseAlerts = 0,
     falseComplete = 0,
     missedAlerts = 0;
-  const serialize = (value: unknown) => JSON.stringify(sortObjectKeys(value));
   const results = cases.map((item) => {
     const extracted = extractor.extract(item.snapshot, item.plan);
     const qualityCorrect = extracted.quality === item.expectedQuality;
-    const entityCorrect = serialize(extracted.records) === serialize(item.expectedRecords);
+    const entityCorrect = canonicalJson(extracted.records) === canonicalJson(item.expectedRecords);
     correctQuality += Number(qualityCorrect);
     exactEntities += Number(entityCorrect);
     item.expectedRecords.forEach((record, index) => {
@@ -37,33 +35,16 @@ export function evaluateCorpus(cases: EvaluationCase[], extractor: IPageExtracto
         correctFields += Number(extracted.records[index]?.[key] === value);
       }
     });
-    const payload = (records: Record<string, Scalar>[]): ExtractedPayload =>
-      item.plan.intent.mode === ExtractionMode.Single
-        ? (records[0] ?? {})
-        : { items: records, count: records.length };
-    const current = payload(extracted.records);
-    const previous = item.previousRecords ? payload(item.previousRecords) : undefined;
     const wouldAlert =
-      previous !== undefined &&
       isAcceptedExtractionQuality(extracted.quality) &&
-      computeExtractionHash(previous) !== computeExtractionHash(current) &&
-      Boolean(
-        buildChangeAlert({
-          job: {
-            id: item.name,
-            userId: 'corpus',
-            name: item.name,
-            url: item.snapshot.url,
-            userPrompt: item.plan.intent.entity,
-            notificationEmail: '',
-            extractionPlan: item.plan,
-          },
-          currentData: current,
-          previousData: previous,
-          triggerRules: item.plan.intent.triggerRules,
-          triggerMatchMode: item.plan.intent.triggerMatchMode,
-        })
-      );
+      evaluationWouldAlert({
+        name: item.name,
+        url: item.snapshot.url,
+        prompt: item.plan.intent.entity,
+        plan: item.plan,
+        currentRecords: extracted.records,
+        previousRecords: item.previousRecords,
+      });
     if (wouldAlert && item.expectChange === false) falseAlerts++;
     if (!wouldAlert && item.expectChange === true) missedAlerts++;
     if (

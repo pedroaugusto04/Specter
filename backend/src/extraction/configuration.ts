@@ -1,31 +1,31 @@
-import { discoverWithCapabilities } from './capabilities.js';
+import { canonicalJson } from '../utils/diffHasher.js';
 import { classifyAccessFailure } from '../acquisition/failure.js';
-import {
-  ExtractionMode,
-  ExtractionQuality,
-  SemanticReviewStatus,
-  SourceKind,
-  TraceStatus,
-  Transport,
-  isAcceptedExtractionQuality,
-} from './constants.js';
-import { CompilerApiRequestError, DomainError } from '../errors/domainErrors.js';
+import { ExtractionQuality, TraceStatus, isAcceptedExtractionQuality } from './constants.js';
+import { DomainError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
-  DocumentSnapshot,
   ExtractionIntent,
   ExtractionPlan,
   SemanticReview,
   StageTrace,
 } from './contracts.js';
-import type { ConfigurationStages, StageInput } from './model.js';
+import type { ConfigurationModel, StageInput } from './model.js';
 import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
-import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
-import { sortObjectKeys } from '../utils/diffHasher.js';
+import { observation } from './configurationTools.js';
 import { logger } from '../utils/logger.js';
+import { ConfigurationSession } from './configurationSession.js';
+import { ConfigurationProgress, sameIntent } from './configurationPolicy.js';
+import { ConfigurationFailure } from './configurationFailure.js';
+import { reviewConfiguration } from './configurationReview.js';
+import {
+  ConfigurationDecisionKind,
+  ConfigurationToolKind,
+  ConfigurationStage,
+  ConfigurationErrorCode,
+} from './configurationConstants.js';
 
 export interface ConfigurationRequest {
   jobId: string;
@@ -35,396 +35,208 @@ export interface ConfigurationRequest {
   storageState?: unknown;
   captureScreenshot?: boolean;
 }
-
 export interface ConfigurationResult {
   plan: ExtractionPlan;
   execution: ExecutionResult;
   semanticReview: SemanticReview;
   trace: StageTrace[];
 }
-
-export class ConfigurationFailure extends DomainError {
-  constructor(
-    message: string,
-    readonly trace: StageTrace[],
-    readonly semanticReview?: SemanticReview
-  ) {
-    super(message, { code: 'CONFIGURATION_REJECTED', statusCode: 422, isRetryable: false });
-  }
-}
-
 export interface IConfigurationPipeline {
   configure(request: ConfigurationRequest): Promise<ConfigurationResult>;
 }
-
 export interface ConfigurationOptions {
   budgetMs: number;
   maxAttempts: number;
-  maxDiscoveryActions: number;
+  maxDecisions: number;
   evidenceLimit: number;
+  reviewReserveMs: number;
   semanticEnabled: boolean;
   semanticThreshold: number;
 }
-/** Orchestrates independent stage ports; owns neither model nor browser implementations. */
+
 export class ConfigurationPipeline implements IConfigurationPipeline {
   constructor(
-    private readonly stages: ConfigurationStages,
+    private readonly model: ConfigurationModel,
     private readonly browser: DocumentAdapter,
     private readonly executor: IExtractionExecutor,
     private readonly options: ConfigurationOptions
   ) {}
+
   async configure(request: ConfigurationRequest): Promise<ConfigurationResult> {
     const context = createExecutionContext(this.options.budgetMs);
+    const reserve = this.options.semanticEnabled ? this.options.reviewReserveMs : 0;
+    if (reserve >= this.options.budgetMs)
+      throw new ConfigurationFailure(
+        'Review reserve must be smaller than the configuration budget.',
+        []
+      );
+    const work = createExecutionContext(
+      Math.max(1, this.options.budgetMs - reserve),
+      context.signal
+    );
     const trace: StageTrace[] = [];
+    const history: unknown[] = [];
+    let attempts = 0;
+    let feedback = 'Configuration budget exhausted.';
+    const progress = new ConfigurationProgress();
+    const rejected = new Set<string>();
+    const fail = (message: string, review?: SemanticReview): never => {
+      throw new ConfigurationFailure(message, trace, review);
+    };
     const run = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
-      context.check();
       const started = Date.now();
+      const stageContext = stage === ConfigurationStage.Semantic ? context : work;
       try {
+        stageContext.check();
         const result = await action();
-        const durationMs = Date.now() - started;
-        trace.push({ stage, durationMs, status: TraceStatus.Success });
-        logger.info('Configuration stage completed', {
+        stageContext.check();
+        trace.push({ stage, durationMs: Date.now() - started, status: TraceStatus.Success });
+        logger.info('Configuration operation completed', {
           jobId: request.jobId,
           stage,
-          durationMs,
+          durationMs: Date.now() - started,
           status: TraceStatus.Success,
         });
         return result;
       } catch (error) {
-        const durationMs = Date.now() - started;
-        trace.push({
-          stage,
-          durationMs,
-          status: TraceStatus.Failed,
-          code: 'STAGE_ERROR',
-        });
-        logger.warn('Configuration stage failed', {
+        trace.push({ stage, durationMs: Date.now() - started, status: TraceStatus.Failed });
+        logger.warn('Configuration operation failed', {
           jobId: request.jobId,
           stage,
-          durationMs,
-          status: TraceStatus.Failed,
+          durationMs: Date.now() - started,
           errorCode:
-            error && typeof error === 'object' && 'code' in error
-              ? String(error.code)
-              : error instanceof Error && error.name === 'ZodError'
-                ? 'MODEL_VALIDATION_ERROR'
-                : 'STAGE_ERROR',
-          errorMessage: error instanceof Error ? error.message : String(error),
-          validationIssues:
-            error && typeof error === 'object' && 'issues' in error && Array.isArray(error.issues)
-              ? error.issues.map((issue) => ({
-                  code: issue.code,
-                  path: issue.path,
-                  message: issue.message,
-                }))
-              : undefined,
+            error instanceof DomainError ? error.code : ConfigurationErrorCode.OperationFailed,
         });
         throw error;
       }
     };
-    const seed: ExtractionPlan = {
-      version: 3,
-      intent: request.intent ?? {
-        entity: request.prompt,
-        fields: {},
-        filters: [],
-        identityFields: [],
-        mode: ExtractionMode.Single,
-        scope: 'page',
-        triggerRules: [],
-        triggerMatchMode: 'all',
-      },
-      strategy: {
-        transport: Transport.Browser,
-        records: { kind: SourceKind.Dom, selector: 'body' },
-        fields: {},
-        ready: [{ kind: 'exists', locator: { kind: 'css', selector: 'body' } }],
-        empty: [],
-      },
-    };
-    let evidence = '';
-    let discoveryActions = 0;
-    let intent = request.intent;
-    const input = (): StageInput => ({
+    const session = new ConfigurationSession(this.browser, request, work, run);
+    const input = (evidence: string, review = false): StageInput => ({
       jobId: request.jobId,
       url: request.url,
       prompt: request.prompt,
       evidence,
-      timeoutMs: context.remaining(),
+      timeoutMs: review ? context.remaining() : work.remaining(),
+      signal: review ? context.signal : work.signal,
     });
-    const session = await run('acquisition', () =>
-      this.browser.open(request.url, seed, context, { storageState: request.storageState })
-    );
     try {
-      const snapshots = [await session.snapshot()];
-      evidence = this.evidence(snapshots);
-      intent ??= await run('intent', () => this.stages.interpreter.interpret(input()));
-      const frozenIntent = intent;
-      for (let step = 0; step < this.options.maxDiscoveryActions; step++) {
-        const action = await run('discovery', () =>
-          this.stages.discovery.next(input(), frozenIntent)
-        );
-        if (!action) break;
-        discoveryActions++;
-        snapshots.push(await run('interaction', () => discoverWithCapabilities(session, action)));
-        evidence = this.evidence(snapshots);
+      let snapshot = await session.snapshot();
+      for (let decisionIndex = 0; decisionIndex < this.options.maxDecisions; decisionIndex++) {
+        work.check();
+        // The model adapter packs the exact input budget and preserves authoritative inputs.
+        const available = this.options.evidenceLimit;
+        const evidence = JSON.stringify({
+          feedback: redactText(feedback),
+          history: redactObject([...history].reverse()),
+          observation: observation(snapshot, available),
+        });
+        try {
+          const decision = await run(ConfigurationStage.Configure, () =>
+            this.model.decide(input(evidence), request.intent)
+          );
+          if (decision.kind === ConfigurationDecisionKind.Tool) {
+            try {
+              const result = await run('tool:' + decision.tool.kind, () =>
+                session.execute(decision.tool)
+              );
+              const state =
+                decision.tool.kind === ConfigurationToolKind.Inspect ||
+                decision.tool.kind === ConfigurationToolKind.Interact
+                  ? [result.result, result.snapshot.html, result.snapshot.responses]
+                  : result.result;
+              if (!progress.observe(decision.tool, state))
+                fail('Repeated operation without progress.');
+              // Inspection is a scoped observation, not a replacement of the browser state.
+              snapshot = await session.snapshot();
+              history.push({
+                id: decisionIndex,
+                tool: decision.tool,
+                result: redactObject(result.result),
+                evidence: observation(result.snapshot, Math.floor(available * 0.2)),
+              });
+              feedback = '';
+            } catch (error) {
+              if (
+                error instanceof ConfigurationFailure ||
+                classifyAccessFailure(error) ||
+                work.signal.aborted
+              )
+                throw error;
+              if (!progress.observe(decision.tool, String(error)))
+                fail('Repeated operation without progress.');
+              history.push({
+                id: decisionIndex,
+                tool: decision.tool,
+                error: redactText(String(error)),
+              });
+              feedback = 'Tool failed: ' + redactText(String(error));
+            }
+            continue;
+          }
+          progress.reset();
+          attempts++;
+          const plan = extractionPlanSchema.parse(decision.plan);
+          if (request.intent && !sameIntent(request.intent, plan.intent))
+            fail('Recovery cannot change extraction intent.');
+          const key = canonicalJson(plan);
+          if (rejected.has(key))
+            fail('Repeated rejected extraction strategy. Previous failure: ' + feedback);
+          rejected.add(key);
+          // Release browser capacity before fresh validation; reopen/replay only if repair needs it.
+          await session.close();
+          const execution = await run(ConfigurationStage.Validation, () =>
+            this.executor.execute(request.url, plan, {
+              timeoutMs: work.remaining(),
+              signal: work.signal,
+              storageState: request.storageState,
+              captureScreenshot: request.captureScreenshot,
+            })
+          );
+          if (!isAcceptedExtractionQuality(execution.report.quality))
+            throw new Error(execution.report.issues.join(' '));
+          if (
+            !request.intent &&
+            execution.report.quality === ExtractionQuality.Empty &&
+            !execution.report.validatedSourceRecords
+          )
+            throw new Error('An initially empty collection cannot validate field sources.');
+          const semanticReview = await reviewConfiguration({
+            model: this.model,
+            enabled: this.options.semanticEnabled,
+            threshold: this.options.semanticThreshold,
+            intent: plan.intent,
+            execution,
+            stageInput: input('', true),
+            evidenceLimit: available,
+            trace,
+            run,
+          });
+          execution.report.semanticReview = semanticReview;
+          execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
+          return { plan, execution, semanticReview, trace };
+        } catch (error) {
+          if (
+            error instanceof ConfigurationFailure ||
+            classifyAccessFailure(error) ||
+            (error instanceof DomainError && error.isRetryable) ||
+            work.signal.aborted
+          )
+            throw error;
+          feedback = redactText(
+            error instanceof Error ? error.message : String(error),
+            this.options.evidenceLimit / 4
+          );
+          history.push({ id: decisionIndex, rejection: feedback });
+          if (attempts >= this.options.maxAttempts) fail(feedback);
+          snapshot = await session.snapshot();
+        }
       }
+      return fail(feedback || 'Configuration decision budget exhausted.');
+    } catch (error) {
+      if (work.signal.aborted || context.signal.aborted) fail('Configuration deadline exhausted.');
+      throw error;
     } finally {
       await session.close();
     }
-    const fixedIntent = intent;
-    let feedback = '';
-    const rejectedStrategies = new Set<string>();
-    let lastReview: SemanticReview | undefined;
-    for (let attempt = 0; attempt < this.options.maxAttempts; attempt++) {
-      context.check();
-      try {
-        const strategy = await run('plan', () =>
-          this.stages.generator.generate(input(), fixedIntent, feedback)
-        );
-        const strategyKey = JSON.stringify(sortObjectKeys(strategy));
-        if (rejectedStrategies.has(strategyKey))
-          throw new ConfigurationFailure(
-            'Repeated rejected extraction strategy. Previous failure: ' + feedback,
-            trace,
-            lastReview
-          );
-        const parsedPlan = extractionPlanSchema.safeParse({
-          version: 3,
-          intent: fixedIntent,
-          strategy,
-        });
-        if (!parsedPlan.success) {
-          logger.diagnostic('Extraction plan rejected by schema', {
-            jobId: request.jobId,
-            attempt: attempt + 1,
-            strategy,
-            validationIssues: parsedPlan.error.issues,
-          });
-          const expectedFields = Object.keys(fixedIntent.fields).sort();
-          const actualFields =
-            strategy &&
-            typeof strategy === 'object' &&
-            'fields' in strategy &&
-            strategy.fields &&
-            typeof strategy.fields === 'object'
-              ? Object.keys(strategy.fields).sort()
-              : [];
-          const missingFields = expectedFields.filter((field) => !actualFields.includes(field));
-          const unexpectedFields = actualFields.filter((field) => !expectedFields.includes(field));
-          logger.warn('Generated extraction strategy failed schema validation', {
-            jobId: request.jobId,
-            stage: 'plan-validation',
-            attempt: attempt + 1,
-            maxAttempts: this.options.maxAttempts,
-            issueMessages: parsedPlan.error.issues.map((issue) => issue.message),
-            expectedFields,
-            actualFields,
-            missingFields,
-            unexpectedFields,
-          });
-          const fieldFeedback =
-            missingFields.length || unexpectedFields.length
-              ? ` Field keys must exactly match the fixed intent. Expected keys: ${JSON.stringify(expectedFields)}. Actual keys: ${JSON.stringify(actualFields)}. Keep the expected keys unchanged; map them to matching page content regardless of page language.`
-              : '';
-          rejectedStrategies.add(strategyKey);
-          throw new Error(
-            parsedPlan.error.issues.map((issue) => issue.message).join(' ') + fieldFeedback
-          );
-        }
-        const plan = parsedPlan.data;
-        logger.diagnostic('Extraction plan accepted by schema', {
-          jobId: request.jobId,
-          attempt: attempt + 1,
-          plan,
-        });
-        const execution = await run('validation', () =>
-          this.executor.execute(request.url, plan, {
-            timeoutMs: context.remaining(),
-            signal: context.signal,
-            storageState: request.storageState,
-            captureScreenshot: request.captureScreenshot,
-          })
-        );
-        logger.diagnostic('Extraction execution result', {
-          jobId: request.jobId,
-          attempt: attempt + 1,
-          data: execution.data,
-          report: execution.report,
-          snapshot: {
-            url: redactText(execution.snapshot.url),
-            transport: execution.snapshot.transport,
-            httpStatus: execution.snapshot.httpStatus,
-          },
-        });
-        if (!isAcceptedExtractionQuality(execution.report.quality)) {
-          if (execution.report.quality === ExtractionQuality.Invalid)
-            rejectedStrategies.add(strategyKey);
-          throw new Error(execution.report.issues.join(' '));
-        }
-        if (
-          !request.intent &&
-          execution.report.quality === ExtractionQuality.Empty &&
-          !execution.report.validatedSourceRecords
-        )
-          throw new Error('An initially empty collection cannot validate field sources.');
-        const enabled = this.options.semanticEnabled;
-        const threshold = this.options.semanticThreshold;
-        let semanticReview: SemanticReview = {
-          status: SemanticReviewStatus.Skipped,
-          score: null,
-          reasons: ['Semantic review disabled.'],
-          evidenceRefs: [],
-        };
-        if (enabled) {
-          try {
-            const review = await run('semantic', () =>
-              this.stages.reviewer.review(input(), fixedIntent, {
-                data: execution.data,
-                provenance: execution.report.evidence,
-                coverage: execution.report.coverage,
-              })
-            );
-            semanticReview = {
-              ...review,
-              status:
-                review.score < threshold
-                  ? SemanticReviewStatus.Rejected
-                  : review.score < 7
-                    ? SemanticReviewStatus.Warning
-                    : SemanticReviewStatus.Passed,
-            };
-          } catch (error) {
-            logger.warn('Semantic review failed after deterministic validation', {
-              jobId: request.jobId,
-              attempt: attempt + 1,
-              errorCode:
-                error && typeof error === 'object' && 'code' in error
-                  ? String(error.code)
-                  : error instanceof Error && error.name === 'ZodError'
-                    ? 'MODEL_VALIDATION_ERROR'
-                    : 'SEMANTIC_REVIEW_ERROR',
-              errorMessage: error instanceof Error ? error.message : String(error),
-            });
-            logger.diagnostic(
-              'Semantic review failed; deterministic validation remains authoritative',
-              {
-                jobId: request.jobId,
-                attempt: attempt + 1,
-                errorName: error instanceof Error ? error.name : 'UnknownError',
-                errorMessage: error instanceof Error ? error.message : String(error),
-              }
-            );
-            semanticReview = {
-              status: SemanticReviewStatus.Error,
-              score: null,
-              reasons: [
-                'Semantic reviewer unavailable or invalid response; deterministic checks passed.',
-              ],
-              evidenceRefs: [],
-            };
-          }
-        } else trace.push({ stage: 'semantic', durationMs: 0, status: TraceStatus.Skipped });
-        lastReview = semanticReview;
-        trace.push({
-          stage: 'semantic-policy',
-          durationMs: 0,
-          status:
-            semanticReview.status === SemanticReviewStatus.Rejected
-              ? TraceStatus.Failed
-              : semanticReview.status === SemanticReviewStatus.Skipped
-                ? TraceStatus.Skipped
-                : TraceStatus.Success,
-          code:
-            semanticReview.status +
-            (semanticReview.score === null ? '' : '_' + semanticReview.score),
-        });
-        logger.diagnostic('Semantic review policy result', {
-          jobId: request.jobId,
-          attempt: attempt + 1,
-          review: semanticReview,
-        });
-        if (semanticReview.status === SemanticReviewStatus.Rejected) {
-          rejectedStrategies.add(strategyKey);
-          throw new Error(
-            'Semantic review rejected candidate: ' + semanticReview.reasons.join(' ')
-          );
-        }
-        execution.report.semanticReview = semanticReview;
-        execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
-        return { plan, execution, semanticReview, trace };
-      } catch (error) {
-        if (error instanceof CompilerApiRequestError && error.statusCode === 429) throw error;
-        if (error instanceof ConfigurationFailure || classifyAccessFailure(error)) throw error;
-        feedback = error instanceof Error ? error.message : 'Candidate validation failed.';
-        logger.diagnostic('Extraction candidate rejected', {
-          jobId: request.jobId,
-          attempt: attempt + 1,
-          maxAttempts: this.options.maxAttempts,
-          feedback,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-          trace: trace.slice(-8),
-        });
-        if (
-          attempt + 1 < this.options.maxAttempts &&
-          discoveryActions < this.options.maxDiscoveryActions
-        ) {
-          const retrySession = await run('acquisition', () =>
-            this.browser.open(request.url, { ...seed, intent: fixedIntent }, context, {
-              storageState: request.storageState,
-            })
-          );
-          try {
-            const retryInput = {
-              ...input(),
-              evidence: evidence + '\nValidation feedback: ' + JSON.stringify(feedback),
-            };
-            const action = await run('discovery', () =>
-              this.stages.discovery.next(retryInput, fixedIntent)
-            );
-            if (action) {
-              discoveryActions++;
-              evidence +=
-                '\nAdditional evidence:\n' +
-                this.evidence([
-                  await run('interaction', () => discoverWithCapabilities(retrySession, action)),
-                ]);
-              evidence = evidence.slice(-this.options.evidenceLimit);
-            }
-          } finally {
-            await retrySession.close();
-          }
-        }
-      }
-    }
-    throw new ConfigurationFailure(
-      feedback || 'Configuration budget exhausted.',
-      trace,
-      lastReview
-    );
   }
-
-  private evidence(snapshots: DocumentSnapshot[]): string {
-    const perSnapshot = Math.max(1, Math.floor(this.options.evidenceLimit / snapshots.length));
-    return snapshots
-      .map(
-        (snapshot, index) =>
-          'Snapshot ' +
-          index +
-          ' (transport ' +
-          (snapshot.transport ?? 'unknown') +
-          '): ' +
-          redactText(snapshot.url) +
-          '\n' +
-          buildCompilerEvidence(snapshot.html, Math.floor(perSnapshot * 0.7)) +
-          '\nObserved responses: ' +
-          JSON.stringify(redactObject(snapshot.responses)).slice(0, Math.floor(perSnapshot * 0.3))
-      )
-      .join('\n')
-      .slice(0, this.options.evidenceLimit);
-  }
-}
-
-export function sameIntent(a: ExtractionIntent, b: ExtractionIntent): boolean {
-  return JSON.stringify(sortObjectKeys(a)) === JSON.stringify(sortObjectKeys(b));
 }

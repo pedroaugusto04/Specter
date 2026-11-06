@@ -81,6 +81,7 @@ export class CliCompilerProvider implements IModelProvider {
         cwd: tempDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
+        signal: input.signal,
       };
 
       const cliProcess = this.spawnFn(this.cliCommand, args, spawnOpts);
@@ -128,7 +129,12 @@ export class CliCompilerProvider implements IModelProvider {
 
       const tryReadOutputFile = async (): Promise<unknown | null> => {
         try {
+          const stat = await fs.stat(outputFile);
+          if (stat.size > env.COMPILER_MAX_OUTPUT_CHARS * 4)
+            throw new CompilerValidationError('Model output exceeds the configured size limit.');
           const content = await fs.readFile(outputFile, 'utf-8');
+          if (content.length > env.COMPILER_MAX_OUTPUT_CHARS)
+            throw new CompilerValidationError('Model output exceeds the configured size limit.');
           if (!content.trim()) return null;
           const parsed: unknown = JSON.parse(content);
           return parsed;
@@ -217,10 +223,12 @@ export class CliCompilerProvider implements IModelProvider {
         settled = true;
         void cleanup().finally(() => {
           reject(
-            new CompilerValidationError(
-              `Failed to spawn ${this.name} CLI subprocess: ${err.message}`,
-              err
-            )
+            input.signal?.aborted
+              ? new CompilerTimeoutError('CLI model task cancelled or timed out.', err)
+              : new CompilerValidationError(
+                  `Failed to spawn ${this.name} CLI subprocess: ${err.message}`,
+                  err
+                )
           );
         });
       });

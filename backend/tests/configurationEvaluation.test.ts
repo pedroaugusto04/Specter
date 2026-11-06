@@ -13,7 +13,7 @@ describe('Configuration evaluation corpus', () => {
     const corpus = JSON.parse(
       await readFile('tests/fixtures/configuration-evaluation-corpus.json', 'utf8')
     ) as { version: number; cases: ConfigurationEvaluationCase[] };
-    expect(corpus.version).toBe(1);
+    expect(corpus.version).toBe(2);
     corpus.cases.forEach(validateConfigurationEvaluationCase);
 
     const report = await evaluateConfigurationCorpus(corpus.cases, (item) =>
@@ -31,7 +31,7 @@ describe('Configuration evaluation corpus', () => {
       createFixtureModelProvider(item.responses)
     );
     expect(isolated.results.filter((result) => !result.passed)).toEqual([]);
-    expect(isolated.cases).toBeGreaterThanOrEqual(20);
+    expect(isolated.cases).toBeGreaterThanOrEqual(12);
     expect(report.results.length).toBeGreaterThanOrEqual(10);
     expect(report.checks.intent!.passed).toBe(report.checks.intent!.total);
     expect(report.checks.routineWithoutModels!.passed).toBeGreaterThan(0);

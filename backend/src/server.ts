@@ -5,9 +5,10 @@ import { RedisLeaseStore } from './resources/redisLeaseStore.js';
 import { Redis } from 'ioredis';
 import { AccessCooldownService } from './acquisition/cooldown.js';
 import { RedisAccessCooldownStore } from './acquisition/redisCooldownStore.js';
-import { createModelStages } from './extraction/modelStages.js';
+import { createConfigurationModel } from './extraction/configurationModel.js';
 import { composeExtraction } from './extraction/composition.js';
 import { ConfigurationPipeline } from './extraction/configuration.js';
+
 import { DrizzleOutboxRepository } from './repositories/outboxRepository.js';
 import { OutboxWorker } from './notifications/outboxWorker.js';
 import { buildApp } from './app.js';
@@ -58,14 +59,15 @@ async function bootstrap(): Promise<void> {
   const browserCapacity = new BrowserCapacity(new RedisLeaseStore(accessRedis));
   const extraction = composeExtraction(createHttpCandidates(), browserCapacity);
   const configurationPipeline = new ConfigurationPipeline(
-    createModelStages(compilerProvider),
+    createConfigurationModel(compilerProvider),
     extraction.discovery,
     extraction.executor,
     {
       budgetMs: env.COMPILATION_BUDGET_MS,
       maxAttempts: env.COMPILATION_MAX_ATTEMPTS,
-      maxDiscoveryActions: env.DISCOVERY_MAX_ACTIONS,
-      evidenceLimit: env.COMPILATION_MAX_EVIDENCE_CHARS,
+      maxDecisions: env.CONFIGURATION_MAX_DECISIONS,
+      reviewReserveMs: env.CONFIGURATION_REVIEW_RESERVE_MS,
+      evidenceLimit: env.CONFIGURATION_MAX_INPUT_CHARS,
       semanticEnabled: env.SEMANTIC_REVIEW_ENABLED,
       semanticThreshold: env.SEMANTIC_REVIEW_THRESHOLD,
     }

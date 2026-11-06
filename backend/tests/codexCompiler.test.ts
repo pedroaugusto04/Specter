@@ -35,7 +35,7 @@ describe('Codex transport', () => {
         spawn(process.execPath, [executable, ...args], options),
     });
     const result = await provider.generate({
-      task: 'plan',
+      task: 'configure',
       timeoutMs: 10000,
       jobId: 'local',
       evidence: '<h1>Example</h1>',

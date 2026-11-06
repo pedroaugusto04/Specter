@@ -31,12 +31,8 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
 
     const startTime = Date.now();
     const timeoutMs = options?.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const signal = options?.signal
-      ? AbortSignal.any([controller.signal, options.signal])
-      : controller.signal;
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
     try {
       signal.throwIfAborted();
       const endpoint = new URL('https://api.crawlbase.com/');
@@ -96,8 +92,6 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       };
     } catch (err) {
       throw normalizeUnblockerError(this.name, err, timeoutMs);
-    } finally {
-      clearTimeout(timer);
     }
   }
 }

@@ -169,7 +169,6 @@ export const executionStrategySchema = z
   .strict();
 export const extractionPlanSchema = z
   .object({
-    version: z.literal(3),
     intent: extractionIntentSchema,
     strategy: executionStrategySchema,
   })

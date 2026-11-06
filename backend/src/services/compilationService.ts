@@ -1,6 +1,7 @@
 import { SuccessfulRunService } from './successfulRunService.js';
 import { snapshotToScrapeResult } from '../extraction/scrapeResultMapper.js';
-import { ConfigurationFailure, sameIntent } from '../extraction/configuration.js';
+import { ConfigurationFailure } from '../extraction/configurationFailure.js';
+import { sameIntent } from '../extraction/configurationPolicy.js';
 import type { IAlertRouter } from '../notifications/contracts.js';
 import type { IConfigurationPipeline } from '../extraction/configuration.js';
 import { assertExecutionLease } from '../queues/executionLease.js';

@@ -64,29 +64,35 @@ export class GeminiApiCompilerProvider implements IModelProvider {
           },
         ],
         generationConfig: {
+          maxOutputTokens: env.COMPILER_MAX_OUTPUT_TOKENS,
           responseMimeType: 'application/json',
           responseJsonSchema: input.outputSchema,
         },
       }),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.any([
+        AbortSignal.timeout(timeoutMs),
+        ...(input.signal ? [input.signal] : []),
+      ]),
     };
     for (let attempt = 0; ; attempt++) {
       try {
         response = await this.fetchFn(url, init);
       } catch (error) {
+        if (init.signal?.aborted)
+          throw new CompilerTimeoutError('Model request cancelled or timed out', error);
         if (attempt >= env.COMPILER_API_MAX_RETRIES) {
           if (error instanceof Error && error.name === 'TimeoutError')
             throw new CompilerTimeoutError('Gemini API request timed out', error);
           throw new CompilerApiRequestError(undefined, error);
         }
-        await this.waitBeforeRetry(attempt);
+        await this.waitBeforeRetry(attempt, undefined, init.signal ?? undefined);
         continue;
       }
       if (response.status === 429) break;
       if (response.status !== 408 && response.status < 500) break;
       if (attempt >= env.COMPILER_API_MAX_RETRIES) break;
       const retryAfter = response.headers.get('retry-after');
-      await this.waitBeforeRetry(attempt, retryAfter);
+      await this.waitBeforeRetry(attempt, retryAfter, init.signal ?? undefined);
     }
 
     if (!response.ok) {
@@ -116,6 +122,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       ?.map((part) => part.text ?? '')
       .join('')
       .trim();
+    if (output && output.length > env.COMPILER_MAX_OUTPUT_CHARS)
+      throw new CompilerValidationError('Model output exceeds the configured size limit.');
     if (!output) throw new CompilerValidationError('Gemini API returned an empty result');
 
     try {
@@ -125,7 +133,11 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     }
   }
 
-  private async waitBeforeRetry(attempt: number, retryAfter?: string | null): Promise<void> {
+  private async waitBeforeRetry(
+    attempt: number,
+    retryAfter?: string | null,
+    signal?: AbortSignal
+  ): Promise<void> {
     const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN;
     const exponential = Math.min(
       env.COMPILER_API_RETRY_BASE_DELAY_MS * 2 ** attempt,
@@ -136,6 +148,18 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         ? Math.min(retryAfterMs, env.COMPILER_API_RETRY_MAX_DELAY_MS)
         : exponential;
     const jittered = Math.floor(delay * (0.8 + Math.random() * 0.4));
-    await new Promise((resolve) => setTimeout(resolve, jittered));
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+        reject(new CompilerTimeoutError('Model retry deadline exhausted.'));
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      }, jittered);
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) abort();
+    });
   }
 }
