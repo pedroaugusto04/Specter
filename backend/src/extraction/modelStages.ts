@@ -14,7 +14,11 @@ import {
 } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { logger } from '../utils/logger.js';
-import { modelDiscoverySchema, modelStrategySchema } from './modelOutputSchemas.js';
+import {
+  modelDiscoverySchema,
+  modelIntentSchema,
+  modelStrategySchema,
+} from './modelOutputSchemas.js';
 const discoverySchema = z
   .object({
     action: discoveryActionSchema.nullable(),
@@ -144,6 +148,12 @@ function validateOutput<T>(
     throw error;
   }
 }
+function defaultEmptyLists(output: unknown, keys: readonly string[]): unknown {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return output;
+  const result = { ...output } as Record<string, unknown>;
+  for (const key of keys) if (result[key] === undefined) result[key] = [];
+  return result;
+}
 /** Each stage can be replaced separately, even when they share the same model transport. */
 export function createModelStages(model: IModelProvider): ConfigurationStages {
   return {
@@ -153,9 +163,14 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
           model,
           input,
           'intent',
-          outputContract(extractionIntentSchema, intentInstructions)
+          outputContract(modelIntentSchema, intentInstructions)
         );
-        return validateOutput(input, 'intent', output, extractionIntentSchema);
+        return validateOutput(
+          input,
+          'intent',
+          defaultEmptyLists(output, ['filters', 'triggerRules']),
+          extractionIntentSchema
+        );
       },
     },
     discovery: {
@@ -190,7 +205,7 @@ export function createModelStages(model: IModelProvider): ConfigurationStages {
             validationFeedback: feedback,
           }
         );
-        return validateOutput(input, 'plan', output, schema);
+        return validateOutput(input, 'plan', defaultEmptyLists(output, ['empty']), schema);
       },
     },
     reviewer: {

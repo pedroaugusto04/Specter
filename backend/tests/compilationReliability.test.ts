@@ -36,6 +36,57 @@ const pricePlan = () =>
   });
 
 describe('Compilation reliability regressions', () => {
+  it('defaults omitted model lists while preserving requested filters, alerts and empty evidence', async () => {
+    const plan = pricePlan();
+    const input = {
+      jobId: 'defaults',
+      url: 'https://example.com',
+      prompt: 'prices',
+      evidence: '',
+      timeoutMs: 1000,
+    };
+    let response: unknown;
+    let request: ModelInput | undefined;
+    const stages = createModelStages({
+      name: 'fixture',
+      generate: async (value) => {
+        request = value;
+        return response;
+      },
+    });
+    const { filters: _filters, triggerRules: _rules, ...intent } = plan.intent;
+    response = intent;
+    await expect(stages.interpreter.interpret(input)).resolves.toMatchObject({
+      filters: [],
+      triggerRules: [],
+    });
+    expect(request!.outputSchema!.required).not.toContain('filters');
+    expect(request!.outputSchema!.required).not.toContain('triggerRules');
+    const filters = ['price below 100'];
+    const triggerRules = [{ field: 'price', operator: 'lt', value: 100 }];
+    response = { ...intent, filters, triggerRules };
+    await expect(stages.interpreter.interpret(input)).resolves.toMatchObject({
+      filters,
+      triggerRules,
+    });
+    response = { ...intent, filters: null };
+    await expect(stages.interpreter.interpret(input)).rejects.toThrow();
+
+    const { empty: _empty, ...strategy } = plan.strategy;
+    response = strategy;
+    await expect(stages.generator.generate(input, plan.intent, '')).resolves.toMatchObject({
+      empty: [],
+    });
+    expect(request!.outputSchema!.required).not.toContain('empty');
+    const empty = [{ kind: 'exists', locator: { kind: 'css', selector: '.empty' } }];
+    response = { ...strategy, empty };
+    await expect(stages.generator.generate(input, plan.intent, '')).resolves.toMatchObject({
+      empty,
+    });
+    response = { ...strategy, empty: null };
+    await expect(stages.generator.generate(input, plan.intent, '')).rejects.toThrow();
+  });
+
   it('guides discovery with a flat contract while rejecting invalid actions', async () => {
     const plan = pricePlan();
     const input = {

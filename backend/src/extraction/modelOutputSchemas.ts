@@ -3,6 +3,7 @@ import {
   conditionSchema,
   discoveryActionSchema,
   executionStrategySchema,
+  extractionIntentSchema,
   locatorSchema,
   sourceSchema,
 } from '../types/extractionPlan.js';
@@ -50,6 +51,10 @@ const action = z
   .strict();
 
 export const modelDiscoverySchema = z.object({ action: action.nullable() }).strict();
+export const modelIntentSchema = extractionIntentSchema.partial({
+  filters: true,
+  triggerRules: true,
+});
 
 const records = z
   .object({
@@ -74,7 +79,7 @@ export const modelStrategySchema = executionStrategySchema.extend({
   records,
   fields: z.record(text, z.array(source).min(1)),
   ready: z.array(condition).min(1),
-  empty: z.array(condition),
+  empty: z.array(condition).optional(),
   pagination: z
     .object({
       kind: z.enum(['link', 'click', 'scroll']),
