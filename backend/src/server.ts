@@ -1,3 +1,4 @@
+import { ScheduleCoordinator } from './queues/scheduleCoordinator.js';
 import { JobPresenter } from './presentation/jobPresenter.js';
 import { BrowserCapacity } from './resources/browserCapacity.js';
 import { RedisLeaseStore } from './resources/redisLeaseStore.js';
@@ -45,24 +46,10 @@ async function bootstrap(): Promise<void> {
   const userRepository = new DrizzleUserRepository();
   const integrationRepository = new DrizzleIntegrationRepository();
   const sessionRepository = new DrizzleSessionRepository();
-  const jobScheduler = new BullMqJobScheduler(undefined, async (jobId) => {
-    const job = await jobRepository.findById(jobId);
-    if (!job) throw new Error(`Job not found: ${jobId}`);
-    const user = await userRepository.findById(job.userId);
-    if (!user) throw new Error(`User not found: ${job.userId}`);
-    return user.timezone;
-  });
-  const reconcileSchedules = async () => {
-    const activeJobs = await jobRepository.findActiveJobs();
-    const jobs = await Promise.all(
-      activeJobs.map(async (job) => {
-        const user = await userRepository.findById(job.userId);
-        if (!user) throw new Error(`User not found: ${job.userId}`);
-        return { id: job.id, cronExpression: job.cronExpression, timezone: user.timezone };
-      })
-    );
-    await reconcileRepeatableJobs(jobScheduler.scrapeQueue, jobs);
-  };
+  const schedules = new ScheduleCoordinator(jobRepository, userRepository);
+  const jobScheduler = new BullMqJobScheduler(undefined, (jobId) =>
+    schedules.timezoneForJob(jobId)
+  );
   const accessCooldown = new AccessCooldownService(
     new RedisAccessCooldownStore(accessRedis),
     sessionRepository
@@ -129,7 +116,9 @@ async function bootstrap(): Promise<void> {
     realtimeService,
     new JobPresenter(accessCooldown)
   );
-  const authService = new AuthService(userRepository, { onTimezoneChanged: reconcileSchedules });
+  const authService = new AuthService(userRepository, {
+    onTimezoneChanged: (userId) => schedules.refreshUserSchedules(userId, jobScheduler),
+  });
   const integrationService = new IntegrationService(
     integrationRepository,
     telegramProvider,
@@ -152,7 +141,7 @@ async function bootstrap(): Promise<void> {
 
   // Reconcile PostgreSQL active jobs with BullMQ repeatable schedules on startup
   try {
-    await reconcileSchedules();
+    await reconcileRepeatableJobs(jobScheduler.scrapeQueue, await schedules.activeSchedules());
     for (const job of await jobRepository.findAll(JobStatus.PendingCompilation)) {
       await jobScheduler.enqueueCompilation(job.id, CompilationReason.Initial);
     }
