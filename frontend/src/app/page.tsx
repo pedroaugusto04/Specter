@@ -22,7 +22,7 @@ import {
   useLogoutMutation,
   useStatsQuery,
 } from '@/hooks/useDashboardQueries';
-import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
+import { useRealtimeEvents, type RealtimeEventPayload } from '@/hooks/useRealtimeEvents';
 import { api, type UserDto } from '@/lib/api';
 import { Plus, Radio } from 'lucide-react';
 import Link from 'next/link';
@@ -61,7 +61,7 @@ export default function DashboardPage() {
   // Real-time server-sent events with auto-invalidation
   const { connectionMode } = useRealtimeEvents({
     enabled: Boolean(user),
-    onJobEvent: React.useCallback((event) => {
+    onJobEvent: React.useCallback((event: RealtimeEventPayload) => {
       if (event.type === 'JOB_UPDATED' && event.status === 'RUNNING') {
         const old = runningTimers.current.get(event.jobId);
         if (old) clearTimeout(old);
