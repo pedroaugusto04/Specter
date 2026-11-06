@@ -21,7 +21,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "evaluate:extraction": "tsx scripts/evaluate-extraction.ts",
-    "evaluate:configuration": "node dist/cli/evaluateConfiguration.js"
+    "evaluate:configuration": "node dist/cli/evaluateConfiguration.js",
+    "evaluate:regression": "node dist/cli/evaluateRegression.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",

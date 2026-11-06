@@ -16,7 +16,11 @@
           "mode": "single",
           "scope": "page",
           "fields": {
-            "title": { "description": "Main chair title", "type": "string", "required": true },
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
             "price": {
               "description": "Current price",
               "type": "number",
@@ -29,16 +33,85 @@
           "triggerRules": [],
           "triggerMatchMode": "all"
         },
-        "discovery": [{ "action": null }],
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
         "plan": [
           {
             "transport": "http",
-            "records": { "kind": "dom", "selector": "main" },
-            "fields": {
-              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
-              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            "records": {
+              "kind": "dom",
+              "selector": "main"
             },
-            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
             "empty": []
           }
         ],
@@ -48,11 +121,51 @@
           "evidenceRefs": ["title", "price"]
         }
       },
-      "expectedRecords": [{ "title": "Chair", "price": 100 }],
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
       "expectedQuality": "COMPLETE",
       "expectedSemanticStatus": "PASSED",
-      "previousRecords": [{ "title": "Chair", "price": 100 }],
-      "expectChange": false
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false,
+      "category": "product-dom",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true
     },
     {
       "name": "Brazilian localized product price",
@@ -86,16 +199,85 @@
           "triggerRules": [],
           "triggerMatchMode": "all"
         },
-        "discovery": [{ "action": null }],
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
         "plan": [
           {
             "transport": "http",
-            "records": { "kind": "dom", "selector": "main" },
-            "fields": {
-              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
-              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            "records": {
+              "kind": "dom",
+              "selector": "main"
             },
-            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
             "empty": []
           }
         ],
@@ -105,9 +287,44 @@
           "evidenceRefs": ["title", "price"]
         }
       },
-      "expectedRecords": [{ "title": "Café especial", "price": 1234.5 }],
+      "expectedRecords": [
+        {
+          "title": "Café especial",
+          "price": 1234.5
+        }
+      ],
       "expectedQuality": "COMPLETE",
-      "expectedSemanticStatus": "PASSED"
+      "expectedSemanticStatus": "PASSED",
+      "category": "product-dom",
+      "expectedIntent": {
+        "entity": "Main coffee product",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main coffee product title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price in Brazilian reais",
+            "type": "number",
+            "required": true,
+            "locale": "pt-BR"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true
     },
     {
       "name": "discovery reveals current price",
@@ -118,21 +335,17 @@
         "httpStatus": 200,
         "responses": []
       },
-      "discoverySnapshots": [
-        {
-          "html": "<main><h1>Chair</h1><button>Details</button><b class=\"current\">$90</b></main>",
-          "url": "https://example.com/chair",
-          "httpStatus": 200,
-          "responses": []
-        }
-      ],
       "responses": {
         "intent": {
           "entity": "Main chair",
           "mode": "single",
           "scope": "page",
           "fields": {
-            "title": { "description": "Main chair title", "type": "string", "required": true },
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
             "price": {
               "description": "Current price",
               "type": "number",
@@ -149,20 +362,1261 @@
           {
             "action": {
               "kind": "click",
-              "locator": { "kind": "role", "role": "button", "name": "Details" }
+              "locator": {
+                "kind": "role",
+                "role": "button",
+                "name": "Details"
+              }
             }
           },
-          { "action": null }
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "browser",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": [],
+            "setup": [
+              {
+                "kind": "click",
+                "locator": {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Details"
+                }
+              }
+            ]
+          },
+          {
+            "transport": "browser",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": [],
+            "setup": [
+              {
+                "kind": "click",
+                "locator": {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Details"
+                }
+              }
+            ]
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The clicked detail state exposed the requested main product price."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 90
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "category": "interaction-replay",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "interactions": [
+        {
+          "action": {
+            "kind": "click",
+            "locator": {
+              "kind": "role",
+              "role": "button",
+              "name": "Details"
+            }
+          },
+          "snapshot": {
+            "html": "<main><h1>Chair</h1><button>Details</button><b class=\"current\">$90</b></main>",
+            "url": "https://example.com/chair",
+            "httpStatus": 200,
+            "responses": []
+          }
+        }
+      ],
+      "isolated": true
+    },
+    {
+      "name": "routine change outage and recovery",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
         ],
         "plan": [
           {
             "transport": "http",
-            "records": { "kind": "dom", "selector": "main" },
-            "fields": {
-              "title": [{ "kind": "dom", "selector": "h1", "attribute": "text" }],
-              "price": [{ "kind": "dom", "selector": ".current", "attribute": "text" }]
+            "records": {
+              "kind": "dom",
+              "selector": "main"
             },
-            "ready": [{ "kind": "exists", "locator": { "kind": "css", "selector": "main" } }],
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "category": "temporal",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "routine": [
+        {
+          "name": "price drop",
+          "snapshot": {
+            "html": "<main><h1>Chair</h1><b class=\"current\">$80</b></main>",
+            "url": "https://example.com/product",
+            "httpStatus": 200,
+            "responses": []
+          },
+          "expectedRecords": [
+            {
+              "title": "Chair",
+              "price": 80
+            }
+          ],
+          "expectedQuality": "COMPLETE",
+          "expectChange": true
+        },
+        {
+          "name": "missing price",
+          "snapshot": {
+            "html": "<main><h1>Chair</h1></main>",
+            "url": "https://example.com/product",
+            "httpStatus": 200,
+            "responses": []
+          },
+          "expectedRecords": [],
+          "expectedQuality": "INVALID",
+          "expectChange": false
+        },
+        {
+          "name": "recovered unchanged",
+          "snapshot": {
+            "html": "<main><h1>Chair</h1><b class=\"current\">$80</b></main>",
+            "url": "https://example.com/product",
+            "httpStatus": 200,
+            "responses": []
+          },
+          "expectedRecords": [
+            {
+              "title": "Chair",
+              "price": 80
+            }
+          ],
+          "expectedQuality": "COMPLETE",
+          "expectChange": false
+        }
+      ]
+    },
+    {
+      "name": "invalid model strategy repaired",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "unsupported"
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "category": "plan-repair",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      }
+    },
+    {
+      "name": "wrong selector repaired from feedback",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".missing",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "category": "source-repair",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      }
+    },
+    {
+      "name": "semantic rejection prevents activation",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "aside"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "aside"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 2,
+          "reasons": [
+            "A valid numeric price was extracted from a recommendation, not the requested main product."
+          ],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "FAILED",
+      "expectedSemanticStatus": "REJECTED",
+      "category": "semantic-rejection",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "expectedErrorCode": "CONFIGURATION_REJECTED",
+      "expectedErrorIncludes": "Semantic review rejected"
+    },
+    {
+      "name": "invalid semantic response records degradation",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b></main><aside><h1>Other chair</h1><b class=\"current\">$20</b></aside>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": "bad"
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "ERROR",
+      "category": "semantic-degraded",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true
+    },
+    {
+      "name": "ambiguous prices cannot activate",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><b class=\"current\">$100</b><b class=\"current\">$20</b></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [],
+      "expectedQuality": "FAILED",
+      "category": "ambiguity",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 0
+      },
+      "expectedErrorCode": "CONFIGURATION_REJECTED",
+      "expectedErrorIncludes": "Ambiguous DOM field source"
+    },
+    {
+      "name": "discovery without replayable setup is rejected",
+      "prompt": "Open the details and track the main chair price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1><button>Details</button></main>",
+        "url": "https://example.com/chair",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": {
+              "kind": "click",
+              "locator": {
+                "kind": "role",
+                "role": "button",
+                "name": "Details"
+              }
+            }
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "browser",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "browser",
+            "records": {
+              "kind": "dom",
+              "selector": "main"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h1",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
             "empty": []
           }
         ],
@@ -172,9 +1626,572 @@
           "evidenceRefs": ["title", "price"]
         }
       },
-      "expectedRecords": [{ "title": "Chair", "price": 90 }],
+      "expectedRecords": [],
+      "expectedQuality": "FAILED",
+      "category": "interaction-replay",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 0
+      },
+      "interactions": [
+        {
+          "action": {
+            "kind": "click",
+            "locator": {
+              "kind": "role",
+              "role": "button",
+              "name": "Details"
+            }
+          },
+          "snapshot": {
+            "html": "<main><h1>Chair</h1><button>Details</button><b class=\"current\">$90</b></main>",
+            "url": "https://example.com/chair",
+            "httpStatus": 200,
+            "responses": []
+          }
+        }
+      ],
+      "expectedErrorCode": "CONFIGURATION_REJECTED",
+      "expectedErrorIncludes": "Required field 'price'"
+    },
+    {
+      "name": "JSON-LD product fields",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main><h1>Chair</h1></main><script type=\"application/ld+json\">{\"@type\":\"Product\",\"name\":\"Chair\",\"offers\":{\"price\":\"100\"}}</script>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main chair",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "jsonld",
+              "type": "Product"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "jsonld",
+                  "path": ["name"]
+                }
+              ],
+              "price": [
+                {
+                  "kind": "jsonld",
+                  "path": ["offers", "price"]
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          },
+          {
+            "transport": "http",
+            "records": {
+              "kind": "jsonld",
+              "type": "Product"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "jsonld",
+                  "path": ["name"]
+                }
+              ],
+              "price": [
+                {
+                  "kind": "jsonld",
+                  "path": ["offers", "price"]
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
       "expectedQuality": "COMPLETE",
-      "expectedSemanticStatus": "PASSED"
+      "expectedSemanticStatus": "PASSED",
+      "category": "jsonld",
+      "expectedIntent": {
+        "entity": "Main chair",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true
+    },
+    {
+      "name": "observed JSON response configuration",
+      "prompt": "Track the main chair title and current price",
+      "snapshot": {
+        "html": "<main></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": [
+          {
+            "url": "https://example.com/api/product",
+            "method": "GET",
+            "status": 200,
+            "body": {
+              "name": "Chair",
+              "price": 100
+            }
+          }
+        ]
+      },
+      "responses": {
+        "intent": {
+          "entity": "Main product",
+          "mode": "single",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Title of main product",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current main product price excluding shipping",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            }
+          },
+          "identityFields": [],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "browser",
+            "records": {
+              "kind": "response",
+              "match": {
+                "urlPattern": "/api/product"
+              },
+              "path": []
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "response",
+                  "path": ["name"]
+                }
+              ],
+              "price": [
+                {
+                  "kind": "response",
+                  "path": ["price"]
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "previousRecords": [
+        {
+          "title": "Chair",
+          "price": 100
+        }
+      ],
+      "expectChange": false,
+      "category": "network",
+      "expectedIntent": {
+        "entity": "Main product",
+        "mode": "single",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Title of main product",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current main product price excluding shipping",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          }
+        },
+        "identityFields": [],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true
+    },
+    {
+      "name": "collection reorder and additions",
+      "prompt": "Track catalog product titles and prices by stable product ID",
+      "snapshot": {
+        "html": "<main><article data-id=\"a\"><h2>a</h2><b class=\"current\">$100</b></article><article data-id=\"b\"><h2>b</h2><b class=\"current\">$100</b></article></main>",
+        "url": "https://example.com/product",
+        "httpStatus": 200,
+        "responses": []
+      },
+      "responses": {
+        "intent": {
+          "entity": "Catalog products",
+          "mode": "collection",
+          "scope": "page",
+          "fields": {
+            "title": {
+              "description": "Main chair title",
+              "type": "string",
+              "required": true
+            },
+            "price": {
+              "description": "Current price",
+              "type": "number",
+              "required": true,
+              "locale": "en-US"
+            },
+            "id": {
+              "description": "Stable product ID",
+              "type": "string",
+              "required": true
+            }
+          },
+          "identityFields": ["id"],
+          "filters": [],
+          "triggerRules": [],
+          "triggerMatchMode": "all"
+        },
+        "discovery": [
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          },
+          {
+            "action": null
+          }
+        ],
+        "plan": [
+          {
+            "transport": "http",
+            "records": {
+              "kind": "dom",
+              "selector": "main article"
+            },
+            "fields": {
+              "title": [
+                {
+                  "kind": "dom",
+                  "selector": "h2",
+                  "attribute": "text"
+                }
+              ],
+              "price": [
+                {
+                  "kind": "dom",
+                  "selector": ".current",
+                  "attribute": "text"
+                }
+              ],
+              "id": [
+                {
+                  "kind": "dom",
+                  "selector": ":scope",
+                  "attribute": "data-id"
+                }
+              ]
+            },
+            "ready": [
+              {
+                "kind": "exists",
+                "locator": {
+                  "kind": "css",
+                  "selector": "main"
+                }
+              }
+            ],
+            "empty": []
+          }
+        ],
+        "semantic": {
+          "score": 8,
+          "reasons": ["The title and price match the requested main product."],
+          "evidenceRefs": ["title", "price"]
+        }
+      },
+      "expectedRecords": [
+        {
+          "id": "a",
+          "title": "a",
+          "price": 100
+        },
+        {
+          "id": "b",
+          "title": "b",
+          "price": 100
+        }
+      ],
+      "expectedQuality": "COMPLETE",
+      "expectedSemanticStatus": "PASSED",
+      "previousRecords": [
+        {
+          "id": "a",
+          "title": "a",
+          "price": 100
+        },
+        {
+          "id": "b",
+          "title": "b",
+          "price": 100
+        }
+      ],
+      "expectChange": false,
+      "category": "collection-identity",
+      "expectedIntent": {
+        "entity": "Catalog products",
+        "mode": "collection",
+        "scope": "page",
+        "fields": {
+          "title": {
+            "description": "Main chair title",
+            "type": "string",
+            "required": true
+          },
+          "price": {
+            "description": "Current price",
+            "type": "number",
+            "required": true,
+            "locale": "en-US"
+          },
+          "id": {
+            "description": "Stable product ID",
+            "type": "string",
+            "required": true
+          }
+        },
+        "identityFields": ["id"],
+        "filters": [],
+        "triggerRules": [],
+        "triggerMatchMode": "all"
+      },
+      "maxModelCalls": {
+        "intent": 1,
+        "discovery": 3,
+        "plan": 2,
+        "semantic": 1
+      },
+      "isolated": true,
+      "routine": [
+        {
+          "name": "reordered",
+          "snapshot": {
+            "html": "<main><article data-id=\"b\"><h2>b</h2><b class=\"current\">$100</b></article><article data-id=\"a\"><h2>a</h2><b class=\"current\">$100</b></article></main>",
+            "url": "https://example.com/product",
+            "httpStatus": 200,
+            "responses": []
+          },
+          "expectedRecords": [
+            {
+              "id": "a",
+              "title": "a",
+              "price": 100
+            },
+            {
+              "id": "b",
+              "title": "b",
+              "price": 100
+            }
+          ],
+          "expectedQuality": "COMPLETE",
+          "expectChange": false
+        },
+        {
+          "name": "added",
+          "snapshot": {
+            "html": "<main><article data-id=\"b\"><h2>b</h2><b class=\"current\">$100</b></article><article data-id=\"c\"><h2>c</h2><b class=\"current\">$100</b></article><article data-id=\"a\"><h2>a</h2><b class=\"current\">$100</b></article></main>",
+            "url": "https://example.com/product",
+            "httpStatus": 200,
+            "responses": []
+          },
+          "expectedRecords": [
+            {
+              "id": "a",
+              "title": "a",
+              "price": 100
+            },
+            {
+              "id": "b",
+              "title": "b",
+              "price": 100
+            },
+            {
+              "id": "c",
+              "title": "c",
+              "price": 100
+            }
+          ],
+          "expectedQuality": "COMPLETE",
+          "expectChange": true
+        }
+      ]
     }
-  ]
+  ],
+  "origin": "Synthetic local fixtures; not captures or evidence of live-site coverage."
 }

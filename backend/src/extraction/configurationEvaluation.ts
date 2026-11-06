@@ -1,24 +1,30 @@
 import { buildChangeAlert } from '../utils/changeAlertHelper.js';
 import { computeExtractionHash, sortObjectKeys } from '../utils/diffHasher.js';
-import { ConfigurationPipeline } from './configuration.js';
+import { ConfigurationFailure, ConfigurationPipeline } from './configuration.js';
 import { evaluateCondition } from './conditions.js';
 import { ExtractionExecutor } from './executor.js';
 import { PageExtractor } from './pageExtractor.js';
 import { standardSourceReaders } from './sources.js';
 import { createModelStages } from './modelStages.js';
-import { extractionIntentSchema, executionStrategySchema } from '../types/extractionPlan.js';
-import type { DocumentAdapter, DocumentSnapshot, ExtractionPlan, Scalar } from './contracts.js';
+import { extractionIntentSchema } from '../types/extractionPlan.js';
+import type {
+  DocumentAdapter,
+  DocumentSnapshot,
+  ExtractionPlan,
+  ExtractionIntent,
+  DiscoveryAction,
+  Scalar,
+} from './contracts.js';
 import type { ConfigurationRequest } from './configuration.js';
 import type { IModelProvider, ModelInput } from './model.js';
 import type { ExecutionPolicy } from './contracts.js';
 import type { ExtractedPayload } from '../types/extractor.js';
-import { ExtractionMode } from './constants.js';
+import { ExtractionMode, isAcceptedExtractionQuality } from './constants.js';
 
 export interface ConfigurationEvaluationCase {
   name: string;
   prompt: string;
   snapshot: DocumentSnapshot;
-  discoverySnapshots?: DocumentSnapshot[];
   responses: {
     intent: unknown;
     discovery: unknown | unknown[];
@@ -26,7 +32,22 @@ export interface ConfigurationEvaluationCase {
     semantic: unknown;
   };
   expectedRecords: Record<string, Scalar>[];
-  expectedQuality: 'COMPLETE' | 'EMPTY';
+  expectedQuality: 'COMPLETE' | 'EMPTY' | 'FAILED';
+  category?: string;
+  isolated?: boolean;
+  expectedIntent?: ExtractionIntent;
+  expectedErrorCode?: string;
+  expectedErrorIncludes?: string;
+  maxModelCalls?: Partial<Record<ModelInput['task'], number>>;
+  interactions?: Array<{ action: DiscoveryAction; snapshot: DocumentSnapshot }>;
+  routine?: Array<{
+    name: string;
+    snapshot: DocumentSnapshot;
+    interactions?: Array<{ action: DiscoveryAction; snapshot: DocumentSnapshot }>;
+    expectedRecords: Record<string, Scalar>[];
+    expectedQuality: import('../types/extractionPlan.js').ExtractionReport['quality'];
+    expectChange: boolean;
+  }>;
   expectedSemanticStatus?: string;
   previousRecords?: Record<string, Scalar>[];
   expectChange?: boolean;
@@ -39,6 +60,8 @@ export interface ConfigurationEvaluationReport {
   qualityAccuracy: number;
   falseAlerts: number;
   missedAlerts: number;
+  falseAcceptances: number;
+  checks: Record<string, { passed: number; total: number }>;
   modelCalls: number;
   modelDurationMs: number;
   modelCallsByTask: Record<string, { calls: number; failures: number; durationMs: number }>;
@@ -48,6 +71,10 @@ export interface ConfigurationEvaluationReport {
     name: string;
     passed: boolean;
     quality: string;
+    category: string;
+    checks: Record<string, boolean>;
+    modelCallsByTask: ConfigurationEvaluationReport['modelCallsByTask'];
+    durationMs: number;
     semanticStatus?: string;
     error?: string;
   }>;
@@ -105,22 +132,33 @@ class CountingModelProvider implements IModelProvider {
   }
 }
 
+/** Every execution opens the initial document; only a matching action reveals new state. */
 function fixtureAdapter(
   snapshot: DocumentSnapshot,
-  discoverySnapshots: DocumentSnapshot[] = []
+  interactions: NonNullable<ConfigurationEvaluationCase['interactions']> = [],
+  passive = false
 ): DocumentAdapter {
   return {
     async open() {
       let captured = structuredClone(snapshot);
-      let discoveryIndex = 0;
+      let offset = 0;
       return {
-        capabilities: { interactions: true, networkResponses: true, scopedDocuments: true },
+        capabilities: {
+          interactions: !passive,
+          networkResponses: !passive,
+          scopedDocuments: !passive,
+        },
         snapshot: async () => structuredClone(captured),
         check: async (condition) => evaluateCondition(condition, captured, []),
-        advance: async () => {},
-        discover: async () => {
-          const next = discoverySnapshots[discoveryIndex++];
-          if (next) captured = structuredClone(next);
+        advance: async () => {
+          throw new Error('Pagination needs a browser integration fixture.');
+        },
+        discover: async (action) => {
+          const transition = interactions[offset];
+          if (!transition || serialize(transition.action) !== serialize(action))
+            throw new Error('No fixture transition matches the requested action.');
+          offset++;
+          captured = structuredClone(transition.snapshot);
           return structuredClone(captured);
         },
         screenshot: async () => undefined,
@@ -130,9 +168,33 @@ function fixtureAdapter(
   };
 }
 
+function recordsEqual(
+  actual: Record<string, Scalar>[],
+  expected: Record<string, Scalar>[],
+  collection: boolean
+) {
+  const canonical = (records: Record<string, Scalar>[]) =>
+    collection ? records.map(serialize).sort() : records;
+  return serialize(canonical(actual)) === serialize(canonical(expected));
+}
+
+export function fixtureExecutor(
+  snapshot: DocumentSnapshot,
+  interactions: ConfigurationEvaluationCase['interactions']
+) {
+  return new ExtractionExecutor(
+    {
+      http: fixtureAdapter(snapshot, [], true),
+      browser: fixtureAdapter(snapshot, interactions),
+    },
+    new PageExtractor(standardSourceReaders()),
+    policy
+  );
+}
+
 function asRecords(data: ExtractedPayload): Record<string, Scalar>[] {
   if ('items' in data && Array.isArray(data.items)) return data.items;
-  return [data as Record<string, Scalar>];
+  return Object.keys(data).length ? [data as Record<string, Scalar>] : [];
 }
 
 function serialize(value: unknown): string {
@@ -186,9 +248,20 @@ export async function evaluateConfigurationCorpus(
   let correctQuality = 0;
   let falseAlerts = 0;
   let missedAlerts = 0;
+  let falseAcceptances = 0;
+  const checkTotals: ConfigurationEvaluationReport['checks'] = {};
 
   const results = [];
+  if (!cases.length) throw new Error('An evaluation corpus must contain cases.');
+  if (new Set(cases.map((item) => item.name)).size !== cases.length)
+    throw new Error('Evaluation case names must be unique.');
   for (const item of cases) {
+    const caseStarted = Date.now();
+    const checks: Record<string, boolean> = {};
+    const check = (name: string, passed: boolean) => {
+      checks[name] = passed;
+    };
+
     totalFields += item.expectedRecords.reduce(
       (total, record) => total + Object.keys(record).length,
       0
@@ -197,20 +270,20 @@ export async function evaluateConfigurationCorpus(
     const countedProvider = new CountingModelProvider(caseProvider);
     let quality = 'FAILED';
     let semanticStatus: string | undefined;
-    let passed = false;
     let errorName: string | undefined;
     try {
+      const stages = createModelStages(countedProvider);
+      const interpret = stages.interpreter.interpret.bind(stages.interpreter);
+      stages.interpreter.interpret = async (input) => {
+        const intent = await interpret(input);
+        if (item.expectedIntent)
+          check('intent', serialize(intent) === serialize(item.expectedIntent));
+        return intent;
+      };
       const pipeline = new ConfigurationPipeline(
-        createModelStages(countedProvider),
-        fixtureAdapter(item.snapshot, item.discoverySnapshots),
-        new ExtractionExecutor(
-          {
-            http: fixtureAdapter(item.discoverySnapshots?.at(-1) ?? item.snapshot),
-            browser: fixtureAdapter(item.discoverySnapshots?.at(-1) ?? item.snapshot),
-          },
-          new PageExtractor(standardSourceReaders()),
-          policy
-        ),
+        stages,
+        fixtureAdapter(item.snapshot, item.interactions),
+        fixtureExecutor(item.snapshot, item.interactions),
         {
           budgetMs: 30000,
           maxAttempts: 2,
@@ -229,9 +302,17 @@ export async function evaluateConfigurationCorpus(
       quality = result.execution.report.quality;
       semanticStatus = result.semanticReview.status;
       const actualRecords = asRecords(result.execution.data);
-      const entitiesCorrect = serialize(actualRecords) === serialize(item.expectedRecords);
+      const entitiesCorrect = recordsEqual(
+        actualRecords,
+        item.expectedRecords,
+        result.plan.intent.mode === ExtractionMode.Collection
+      );
+      check('acceptance', item.expectedQuality !== 'FAILED');
+      if (item.expectedQuality === 'FAILED') falseAcceptances++;
+      check('extraction', entitiesCorrect);
+      check('quality', quality === item.expectedQuality);
       const qualityCorrect = quality === item.expectedQuality;
-      exactEntities += Number(entitiesCorrect);
+      exactEntities += Number(entitiesCorrect && item.expectedQuality !== 'FAILED');
       correctQuality += Number(qualityCorrect);
       item.expectedRecords.forEach((record, index) => {
         Object.entries(record).forEach(([key, value]) => {
@@ -241,12 +322,40 @@ export async function evaluateConfigurationCorpus(
       const wouldAlert = alertFor(item, result.plan, actualRecords);
       if (wouldAlert && item.expectChange === false) falseAlerts++;
       if (!wouldAlert && item.expectChange === true) missedAlerts++;
-      passed =
-        entitiesCorrect &&
-        qualityCorrect &&
-        (item.expectedSemanticStatus === undefined ||
-          semanticStatus === item.expectedSemanticStatus) &&
-        (item.expectChange === undefined || wouldAlert === item.expectChange);
+      if (item.expectedSemanticStatus !== undefined)
+        check('semantic', semanticStatus === item.expectedSemanticStatus);
+      if (item.expectChange !== undefined) check('alerts', wouldAlert === item.expectChange);
+      let baseline = actualRecords;
+      const callsBeforeRoutine = JSON.stringify(countedProvider.callsByTask);
+      for (const step of item.routine ?? []) {
+        const execution = await fixtureExecutor(step.snapshot, step.interactions).execute(
+          step.snapshot.url,
+          result.plan
+        );
+        const records = asRecords(execution.data);
+        const accepted = isAcceptedExtractionQuality(execution.report.quality);
+        const alerts =
+          accepted && alertFor({ ...item, previousRecords: baseline }, result.plan, records);
+        check(
+          'routine:' + step.name,
+          execution.report.quality === step.expectedQuality &&
+            recordsEqual(
+              records,
+              step.expectedRecords,
+              result.plan.intent.mode === ExtractionMode.Collection
+            ) &&
+            alerts === step.expectChange
+        );
+        if (alerts && !step.expectChange) falseAlerts++;
+        if (!alerts && step.expectChange) missedAlerts++;
+        // Rejected snapshots must never replace the baseline in the scenario.
+        if (accepted) baseline = records;
+      }
+      if (item.routine?.length)
+        check(
+          'routineWithoutModels',
+          JSON.stringify(countedProvider.callsByTask) === callsBeforeRoutine
+        );
       for (const trace of result.trace) {
         const metric = (stageTotals[trace.stage] ??= { calls: 0, failures: 0, durationMs: 0 });
         metric.calls++;
@@ -255,7 +364,19 @@ export async function evaluateConfigurationCorpus(
       }
     } catch (error) {
       errorName = error instanceof Error ? error.name : 'UnknownError';
+      if (error instanceof ConfigurationFailure) semanticStatus = error.semanticReview?.status;
+      const expectedFailure =
+        item.expectedQuality === 'FAILED' &&
+        error instanceof ConfigurationFailure &&
+        (!item.expectedErrorCode || error.code === item.expectedErrorCode) &&
+        (!item.expectedErrorIncludes || error.message.includes(item.expectedErrorIncludes));
+      check('acceptance', expectedFailure);
+      check('quality', expectedFailure);
+      correctQuality += Number(expectedFailure);
+      if (item.expectedIntent && checks.intent === undefined) check('intent', false);
       if (item.expectChange === true) missedAlerts++;
+      if (error instanceof ConfigurationFailure && item.expectedSemanticStatus)
+        check('semantic', error.semanticReview?.status === item.expectedSemanticStatus);
       for (const trace of error && typeof error === 'object' && 'trace' in error
         ? (error.trace as Array<{ stage: string; durationMs: number; status: string }>)
         : []) {
@@ -271,7 +392,19 @@ export async function evaluateConfigurationCorpus(
       total.failures += metric.failures;
       total.durationMs += metric.durationMs;
     }
+    for (const [task, limit] of Object.entries(item.maxModelCalls ?? {}))
+      check('budget:' + task, (countedProvider.callsByTask[task]?.calls ?? 0) <= limit!);
+    for (const [name, succeeded] of Object.entries(checks)) {
+      const total = (checkTotals[name] ??= { passed: 0, total: 0 });
+      total.total++;
+      total.passed += Number(succeeded);
+    }
+    const passed = Object.values(checks).every(Boolean);
     results.push({
+      category: item.category ?? 'uncategorized',
+      checks,
+      modelCallsByTask: countedProvider.callsByTask,
+      durationMs: Date.now() - caseStarted,
       name: item.name,
       passed,
       quality,
@@ -288,10 +421,14 @@ export async function evaluateConfigurationCorpus(
   return {
     cases: cases.length,
     fieldAccuracy: totalFields ? correctFields / totalFields : 1,
-    entityAccuracy: cases.length ? exactEntities / cases.length : 1,
+    entityAccuracy: cases.some((item) => item.expectedQuality !== 'FAILED')
+      ? exactEntities / cases.filter((item) => item.expectedQuality !== 'FAILED').length
+      : 1,
     qualityAccuracy: cases.length ? correctQuality / cases.length : 1,
     falseAlerts,
     missedAlerts,
+    falseAcceptances,
+    checks: checkTotals,
     modelCalls,
     modelDurationMs,
     modelCallsByTask: taskTotals,
@@ -308,7 +445,13 @@ export function createFixtureModelProvider(
 }
 
 export function validateConfigurationEvaluationCase(item: ConfigurationEvaluationCase): void {
-  extractionIntentSchema.parse(item.responses.intent);
-  const plans = Array.isArray(item.responses.plan) ? item.responses.plan : [item.responses.plan];
-  plans.forEach((plan) => executionStrategySchema.parse(plan));
+  if (!item.name.trim() || !item.prompt.trim())
+    throw new Error('Case name and prompt are required.');
+  if (item.expectedQuality === 'FAILED' && (!item.expectedErrorCode || !item.expectedErrorIncludes))
+    throw new Error('Rejected cases require an expected error code and reason.');
+  if (item.expectedIntent) extractionIntentSchema.parse(item.expectedIntent);
+  for (const limit of Object.values(item.maxModelCalls ?? {}))
+    if (!Number.isInteger(limit) || limit! < 0) throw new Error('Invalid model call budget.');
+  // Recorded outputs may intentionally violate a model contract to exercise recovery.
+  // Validate the independent oracle, not the candidate responses.
 }

@@ -164,8 +164,7 @@ jobs:
         run: |
           npm run build
           npm run lint
-          npm run evaluate:extraction
-          npm run evaluate:configuration
+          npm run evaluate:regression
 
       - name: Run backend tests
         working-directory: backend

@@ -1,0 +1,54 @@
+name: Pipeline regression evals
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'packages/contracts/**'
+      - '.github/workflows/evals.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'backend/**'
+      - 'packages/contracts/**'
+      - '.github/workflows/evals.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      NOTIFICATION_PROVIDER: console
+      COMPILER_PROVIDER: agy
+      EVALS_LIVE_MODELS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run evaluate:regression
+      - name: Behavioral and browser integration tests
+        if: ${{ !cancelled() }}
+        run: npm test -- --reporter=default --reporter=junit --outputFile=reports/evals/behavior.xml
+      - name: Upload evaluation reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-evals-${{ github.sha }}
+          path: backend/reports/evals/
+          if-no-files-found: warn

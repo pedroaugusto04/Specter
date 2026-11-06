@@ -15,3 +15,5 @@ coverage/
 .DS_Store
 tsconfig.tsbuildinfo
 specter-companion.zip
+
+backend/reports/

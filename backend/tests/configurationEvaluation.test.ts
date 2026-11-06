@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { evaluateIsolatedStages } from '../src/extraction/stageEvaluation.js';
 import { describe, expect, it } from 'vitest';
 import {
   createFixtureModelProvider,
@@ -25,10 +26,14 @@ describe('Configuration evaluation corpus', () => {
     expect(report.qualityAccuracy).toBe(1);
     expect(report.falseAlerts).toBe(0);
     expect(report.missedAlerts).toBe(0);
-    expect(report.modelCalls).toBe(13);
-    expect(report.stages.intent!.calls).toBe(3);
-    expect(report.stages.discovery!.calls).toBe(4);
-    expect(report.stages.plan!.calls).toBe(3);
-    expect(report.stages.interaction!.calls).toBe(1);
+    expect(report.falseAcceptances).toBe(0);
+    const isolated = await evaluateIsolatedStages(corpus.cases, (item) =>
+      createFixtureModelProvider(item.responses)
+    );
+    expect(isolated.results.filter((result) => !result.passed)).toEqual([]);
+    expect(isolated.cases).toBeGreaterThanOrEqual(20);
+    expect(report.results.length).toBeGreaterThanOrEqual(10);
+    expect(report.checks.intent!.passed).toBe(report.checks.intent!.total);
+    expect(report.checks.routineWithoutModels!.passed).toBeGreaterThan(0);
   });
 });

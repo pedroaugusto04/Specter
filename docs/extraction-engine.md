@@ -204,3 +204,75 @@ The executor uses a single quality acceptance rule and a single pagination progr
 
 Live readiness/end checks run before capturing the HTML used for extraction. This prevents a newly observed terminal marker from validating an older snapshot that omits the final virtualized records. A deterministic regression test covers this ordering.
 Static CSS and response conditions are evaluated from the captured snapshot instead of reading live browser state a second time. Visibility and role conditions still use the browser; discovery waits retain their live checks.
+
+### Regression gate and stage isolation
+
+From `backend/`, run:
+
+```sh
+npm run build
+npm run evaluate:regression
+npm test
+```
+
+`evaluate:regression` is always offline: it constructs only recorded model
+providers and local document adapters, regardless of `EVALS_LIVE_MODELS_ENABLED`.
+It writes `reports/evals/regression.json`, prints the same JSON, and exits nonzero
+if any case or isolated stage fails. The report includes a corpus SHA-256, Node
+version, mode and timestamp so results from different datasets are distinguishable.
+The report directory is ignored by Git.
+
+The gate combines three views:
+
+- **Extraction:** known plans against documents, with field/entity/quality accuracy,
+  false complete results, false alerts and missed alerts.
+- **Configuration and routine replay:** the real configuration pipeline and
+  deterministic executor, with a separately declared gold intent, semantic status,
+  expected rejection code/reason, and maximum model calls by task. A changed page,
+  rejected extraction and recovery can be replayed in sequence. Rejected results
+  leave the scenario baseline intact. Every routine observation is graded and
+  model calls must remain unchanged. This scenario models baseline policy; the
+  persistence implementation is exercised by the service/transaction tests.
+- **Isolated stages:** interpreter, discovery, plan generator and reviewer receive
+  gold inputs with fresh providers. A bad interpreter result therefore cannot
+  contaminate the generator's score. Generated plans are graded by their resulting
+  extraction, rather than by selector equality. Intent equality deliberately
+  checks the complete declared domain contract, including descriptions; discovery
+  compares the declared action. These strict checks are regression contracts,
+  not fuzzy measures of semantic equivalence for live models.
+
+Fixture interactions pair an action with the resulting snapshot. A fresh
+execution starts from the original document and requires the matching replayable
+setup action. HTTP adapters have no interaction capabilities. Discovering a value
+once does not make that value available automatically in subsequent executions.
+Pagination, rendering delays, iframe/Shadow DOM and virtualized scrolling remain
+covered by the real Chromium integration tests, rather than being simulated by
+this snapshot adapter. Acquisition fallback, cooldown, browser capacity, healing,
+scheduling, persistence and delivery are covered by the behavioral suite.
+
+The PR/push workflow `evals.yml` runs the regression gate and the full behavioral
+suite, then uploads JSON and JUnit reports even on evaluation failure. Deployment
+also runs the regression gate before building the image. Configure the workflow
+check as required in branch protection if merges must be blocked; adding the
+workflow alone does not change repository protection settings.
+
+Durations are reported by configuration stage, model task, isolated stage and
+case. They are diagnostic, not latency gates: fixture-model timings measure local
+code, not real provider latency, website performance or VPS capacity. Model call
+budgets are deterministic cost regression gates. Token usage, monetary cost and
+live-site success rates cannot be inferred from them. The existing opt-in
+`evaluate:configuration` command can assess a configured provider separately;
+the offline gate never enables it. Recorded outputs cannot establish whether a
+new model or modified prompt produces correct answers in practice.
+
+To add a regression, sanitize the input, document its synthetic/captured origin,
+and review expected intent, values, quality and alerts independently of candidate
+outputs. Append it to the appropriate versioned corpus. Negative configurations
+must declare both `expectedErrorCode` and `expectedErrorIncludes`, so an unrelated
+failure cannot count as a correct rejection. Candidate responses may intentionally
+violate schemas to exercise validation and bounded repair. Use `interactions`
+for state changes, `routine` for temporal observations, `maxModelCalls` for task
+budgets and `isolated: true` for cases with gold inputs suitable for stage grading.
+Do not silently update expectations to match a failing implementation. Promote
+sanitized real failures into this corpus and maintain a separate held-out dataset
+before making provider or web-coverage comparisons.
