@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type { DocumentSnapshot, ExecutionStrategy, Source } from './contracts.js';
 import { matchingResponses, readPath } from './conditions.js';
+import { extractJsonLdBlocks } from '../utils/htmlSanitizer.js';
 type RecordSelector = ExecutionStrategy['records'];
 
 export interface SourceRecord {
@@ -52,7 +53,6 @@ export class JsonLdSourceReader implements ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[] {
     if (selector.kind !== SourceKind.JsonLd)
       throw new Error('JSON-LD reader requires an entity type.');
-    const $ = cheerio.load(snapshot.html);
     const entities: SourceRecord[] = [];
     const visit = (value: unknown, depth = 0) => {
       if (depth > 32) throw new Error('Structured-data nesting limit exceeded.');
@@ -71,15 +71,9 @@ export class JsonLdSourceReader implements ISourceReader {
       for (const key of ['@graph', '@included', 'mainEntity', 'itemListElement', 'item'])
         if (node[key]) visit(node[key], depth + 1);
     };
-    $('script[type="application/ld+json"]').each((_, element) => {
-      let data: unknown;
-      try {
-        data = JSON.parse($(element).html() ?? '');
-      } catch {
-        return;
-      }
-      visit(data);
-    });
+    for (const block of extractJsonLdBlocks(snapshot.html)) {
+      visit(block);
+    }
     return entities;
   }
   read(_snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown {

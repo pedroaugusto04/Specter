@@ -94,18 +94,20 @@ export const extractionIntentSchema = z
         })
         .strict()
     ),
-    identityFields: z.array(text),
-    filters: z.array(text),
-    triggerRules: z.array(
-      z
-        .object({
-          field: text,
-          operator: z.nativeEnum(TriggerOperator),
-          value: z.union([z.string(), z.number().finite(), z.boolean()]),
-        })
-        .strict()
-    ),
-    triggerMatchMode: z.nativeEnum(TriggerMatchMode),
+    identityFields: z.array(text).default([]),
+    filters: z.array(text).default([]),
+    triggerRules: z
+      .array(
+        z
+          .object({
+            field: text,
+            operator: z.nativeEnum(TriggerOperator),
+            value: z.union([z.string(), z.number().finite(), z.boolean()]),
+          })
+          .strict()
+      )
+      .default([]),
+    triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
   })
   .strict();
 export const executionStrategySchema = z
@@ -155,7 +157,7 @@ export const executionStrategySchema = z
       .optional(),
     fields: z.record(text, z.array(sourceSchema).min(1)),
     ready: z.array(conditionSchema).min(1),
-    empty: z.array(conditionSchema),
+    empty: z.array(conditionSchema).default([]),
     pagination: z
       .object({
         kind: z.enum(['link', 'click', 'scroll']),

@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 
 const TAGS_TO_STRIP = 'style, svg, noscript, iframe, link, track, canvas, object, embed';
 
@@ -8,9 +9,39 @@ const TRACKING_ATTR_PREFIXES = [
   'data-telemetry',
   'data-ga',
   'data-gtm',
+  'data-sentry-',
+  'data-v-',
+  'data-emotion',
+  'data-styled',
   'aria-live',
   'on', // inline event handlers like onclick, onload, onerror
 ];
+
+const NOISY_ATTRIBUTES = new Set([
+  'style',
+  'srcset',
+  'sizes',
+  'integrity',
+  'crossorigin',
+  'nonce',
+  'referrerpolicy',
+  'fetchpriority',
+  'decoding',
+  'loading',
+  'tabindex',
+  'draggable',
+  'spellcheck',
+  'autocapitalize',
+  'autocomplete',
+  'autocorrect',
+  'jsaction',
+  'jscontroller',
+  'jsmodel',
+  'jsname',
+  'jsshadow',
+  'jsslot',
+  'data-reactroot',
+]);
 
 const SEMANTIC_META_PROPERTIES = new Set([
   'og:title',
@@ -86,6 +117,10 @@ export function shouldStripAttribute(attrName: string, attrValue: string): boole
     return true;
   }
 
+  if (NOISY_ATTRIBUTES.has(lowerName)) {
+    return true;
+  }
+
   for (const prefix of TRACKING_ATTR_PREFIXES) {
     if (prefix === 'on') {
       if (/^on[a-z]+$/.test(lowerName)) {
@@ -97,6 +132,58 @@ export function shouldStripAttribute(attrName: string, attrValue: string): boole
   }
 
   return false;
+}
+
+function siblingSignature(el: AnyNode): string | null {
+  if (el.type !== 'tag') return null;
+  const tag = el.tagName.toLowerCase();
+  const id = (el.attribs?.id ?? '').trim();
+  if (id) return null;
+  const cls = (el.attribs?.class ?? '').trim().replace(/\s+/g, ' ');
+  if (cls) return `${tag}.${cls}`;
+  if (['article', 'tr', 'li', 'dd', 'dt'].includes(tag)) return tag;
+  return null;
+}
+
+function pruneRepetitiveRuns($: cheerio.CheerioAPI, maxRepetitiveSamples: number): void {
+  $('ul, ol, tbody').each((_, container) => {
+    const children = $(container).children();
+    if (children.length > maxRepetitiveSamples) {
+      children.slice(maxRepetitiveSamples).remove();
+    }
+  });
+
+  $('div, section, main, aside').each((_, container) => {
+    const children = $(container).children().toArray();
+    if (children.length <= maxRepetitiveSamples) return;
+    let currentSig: string | null = null;
+    let count = 0;
+    for (const child of children) {
+      const sig = siblingSignature(child);
+      if (sig && sig === currentSig) {
+        count++;
+        if (count > maxRepetitiveSamples) {
+          $(child).remove();
+        }
+      } else {
+        currentSig = sig;
+        count = 1;
+      }
+    }
+  });
+}
+
+export function extractJsonLdBlocks(htmlOrRoot: string | cheerio.CheerioAPI): unknown[] {
+  const $ = typeof htmlOrRoot === 'string' ? cheerio.load(htmlOrRoot) : htmlOrRoot;
+  const blocks: unknown[] = [];
+  $('script[type="application/ld+json"]').each((_, node) => {
+    try {
+      blocks.push(JSON.parse($(node).html() ?? ''));
+    } catch {
+      /* Ignore malformed JSON-LD blocks */
+    }
+  });
+  return blocks;
 }
 
 /**
@@ -142,13 +229,8 @@ export function sanitizeHtml(rawHtml: string, maxRepetitiveSamples = 3): string 
     }
   });
 
-  // 5. Prune repeated sibling nodes (keeps at most `maxRepetitiveSamples` samples per container)
-  $('ul, ol, tbody').each((_, container) => {
-    const children = $(container).children();
-    if (children.length > maxRepetitiveSamples) {
-      children.slice(maxRepetitiveSamples).remove();
-    }
-  });
+  // 5. Prune repeated sibling nodes (keeps at most `maxRepetitiveSamples` samples per run)
+  pruneRepetitiveRuns($, maxRepetitiveSamples);
 
   return $.html().trim();
 }

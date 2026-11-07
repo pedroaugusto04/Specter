@@ -109,6 +109,35 @@ describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
     expect(sanitized).not.toContain('Row 5');
   });
 
+  it('prunes consecutive repetitive card runs in generic containers while preserving trailing controls and stripping noisy layout attributes', () => {
+    const rawHtml = `
+      <main>
+        <h1 style="font-size: 24px" data-v-12345="">Catalog</h1>
+        <div class="grid">
+          <article class="card"><img src="/1.jpg" srcset="/1-2x.jpg 2x" loading="lazy" /><b>Card 1</b></article>
+          <article class="card"><b>Card 2</b></article>
+          <article class="card"><b>Card 3</b></article>
+          <article class="card"><b>Card 4</b></article>
+          <article class="card"><b>Card 5</b></article>
+          <nav class="pagination"><a href="/page/2">Next</a></nav>
+        </div>
+      </main>
+    `;
+
+    const sanitized = sanitizeHtml(rawHtml);
+
+    expect(sanitized).toContain('Card 1');
+    expect(sanitized).toContain('Card 2');
+    expect(sanitized).toContain('Card 3');
+    expect(sanitized).not.toContain('Card 4');
+    expect(sanitized).not.toContain('Card 5');
+    expect(sanitized).toContain('class="pagination"');
+    expect(sanitized).not.toContain('style=');
+    expect(sanitized).not.toContain('srcset=');
+    expect(sanitized).not.toContain('loading=');
+    expect(sanitized).not.toContain('data-v-12345');
+  });
+
   it('preserves observed meta tags without synthesizing selectors from JSON-LD', () => {
     const rawSpaHtml = `
       <!DOCTYPE html>

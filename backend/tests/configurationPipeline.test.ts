@@ -229,4 +229,46 @@ describe('Bounded configuration with tools', () => {
     await expect(fixture.pipeline.configure(request)).rejects.toThrow('Incomplete collection');
     expect(fixture.calls).toEqual(['configure']);
   });
+  it('samples large collection items and provenance before semantic review', async () => {
+    const fixture = setup();
+    fixture.execute.mockResolvedValue({
+      data: {
+        items: Array.from({ length: 60 }, (_, idx) => ({ title: `Item ${idx + 1}` })),
+        count: 60,
+      },
+      report: {
+        quality: 'COMPLETE',
+        scope: 'collection',
+        pagesVisited: 1,
+        issues: [],
+        sourcesUsed: { dom: 60 },
+        evidence: Array.from({ length: 55 }, (_, idx) => ({
+          recordIdentity: String(idx),
+          field: 'title',
+          sourceIndex: 0,
+          source: { kind: 'dom' as const, selector: '.title', attribute: 'text' },
+          raw: `Item ${idx + 1}`,
+          value: `Item ${idx + 1}`,
+        })),
+        coverage: 'COMPLETE',
+      },
+      snapshot: { ...snapshot, html: '<h1>Validated collection</h1>' },
+      durationMs: 0,
+    });
+    await expect(fixture.pipeline.configure(request)).resolves.toMatchObject({
+      semanticReview: { status: 'PASSED' },
+    });
+    const reviewPacket = JSON.parse(fixture.inputs[1]!) as {
+      context: {
+        result: {
+          data: { items: unknown[]; count: number; truncatedItems: boolean };
+          provenance: unknown[];
+        };
+      };
+    };
+    expect(reviewPacket.context.result.data.count).toBe(60);
+    expect(reviewPacket.context.result.data.truncatedItems).toBe(true);
+    expect(reviewPacket.context.result.data.items).toHaveLength(25);
+    expect(reviewPacket.context.result.provenance).toHaveLength(40);
+  });
 });

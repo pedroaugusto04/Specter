@@ -68,7 +68,7 @@ are not executed twice. Repeated identical tool operations without state progres
 stop after two repeats. There is no hidden expensive fallback or additional retry
 loop. Existing bounded provider/queue retries apply only to transient failures.
 
-`CONFIGURATION_MAX_INPUT_CHARS` defaults to 30000 and includes model instructions,
+`CONFIGURATION_MAX_INPUT_CHARS` defaults to 250000 and includes model instructions,
 schema and evidence packet. Evidence is truncated explicitly before authoritative
 inputs. `COMPILER_MAX_OUTPUT_CHARS` defaults to 30000; API providers also enforce
 `COMPILER_MAX_OUTPUT_TOKENS` (8192). CLI output files are size-checked and model

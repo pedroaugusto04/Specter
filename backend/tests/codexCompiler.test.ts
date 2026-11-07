@@ -49,4 +49,31 @@ describe('Codex transport', () => {
     expect(result).toEqual(output);
     expect(await readdir(path.join(root, 'work'))).toEqual([]);
   });
+
+  it('parses JSON output wrapped in markdown code fences', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'specter-codex-fenced-'));
+    directories.push(root);
+    const executable = path.join(root, 'fake-codex-fenced.cjs');
+    const output = fixturePlan();
+    const fencedOutput = '```json\n' + JSON.stringify(output, null, 2) + '\n```';
+    await writeFile(
+      executable,
+      `const fs=require('node:fs');const args=process.argv.slice(2);
+      const index=args.indexOf('--output-last-message');
+      fs.writeFileSync(args[index+1], ${JSON.stringify(fencedOutput)});`
+    );
+    const provider = new CodexCompilerProvider({
+      tempBaseDir: path.join(root, 'work'),
+      spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
+        spawn(process.execPath, [executable, ...args], options),
+    });
+    const result = await provider.generate({
+      task: 'configure',
+      timeoutMs: 10000,
+      jobId: 'fenced',
+      evidence: '<h1>Example</h1>',
+      instructions: 'Find the page title',
+    });
+    expect(result).toEqual(output);
+  });
 });

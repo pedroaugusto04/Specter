@@ -127,6 +127,19 @@ export class CliCompilerProvider implements IModelProvider {
           });
       };
 
+      const parseCliJson = (raw: string): unknown => {
+        const trimmed = raw.trim();
+        try {
+          return JSON.parse(trimmed);
+        } catch (err) {
+          const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
+          if (fenced?.[1]) {
+            return JSON.parse(fenced[1].trim());
+          }
+          throw err;
+        }
+      };
+
       const tryReadOutputFile = async (): Promise<unknown | null> => {
         try {
           const stat = await fs.stat(outputFile);
@@ -136,7 +149,7 @@ export class CliCompilerProvider implements IModelProvider {
           if (content.length > env.COMPILER_MAX_OUTPUT_CHARS)
             throw new CompilerValidationError('Model output exceeds the configured size limit.');
           if (!content.trim()) return null;
-          const parsed: unknown = JSON.parse(content);
+          const parsed: unknown = parseCliJson(content);
           return parsed;
         } catch (err) {
           if (err instanceof CompilerValidationError) {

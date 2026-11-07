@@ -116,6 +116,19 @@ describe('Extraction contract and integrity', () => {
       singlePlan
     );
     expect(conflicting.quality).toBe('INVALID');
+    expect(conflicting.issues.join(' ')).toContain('Ambiguous DOM field source');
+
+    const fallbackPlan = structuredClone(singlePlan);
+    fallbackPlan.strategy.fields.price = [
+      { kind: 'dom', selector: '.price', attribute: 'text' },
+      { kind: 'dom', selector: '.final-price', attribute: 'text' },
+    ];
+    const resolvedByFallback = extract(
+      '<main><span class="price">R$ 4.549,00</span><span class="price">R$ 329,00</span><b class="final-price">R$ 4.549,00</b></main>',
+      fallbackPlan
+    );
+    expect(resolvedByFallback.quality).toBe('COMPLETE');
+    expect(resolvedByFallback.records).toEqual([{ price: 4549 }]);
   });
   it('requires explicit empty and readiness evidence', () => {
     expect(extract('<main><p class="empty">No records</p></main>').quality).toBe('EMPTY');
@@ -152,6 +165,8 @@ describe('Extraction contract and integrity', () => {
     expect(
       convertFieldValue('1.299,99', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBe(1299.99);
+    expect(convertFieldValue('US$ 49.99', field, 'https://example.com')).toBe(49.99);
+    expect(convertFieldValue('CA$ 1,299.99', field, 'https://example.com')).toBe(1299.99);
   });
   it('honors non-Western grouping, digit scripts and space separators', () => {
     const field = plan.intent.fields.price!;

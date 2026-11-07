@@ -22,6 +22,20 @@ describe('Single extraction contract', () => {
         plan: { ...plan, strategy: { ...plan.strategy, fields: {} } },
       }).success
     ).toBe(false);
+    const {
+      identityFields: _id,
+      filters: _filters,
+      triggerRules: _rules,
+      triggerMatchMode: _mode,
+      ...intentWithoutOptionalLists
+    } = plan.intent;
+    const { empty: _empty, ...strategyWithoutEmpty } = plan.strategy;
+    expect(
+      extractionPlanSchema.parse({
+        intent: intentWithoutOptionalLists,
+        strategy: strategyWithoutEmpty,
+      })
+    ).toEqual(plan);
   });
 
   for (const [score, status] of [

@@ -1,7 +1,11 @@
 import { ConfigurationToolKind } from './configurationConstants.js';
-import { fitEvidenceText, EvidenceTruncationMarker } from './evidenceBudget.js';
+import {
+  fitEvidenceText,
+  truncateEvidence,
+  EvidenceTruncationMarker,
+} from './evidenceBudget.js';
 import { env } from '../config/env.js';
-import { shouldStripAttribute } from '../utils/htmlSanitizer.js';
+import { extractJsonLdBlocks, shouldStripAttribute } from '../utils/htmlSanitizer.js';
 import * as cheerio from 'cheerio';
 import type { DocumentSession, DocumentSnapshot } from './contracts.js';
 import type { ConfigurationTool } from './model.js';
@@ -9,20 +13,31 @@ import { discoverWithCapabilities } from './capabilities.js';
 import { redactObject, redactText } from './evidence.js';
 import { buildCompilerEvidence } from '../utils/compilerEvidence.js';
 
-export function observation(snapshot: DocumentSnapshot, limit: number): string {
+export function observationPacket(snapshot: DocumentSnapshot, limit: number) {
+  const rawResponses = JSON.stringify(redactObject(snapshot.responses));
+  const boundedResponses = truncateEvidence(
+    rawResponses,
+    Math.max(200, Math.floor(limit * 0.25)),
+    ''
+  );
   const content =
-    buildCompilerEvidence(snapshot.html, limit) +
-    '\nObserved responses: ' +
-    JSON.stringify(redactObject(snapshot.responses));
-  const serialize = (text: string) =>
-    JSON.stringify({
-      url: redactText(snapshot.url),
-      httpStatus: snapshot.httpStatus,
-      transport: snapshot.transport,
-      content: text,
-      truncated: text.includes(EvidenceTruncationMarker),
-    });
-  return serialize(fitEvidenceText(content, limit, serialize));
+    'Observed responses: ' +
+    boundedResponses +
+    '\n' +
+    buildCompilerEvidence(snapshot.html, limit);
+  const buildRecord = (text: string) => ({
+    url: redactText(snapshot.url),
+    httpStatus: snapshot.httpStatus,
+    transport: snapshot.transport,
+    content: text,
+    truncated: text.includes(EvidenceTruncationMarker),
+  });
+  const fitted = fitEvidenceText(content, limit, (text) => JSON.stringify(buildRecord(text)));
+  return buildRecord(fitted);
+}
+
+export function observation(snapshot: DocumentSnapshot, limit: number): string {
+  return JSON.stringify(observationPacket(snapshot, limit));
 }
 
 export async function executeConfigurationTool(session: DocumentSession, tool: ConfigurationTool) {
@@ -46,7 +61,7 @@ export async function executeConfigurationTool(session: DocumentSession, tool: C
   const $ = cheerio.load(snapshot.html);
   if (tool.kind === ConfigurationToolKind.Query) {
     const nodes = $(tool.selector);
-    const limit = env.EXTRACTION_MAX_EVIDENCE;
+    const limit = Math.min(env.EXTRACTION_MAX_EVIDENCE, 25);
     return {
       snapshot,
       result: {
@@ -61,7 +76,8 @@ export async function executeConfigurationTool(session: DocumentSession, tool: C
                 ? $(node).text()
                 : shouldStripAttribute(tool.attribute, $(node).attr(tool.attribute) ?? '')
                   ? '[REMOVED]'
-                  : ($(node).attr(tool.attribute) ?? '')
+                  : ($(node).attr(tool.attribute) ?? ''),
+              500
             ),
             attributes: redactObject(
               node.type === 'tag'
@@ -70,22 +86,16 @@ export async function executeConfigurationTool(session: DocumentSession, tool: C
                       ([key, value]) => !shouldStripAttribute(key, value)
                     )
                   )
-                : {}
+                : {},
+              0,
+              500
             ),
           })),
       },
     };
   }
   if (tool.kind === ConfigurationToolKind.Structured) {
-    const blocks: unknown[] = [];
-    $('script[type="application/ld+json"]').each((_, node) => {
-      try {
-        blocks.push(JSON.parse($(node).html() ?? ''));
-      } catch {
-        /* malformed data is not evidence */
-      }
-    });
-    return { snapshot, result: redactObject(blocks) };
+    return { snapshot, result: redactObject(extractJsonLdBlocks($)) };
   }
   return {
     snapshot,

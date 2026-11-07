@@ -8,6 +8,31 @@ import { ConfigurationStage, SemanticReviewWarningScore } from './configurationC
 import { SemanticReviewStatus } from './constants.js';
 import { observation } from './configurationTools.js';
 
+const MAX_REVIEW_ITEMS = 25;
+const MAX_REVIEW_PROVENANCE = 40;
+
+export function buildSemanticReviewPayload(execution: ExecutionResult): Record<string, unknown> {
+  const data =
+    'items' in execution.data &&
+    Array.isArray(execution.data.items) &&
+    execution.data.items.length > MAX_REVIEW_ITEMS
+      ? {
+          items: execution.data.items.slice(0, MAX_REVIEW_ITEMS),
+          count: execution.data.count,
+          truncatedItems: true,
+        }
+      : execution.data;
+  const provenance =
+    execution.report.evidence && execution.report.evidence.length > MAX_REVIEW_PROVENANCE
+      ? execution.report.evidence.slice(0, MAX_REVIEW_PROVENANCE)
+      : execution.report.evidence;
+  return {
+    data,
+    provenance,
+    coverage: execution.report.coverage,
+  };
+}
+
 export function semanticReviewStatus(score: number, threshold: number): SemanticReview['status'] {
   return score < threshold
     ? SemanticReviewStatus.Rejected
@@ -42,11 +67,7 @@ export async function reviewConfiguration(input: {
           evidence: observation(input.execution.snapshot, input.evidenceLimit),
         },
         input.intent,
-        {
-          data: input.execution.data,
-          provenance: input.execution.report.evidence,
-          coverage: input.execution.report.coverage,
-        }
+        buildSemanticReviewPayload(input.execution)
       )
     );
     semanticReview = { ...review, status: semanticReviewStatus(review.score, input.threshold) };

@@ -14,7 +14,7 @@ import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
-import { observation } from './configurationTools.js';
+import { observationPacket } from './configurationTools.js';
 import { logger } from '../utils/logger.js';
 import { ConfigurationSession } from './configurationSession.js';
 import { ConfigurationProgress, sameIntent } from './configurationPolicy.js';
@@ -125,10 +125,13 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         work.check();
         // The model adapter packs the exact input budget and preserves authoritative inputs.
         const available = this.options.evidenceLimit;
+        const observationBudget = history.length
+          ? Math.max(1000, Math.floor(available * 0.65))
+          : available;
         const evidence = JSON.stringify({
           feedback: redactText(feedback),
+          observation: observationPacket(snapshot, observationBudget),
           history: redactObject([...history].reverse()),
-          observation: observation(snapshot, available),
         });
         try {
           const decision = await run(ConfigurationStage.Configure, () =>
@@ -139,11 +142,12 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               const result = await run('tool:' + decision.tool.kind, () =>
                 session.execute(decision.tool)
               );
-              const state =
+              const isScopedOrInteractive =
                 decision.tool.kind === ConfigurationToolKind.Inspect ||
-                decision.tool.kind === ConfigurationToolKind.Interact
-                  ? [result.result, result.snapshot.html, result.snapshot.responses]
-                  : result.result;
+                decision.tool.kind === ConfigurationToolKind.Interact;
+              const state = isScopedOrInteractive
+                ? [result.result, result.snapshot.html, result.snapshot.responses]
+                : result.result;
               if (!progress.observe(decision.tool, state))
                 fail('Repeated operation without progress.');
               // Inspection is a scoped observation, not a replacement of the browser state.
@@ -152,7 +156,14 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
                 id: decisionIndex,
                 tool: decision.tool,
                 result: redactObject(result.result),
-                evidence: observation(result.snapshot, Math.floor(available * 0.2)),
+                ...(isScopedOrInteractive
+                  ? {
+                      evidence: observationPacket(
+                        result.snapshot,
+                        Math.max(500, Math.floor(available * 0.2))
+                      ),
+                    }
+                  : {}),
               });
               feedback = '';
             } catch (error) {

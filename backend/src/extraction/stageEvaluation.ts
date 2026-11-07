@@ -1,4 +1,5 @@
-import { semanticReviewStatus } from './configurationReview.js';
+import { buildSemanticReviewPayload, semanticReviewStatus } from './configurationReview.js';
+import { payloadRecords } from './comparison.js';
 import { ConfigurationDecisionKind, ConfigurationStage } from './configurationConstants.js';
 import type { ConfigurationEvaluationCase } from './configurationEvaluation.js';
 import { fixtureExecutor } from './configurationEvaluation.js';
@@ -59,7 +60,7 @@ export async function evaluateIsolatedStages(
         item.snapshot.url,
         plan
       );
-      const records = plan.intent.mode === 'single' ? [execution.data] : execution.data.items;
+      const records = payloadRecords(execution.data);
       return (
         execution.report.quality === item.expectedQuality && equal(records, item.expectedRecords)
       );
@@ -82,11 +83,7 @@ export async function evaluateIsolatedStages(
       const review = await createConfigurationModel(provider(item)).review(
         reviewInput,
         item.expectedIntent!,
-        {
-          data: execution.data,
-          provenance: execution.report.evidence,
-          coverage: execution.report.coverage,
-        }
+        buildSemanticReviewPayload(execution)
       );
       const status = semanticReviewStatus(review.score, 4);
       return status === item.expectedSemanticStatus;

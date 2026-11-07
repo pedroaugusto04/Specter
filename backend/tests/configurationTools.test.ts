@@ -47,6 +47,19 @@ describe('Generic configuration observations', () => {
     expect(evidence).not.toContain('product:price:amount');
     expect(evidence).not.toContain('token=secret');
   });
+  it('preserves structured data and observed responses when large HTML is truncated', () => {
+    const oversizedSnapshot = {
+      ...snapshot,
+      html: `<header>${'<span>nav-item</span>'.repeat(500)}</header><main><h1>Chair</h1></main><script type="application/ld+json">{"@type":"Product","name":"Chair","offers":{"price":"199.90"}}</script>`,
+    };
+    const encoded = observation(oversizedSnapshot, 2000);
+    const parsed = JSON.parse(encoded) as { content: string; truncated: boolean };
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.content).toContain('Observed responses:');
+    expect(parsed.content).toContain('/api/items');
+    expect(parsed.content).toContain('Structured data (untrusted JSON):');
+    expect(parsed.content).toContain('199.90');
+  });
   it('filters observed responses and redacts secrets', async () => {
     const result = await executeConfigurationTool(session, {
       kind: 'responses',
@@ -78,7 +91,7 @@ describe('Generic configuration observations', () => {
       jobId: 'bounded',
       url: snapshot.url,
       prompt: original,
-      evidence: '"'.repeat(100000),
+      evidence: '"'.repeat(300000),
       timeoutMs: 1000,
     });
   });

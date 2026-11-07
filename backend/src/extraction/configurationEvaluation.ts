@@ -1,5 +1,6 @@
 import { ConfigurationDecisionKind } from './configurationConstants.js';
 import { evaluationWouldAlert } from './evaluationAlerts.js';
+import { payloadRecords } from './comparison.js';
 import { canonicalJson } from '../utils/diffHasher.js';
 import { ConfigurationPipeline } from './configuration.js';
 import { ConfigurationFailure } from './configurationFailure.js';
@@ -20,7 +21,6 @@ import type {
 import type { ConfigurationRequest } from './configuration.js';
 import type { IModelProvider, ModelInput } from './model.js';
 import type { ExecutionPolicy } from './contracts.js';
-import type { ExtractedPayload } from '../types/extractor.js';
 import { ExtractionMode, isAcceptedExtractionQuality } from './constants.js';
 
 export interface ConfigurationEvaluationCase {
@@ -189,11 +189,6 @@ export function fixtureExecutor(
   );
 }
 
-function asRecords(data: ExtractedPayload): Record<string, Scalar>[] {
-  if ('items' in data && Array.isArray(data.items)) return data.items;
-  return Object.keys(data).length ? [data as Record<string, Scalar>] : [];
-}
-
 function alertFor(
   item: ConfigurationEvaluationCase,
   plan: ExtractionPlan,
@@ -282,7 +277,7 @@ export async function evaluateConfigurationCorpus(
       const result = await pipeline.configure(request);
       quality = result.execution.report.quality;
       semanticStatus = result.semanticReview.status;
-      const actualRecords = asRecords(result.execution.data);
+      const actualRecords = payloadRecords(result.execution.data);
       const entitiesCorrect = recordsEqual(
         actualRecords,
         item.expectedRecords,
@@ -313,7 +308,7 @@ export async function evaluateConfigurationCorpus(
           step.snapshot.url,
           result.plan
         );
-        const records = asRecords(execution.data);
+        const records = payloadRecords(execution.data);
         const accepted = isAcceptedExtractionQuality(execution.report.quality);
         const alerts =
           accepted && alertFor({ ...item, previousRecords: baseline }, result.plan, records);

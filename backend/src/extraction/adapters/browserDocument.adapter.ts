@@ -197,6 +197,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         timeout: Math.max(1, Math.min(execution.remaining(), this.policy.navigationTimeoutMs)),
       });
       httpStatus = response?.status() ?? 200;
+      let settled = false;
       const documentRoot = () =>
         request.strategy?.document?.frame
           ? page.frameLocator(request.strategy?.document.frame)
@@ -219,6 +220,22 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       const snapshot = async () => {
         execution.check();
+        if (!settled) {
+          settled = true;
+          const isEmptyShell = await page
+            .evaluate?.(
+              () =>
+                !document.querySelector('main, article, h1, h2, table, [role="main"]') &&
+                (document.body?.innerText?.trim().length ?? 0) < 32
+            )
+            ?.catch(() => false);
+          if (isEmptyShell) {
+            await page
+              .waitForLoadState?.('networkidle', { timeout: Math.min(1500, timeout()) })
+              ?.catch(() => {});
+          }
+        }
+        await Promise.allSettled([...responseTasks]);
         // Browser projection includes open shadow trees, which page.content() cannot serialize.
         const documentElement = request.strategy?.document?.shadow
           ? documentRoot().locator(request.strategy?.document.shadow)
@@ -251,12 +268,14 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       const check = async (condition: Condition): Promise<boolean | undefined> => {
         if (condition.kind === 'field') return undefined;
-        if (condition.kind === SourceKind.Response)
+        if (condition.kind === SourceKind.Response) {
+          await Promise.allSettled([...responseTasks]);
           return evaluateCondition(
             condition,
             { html: '', url: page.url(), httpStatus, responses },
             []
           );
+        }
         const target = locate(condition.locator);
         if (condition.kind === 'exists') return (await target.count()) > 0;
         if (condition.kind === 'absent') return (await target.count()) === 0;

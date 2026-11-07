@@ -52,7 +52,6 @@ export function comparisonPayload(payload: ExtractedPayload, identityFields: str
 }
 
 export function payloadRecords(payload: ExtractedPayload): ExtractedRecord[] {
-  return 'items' in payload && Array.isArray(payload.items)
-    ? payload.items
-    : [payload as ExtractedRecord];
+  if ('items' in payload && Array.isArray(payload.items)) return payload.items;
+  return Object.keys(payload).length ? [payload as ExtractedRecord] : [];
 }

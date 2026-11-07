@@ -1,5 +1,12 @@
 import { CompilerValidationError } from '../errors/domainErrors.js';
 export const EvidenceTruncationMarker = '[EVIDENCE TRUNCATED]';
+
+export function truncateEvidence(text: string, limit: number, separator = '\n'): string {
+  if (text.length <= limit) return text;
+  const budget = Math.max(0, limit - EvidenceTruncationMarker.length - separator.length);
+  return `${text.slice(0, budget)}${separator}${EvidenceTruncationMarker}`;
+}
+
 /** Fits escaped JSON/text exactly; metadata owned by serialize is never truncated. */
 export function fitEvidenceText(
   value: string,

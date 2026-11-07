@@ -88,7 +88,7 @@ export const envSchema = z.object({
   COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(300000),
   COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   COMPILATION_QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
-  CONFIGURATION_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(30000),
+  CONFIGURATION_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(250000),
   // Detailed prompts and model outputs may contain customer-provided text and page content.
   COMPILATION_DIAGNOSTICS_ENABLED: z
     .enum(['true', 'false'])

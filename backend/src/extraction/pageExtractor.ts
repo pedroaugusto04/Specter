@@ -68,8 +68,10 @@ export class PageExtractor implements IPageExtractor {
         const record: Record<string, Scalar> = {};
         const failures = new Map<string, unknown[]>();
         const evidence: PageExtraction['evidence'] = [];
+        let hasUnhandledSourceError = false;
         for (const [name, field] of definitions) {
           let value: Scalar = null;
+          let unhandledSourceError: string | null = null;
           const sources = strategy.fields[name] ?? [];
           for (let index = 0; index < sources.length; index++) {
             const source = sources[index]!;
@@ -98,7 +100,22 @@ export class PageExtractor implements IPageExtractor {
               }
               sourceRecord = matching[0]!;
             }
-            const raw = this.readers[source.kind].read(snapshot, source, sourceRecord);
+            let raw: unknown;
+            try {
+              raw = this.readers[source.kind].read(snapshot, source, sourceRecord);
+            } catch (sourceError) {
+              const reason =
+                sourceError instanceof Error ? sourceError.message : 'Source reading failed';
+              unhandledSourceError ??= reason;
+              const readings = failures.get(name) ?? [];
+              readings.push({
+                source,
+                raw: null,
+                reason,
+              });
+              failures.set(name, readings);
+              continue;
+            }
             value = convertFieldValue(raw, field, snapshot.url);
             if (value === null) {
               const readings = failures.get(name) ?? [];
@@ -123,6 +140,10 @@ export class PageExtractor implements IPageExtractor {
               });
               break;
             }
+          }
+          if (value === null && unhandledSourceError) {
+            hasUnhandledSourceError = true;
+            if (!field.required) fail(unhandledSourceError);
           }
           record[name] = value;
         }
@@ -149,6 +170,7 @@ export class PageExtractor implements IPageExtractor {
             fail(
               `Required field '${name}' is missing or invalid. Failed sources: ${JSON.stringify(redactObject(failures.get(name) ?? []))}`
             );
+        if (hasUnhandledSourceError) continue;
         const identity = recordIdentity(record, intent.identityFields);
         evidence.forEach((entry) => {
           entry.recordIdentity = redactText(identity);
