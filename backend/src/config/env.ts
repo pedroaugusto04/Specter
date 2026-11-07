@@ -62,6 +62,7 @@ export const envSchema = z.object({
   SCRAPERAPI_KEY: z.string().optional().default(''),
   SCRAPINGBEE_API_KEY: z.string().optional().default(''),
   CRAWLBASE_TOKEN: z.string().optional().default(''),
+  UNBLOCKER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
 
   SEMANTIC_REVIEW_ENABLED: z
     .enum(['true', 'false'])

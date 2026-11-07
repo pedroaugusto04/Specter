@@ -14,7 +14,7 @@ export class CheerioScraperEngine implements IScraperEngine {
   private readonly fetchFn: typeof fetch;
 
   constructor(options: { timeoutMs?: number; fetchFn?: typeof fetch } = {}) {
-    this.defaultTimeoutMs = options.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
+    this.defaultTimeoutMs = options.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
     this.fetchFn = options.fetchFn ?? fetch;
   }
 

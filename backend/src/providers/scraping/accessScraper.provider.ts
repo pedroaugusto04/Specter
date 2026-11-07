@@ -37,7 +37,10 @@ export class AccessScraperEngine implements IScraperEngine {
           const result = await engine.fetchHtml(url, {
             ...options,
             storageState: external ? undefined : options.storageState,
-            timeoutMs: Math.min(context.remaining(), env.PLAYWRIGHT_TIMEOUT_MS),
+            timeoutMs: Math.min(
+              context.remaining(),
+              external ? env.UNBLOCKER_TIMEOUT_MS : env.PLAYWRIGHT_TIMEOUT_MS
+            ),
             signal: context.signal,
           });
           detectAntiBotBlock(result.url, result.rawHtml, result.httpStatus);

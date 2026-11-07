@@ -142,7 +142,7 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
     }
 
     const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
+    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
     try {

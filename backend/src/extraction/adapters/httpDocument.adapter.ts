@@ -25,7 +25,7 @@ export class HttpDocumentAdapter implements DocumentAdapter {
   ): Promise<DocumentSession> {
     context.check();
     const result = await this.scraper.fetchHtml(await assertSafeUrl(url, 'targetUrl'), {
-      timeoutMs: Math.min(context.remaining(), env.PLAYWRIGHT_TIMEOUT_MS),
+      timeoutMs: Math.min(context.remaining(), env.UNBLOCKER_TIMEOUT_MS),
       signal: context.signal,
       captureScreenshot: options.captureScreenshot,
       storageState: (this.external ? undefined : options.storageState) as

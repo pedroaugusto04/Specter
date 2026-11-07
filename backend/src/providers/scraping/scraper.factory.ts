@@ -32,10 +32,10 @@ export function createScraperEngine(
 
 export function createUnblockers() {
   return [
+    new CrawlbaseUnblockerProvider(),
     new ZenRowsUnblockerProvider(),
     new ScraperApiUnblockerProvider(),
     new ScrapingBeeUnblockerProvider(),
-    new CrawlbaseUnblockerProvider(),
   ];
 }
 export function createHttpCandidates() {

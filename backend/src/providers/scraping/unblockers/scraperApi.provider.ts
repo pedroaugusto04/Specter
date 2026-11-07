@@ -113,7 +113,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
     }
 
     const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.PLAYWRIGHT_TIMEOUT_MS;
+    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
     try {
@@ -127,8 +127,10 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         const isChallenged = err instanceof AntiBotBlockedError;
         const isProxyConfigIssue =
           err instanceof UnblockerError &&
-          typeof err.message === 'string' &&
-          (err.message.includes('country_code') || err.message.includes('premium'));
+          (err.statusCode === 403 ||
+            err.statusCode === 500 ||
+            (typeof err.message === 'string' &&
+              (err.message.includes('country_code') || err.message.includes('premium'))));
 
         if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
           logger.info(`[${this.name}] Standard proxy challenged or requires premium residential proxy; retrying with premium residential proxy...`, {
