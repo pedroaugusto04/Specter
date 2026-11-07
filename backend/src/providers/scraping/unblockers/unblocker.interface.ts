@@ -4,6 +4,10 @@ export class UnblockerError extends Error {
   public readonly providerName: string;
   public readonly httpStatus?: number;
 
+  get statusCode(): number | undefined {
+    return this.httpStatus;
+  }
+
   constructor(providerName: string, message: string, httpStatus?: number, cause?: unknown) {
     super(`[${providerName}] ${message}`, { cause });
     this.name = 'UnblockerError';

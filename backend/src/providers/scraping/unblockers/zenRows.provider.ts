@@ -152,8 +152,8 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
         const isChallenged = err instanceof AntiBotBlockedError;
         const isProxyConfigIssue =
           err instanceof UnblockerError &&
-          (err.statusCode === 422 ||
-            err.statusCode === 400 ||
+          (err.httpStatus === 422 ||
+            err.httpStatus === 400 ||
             (typeof err.message === 'string' &&
               (err.message.includes('proxy_country') ||
                 err.message.includes('premium') ||

@@ -127,8 +127,8 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
         const isChallenged = err instanceof AntiBotBlockedError;
         const isProxyConfigIssue =
           err instanceof UnblockerError &&
-          (err.statusCode === 403 ||
-            err.statusCode === 500 ||
+          (err.httpStatus === 403 ||
+            err.httpStatus === 500 ||
             (typeof err.message === 'string' &&
               (err.message.includes('country_code') || err.message.includes('premium'))));
 
