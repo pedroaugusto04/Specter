@@ -124,6 +124,72 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
       expect(secondCallUrl.searchParams.get('premium_proxy')).toBe('true');
     });
+
+    it('does not send proxy_country on standard proxy attempt for ccTLD, but sends both on premium retry', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><head><title>Attention Required! | Cloudflare</title></head></html>'),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><body><h1>Mercado Livre BR Produto</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://www.mercadolivre.com.br/produto/123');
+      expect(result.rawHtml).toContain('Mercado Livre BR Produto');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const firstCallUrl = new URL(mockFetch.mock.calls[0]![0]);
+      expect(firstCallUrl.searchParams.has('premium_proxy')).toBe(false);
+      expect(firstCallUrl.searchParams.has('proxy_country')).toBe(false);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium_proxy')).toBe('true');
+      expect(secondCallUrl.searchParams.get('proxy_country')).toBe('br');
+    });
+
+    it('retries with premium proxy when standard attempt fails with proxy_country 400 error', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 400,
+          ok: false,
+          text: () =>
+            Promise.resolve(
+              '{"code":"REQS004","title":"Invalid value provided for \'proxy_country\' parameter; proxy geolocation is only supported when \'premium_proxy\' is set to true"}'
+            ),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><body><h1>Unblocked with Premium</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://www.mercadolivre.com.br/produto/123');
+      expect(result.rawHtml).toContain('Unblocked with Premium');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium_proxy')).toBe('true');
+      expect(secondCallUrl.searchParams.get('proxy_country')).toBe('br');
+    });
   });
 
   describe('ScraperApiUnblockerProvider', () => {
@@ -213,6 +279,42 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
       expect(secondCallUrl.searchParams.get('premium')).toBe('true');
     });
+
+    it('does not send country_code on standard ScraperAPI attempt, but sends both on premium retry', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          headers: new Headers(),
+          text: () =>
+            Promise.resolve('<html><head><title>Attention Required! | Cloudflare</title></head></html>'),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          headers: new Headers(),
+          text: () =>
+            Promise.resolve('<html><body><h1>Unblocked via ScraperAPI Premium BR</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ScraperApiUnblockerProvider({
+        apiKey: 'test-scraperapi-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://www.mercadolivre.com.br/produto/123');
+      expect(result.rawHtml).toContain('Unblocked via ScraperAPI Premium BR');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const firstCallUrl = new URL(mockFetch.mock.calls[0]![0]);
+      expect(firstCallUrl.searchParams.has('premium')).toBe(false);
+      expect(firstCallUrl.searchParams.has('country_code')).toBe(false);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium')).toBe('true');
+      expect(secondCallUrl.searchParams.get('country_code')).toBe('br');
+    });
   });
 
   describe('ScrapingBeeUnblockerProvider', () => {
@@ -263,6 +365,40 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
         UnblockerQuotaExhaustedError
       );
+    });
+
+    it('does not send country_code on standard ScrapingBee attempt, but sends both on premium retry', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><head><title>Attention Required! | Cloudflare</title></head></html>'),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><body><h1>ScrapingBee BR Unblocked</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ScrapingBeeUnblockerProvider({
+        apiKey: 'test-bee-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://www.mercadolivre.com.br/produto/123');
+      expect(result.rawHtml).toContain('ScrapingBee BR Unblocked');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const firstCallUrl = new URL(mockFetch.mock.calls[0]![0]);
+      expect(firstCallUrl.searchParams.has('premium_proxy')).toBe(false);
+      expect(firstCallUrl.searchParams.has('country_code')).toBe(false);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium_proxy')).toBe('true');
+      expect(secondCallUrl.searchParams.get('country_code')).toBe('br');
     });
   });
 

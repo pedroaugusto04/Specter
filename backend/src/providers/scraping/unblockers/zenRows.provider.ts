@@ -40,11 +40,10 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
     endpoint.searchParams.set('js_render', 'true');
     if (usePremium) {
       endpoint.searchParams.set('premium_proxy', 'true');
-    }
-
-    const country = resolveTargetCountry(targetUrl);
-    if (country) {
-      endpoint.searchParams.set('proxy_country', country.toLowerCase());
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('proxy_country', country.toLowerCase());
+      }
     }
 
     if (options?.waitForSelector) {
@@ -150,8 +149,14 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       try {
         return await this.executeAttempt(targetUrl, false, options, signal, startTime);
       } catch (err) {
-        if (err instanceof AntiBotBlockedError && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged by target; retrying with premium proxy...`, {
+        const isChallenged = err instanceof AntiBotBlockedError;
+        const isProxyConfigIssue =
+          err instanceof UnblockerError &&
+          typeof err.message === 'string' &&
+          (err.message.includes('proxy_country') || err.message.includes('premium_proxy'));
+
+        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
+          logger.info(`[${this.name}] Standard proxy challenged or requires premium proxy; retrying with premium proxy...`, {
             targetUrl,
           });
           return await this.executeAttempt(targetUrl, true, options, signal, startTime);

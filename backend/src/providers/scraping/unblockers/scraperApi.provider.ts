@@ -40,11 +40,10 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
     endpoint.searchParams.set('render', 'true');
     if (usePremium) {
       endpoint.searchParams.set('premium', 'true');
-    }
-
-    const country = resolveTargetCountry(targetUrl);
-    if (country) {
-      endpoint.searchParams.set('country_code', country.toLowerCase());
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('country_code', country.toLowerCase());
+      }
     }
 
     if (options?.captureScreenshot) {
@@ -125,8 +124,14 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       try {
         return await this.executeAttempt(targetUrl, false, options, signal, startTime);
       } catch (err) {
-        if (err instanceof AntiBotBlockedError && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged by target; retrying with premium residential proxy...`, {
+        const isChallenged = err instanceof AntiBotBlockedError;
+        const isProxyConfigIssue =
+          err instanceof UnblockerError &&
+          typeof err.message === 'string' &&
+          (err.message.includes('country_code') || err.message.includes('premium'));
+
+        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
+          logger.info(`[${this.name}] Standard proxy challenged or requires premium residential proxy; retrying with premium residential proxy...`, {
             targetUrl,
           });
           return await this.executeAttempt(targetUrl, true, options, signal, startTime);

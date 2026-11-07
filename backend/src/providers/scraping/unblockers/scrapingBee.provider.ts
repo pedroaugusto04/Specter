@@ -40,14 +40,13 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
     endpoint.searchParams.set('render_js', 'true');
     if (usePremium) {
       endpoint.searchParams.set('premium_proxy', 'true');
+      const country = resolveTargetCountry(targetUrl);
+      if (country) {
+        endpoint.searchParams.set('country_code', country.toLowerCase());
+      }
     }
     endpoint.searchParams.set('block_resources', 'false');
     endpoint.searchParams.set('block_ads', 'true');
-
-    const country = resolveTargetCountry(targetUrl);
-    if (country) {
-      endpoint.searchParams.set('country_code', country.toLowerCase());
-    }
 
     if (options?.waitForSelector) {
       const cleanWaitSelector = options.waitForSelector.split(',')[0]?.trim();
@@ -154,8 +153,14 @@ export class ScrapingBeeUnblockerProvider implements IUnblockerProvider {
       try {
         return await this.executeAttempt(targetUrl, false, options, signal, startTime);
       } catch (err) {
-        if (err instanceof AntiBotBlockedError && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged by target; retrying with premium proxy...`, {
+        const isChallenged = err instanceof AntiBotBlockedError;
+        const isProxyConfigIssue =
+          err instanceof UnblockerError &&
+          typeof err.message === 'string' &&
+          (err.message.includes('country_code') || err.message.includes('premium_proxy'));
+
+        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
+          logger.info(`[${this.name}] Standard proxy challenged or requires premium proxy; retrying with premium proxy...`, {
             targetUrl,
           });
           return await this.executeAttempt(targetUrl, true, options, signal, startTime);
