@@ -12,6 +12,12 @@ export interface PlanExecutionResult {
 export interface IPlanExecutor {
   execute(url: string, plan: ExtractionPlan, options?: ScrapeOptions): Promise<PlanExecutionResult>;
 }
+/** Persisted plans from older releases carry a top-level `version` key the strict schema rejects. */
+function stripLegacyPlanVersion(plan: ExtractionPlan): ExtractionPlan {
+  if (!plan || typeof plan !== 'object' || !('version' in plan)) return plan;
+  const { version: _legacy, ...rest } = plan as ExtractionPlan & { version?: unknown };
+  return rest as ExtractionPlan;
+}
 /** Application port; the common executor and its adapters are composed at bootstrap. */
 export class PlanExecutionService implements IPlanExecutor {
   constructor(private readonly executor: IExtractionExecutor) {}
@@ -20,7 +26,7 @@ export class PlanExecutionService implements IPlanExecutor {
     plan: ExtractionPlan,
     options: ScrapeOptions = {}
   ): Promise<PlanExecutionResult> {
-    const result = await this.executor.execute(url, extractionPlanSchema.parse(plan), options);
+    const result = await this.executor.execute(url, extractionPlanSchema.parse(stripLegacyPlanVersion(plan)), options);
     return {
       data: result.data,
       report: result.report,
