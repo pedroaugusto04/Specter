@@ -62,10 +62,15 @@ fi
 
 echo "5. Compilando e atualizando Frontend..."
 if [ -d "frontend" ]; then
+  if [ -d "extension" ] && command -v zip >/dev/null 2>&1; then
+    mkdir -p frontend/public
+    (cd extension && zip -qr ../frontend/public/specter-companion.zip . -x "specter-companion.zip") || true
+  fi
   cd frontend
   npm ci --no-audit --no-fund
   NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-}" \
   NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
+  NEXT_PUBLIC_EXTENSION_URL="${NEXT_PUBLIC_EXTENSION_URL:-}" \
   npm run build
 
   echo "Sincronizando arquivos do frontend para $FRONTEND_DEPLOY_PATH..."

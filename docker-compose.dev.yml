@@ -106,6 +106,7 @@ services:
       HOSTNAME: '0.0.0.0'
       PORT: '3000'
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_EXTENSION_URL: ${NEXT_PUBLIC_EXTENSION_URL:-}
       WATCHPACK_POLLING: 'true'
     ports:
       - '3005:3000'

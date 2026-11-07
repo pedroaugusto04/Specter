@@ -53,6 +53,12 @@ export function IntegrationsModal({
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
   // Sessions state (from companion browser extension)
+  const extensionUrl =
+    process.env.NEXT_PUBLIC_EXTENSION_URL ||
+    `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/specter-companion.zip`;
+  const isExternalExtensionUrl = Boolean(
+    process.env.NEXT_PUBLIC_EXTENSION_URL && /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
+  );
   const [sessions, setSessions] = React.useState<SessionDto[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = React.useState(false);
   const [deletingSessionId, setDeletingSessionId] = React.useState<string | null>(null);
@@ -704,15 +710,18 @@ export function IntegrationsModal({
                       <Globe className="h-3.5 w-3.5 text-primary" />
                       How to use the Companion extension:
                     </div>
-                    <ol className="list-decimal list-inside text-muted-foreground space-y-1 pl-1">
+                    <ol className="list-decimal list-inside text-muted-foreground space-y-1.5 pl-1">
                       <li>
-                        Load the{' '}
-                        <code className="text-foreground bg-muted px-1 py-0.5 rounded">
-                          extension/
-                        </code>{' '}
-                        folder in Chrome (
-                        <code className="text-foreground">chrome://extensions</code> in Developer
-                        Mode) or install from the Chrome Web Store.
+                        <a
+                          href={extensionUrl}
+                          {...(isExternalExtensionUrl
+                            ? { target: '_blank', rel: 'noopener noreferrer' }
+                            : { download: 'specter-companion.zip' })}
+                          className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+                        >
+                          Download the Specter Companion extension
+                          <ExternalLink className="h-3 w-3 inline" />
+                        </a>
                       </li>
                       <li>
                         Visit and log in to the desired target website in your normal browser.
@@ -756,8 +765,18 @@ export function IntegrationsModal({
                     </div>
                   ) : sessions.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
-                      No web sessions synced yet. Install the Specter Companion extension and sync
-                      your logged-in sites with 1 click.
+                      No web sessions synced yet.{' '}
+                      <a
+                        href={extensionUrl}
+                        {...(isExternalExtensionUrl
+                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                          : { download: 'specter-companion.zip' })}
+                        className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        Download the extension
+                        <ExternalLink className="h-3 w-3 inline" />
+                      </a>{' '}
+                      and sync your logged-in sites with 1 click.
                     </div>
                   ) : (
                     <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">

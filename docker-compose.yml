@@ -95,6 +95,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_EXTENSION_URL: ${NEXT_PUBLIC_EXTENSION_URL:-}
     container_name: specter-frontend
     restart: unless-stopped
     ports:

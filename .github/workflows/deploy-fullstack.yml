@@ -41,6 +41,7 @@ env:
   CORS_ORIGIN: ${{ vars.CORS_ORIGIN || 'https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com' }}
   NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH || '' }}
   NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || '/api' }}
+  NEXT_PUBLIC_EXTENSION_URL: ${{ vars.NEXT_PUBLIC_EXTENSION_URL || '' }}
   SEMANTIC_REVIEW_ENABLED: ${{ vars.SEMANTIC_REVIEW_ENABLED || 'true' }}
   SEMANTIC_REVIEW_THRESHOLD: ${{ vars.SEMANTIC_REVIEW_THRESHOLD || '4' }}
   EXTRACTION_ACTION_TIMEOUT_MS: ${{ vars.EXTRACTION_ACTION_TIMEOUT_MS || '10000' }}
@@ -296,6 +297,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_STORAGE_BUCKET: ${{ vars.SUPABASE_STORAGE_BUCKET || env.SUPABASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_EXTENSION_URL: ${{ env.NEXT_PUBLIC_EXTENSION_URL }}
         run: |
           bash scripts/deploy/generate-backend-env.sh .deploy/backend.env 3001
 
@@ -401,11 +403,19 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
 
+      - name: Package companion extension artifact
+        run: |
+          if [ -d "extension" ] && command -v zip >/dev/null 2>&1; then
+            mkdir -p frontend/public
+            (cd extension && zip -qr ../frontend/public/specter-companion.zip . -x "specter-companion.zip") || true
+          fi
+
       - name: Build frontend static export
         working-directory: frontend
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ env.NEXT_PUBLIC_BASE_PATH }}
           NEXT_PUBLIC_API_URL: ${{ env.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_EXTENSION_URL: ${{ env.NEXT_PUBLIC_EXTENSION_URL }}
         run: |
           npm run build
 
