@@ -45,6 +45,32 @@ describe('Anti-Bot Detection & Verification Interstitial Defense', () => {
     ).not.toThrow();
   });
 
+  it('does NOT block legitimate product pages that contain an embedded recaptcha or hcaptcha widget in the footer', () => {
+    const legitimateHtmlWithRecaptcha = `
+      <html>
+        <head><title>Notebook Dell Inspiron 15 - Loja Oficial</title></head>
+        <body>
+          <main>
+            <h1>Notebook Dell Inspiron</h1>
+            <span class="price">R$ 3.500</span>
+            <p>Processador Intel Core i7, 16GB de RAM, SSD de 512GB e placa de vídeo dedicada.</p>
+          </main>
+          <footer>
+            <form action="/newsletter">
+              <input type="email" placeholder="Assine a newsletter" />
+              <div class="g-recaptcha" data-sitekey="6Le-wvkSAAAAAPBMRTvw0Q4Muexq9bi0DJwx_mJ-"></div>
+              <div class="h-captcha" data-sitekey="10000000-ffff-ffff-ffff-000000000001"></div>
+            </form>
+          </footer>
+        </body>
+      </html>
+    `;
+
+    expect(() =>
+      detectAntiBotBlock('https://store.example.com/product/dell-inspiron', legitimateHtmlWithRecaptcha, 200)
+    ).not.toThrow();
+  });
+
   it('CheerioScraperEngine throws AntiBotBlockedError when response redirects to verification page', async () => {
     // Mock response.url being redirected
     const mockRedirectFetch: typeof fetch = async () => {

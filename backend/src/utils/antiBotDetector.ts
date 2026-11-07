@@ -16,14 +16,55 @@ const SUSPICIOUS_URL_PATTERNS = [
 
 const SUSPICIOUS_HTML_PATTERNS = [
   /action=["'][^"']*account-verification/i,
-  /<title[^>]*>Just a moment\.\.\.<\/title>/i,
-  /<title[^>]*>Attention Required! \| Cloudflare<\/title>/i,
-  /<title[^>]*>Access Denied<\/title>/i,
-  /<title[^>]*>Robot Check<\/title>/i,
+  /<title[^>]*>\s*Just a moment\.\.\.\s*<\/title>/i,
+  /<title[^>]*>\s*Attention Required!\s*\|\s*Cloudflare\s*<\/title>/i,
+  /<title[^>]*>\s*Access Denied\s*<\/title>/i,
+  /<title[^>]*>\s*Robot Check\s*<\/title>/i,
+  /<title[^>]*>[^<]*(?:security challenge|human verification|verify you are human|are you a robot|are you human|bot detection)\b[^<]*<\/title>/i,
   /cf-chl-widget/i,
-  /g-recaptcha/i,
-  /h-captcha/i,
+  /id=["']challenge-form["']/i,
+  /id=["']px-captcha["']/i,
+  /class=["'][^"']*px-captcha/i,
 ];
+
+function isCaptchaInterstitial(rawHtml: string): boolean {
+  const hasCaptchaMarker =
+    /g-recaptcha/i.test(rawHtml) ||
+    /h-captcha/i.test(rawHtml) ||
+    /cf-turnstile/i.test(rawHtml);
+
+  if (!hasCaptchaMarker) return false;
+
+  // Title indicates a challenge / bot verification screen
+  const hasChallengeTitle =
+    /<title[^>]*>[^<]*(?:captcha|verify|human|robot|security|checkpoint|attention required|access denied)\b[^<]*<\/title>/i.test(
+      rawHtml
+    );
+  if (hasChallengeTitle) return true;
+
+  // Form explicitly posts to a captcha or security verification endpoint
+  const hasChallengeForm =
+    /<form[^>]*action=["'][^"']*(?:captcha|checkpoint|challenge|verify|validate)[^"']*["']/i.test(
+      rawHtml
+    );
+  if (hasChallengeForm) return true;
+
+  // Interstitial shell detection: challenge screens typically have minimal textual content and no semantic layout
+  const bodyText = rawHtml
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const hasMainContentTag = /<(main|article|table)\b/i.test(rawHtml);
+
+  if (!hasMainContentTag && bodyText.length < 350) {
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Checks for HTTP status codes, redirection URLs, and DOM patterns
@@ -55,5 +96,12 @@ export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: num
         403
       );
     }
+  }
+
+  if (isCaptchaInterstitial(rawHtml)) {
+    throw new AntiBotBlockedError(
+      `Anti-bot block detected: CAPTCHA challenge interstitial screen presented.`,
+      403
+    );
   }
 }

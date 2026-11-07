@@ -20,6 +20,7 @@ import { NotificationDispatcher } from './providers/notifications/notificationDi
 import { TelegramNotificationProvider } from './providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from './providers/notifications/webhookNotification.provider.js';
 import { createScraperEngine, createHttpCandidates } from './providers/scraping/scraper.factory.js';
+import { logProviderQuotasOnStartup } from './providers/scraping/unblockers/index.js';
 import { createStorageProvider } from './providers/storage/index.js';
 import { createRealtimeEventBus } from './providers/realtime/realtime.factory.js';
 import { BullMqJobScheduler } from './queues/queues.js';
@@ -202,6 +203,11 @@ async function bootstrap(): Promise<void> {
       port: env.PORT,
       host: env.HOST,
       environment: env.NODE_ENV,
+    });
+    void logProviderQuotasOnStartup().catch((quotaErr) => {
+      logger.warn('Failed to verify unblocker provider quotas on startup', {
+        errorMessage: quotaErr instanceof Error ? quotaErr.message : String(quotaErr),
+      });
     });
   } catch (error) {
     logger.error('Failed to bind server port', {

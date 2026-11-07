@@ -92,6 +92,38 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         UnblockerQuotaExhaustedError
       );
     });
+
+    it('retries with premium proxy only when standard attempt is challenged by anti-bot', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><head><title>Attention Required! | Cloudflare</title></head></html>'),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: () =>
+            Promise.resolve('<html><body><h1>Unblocked Product</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ZenRowsUnblockerProvider({
+        apiKey: 'test-zenrows-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product');
+      expect(result.rawHtml).toContain('Unblocked Product');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const firstCallUrl = new URL(mockFetch.mock.calls[0]![0]);
+      expect(firstCallUrl.searchParams.has('premium_proxy')).toBe(false);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium_proxy')).toBe('true');
+    });
   });
 
   describe('ScraperApiUnblockerProvider', () => {
@@ -146,6 +178,40 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
       await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
         UnblockerQuotaExhaustedError
       );
+    });
+
+    it('retries with premium residential proxy when standard proxy is challenged by anti-bot', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          headers: new Headers(),
+          text: () =>
+            Promise.resolve('<html><head><title>Attention Required! | Cloudflare</title></head></html>'),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          headers: new Headers(),
+          text: () =>
+            Promise.resolve('<html><body><h1>Unblocked via ScraperAPI Premium</h1></body></html>'),
+        } as unknown as Response);
+
+      const provider = new ScraperApiUnblockerProvider({
+        apiKey: 'test-scraperapi-key',
+        fetchFn: mockFetch,
+      });
+
+      const result = await provider.fetchHtml('https://example.com/product');
+      expect(result.rawHtml).toContain('Unblocked via ScraperAPI Premium');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const firstCallUrl = new URL(mockFetch.mock.calls[0]![0]);
+      expect(firstCallUrl.searchParams.has('premium')).toBe(false);
+
+      const secondCallUrl = new URL(mockFetch.mock.calls[1]![0]);
+      expect(secondCallUrl.searchParams.get('premium')).toBe('true');
     });
   });
 

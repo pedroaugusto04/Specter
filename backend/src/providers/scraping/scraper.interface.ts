@@ -6,6 +6,7 @@ export interface ScrapeOptions {
   waitForSelector?: string;
   storageState?: PlaywrightStorageState;
   captureScreenshot?: boolean;
+  premium?: boolean;
 }
 
 export interface ScrapeResult {

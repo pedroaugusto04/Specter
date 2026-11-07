@@ -25,6 +25,7 @@ import type {
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
 import { buildChromeFingerprint } from '../../utils/chromeFingerprint.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
+import { parseProxyConfig } from '../../utils/proxyParser.js';
 
 export class BrowserDocumentAdapter implements DocumentAdapter {
   constructor(
@@ -77,6 +78,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
     execution.signal.addEventListener('abort', abort, { once: true });
     try {
       execution.check();
+      const proxyConfig = parseProxyConfig(this.proxy);
       launch = chromium.launch({
         headless: true,
         timeout: Math.max(1, execution.remaining()),
@@ -88,7 +90,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           '--disable-infobars',
           '--window-size=1920,1080',
         ],
-        ...(this.proxy ? { proxy: { server: this.proxy } } : {}),
+        ...(proxyConfig ? { proxy: proxyConfig } : {}),
       });
       browser = await launch;
       execution.check();
