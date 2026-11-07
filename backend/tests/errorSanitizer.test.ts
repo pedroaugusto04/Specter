@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   AntiBotBlockedError,
+  CompilerApiRequestError,
+  UpstreamHttpError,
+  DecryptionError,
+  ResourceLeaseLostError,
+  UnsupportedCapabilityError,
   CompilerTimeoutError,
   CompilerValidationError,
   NavigationTimeoutError,
   SelectorMismatchError,
 } from '../src/errors/domainErrors.js';
-import { formatUserErrorMessage } from '../src/utils/errorSanitizer.js';
+import { formatUserErrorMessage, presentStoredError } from '../src/utils/errorSanitizer.js';
 
 describe('formatUserErrorMessage (Transparent & User-Friendly Errors)', () => {
   it('formats anti-bot redirect errors without leaking stack traces or query token URLs', () => {
@@ -62,5 +67,53 @@ describe('formatUserErrorMessage (Transparent & User-Friendly Errors)', () => {
     expect(cleaned).toBe('We could not complete this request. Please try again later.');
     expect(cleaned).not.toContain('node:net');
     expect(cleaned).not.toContain('file:///');
+  });
+});
+
+import { USER_FAILURES, getUserFailure } from '@specter/contracts';
+import { ConfigurationFailure } from '../src/extraction/configurationFailure.js';
+
+describe('public failure details', () => {
+  it.each([
+    [new CompilerApiRequestError(429), USER_FAILURES.compilerRateLimited],
+    [
+      new CompilerApiRequestError(401, undefined, 'secret provider response'),
+      USER_FAILURES.setupUnavailable,
+    ],
+    [new CompilerApiRequestError(undefined, new Error('timeout')), USER_FAILURES.setupUnavailable],
+    [new CompilerTimeoutError('timeout'), USER_FAILURES.setupTimedOut],
+    [new UpstreamHttpError(404), USER_FAILURES.websiteUnavailable],
+    [new DecryptionError(), USER_FAILURES.sessionUnavailable],
+    [new ResourceLeaseLostError(), USER_FAILURES.executionInterrupted],
+    [new UnsupportedCapabilityError('internal capability'), USER_FAILURES.unsupported],
+    [new ConfigurationFailure('private model response', []), USER_FAILURES.configurationRejected],
+  ])('maps %s to approved copy and actionable details', (error, expected) => {
+    const message = formatUserErrorMessage(error);
+    expect(message).toBe(expected.description);
+    expect(getUserFailure(message)).toEqual(expected);
+    expect(expected.nextStep.length).toBeGreaterThan(0);
+  });
+
+  it('preserves all approved messages at the API boundary', () => {
+    for (const failure of Object.values(USER_FAILURES)) {
+      expect(presentStoredError(failure.description)).toBe(failure.description);
+    }
+    expect(presentStoredError(null)).toBeNull();
+  });
+
+  it('hides historical internal errors and unrecognized provider messages', () => {
+    expect(presentStoredError('Error: password=secret at /app/private.ts:12')).toBe(
+      USER_FAILURES.requestFailed.description
+    );
+    expect(getUserFailure('secret token')).toEqual(USER_FAILURES.requestFailed);
+  });
+
+  it('translates old public messages without exposing technical vocabulary', () => {
+    expect(
+      presentStoredError('The AI provider rate limit was reached. Please try again later.')
+    ).toBe(USER_FAILURES.compilerRateLimited.description);
+    expect(presentStoredError('Self-healing retry limit exceeded (3): internal details')).toBe(
+      USER_FAILURES.configurationRejected.description
+    );
   });
 });

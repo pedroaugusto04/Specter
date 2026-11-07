@@ -1,3 +1,4 @@
+import { presentStoredError } from '../utils/errorSanitizer.js';
 import type { ScrapingJobDto, JobRunDto } from '@specter/contracts';
 import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
@@ -61,7 +62,7 @@ export const JobMapper = {
       contractRevision: entity.contractRevision ?? null,
       status: entity.status,
       accessState: context.accessState,
-      lastError: entity.lastError,
+      lastError: presentStoredError(entity.lastError),
       failureCount: entity.failureCount,
       captureScreenshotOnChange: entity.captureScreenshotOnChange,
       createdAt: entity.createdAt.toISOString(),
@@ -98,7 +99,7 @@ export const JobMapper = {
       hasChanges: entity.hasChanges,
       contractRevision: entity.contractRevision ?? null,
       status: entity.status,
-      errorMessage: entity.errorMessage,
+      errorMessage: presentStoredError(entity.errorMessage),
       httpStatus: entity.httpStatus,
       durationMs: entity.durationMs,
       screenshotUrl: entity.screenshotUrl,

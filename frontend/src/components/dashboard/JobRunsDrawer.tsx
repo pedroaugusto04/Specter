@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
-import type { IntentField } from '@specter/contracts';
+import { USER_FAILURES, type IntentField } from '@specter/contracts';
 import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
@@ -20,7 +20,6 @@ import {
   ListChecks,
   ExternalLink,
   GitCompare,
-  ShieldAlert,
   SlidersHorizontal,
   TrendingUp,
   ZoomIn,
@@ -37,7 +36,7 @@ const MONITOR_STATUS = {
 
 function displayValue(
   value: string | number | boolean | null | undefined,
-  field?: Pick<IntentField, "type" | "displayName" | "locale">
+  field?: Pick<IntentField, 'type' | 'displayName' | 'locale'>
 ): string {
   if (value === null || value === undefined) return 'Not available';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -67,12 +66,7 @@ export function JobRunsDrawer({
   const latestData = latestReading?.extractedData;
   const latestRecord = latestData && !('items' in latestData) ? latestData : null;
   const monitorStatus = MONITOR_STATUS[job?.status ?? JOB_STATUS.PendingCompilation];
-  const missingField = /Required field '([^']+)' is missing or invalid\./.exec(
-    job?.lastError ?? ''
-  )?.[1];
-  const issueMessage = missingField
-    ? `We couldn't find ${fieldLabels[missingField] ?? 'a requested field'} on this page.`
-    : parseErrorMessage(job?.lastError)?.description;
+  const jobFailure = parseErrorMessage(job?.lastError);
 
   const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
@@ -95,6 +89,11 @@ export function JobRunsDrawer({
   return (
     <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
       <div className="space-y-6">
+        {job.status === JOB_STATUS.Failed && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+            <FailureDetails failure={jobFailure ?? USER_FAILURES.requestFailed} />
+          </div>
+        )}
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
           <button
@@ -277,7 +276,9 @@ export function JobRunsDrawer({
                   {runs.map((run) => {
                     const parsedError = run.errorMessage
                       ? parseErrorMessage(run.errorMessage)
-                      : null;
+                      : run.status === RUN_STATUS.Failed
+                        ? USER_FAILURES.requestFailed
+                        : null;
                     const isSelected = selectedRunId === run.id;
 
                     return (
@@ -329,17 +330,8 @@ export function JobRunsDrawer({
                         {parsedError && (
                           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                             <div className="flex items-start gap-2.5">
-                              {parsedError.category === 'anti-bot' ? (
-                                <ShieldAlert className="h-4.5 w-4.5 shrink-0 mt-0.5" />
-                              ) : (
-                                <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="font-semibold">{parsedError.title}</p>
-                                <p className="mt-0.5 leading-relaxed opacity-90">
-                                  {parsedError.description}
-                                </p>
-                              </div>
+                              <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
+                              <FailureDetails failure={parsedError} />
                             </div>
                           </div>
                         )}
@@ -485,10 +477,10 @@ export function JobRunsDrawer({
               </p>
             )}
             {(job.status === JOB_STATUS.Failed || job.status === JOB_STATUS.Healing) &&
-              issueMessage && (
-                <p className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                  {issueMessage}
-                </p>
+              jobFailure && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                  <FailureDetails failure={jobFailure} />
+                </div>
               )}
           </section>
         )}
@@ -539,5 +531,25 @@ export function JobRunsDrawer({
         )}
       </div>
     </Drawer>
+  );
+}
+
+function FailureDetails({
+  failure,
+}: {
+  failure: NonNullable<ReturnType<typeof parseErrorMessage>>;
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="font-semibold">{failure.title}</p>
+      <details className="mt-2">
+        <summary className="cursor-pointer font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+          View failure details
+        </summary>
+        <p className="mt-2 leading-relaxed">{failure.description}</p>
+        <p className="mt-2 font-medium">What you can do</p>
+        <p className="mt-1 leading-relaxed">{failure.nextStep}</p>
+      </details>
+    </div>
   );
 }

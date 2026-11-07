@@ -6,3 +6,5 @@ export * from './diff.js';
 export { FieldType, TriggerOperator } from './vocabulary.js';
 
 export * from './values.js';
+
+export * from './errors.js';

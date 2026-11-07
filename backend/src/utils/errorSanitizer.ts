@@ -1,3 +1,4 @@
+import { USER_FAILURES, getUserFailure } from '@specter/contracts';
 import { AccessFailure } from '../types/access.js';
 import { ExtractionQuality, FailureCode } from '../extraction/constants.js';
 import { classifyAccessFailure } from '../acquisition/failure.js';
@@ -13,22 +14,19 @@ import {
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
 
-const USER_ERROR_MESSAGES = {
-  resourceUnavailable: 'Browser capacity is currently in use. Please try again later.',
-  accessBlocked:
-    'The website is blocking access right now. Try again later or connect an authenticated session.',
-  requestTimedOut: 'The website took too long to respond. Please try again later.',
-  requestedDataUnavailable:
-    'The requested information could not be verified on the page. Check the instructions and try again.',
-  setupTimedOut: 'Monitor setup took too long to complete. Please try again.',
-  compilerRateLimited: 'The AI provider rate limit was reached. Please try again later.',
-  optionalEvidenceUnavailable: 'Optional extraction evidence unavailable.',
-  requestFailed: 'We could not complete this request. Please try again later.',
-} as const;
+const USER_ERROR_MESSAGES = Object.fromEntries(
+  Object.entries(USER_FAILURES).map(([key, failure]) => [key, failure.description])
+) as Record<keyof typeof USER_FAILURES, string>;
 
 /** Maps internal exceptions to short user-facing messages without exposing technical details. */
 export function formatUserErrorMessage(error: unknown): string {
   if (error instanceof BrowserCapacityError) return USER_ERROR_MESSAGES.resourceUnavailable;
+  // Setup deadlines must not be mistaken for website navigation timeouts.
+  if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
+  if (error instanceof CompilerApiRequestError)
+    return error.statusCode === 429
+      ? USER_ERROR_MESSAGES.compilerRateLimited
+      : USER_ERROR_MESSAGES.setupUnavailable;
   const accessFailure = classifyAccessFailure(error);
   if (accessFailure === AccessFailure.Blocked || error instanceof AntiBotBlockedError)
     return USER_ERROR_MESSAGES.accessBlocked;
@@ -36,10 +34,22 @@ export function formatUserErrorMessage(error: unknown): string {
     return USER_ERROR_MESSAGES.requestTimedOut;
   if (error instanceof SelectorMismatchError || error instanceof CompilerValidationError)
     return USER_ERROR_MESSAGES.requestedDataUnavailable;
-  if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
-  if (error instanceof CompilerApiRequestError && error.statusCode === 429)
-    return USER_ERROR_MESSAGES.compilerRateLimited;
-  if (error instanceof DomainError) return USER_ERROR_MESSAGES.requestFailed;
+  if (accessFailure === AccessFailure.Transient) return USER_ERROR_MESSAGES.websiteUnavailable;
+  if (error instanceof DomainError) {
+    switch (error.code) {
+      case 'UPSTREAM_HTTP_ERROR':
+        return USER_ERROR_MESSAGES.websiteUnavailable;
+      case 'CONFIGURATION_REJECTED':
+      case 'CONFIGURATION_OPERATION_FAILED':
+        return USER_ERROR_MESSAGES.configurationRejected;
+      case 'DECRYPTION_FAILED':
+        return USER_ERROR_MESSAGES.sessionUnavailable;
+      case 'UNSUPPORTED_CAPABILITY':
+        return USER_ERROR_MESSAGES.unsupported;
+      case 'RESOURCE_LEASE_LOST':
+        return USER_ERROR_MESSAGES.executionInterrupted;
+    }
+  }
   return USER_ERROR_MESSAGES.requestFailed;
 }
 
@@ -68,7 +78,7 @@ export function presentExtractionReport(report: ExtractionReport): ExtractionRep
               ? USER_ERROR_MESSAGES.requestTimedOut
               : report.quality === ExtractionQuality.Complete ||
                   report.quality === ExtractionQuality.Empty
-                ? USER_ERROR_MESSAGES.optionalEvidenceUnavailable
+                ? 'Optional extraction evidence unavailable.'
                 : USER_ERROR_MESSAGES.requestedDataUnavailable,
         ]
       : [],
@@ -83,4 +93,10 @@ export function presentExtractionReport(report: ExtractionReport): ExtractionRep
         }
       : undefined,
   };
+}
+
+/** Only approved public copy may cross the API boundary, including for historical records. */
+export function presentStoredError(message: string | null): string | null {
+  if (!message) return null;
+  return getUserFailure(message).description;
 }
