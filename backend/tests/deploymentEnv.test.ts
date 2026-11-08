@@ -20,7 +20,7 @@ const tuning = {
 describe('Environment configuration', () => {
   it('uses documented defaults and rejects invalid tuning values', () => {
     expect(parseEnv({ ENCRYPTION_KEY: 'a'.repeat(64), NODE_ENV: 'test' })).toMatchObject({
-      ACQUISITION_MAX_ATTEMPTS: 3,
+      ACQUISITION_MAX_ATTEMPTS: 5,
       ACCESS_BLOCK_THRESHOLD: 2,
       ACCESS_BLOCK_COOLDOWN_MINUTES: 60,
       EVALS_LIVE_MODELS_ENABLED: false,

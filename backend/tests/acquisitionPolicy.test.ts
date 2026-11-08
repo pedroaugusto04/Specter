@@ -147,16 +147,18 @@ describe('Shared acquisition policy', () => {
     expect(local.adapter.open).not.toHaveBeenCalled();
   });
   it('limits alternatives and preserves block classification across provider failures', async () => {
-    const fourth = candidate('fourth', true, '<h1>remote</h1>');
+    const sixth = candidate('sixth', true, '<h1>remote</h1>');
     await expect(
       executor([
         candidate('local', false, new AntiBotBlockedError('blocked')),
         candidate('one', true, new Error('quota')),
         candidate('two', true, new Error('quota')),
-        fourth,
+        candidate('three', true, new Error('quota')),
+        candidate('four', true, new Error('quota')),
+        sixth,
       ]).execute('https://example.com', fixturePlan())
     ).rejects.toMatchObject({ category: 'BLOCKED', isRetryable: false });
-    expect(fourth.adapter.open).not.toHaveBeenCalled();
+    expect(sixth.adapter.open).not.toHaveBeenCalled();
     expect(classifyAccessFailure(new NavigationTimeoutError('timeout'))).toBe('TIMEOUT');
   });
 });
