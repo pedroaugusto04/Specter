@@ -1,10 +1,13 @@
 'use client';
+import * as React from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_JOB_CRON, type JobFormValues } from '@/forms/jobForm';
-import { cn, CRON_PRESETS } from '@/lib/utils';
+import { cn, DEFAULT_TIMEZONE, getCronPresets } from '@/lib/utils';
+
 const CUSTOM_SCHEDULE = 'custom';
 type Schedule = Pick<JobFormValues, 'cronPreset' | 'customCron' | 'useCustomCron'>;
+
 export function JobScheduleFields({
   value,
   onChange,
@@ -12,6 +15,7 @@ export function JobScheduleFields({
   error,
   prefix = '',
   label = 'Monitoring Frequency',
+  timeZone = DEFAULT_TIMEZONE,
 }: {
   value: Schedule;
   onChange(value: Schedule): void;
@@ -19,14 +23,18 @@ export function JobScheduleFields({
   error?: string;
   prefix?: string;
   label?: string;
+  timeZone?: string;
 }) {
+  const effectiveTimeZone = timeZone || DEFAULT_TIMEZONE;
+  const presets = React.useMemo(() => getCronPresets(effectiveTimeZone), [effectiveTimeZone]);
   const presetId = `${prefix}cron-preset`;
   const customId = `${prefix}custom-cron`;
+
   return (
     <>
       <FormField
         label={label}
-        hint="Scheduled times use the timezone in your profile."
+        hint={`Scheduled times use your profile timezone (${effectiveTimeZone}).`}
         htmlFor={presetId}
         required
         error={!value.useCustomCron ? error : undefined}
@@ -53,7 +61,7 @@ export function JobScheduleFields({
             );
           }}
         >
-          {CRON_PRESETS.map((preset) => (
+          {presets.map((preset) => (
             <option key={preset.value} value={preset.value}>
               {preset.label} ({preset.value})
             </option>
@@ -67,7 +75,7 @@ export function JobScheduleFields({
           htmlFor={customId}
           required
           error={error}
-          hint="5 space-delimited fields: minute hour day month weekday."
+          hint={`5 space-delimited fields: minute hour day month weekday (evaluated in ${effectiveTimeZone}).`}
         >
           <Input
             id={customId}

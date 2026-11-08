@@ -31,7 +31,13 @@ class SimpleLeaseStore implements ILeaseStore {
 export interface LiveBenchmarkTest {
   id: string;
   name: string;
-  category: 'SPA_JAVASCRIPT' | 'HEAVY_TABLE' | 'MULTI_FIELD_CATALOG' | 'TECHNICAL_FEED' | 'ECOMMERCE_MICRODATA';
+  category:
+    | 'SPA_JAVASCRIPT'
+    | 'HEAVY_TABLE'
+    | 'MULTI_FIELD_CATALOG'
+    | 'TECHNICAL_FEED'
+    | 'ECOMMERCE_MICRODATA'
+    | 'NEWS_PORTAL';
   url: string;
   prompt: string;
   transport: 'http' | 'browser';
@@ -98,6 +104,42 @@ export const liveBenchmarkSuite: LiveBenchmarkTest[] = [
     prompt: 'Extraia os posts com título e link para a notícia',
     description: 'Agregador de notícias tradicional organizado em linhas HTML com links externos e pontuações.',
     expectedFields: ['title', 'link'],
+  },
+
+  // 6. E-commerce nacional de varejo e tecnologia com precificação em BRL
+  {
+    id: 'kabum',
+    name: '6. KaBuM! (E-commerce Brasileiro Real)',
+    category: 'ECOMMERCE_MICRODATA',
+    transport: 'http',
+    url: 'https://www.kabum.com.br/produto/475438/placa-de-video-rx-6600-v2-asus-dual-amd-radeon-8gb-gddr6-dual-rx6600-8g-v2',
+    prompt: 'Extraia o nome do produto e o preço à vista em reais',
+    description: 'Página de grande e-commerce brasileiro com precificação em reais (BRL), parcelamentos e tags dinâmicas de varejo.',
+    expectedFields: ['name', 'price'],
+  },
+
+  // 7. Portal de notícias de grande circulação com manchetes editoriais ao vivo
+  {
+    id: 'g1',
+    name: '7. G1 Globo (Portal de Notícias Real)',
+    category: 'NEWS_PORTAL',
+    transport: 'http',
+    url: 'https://g1.globo.com',
+    prompt: 'Extraia as principais notícias com título da matéria e link',
+    description: 'Portal de notícias brasileiro de alto tráfego com manchetes, links e blocos editoriais ao vivo.',
+    expectedFields: ['title', 'link'],
+  },
+
+  // 8. Coleção HTML estático tradicional como baseline de comparação
+  {
+    id: 'quotes',
+    name: '8. Quotes to Scrape (Catálogo Estático Baseline)',
+    category: 'MULTI_FIELD_CATALOG',
+    transport: 'http',
+    url: 'https://quotes.toscrape.com',
+    prompt: 'Extraia todas as frases com o texto da citação e o nome do autor',
+    description: 'Página tradicional renderizada no servidor para teste baseline de extração de coleção sem execução de JavaScript.',
+    expectedFields: ['text', 'author'],
   },
 ];
 
