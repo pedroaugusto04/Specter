@@ -243,20 +243,28 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           ? documentRoot().locator(request.strategy?.document.shadow)
           : documentRoot().locator('html');
         const html = await documentElement.first().evaluate((element) => {
-          const cloneTree = (node: typeof element): typeof element => {
-            const clone = node.cloneNode(true) as typeof element;
-            const attachShadows = (original: typeof element, copy: typeof element) => {
-              Array.from(original.children).forEach((child, index) => {
-                attachShadows(child as typeof element, copy.children[index] as typeof element);
-              });
-              if (original.shadowRoot)
-                for (const child of Array.from(original.shadowRoot.children))
-                  copy.appendChild(cloneTree(child as typeof element));
-            };
-            attachShadows(node, clone);
-            return clone;
-          };
-          return cloneTree(element).outerHTML;
+          const clone = element.cloneNode(true) as typeof element;
+          const stack: Array<[typeof element, typeof element]> = [[element, clone]];
+          while (stack.length > 0) {
+            const [orig, copy] = stack.pop()!;
+            const origChildren = Array.from(orig.children) as Array<typeof element>;
+            const copyChildren = Array.from(copy.children) as Array<typeof element>;
+            for (let i = 0; i < origChildren.length; i++) {
+              const origChild = origChildren[i];
+              const copyChild = copyChildren[i];
+              if (origChild && copyChild) {
+                stack.push([origChild, copyChild]);
+              }
+            }
+            if (orig.shadowRoot) {
+              for (const child of Array.from(orig.shadowRoot.children) as Array<typeof element>) {
+                const childClone = child.cloneNode(true) as typeof element;
+                copy.appendChild(childClone);
+                stack.push([child, childClone]);
+              }
+            }
+          }
+          return clone.outerHTML;
         });
         const currentUrl = page.url();
         detectAntiBotBlock(currentUrl, html, httpStatus);

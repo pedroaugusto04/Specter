@@ -73,7 +73,7 @@ export const envSchema = z.object({
   EXTRACTION_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(250),
   EXTRACTION_MAX_EVIDENCE: z.coerce.number().int().positive().default(200),
   EXTRACTION_EVIDENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
-  CONFIGURATION_MAX_DECISIONS: z.coerce.number().int().min(1).max(30).default(6),
+  CONFIGURATION_MAX_DECISIONS: z.coerce.number().int().min(1).max(30).default(10),
   CONFIGURATION_REVIEW_RESERVE_MS: z.coerce.number().int().positive().default(30000),
   COMPILER_MAX_OUTPUT_CHARS: z.coerce.number().int().min(1000).default(30000),
   COMPILER_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(8192),
