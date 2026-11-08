@@ -154,9 +154,10 @@ export class PageExtractor implements IPageExtractor {
           )
         )
           result.validatedSourceRecords++;
-        if (intent.identityFields.some((key) => record[key] === null || record[key] === undefined))
+        const identityFields = intent.identityFields ?? [];
+        if (identityFields.some((key) => record[key] === null || record[key] === undefined))
           fail('Source record has no stable identity.');
-        result.observedIdentities.push(recordIdentity(record, intent.identityFields));
+        result.observedIdentities.push(recordIdentity(record, identityFields));
         const filters = strategy.filters ?? [];
         if (
           filters.some(

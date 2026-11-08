@@ -29,7 +29,11 @@ export class DomSourceReader implements ISourceReader {
     if (source.kind !== SourceKind.Dom || record.kind !== SourceKind.Dom)
       throw new Error('DOM source requires a matching record context.');
     const scope = record.value as cheerio.Cheerio<AnyNode>;
-    const target = source.selector === ':scope' ? scope : scope.find(source.selector);
+    let target = source.selector === ':scope' ? scope : scope.find(source.selector);
+    if (target.length === 0 && (source.selector.startsWith('meta') || source.selector.startsWith('head'))) {
+      const $ = cheerio.load(_snapshot.html);
+      target = $(source.selector);
+    }
     const readSingle = (el: cheerio.Cheerio<AnyNode>) =>
       source.attribute === 'text' ? el.text() : el.attr(source.attribute);
     if (target.length <= 1) return readSingle(target);
@@ -74,7 +78,22 @@ export class JsonLdSourceReader implements ISourceReader {
     for (const block of extractJsonLdBlocks(snapshot.html)) {
       visit(block);
     }
-    return entities;
+    const idMap = new Map<string, Record<string, unknown>>();
+    const mergedEntities: SourceRecord[] = [];
+    for (const entity of entities) {
+      const node = entity.value as Record<string, unknown>;
+      const id = typeof node['@id'] === 'string' && node['@id'].trim() ? node['@id'].trim() : null;
+      if (id) {
+        const existing = idMap.get(id);
+        if (existing) {
+          Object.assign(existing, node);
+          continue;
+        }
+        idMap.set(id, node);
+      }
+      mergedEntities.push(entity);
+    }
+    return mergedEntities;
   }
   read(_snapshot: DocumentSnapshot, source: Source, record: SourceRecord): unknown {
     if (source.kind !== SourceKind.JsonLd || record.kind !== SourceKind.JsonLd)
