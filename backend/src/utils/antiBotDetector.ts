@@ -1,6 +1,9 @@
 import { AntiBotBlockedError } from '../errors/domainErrors.js';
 
-const SUSPICIOUS_URL_PATTERNS = [
+/**
+ * URL segments that unequivocally represent security checkpoints or CAPTCHA interstitials.
+ */
+const SECURITY_CHECKPOINT_URL_PATTERNS = [
   /\/account-verification/i,
   /\/checkpoint/i,
   /\/challenge/i,
@@ -8,52 +11,66 @@ const SUSPICIOUS_URL_PATTERNS = [
   /\/captcha/i,
   /\/bot-detection/i,
   /\/validateCaptcha/i,
-  /challenges\.cloudflare\.com/i,
-  /\/cdn-cgi\/challenge-platform/i,
-  /geo\.captcha-delivery\.com/i,
-  /px-captcha/i,
   /_sec\/verify/i,
-  /\/akamai\//i,
-  /datadome\.co/i,
+  /\/cdn-cgi\/challenge-platform/i,
+  /challenges\.cloudflare\.com/i,
+  /geo\.captcha-delivery\.com/i,
 ];
 
-const SUSPICIOUS_HTML_PATTERNS = [
-  /action=["'][^"']*account-verification/i,
-  /<title[^>]*>\s*Just a moment\.\.\.\s*<\/title>/i,
-  /<title[^>]*>\s*Attention Required!\s*\|\s*Cloudflare\s*<\/title>/i,
-  /<title[^>]*>\s*Access Denied\s*<\/title>/i,
-  /<title[^>]*>\s*Robot Check\s*<\/title>/i,
-  /<title[^>]*>[^<]*(?:security challenge|human verification|verify you are human|are you a robot|are you human|bot detection)\b[^<]*<\/title>/i,
+/**
+ * Universal title markers typical of WAF interstitials and bot-challenge screens.
+ */
+const CHALLENGE_TITLE_PATTERN =
+  /<title[^>]*>[^<]*(?:captcha|verify\b|human verification|verify you are human|are you a robot|are you human|robot check|bot detection|attention required|access denied|just a moment|security checkpoint|pardon our interruption)\b[^<]*<\/title>/i;
+
+/**
+ * Forms that specifically post to challenge or verification endpoints.
+ */
+const CHALLENGE_FORM_PATTERN =
+  /<form[^>]*action=["'][^"']*(?:captcha|checkpoint|challenge|verify|validate|account-verification)[^"']*["']/i;
+
+/**
+ * Universal security & challenge provider indicators (scripts, widgets, or phrases).
+ */
+const SECURITY_CHALLENGE_INDICATORS = [
+  /g-recaptcha/i,
+  /h-captcha/i,
+  /cf-turnstile/i,
   /cf-chl-widget/i,
-  /id=["'](?:challenge-form|px-captcha|datadome|dd-captcha)["']/i,
-  /class=["'][^"']*(?:px-captcha|scf-akamai|akamai-privacy|datadome)/i,
-  /(?:scf-akamai-protected-by|Powered and protected by.*Akamai)/i,
-  /<img[^>]*alt=["']Akamai["']/i,
+  /px-captcha/i,
+  /datadome/i,
+  /akamai/i,
+  /kasada/i,
+  /incapsula/i,
+  /aws-waf/i,
+  /challenge-platform/i,
+  /challenge-form/i,
+  /security check/i,
+  /human verification/i,
+  /automated access/i,
 ];
 
-function isCaptchaInterstitial(rawHtml: string): boolean {
-  const hasCaptchaMarker =
-    /g-recaptcha/i.test(rawHtml) ||
-    /h-captcha/i.test(rawHtml) ||
-    /cf-turnstile/i.test(rawHtml);
+/**
+ * Evaluates whether an HTML document is an anti-bot challenge or interstitial holding page.
+ * Uses a combination of:
+ * 1. Challenge titles or validation form actions (immediate positive match).
+ * 2. Structural density heuristic ("casca vazia"): presence of challenge indicators in a
+ *    minimalist document lacking semantic layout (<main>, <article>, <table>) and with low text density (< 400 chars).
+ */
+function isChallengeInterstitial(rawHtml: string): boolean {
+  if (CHALLENGE_TITLE_PATTERN.test(rawHtml)) return true;
+  if (CHALLENGE_FORM_PATTERN.test(rawHtml)) return true;
 
-  if (!hasCaptchaMarker) return false;
+  const hasChallengeIndicator = SECURITY_CHALLENGE_INDICATORS.some((pattern) =>
+    pattern.test(rawHtml)
+  );
+  if (!hasChallengeIndicator) return false;
 
-  // Title indicates a challenge / bot verification screen
-  const hasChallengeTitle =
-    /<title[^>]*>[^<]*(?:captcha|verify|human|robot|security|checkpoint|attention required|access denied)\b[^<]*<\/title>/i.test(
-      rawHtml
-    );
-  if (hasChallengeTitle) return true;
+  // Real content pages possess semantic layout tags
+  const hasSemanticContentTag = /<(main|article|table)\b/i.test(rawHtml);
+  if (hasSemanticContentTag) return false;
 
-  // Form explicitly posts to a captcha or security verification endpoint
-  const hasChallengeForm =
-    /<form[^>]*action=["'][^"']*(?:captcha|checkpoint|challenge|verify|validate)[^"']*["']/i.test(
-      rawHtml
-    );
-  if (hasChallengeForm) return true;
-
-  // Interstitial shell detection: challenge screens typically have minimal textual content and no semantic layout
+  // Extract visible body text (excluding scripts, styles and HTML tags)
   const bodyText = rawHtml
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
@@ -61,13 +78,8 @@ function isCaptchaInterstitial(rawHtml: string): boolean {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const hasMainContentTag = /<(main|article|table)\b/i.test(rawHtml);
-
-  if (!hasMainContentTag && bodyText.length < 350) {
-    return true;
-  }
-
-  return false;
+  // Challenge interstitials typically contain under 400 characters of total readable text
+  return bodyText.length < 400;
 }
 
 /**
@@ -84,7 +96,7 @@ export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: num
     );
   }
 
-  for (const pattern of SUSPICIOUS_URL_PATTERNS) {
+  for (const pattern of SECURITY_CHECKPOINT_URL_PATTERNS) {
     if (pattern.test(url)) {
       throw new AntiBotBlockedError(
         `Anti-bot block detected via redirect to security checkpoint or CAPTCHA verification screen.`,
@@ -93,18 +105,9 @@ export function detectAntiBotBlock(url: string, rawHtml: string, httpStatus: num
     }
   }
 
-  for (const pattern of SUSPICIOUS_HTML_PATTERNS) {
-    if (pattern.test(rawHtml)) {
-      throw new AntiBotBlockedError(
-        `Anti-bot block or security challenge detected in page content.`,
-        403
-      );
-    }
-  }
-
-  if (isCaptchaInterstitial(rawHtml)) {
+  if (isChallengeInterstitial(rawHtml)) {
     throw new AntiBotBlockedError(
-      `Anti-bot block detected: CAPTCHA challenge interstitial screen presented.`,
+      `Anti-bot block detected: security challenge interstitial screen presented.`,
       403
     );
   }
