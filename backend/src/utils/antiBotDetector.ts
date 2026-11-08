@@ -12,6 +12,9 @@ const SUSPICIOUS_URL_PATTERNS = [
   /\/cdn-cgi\/challenge-platform/i,
   /geo\.captcha-delivery\.com/i,
   /px-captcha/i,
+  /_sec\/verify/i,
+  /\/akamai\//i,
+  /datadome\.co/i,
 ];
 
 const SUSPICIOUS_HTML_PATTERNS = [
@@ -22,9 +25,10 @@ const SUSPICIOUS_HTML_PATTERNS = [
   /<title[^>]*>\s*Robot Check\s*<\/title>/i,
   /<title[^>]*>[^<]*(?:security challenge|human verification|verify you are human|are you a robot|are you human|bot detection)\b[^<]*<\/title>/i,
   /cf-chl-widget/i,
-  /id=["']challenge-form["']/i,
-  /id=["']px-captcha["']/i,
-  /class=["'][^"']*px-captcha/i,
+  /id=["'](?:challenge-form|px-captcha|datadome|dd-captcha)["']/i,
+  /class=["'][^"']*(?:px-captcha|scf-akamai|akamai-privacy|datadome)/i,
+  /(?:scf-akamai-protected-by|Powered and protected by.*Akamai)/i,
+  /<img[^>]*alt=["']Akamai["']/i,
 ];
 
 function isCaptchaInterstitial(rawHtml: string): boolean {

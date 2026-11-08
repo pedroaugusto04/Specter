@@ -36,6 +36,24 @@ describe('Anti-Bot Detection & Verification Interstitial Defense', () => {
     );
   });
 
+  it('detects Akamai challenge and bot interstitial screens in page content', () => {
+    const akamaiHtml = `
+      <html><body>
+        <div class="scf-akamai-logo-sec-abc">
+          <p class="scf-akamai-protected-by">Powered and protected by</p>
+          <div class="scf-akamai-logo-img">
+            <img src="https://www.akamai.com/site/ko/images/logo/akamai-logo1.svg" class="scf-akamai-logo" alt="Akamai">
+          </div>
+          <div class="akamai-privacy"><a href="https://www.akamai.com/privacy">Privacy</a></div>
+        </div>
+      </body></html>
+    `;
+
+    expect(() =>
+      detectAntiBotBlock('https://www.magazineluiza.com.br/produto', akamaiHtml, 200)
+    ).toThrowError(AntiBotBlockedError);
+  });
+
   it('passes silently for legitimate, unblocked product pages', () => {
     const legitimateHtml =
       '<html><body><h1>Notebook Dell Inspiron</h1><span class="price">R$ 3.500</span></body></html>';
