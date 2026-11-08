@@ -173,6 +173,22 @@ describe('Extraction contract and integrity', () => {
     ).toBe(42);
     expect(convertFieldValue('US$ 49.99', field, 'https://example.com')).toBe(49.99);
     expect(convertFieldValue('CA$ 1,299.99', field, 'https://example.com')).toBe(1299.99);
+
+    const boolField = {
+      type: 'boolean' as const,
+      description: 'in stock',
+      required: true,
+      booleanValues: { 'em estoque': true, esgotado: false },
+    };
+    expect(convertFieldValue(true, boolField, 'https://example.com')).toBe(true);
+    expect(convertFieldValue(false, boolField, 'https://example.com')).toBe(false);
+    expect(convertFieldValue('Em Estoque', boolField, 'https://example.com')).toBe(true);
+    expect(convertFieldValue('esgotado', boolField, 'https://example.com')).toBe(false);
+    expect(convertFieldValue('true', boolField, 'https://example.com')).toBe(true);
+    expect(convertFieldValue('false', boolField, 'https://example.com')).toBe(false);
+    expect(convertFieldValue('1', boolField, 'https://example.com')).toBe(true);
+    expect(convertFieldValue('0', boolField, 'https://example.com')).toBe(false);
+    expect(convertFieldValue('talvez', boolField, 'https://example.com')).toBeNull();
   });
   it('honors non-Western grouping, digit scripts and space separators', () => {
     const field = plan.intent.fields.price!;

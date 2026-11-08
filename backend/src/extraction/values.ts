@@ -10,10 +10,16 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
   switch (field.type) {
     case FieldType.String:
       return field.normalizeVolatileText ? sanitizeVolatileString(text) : text;
-    case FieldType.Boolean:
-      return typeof value === 'boolean'
-        ? value
-        : (field.booleanValues?.[text.toLowerCase()] ?? null);
+    case FieldType.Boolean: {
+      if (typeof value === 'boolean') return value;
+      const lower = text.toLowerCase();
+      if (field.booleanValues && lower in field.booleanValues) {
+        return field.booleanValues[lower]!;
+      }
+      if (lower === 'true' || lower === '1') return true;
+      if (lower === 'false' || lower === '0') return false;
+      return null;
+    }
     case FieldType.Url:
       try {
         const url = new URL(text, baseUrl);
