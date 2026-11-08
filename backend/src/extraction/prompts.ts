@@ -18,15 +18,16 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 - Default to transport: "http". Always use HTTP when records and fields can be extracted directly from the observed HTML or structured data.
 - Use transport: "browser" strictly when execution requires user interactions (setup: click/type), scroll/click pagination, frames, shadow DOM, or network response capture.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
-- ready confirms that extraction can proceed: use empty ready: [] if records are already present in the snapshot, or use exists or field condition. Use visible only with browser transport when waiting for an element that is hidden until interacted with. Use empty: [] when there is no positive evidence of empty results.
+- ready confirms that extraction can proceed and requires at least one condition: use an exists condition on a stable container or element (e.g. {"kind":"exists","locator":{"kind":"css","selector":".price"}}), or a field condition (e.g. {"kind":"field","field":"price"}). Use visible only with browser transport when waiting for an element that is hidden until interacted with. Use empty: [] when there is no positive evidence of empty results.
 
 ### Syntax Contracts
 - Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.
 - Strategy fields must match intent fields exactly. Map to observed data by meaning and entity context.
 - Records use kind dom with selector, jsonld with type, or response with match and path.
-- Field sources use kind dom with selector and attribute ("text" to read DOM textContent), jsonld with path array, or response with path array. Any source may include association. Never use css or locator as a source or records kind.
+- Field sources must strictly match the records kind unless using an explicit association: when records are "dom", all field sources must be "dom" with selector and attribute ("text" to read DOM textContent); when records are "jsonld", all field sources must be "jsonld" with path array; when records are "response", all field sources must be "response" with path array. Never mix DOM selectors inside a JSON-LD record.
+- If JSON-LD is missing target fields or fails extraction, switch both records (kind "dom" with container selector or "body") and all field sources to "dom".
 - Locators: {"kind":"css","selector":".item"} or {"kind":"role","role":"button","name":"OK"}.
-- Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals).
+- Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals). Never use jsonld or dom as condition kinds.
 - Setup actions: click (locator), scroll (optional selector), wait (condition). Never submit forms, log in, purchase or change settings.
 - Collections: paginate with positive end evidence. Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
 - Associations require observed exact key matches: localField must be required and directly sourced from the primary record; match exactly one foreign record.
