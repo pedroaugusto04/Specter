@@ -34,6 +34,105 @@ import * as React from 'react';
 type RowActionType = 'run' | 'recompile' | 'pause' | 'delete';
 type StatusFilter = (typeof JOB_STATUS_FILTER)[keyof typeof JOB_STATUS_FILTER];
 
+interface ActionPermissions {
+  edit: { disabled: boolean; title: string };
+  run: { disabled: boolean; title: string };
+  recompile: { disabled: boolean; title: string };
+  pause: { disabled: boolean; title: string };
+  delete: { disabled: boolean; title: string };
+}
+
+function getJobActionPermissions(
+  job: ScrapingJobDto,
+  currentAction: RowActionType | undefined,
+  isExecutingExtraction: boolean,
+  timeZone: string
+): ActionPermissions {
+  const isJobBusy = Boolean(currentAction);
+  const isCompiling =
+    job.status === JOB_STATUS.PendingCompilation ||
+    job.status === JOB_STATUS.Healing ||
+    currentAction === 'recompile';
+  const isRunning = isExecutingExtraction || currentAction === 'run';
+  const isPaused = job.status === JOB_STATUS.Paused;
+  const isFailed = job.status === JOB_STATUS.Failed;
+  const isAccessBlocked = Boolean(
+    job.accessState?.retryAt && new Date(job.accessState.retryAt).getTime() > Date.now()
+  );
+
+  // Edit Action
+  let editDisabled = isJobBusy || isCompiling || isRunning;
+  let editTitle = 'Edit monitor configuration';
+  if (isCompiling) {
+    editTitle = 'Cannot edit monitor while selector compilation is in progress';
+  } else if (isRunning) {
+    editTitle = 'Cannot edit monitor while extraction is in progress';
+  } else if (isJobBusy) {
+    editTitle = 'Action in progress...';
+  }
+
+  // Run Immediate Action
+  let runDisabled = isJobBusy || isCompiling || isRunning || isFailed || isAccessBlocked;
+  let runTitle = 'Run immediate extraction';
+  if (isCompiling) {
+    runTitle = 'Cannot run extraction while selector compilation is in progress';
+  } else if (isRunning) {
+    runTitle = 'Executing extraction...';
+  } else if (isFailed) {
+    runTitle = 'Cannot run extraction on a failed monitor. Please recompile selectors or edit the monitor.';
+  } else if (isAccessBlocked && job.accessState?.retryAt) {
+    runTitle = `Target access is currently blocked. Next attempt allowed after ${formatDateTime(
+      job.accessState.retryAt,
+      timeZone
+    )}`;
+  } else if (isJobBusy) {
+    runTitle = 'Action in progress...';
+  }
+
+  // Recompile Action
+  let recompileDisabled = isJobBusy || isCompiling || isRunning;
+  let recompileTitle = 'Recompile selectors';
+  if (isCompiling) {
+    recompileTitle = 'Compilation is already in progress';
+  } else if (isRunning) {
+    recompileTitle = 'Cannot recompile while extraction is running';
+  } else if (isJobBusy) {
+    recompileTitle = 'Action in progress...';
+  }
+
+  // Pause / Resume Action
+  let pauseDisabled = isJobBusy || isCompiling || isRunning || isFailed;
+  let pauseTitle = isPaused ? 'Resume schedule' : 'Pause schedule';
+  if (isFailed) {
+    pauseTitle = 'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.';
+  } else if (isCompiling) {
+    pauseTitle = 'Schedule is suspended during compilation';
+  } else if (isRunning) {
+    pauseTitle = 'Cannot change schedule state while extraction is running';
+  } else if (isJobBusy) {
+    pauseTitle = 'Action in progress...';
+  }
+
+  // Delete Action
+  let deleteDisabled = isJobBusy || isRunning;
+  let deleteTitle = 'Delete monitor';
+  if (isRunning) {
+    deleteTitle = 'Cannot delete while extraction is in progress';
+  } else if (currentAction === 'recompile') {
+    deleteTitle = 'Cannot delete while recompile request is running';
+  } else if (isJobBusy) {
+    deleteTitle = 'Action in progress...';
+  }
+
+  return {
+    edit: { disabled: editDisabled, title: editTitle },
+    run: { disabled: runDisabled, title: runTitle },
+    recompile: { disabled: recompileDisabled, title: recompileTitle },
+    pause: { disabled: pauseDisabled, title: pauseTitle },
+    delete: { disabled: deleteDisabled, title: deleteTitle },
+  };
+}
+
 function formatDisplayUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
@@ -301,16 +400,21 @@ export function JobsTable({
             <tbody className="divide-y divide-border">
               {filteredJobs.map((job) => {
                 const currentAction = activeActions[job.id];
-                const isJobBusy = Boolean(currentAction);
+                const isRunningExtraction = runningJobIds.has(job.id);
                 const isRunning = currentAction === 'run';
-                const isRecompilingAction = currentAction === 'recompile';
-                const isPausing = currentAction === 'pause';
-                const isDeleting = currentAction === 'delete';
-
                 const isCompilingState =
                   job.status === JOB_STATUS.PendingCompilation || job.status === JOB_STATUS.Healing;
-                const isCompiling = isCompilingState || isRecompilingAction;
+                const isCompiling = isCompilingState || currentAction === 'recompile';
+                const isPausing = currentAction === 'pause';
+                const isDeleting = currentAction === 'delete';
                 const isPaused = job.status === JOB_STATUS.Paused;
+
+                const permissions = getJobActionPermissions(
+                  job,
+                  currentAction,
+                  isRunningExtraction,
+                  timeZone
+                );
 
                 return (
                   <tr key={job.id} className="group hover:bg-muted/30 transition-colors">
@@ -335,7 +439,7 @@ export function JobsTable({
 
                     {/* Status Pill */}
                     <td className="whitespace-nowrap px-2.5 py-3">
-                      {runningJobIds.has(job.id) && job.status === JOB_STATUS.Active ? (
+                      {isRunningExtraction && job.status === JOB_STATUS.Active ? (
                         <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-primary">
                           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> RUNNING
                         </span>
@@ -384,14 +488,8 @@ export function JobsTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={isJobBusy || isCompiling}
-                          title={
-                            isCompiling
-                              ? 'Cannot edit monitor while selector compilation is in progress'
-                              : isRunning
-                                ? 'Cannot edit monitor while extraction is in progress'
-                                : 'Edit monitor configuration'
-                          }
+                          disabled={permissions.edit.disabled}
+                          title={permissions.edit.title}
                           aria-label="Edit monitor configuration"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={() => onEditJob(job)}
@@ -403,16 +501,8 @@ export function JobsTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={isJobBusy || isCompiling}
-                          title={
-                            isCompiling
-                              ? 'Cannot run extraction while selector compilation is in progress'
-                              : isRunning
-                                ? 'Executing extraction...'
-                                : isJobBusy
-                                  ? 'Action in progress...'
-                                  : 'Run immediate extraction'
-                          }
+                          disabled={permissions.run.disabled}
+                          title={permissions.run.title}
                           aria-label="Run immediate extraction"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={async () => {
@@ -454,14 +544,8 @@ export function JobsTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={isJobBusy || isCompiling}
-                          title={
-                            isCompiling
-                              ? 'Compilation is already in progress'
-                              : isRunning
-                                ? 'Cannot recompile while extraction is running'
-                                : 'Recompile selectors'
-                          }
+                          disabled={permissions.recompile.disabled}
+                          title={permissions.recompile.title}
                           aria-label="Recompile selectors"
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={async () => {
@@ -490,16 +574,8 @@ export function JobsTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={isJobBusy || isCompiling}
-                          title={
-                            isCompiling
-                              ? 'Schedule is suspended during compilation'
-                              : isRunning
-                                ? 'Cannot change schedule state while extraction is running'
-                                : isPaused
-                                  ? 'Resume schedule'
-                                  : 'Pause schedule'
-                          }
+                          disabled={permissions.pause.disabled}
+                          title={permissions.pause.title}
                           aria-label={isPaused ? 'Resume schedule' : 'Pause schedule'}
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={async () => {
@@ -535,14 +611,8 @@ export function JobsTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={isJobBusy}
-                          title={
-                            isRunning
-                              ? 'Cannot delete while extraction is in progress'
-                              : isRecompilingAction
-                                ? 'Cannot delete while recompile request is running'
-                                : 'Delete monitor'
-                          }
+                          disabled={permissions.delete.disabled}
+                          title={permissions.delete.title}
                           aria-label="Delete monitor"
                           className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted"
                           onClick={async () => {
