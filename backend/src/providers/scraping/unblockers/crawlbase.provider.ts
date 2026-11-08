@@ -103,6 +103,7 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
     const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
+
     try {
       if (options?.premium !== undefined) {
         return await this.executeAttempt(targetUrl, options.premium, options, signal, startTime);
