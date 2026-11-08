@@ -62,7 +62,7 @@ export const envSchema = z.object({
   SCRAPERAPI_KEY: z.string().optional().default(''),
   SCRAPINGBEE_API_KEY: z.string().optional().default(''),
   CRAWLBASE_TOKEN: z.string().optional().default(''),
-  UNBLOCKER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
+  UNBLOCKER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120000),
 
   SEMANTIC_REVIEW_ENABLED: z
     .enum(['true', 'false'])
@@ -85,8 +85,8 @@ export const envSchema = z.object({
   ACQUISITION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   ACCESS_BLOCK_THRESHOLD: z.coerce.number().int().positive().default(2),
   ACCESS_BLOCK_COOLDOWN_MINUTES: z.coerce.number().int().positive().default(60),
-  EXTRACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
-  COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(300000),
+  EXTRACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(240000),
+  COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(360000),
   COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   COMPILATION_QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   CONFIGURATION_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(250000),
