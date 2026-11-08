@@ -17,6 +17,7 @@ export type RunConfigurationOperation = <T>(stage: string, action: () => Promise
 export class ConfigurationSession {
   private session?: DocumentSession;
   private readonly actions: DiscoveryAction[] = [];
+  private lastSnapshot?: DocumentSnapshot;
   constructor(
     private readonly adapter: DocumentAdapter,
     private readonly request: ConfigurationRequest,
@@ -39,12 +40,19 @@ export class ConfigurationSession {
     return this.session;
   }
   async snapshot(): Promise<DocumentSnapshot> {
-    return (await this.open()).snapshot();
+    if (this.lastSnapshot && !this.session && this.actions.length === 0) {
+      return structuredClone(this.lastSnapshot);
+    }
+    const session = await this.open();
+    const snap = await session.snapshot();
+    this.lastSnapshot = snap;
+    return snap;
   }
   async execute(tool: ConfigurationTool) {
     const session = await this.open();
     const result = await executeConfigurationTool(session, tool);
     if (tool.kind === ConfigurationToolKind.Interact) this.actions.push(tool.action);
+    this.lastSnapshot = result.snapshot;
     return result;
   }
   async close(): Promise<void> {

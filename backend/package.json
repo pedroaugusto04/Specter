@@ -22,7 +22,8 @@
     "db:studio": "drizzle-kit studio",
     "evaluate:extraction": "tsx scripts/evaluate-extraction.ts",
     "evaluate:configuration": "node dist/cli/evaluateConfiguration.js",
-    "evaluate:regression": "node dist/cli/evaluateRegression.js"
+    "evaluate:regression": "node dist/cli/evaluateRegression.js",
+    "test:benchmark": "tsx scripts/run-benchmark.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",

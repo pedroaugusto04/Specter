@@ -27,6 +27,10 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 - Field sources must strictly match the records kind unless using an explicit association: when records are "dom", all field sources must be "dom" with selector and attribute ("text" to read DOM textContent); when records are "jsonld", all field sources must be "jsonld" with path array; when records are "response", all field sources must be "response" with path array. Never mix DOM selectors inside a JSON-LD record.
 - If JSON-LD is missing target fields or fails extraction, switch both records (kind "dom" with container selector or "body") and all field sources to "dom".
 - Locators: {"kind":"css","selector":".item"} or {"kind":"role","role":"button","name":"OK"}.
+- Selectors priority: Prefer resilient selectors:
+  1. Semantic attributes (data-testid, itemprop, id, aria-label) or direct semantic tags (e.g. main h1, article header).
+  2. For classes with build/hash suffixes (e.g. Next.js/CSS modules like _title__hdTX_ or price__vpgdo), prefer prefix attribute selectors (e.g. [class*="ProductPrice_productPrice"]) or parent tag scoping.
+  3. Literal class names as fallback when no resilient alternative uniquely identifies the element.
 - Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals). Never use jsonld or dom as condition kinds.
 - Setup actions: click (locator), scroll (optional selector), wait (condition). Never submit forms, log in, purchase or change settings.
 - Collections: paginate with positive end evidence. Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
