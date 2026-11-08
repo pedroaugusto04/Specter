@@ -165,6 +165,12 @@ describe('Extraction contract and integrity', () => {
     expect(
       convertFieldValue('1.299,99', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBe(1299.99);
+    expect(
+      convertFieldValue('2789.10', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBe(2789.1);
+    expect(
+      convertFieldValue('42', { ...field, locale: undefined }, 'https://example.com')
+    ).toBe(42);
     expect(convertFieldValue('US$ 49.99', field, 'https://example.com')).toBe(49.99);
     expect(convertFieldValue('CA$ 1,299.99', field, 'https://example.com')).toBe(1299.99);
   });

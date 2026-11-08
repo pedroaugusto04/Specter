@@ -36,7 +36,15 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
     }
     case FieldType.Number: {
       if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-      return field.locale ? parseLocalizedNumber(text, field.locale) : null;
+      if (field.locale) {
+        const localized = parseLocalizedNumber(text, field.locale);
+        if (localized !== null) return localized;
+      }
+      if (/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text)) {
+        const standard = Number(text);
+        if (Number.isFinite(standard)) return standard;
+      }
+      return null;
     }
   }
 }
