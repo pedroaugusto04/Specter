@@ -50,6 +50,21 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
         const standard = Number(text);
         if (Number.isFinite(standard)) return standard;
       }
+      const parenMatches = [...text.matchAll(/\(\s*([+-]?[\d.,\s]+)\s*\)/g)];
+      if (parenMatches.length === 1 && parenMatches[0]?.[1]) {
+        const outside = text.replace(parenMatches[0][0], '').trim();
+        if (/[a-zA-ZÀ-ÿ]/.test(outside)) {
+          const candidate = parenMatches[0][1].trim();
+          if (field.locale) {
+            const localized = parseLocalizedNumber(candidate, field.locale);
+            if (localized !== null) return localized;
+          }
+          if (/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(candidate)) {
+            const standard = Number(candidate);
+            if (Number.isFinite(standard)) return standard;
+          }
+        }
+      }
       return null;
     }
   }

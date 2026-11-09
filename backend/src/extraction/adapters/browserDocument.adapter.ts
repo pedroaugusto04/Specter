@@ -224,16 +224,16 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         execution.check();
         if (!settled) {
           settled = true;
-          const isEmptyShell = await page
-            .evaluate?.(
-              () =>
-                !document.querySelector('main, article, h1, h2, table, [role="main"]') &&
-                (document.body?.innerText?.trim().length ?? 0) < 32
-            )
-            ?.catch(() => false);
-          if (isEmptyShell) {
+          const idleTimeout = Math.min(2500, timeout());
+          if (idleTimeout > 0) {
+            await page.waitForLoadState?.('networkidle', { timeout: idleTimeout })?.catch(() => {});
+          }
+          const loadingTimeout = Math.min(1500, timeout());
+          if (loadingTimeout > 0) {
             await page
-              .waitForLoadState?.('networkidle', { timeout: Math.min(1500, timeout()) })
+              .locator?.('[aria-busy="true"], .animate-pulse, [class*="skeleton"], [role="progressbar"]')
+              ?.first?.()
+              ?.waitFor?.({ state: 'hidden', timeout: loadingTimeout })
               ?.catch(() => {});
           }
         }
@@ -335,6 +335,10 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           );
         if (unsafe) throw new Error('Form interactions are not supported.');
         await target.first().click({ timeout: timeout() });
+        const postClickTimeout = Math.min(1500, timeout());
+        if (postClickTimeout > 0) {
+          await page.waitForLoadState?.('networkidle', { timeout: postClickTimeout })?.catch(() => {});
+        }
       };
       const scroll = async (selector?: string) => {
         if (selector)
