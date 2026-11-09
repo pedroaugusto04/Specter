@@ -72,7 +72,6 @@ export function fixturePlan(input: FixtureInput = {}): ExtractionPlan {
         ])
       ),
       identityFields: input.identityFields ?? [],
-      filters: [],
       triggerRules: input.triggerRules ?? [],
       triggerMatchMode: input.triggerMatchMode ?? 'all',
     },

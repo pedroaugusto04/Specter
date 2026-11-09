@@ -1,3 +1,4 @@
+import { sameIntent } from './configurationPolicy.js';
 import { buildSemanticReviewPayload, semanticReviewStatus } from './configurationReview.js';
 import { payloadRecords } from './comparison.js';
 import { ConfigurationDecisionKind, ConfigurationStage } from './configurationConstants.js';
@@ -55,7 +56,7 @@ export async function evaluateIsolatedStages(
       const expected = item.responses.configure[0];
       if (decision.kind === ConfigurationDecisionKind.Tool) return equal(decision, expected);
       const plan = extractionPlanSchema.parse(normalizeExtractionCandidate(decision.plan));
-      if (!equal(plan.intent, item.expectedIntent)) return false;
+      if (!item.expectedIntent || !sameIntent(plan.intent, item.expectedIntent)) return false;
       const execution = await fixtureExecutor(item.snapshot, item.interactions).execute(
         item.snapshot.url,
         plan

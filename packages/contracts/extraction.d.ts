@@ -41,7 +41,6 @@ export interface ExtractionIntent {
   scope: ExtractionScope;
   fields: Record<string, IntentField>;
   identityFields: string[];
-  filters: string[];
   triggerRules: TriggerRule[];
   triggerMatchMode: TriggerMatchMode;
 }

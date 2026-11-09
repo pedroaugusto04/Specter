@@ -1,3 +1,4 @@
+import { sameIntent } from './configurationPolicy.js';
 import { ConfigurationDecisionKind } from './configurationConstants.js';
 import { evaluationWouldAlert } from './evaluationAlerts.js';
 import { payloadRecords } from './comparison.js';
@@ -256,7 +257,7 @@ export async function evaluateConfigurationCorpus(
           if (candidate.success)
             check(
               'intent',
-              canonicalJson(candidate.data.intent) === canonicalJson(item.expectedIntent)
+              sameIntent(candidate.data.intent, item.expectedIntent)
             );
         }
         return decision;

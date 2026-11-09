@@ -24,7 +24,6 @@ describe('Single extraction contract', () => {
     ).toBe(false);
     const {
       identityFields: _id,
-      filters: _filters,
       triggerRules: _rules,
       triggerMatchMode: _mode,
       ...intentWithoutOptionalLists

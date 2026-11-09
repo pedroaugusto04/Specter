@@ -359,7 +359,6 @@ describe('Extraction contract and integrity', () => {
           },
         },
         identityFields: [],
-        filters: [],
         triggerRules: [],
         triggerMatchMode: 'all',
       },
@@ -416,7 +415,6 @@ describe('Extraction contract and integrity', () => {
           },
         },
         identityFields: [],
-        filters: [],
         triggerRules: [],
         triggerMatchMode: 'all',
       },
@@ -469,7 +467,6 @@ describe('Extraction contract and integrity', () => {
           },
         },
         identityFields: ['date', 'course', 'description'],
-        filters: [],
         triggerRules: [],
         triggerMatchMode: 'all',
       },
@@ -518,7 +515,6 @@ describe('Extraction contract and integrity', () => {
           },
         },
         identityFields: ['title'],
-        filters: [],
         triggerRules: [],
         triggerMatchMode: 'all',
       },
@@ -560,7 +556,7 @@ describe('Extraction contract and integrity', () => {
     const normalized = normalizeExtractionCandidate(minimalPlan);
     const parsed = extractionPlanSchema.parse(normalized);
     expect(parsed.intent.scope).toBe('page');
-    expect(parsed.intent.filters).toEqual([]);
+    expect('filters' in parsed.intent).toBe(false);
     expect(parsed.intent.fields.price?.locale).toBe('pt-BR');
     expect(parsed.strategy.ready.length).toBeGreaterThanOrEqual(1);
   });
@@ -611,7 +607,7 @@ describe('Common execution and comparisons', () => {
     });
     const result = await executor.execute('https://example.com/', {
       ...plan,
-      intent: { ...plan.intent, scope: 'collection', filters: ['price below 100'] },
+      intent: { ...plan.intent, scope: 'collection' },
       strategy: {
         ...plan.strategy,
         filters: [{ field: 'price', operator: 'lt', value: 100 }],
