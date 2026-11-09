@@ -60,7 +60,7 @@ export interface ResponseMatch {
 }
 
 export type Source =
-  | { kind: 'dom'; selector: string; attribute: string; association?: string }
+  | { kind: 'dom'; selector: string; attribute: string; pattern?: string; association?: string }
   | { kind: 'jsonld'; path: Array<string | number>; association?: string }
   | { kind: 'response'; path: Array<string | number>; association?: string };
 

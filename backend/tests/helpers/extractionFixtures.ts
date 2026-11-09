@@ -31,7 +31,7 @@ export interface FixtureCompiler {
 interface FixtureField extends Partial<IntentField> {
   type: IntentField['type'];
   sources: Array<
-    Exclude<Source, { kind: 'dom' }> | { kind: 'dom'; selector: string; attribute?: string }
+    Exclude<Source, { kind: 'dom' }> | { kind: 'dom'; selector: string; attribute?: string; pattern?: string }
   >;
 }
 interface FixtureInput {

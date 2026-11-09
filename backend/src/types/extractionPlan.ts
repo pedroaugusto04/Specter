@@ -68,6 +68,7 @@ export const sourceSchema = z.discriminatedUnion('kind', [
       attribute: text.refine((attribute) => !['textContent', 'innerText'].includes(attribute), {
         message: 'Use "text" to read DOM text.',
       }),
+      pattern: text.optional(),
       association: text.optional(),
     })
     .strict(),

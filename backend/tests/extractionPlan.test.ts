@@ -253,6 +253,40 @@ describe('Extraction contract and integrity', () => {
     expect(convertFieldValue('invalid date', dateField, 'https://example.com')).toBeNull();
     expect(convertFieldValue('31/02/2024', dateField, 'https://example.com')).toBeNull();
   });
+  it('extracts tokens from mixed DOM text using optional pattern regex with capture group', () => {
+    const input = fixturePlan({
+      mode: 'single',
+      fields: {
+        count: {
+          type: 'number',
+          sources: [
+            {
+              kind: 'dom',
+              selector: '.badge',
+              attribute: 'text',
+              pattern: '\\((\\d+)\\)',
+            },
+          ],
+        },
+        active: {
+          type: 'number',
+          sources: [
+            {
+              kind: 'dom',
+              selector: '.status',
+              attribute: 'text',
+              pattern: 'Ativos:\\s*(\\d+)',
+            },
+          ],
+        },
+      },
+    });
+    const result = extract(
+      '<div class="badge">Clientes (42)</div><div class="status">Status: Ativos: 99</div>',
+      input
+    );
+    expect(result.records[0]).toEqual({ count: 42, active: 99 });
+  });
   it('keeps graph/list entities distinct and recognizes Schema.org URLs', () => {
     const structured = fixturePlan({
       mode: 'collection',

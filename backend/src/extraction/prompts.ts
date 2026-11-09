@@ -19,16 +19,13 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
   - Use transport: "http" ONLY when records and fields are extracted directly from static DOM (kind: "dom") or JSON-LD (kind: "jsonld") without setup interactions or network responses.
   - Use transport: "browser" ALWAYS when the strategy uses network responses (records, fields, or ready conditions of kind "response"), user interactions (setup: click/type/wait), scroll/click pagination, frames, shadow DOM, or visible conditions.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
-- ready confirms that extraction can proceed and requires at least one condition:
-  - On static pages or DOM elements: use an exists condition on a stable container or element (e.g. {"kind":"exists","locator":{"kind":"css","selector":".price"}}), or a field condition (e.g. {"kind":"field","field":"price"}).
-  - On dynamic SPAs or dashboards: if content loads via API, prefer a response condition (e.g. {"kind":"response","match":{"urlPattern":"/api/..."}}) or an exists condition on the primary content container. Do not invent speculative CSS classes for loading indicators or spinners.
-  - Use visible only with browser transport when waiting for an element that is hidden until interacted with. When ready uses kind "response", transport must be "browser". Use empty: [] when there is no positive evidence of empty results.
+- ready requires at least one condition (exists on container/element, field, or response) to confirm data is present before extraction. Use empty: [] when there is no positive evidence of empty results.
 
 ### Syntax Contracts
 - Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.
 - Strategy fields must match intent fields exactly. Map to observed data by meaning and entity context.
 - Records use kind dom with selector, jsonld with type, or response with match and path.
-- Field sources must strictly match the records kind unless using an explicit association: when records are "dom", all field sources must be "dom" with selector and attribute ("text" to read DOM textContent); when records are "jsonld", all field sources must be "jsonld" with path array; when records are "response", all field sources must be "response" with path array. Never mix DOM selectors inside a JSON-LD record.
+- Field sources must strictly match the records kind unless using an explicit association: when records are "dom", all field sources must be "dom" with selector and attribute ("text" to read DOM textContent; optional "pattern" regex to extract a target token/number from surrounding label text, e.g. "\\d+" or "(\\d+)"); when records are "jsonld", all field sources must be "jsonld" with path array; when records are "response", all field sources must be "response" with path array. Never mix DOM selectors inside a JSON-LD record.
 - If JSON-LD is missing target fields or fails extraction, switch both records (kind "dom" with container selector or "body") and all field sources to "dom".
 - Locators: {"kind":"css","selector":".item"} or {"kind":"role","role":"button","name":"OK"}.
 - Selectors priority: Prefer resilient selectors:

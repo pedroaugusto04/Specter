@@ -36,17 +36,31 @@ export class DomSourceReader implements ISourceReader {
     }
     const readSingle = (el: cheerio.Cheerio<AnyNode>) =>
       source.attribute === 'text' ? el.text() : el.attr(source.attribute);
-    if (target.length <= 1) return readSingle(target);
-    const distinctValues = new Set<string>();
-    for (let i = 0; i < target.length; i++) {
-      const val = readSingle(target.eq(i))?.trim();
-      if (val) distinctValues.add(val);
+    let raw: unknown;
+    if (target.length <= 1) raw = readSingle(target);
+    else {
+      const distinctValues = new Set<string>();
+      for (let i = 0; i < target.length; i++) {
+        const val = readSingle(target.eq(i))?.trim();
+        if (val) distinctValues.add(val);
+      }
+      if (distinctValues.size > 1)
+        throw new Error(
+          `Ambiguous DOM field source: selector '${source.selector}' matched ${target.length} elements with ${distinctValues.size} distinct values. Scope the record or field selector to match a single element.`
+        );
+      raw = distinctValues.values().next().value;
     }
-    if (distinctValues.size > 1)
-      throw new Error(
-        `Ambiguous DOM field source: selector '${source.selector}' matched ${target.length} elements with ${distinctValues.size} distinct values. Scope the record or field selector to match a single element.`
-      );
-    return distinctValues.values().next().value;
+    if (typeof raw === 'string' && source.pattern) {
+      try {
+        const regex = new RegExp(source.pattern, 'u');
+        const match = raw.match(regex);
+        if (!match) return null;
+        return match[1] !== undefined ? match[1] : match[0];
+      } catch {
+        return null;
+      }
+    }
+    return raw;
   }
 }
 function typeName(type: string): string {
