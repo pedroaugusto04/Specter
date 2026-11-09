@@ -90,6 +90,13 @@ export function JobRunsDrawer({
   const monitorStatus = MONITOR_STATUS[job?.status ?? JOB_STATUS.PendingCompilation];
   const jobFailure = parseErrorMessage(job?.lastError);
 
+  const runsWithScreenshot = React.useMemo(
+    () => runs.filter((r): r is JobRunDto & { screenshotUrl: string } => Boolean(r.screenshotUrl)),
+    [runs]
+  );
+  const latestScreenshotRun = runsWithScreenshot[0] ?? null;
+  const priorScreenshotRun = runsWithScreenshot[1] ?? null;
+
   const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
@@ -219,69 +226,58 @@ export function JobRunsDrawer({
                   </table>
                 </div>
 
-                {runs[0]?.screenshotUrl &&
-                  (() => {
-                    const currentScreenshot = runs[0].screenshotUrl;
-                    const priorScreenshotRun = runs.slice(1).find((r) => Boolean(r.screenshotUrl));
-                    const previousScreenshot = priorScreenshotRun?.screenshotUrl;
-
-                    return (
-                      <div className="overflow-hidden rounded-lg border border-border bg-muted/20">
-                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                          <span className="flex items-center gap-1.5 font-mono">
-                            {previousScreenshot ? (
-                              <>
-                                <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
-                                Visual Diff (Before vs After)
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="h-3.5 w-3.5 text-primary" />
-                                Visual Snapshot Proof
-                              </>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedScreenshot(currentScreenshot)}
-                            className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
-                          >
-                            <ZoomIn className="h-3 w-3" />
-                            Zoom Full Size
-                          </button>
+                {latestScreenshotRun && (
+                  <div className="overflow-hidden rounded-lg border border-border bg-muted/20">
+                    <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1.5 font-mono">
+                        {priorScreenshotRun ? (
+                          <>
+                            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                            Visual Diff (Before vs After)
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-3.5 w-3.5 text-primary" />
+                            Visual Snapshot Proof
+                          </>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedScreenshot(latestScreenshotRun.screenshotUrl)}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
+                      >
+                        <ZoomIn className="h-3 w-3" />
+                        Zoom Full Size
+                      </button>
+                    </div>
+                    <div className="p-3">
+                      {priorScreenshotRun ? (
+                        <VisualDiffSlider
+                          previousUrl={priorScreenshotRun.screenshotUrl}
+                          currentUrl={latestScreenshotRun.screenshotUrl}
+                          previousLabel="Previous"
+                          currentLabel="Current"
+                          previousDate={formatDateTime(priorScreenshotRun.executedAt, timeZone)}
+                          currentDate={formatDateTime(latestScreenshotRun.executedAt, timeZone)}
+                          onOpenZoom={(url) => setSelectedScreenshot(url)}
+                        />
+                      ) : (
+                        <div
+                          className="relative cursor-pointer overflow-hidden rounded-lg max-h-60"
+                          onClick={() => setSelectedScreenshot(latestScreenshotRun.screenshotUrl)}
+                        >
+                          <img
+                            src={latestScreenshotRun.screenshotUrl}
+                            alt="Latest visual diff snapshot"
+                            className="w-full object-cover object-top"
+                            loading="lazy"
+                          />
                         </div>
-                        <div className="p-3">
-                          {previousScreenshot ? (
-                            <VisualDiffSlider
-                              previousUrl={previousScreenshot}
-                              currentUrl={currentScreenshot}
-                              previousLabel="Previous"
-                              currentLabel="Current"
-                              previousDate={
-                                priorScreenshotRun
-                                  ? formatDateTime(priorScreenshotRun.executedAt, timeZone)
-                                  : undefined
-                              }
-                              currentDate={formatDateTime(runs[0].executedAt, timeZone)}
-                              onOpenZoom={(url) => setSelectedScreenshot(url)}
-                            />
-                          ) : (
-                            <div
-                              className="relative cursor-pointer overflow-hidden rounded-lg max-h-60"
-                              onClick={() => setSelectedScreenshot(currentScreenshot)}
-                            >
-                              <img
-                                src={currentScreenshot}
-                                alt="Latest visual diff snapshot"
-                                className="w-full object-cover object-top"
-                                loading="lazy"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                      )}
+                    </div>
+                  </div>
+                )}
               </section>
             )}
 
