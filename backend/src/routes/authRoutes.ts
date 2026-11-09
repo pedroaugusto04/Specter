@@ -47,7 +47,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
     const user = requireUser(request);
     const body = authProfileUpdateSchema.parse(request.body);
     const updated = await authService.updateProfile(user.id, {
-      name: body.name !== undefined ? body.name : undefined,
+      name: body.name,
       timezone: body.timezone,
     });
     return reply.status(200).send({ data: updated });

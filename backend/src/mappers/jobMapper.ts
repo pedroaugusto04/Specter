@@ -7,21 +7,6 @@ import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enu
 
 export const JobMapper = {
   rowToEntity(row: ScrapingJobRow): ScrapingJobEntity {
-    const extractionPlan = row.extractionPlan
-      ? (() => {
-          const plan = row.extractionPlan;
-          if (
-            plan.intent &&
-            typeof plan.intent === 'object' &&
-            'filters' in (plan.intent as unknown as Record<string, unknown>)
-          ) {
-            const { filters: _, ...cleanIntent } = plan.intent as unknown as Record<string, unknown>;
-            return { ...plan, intent: cleanIntent as unknown as ScrapingJobEntity['extractionPlan'] extends null ? never : NonNullable<ScrapingJobEntity['extractionPlan']>['intent'] };
-          }
-          return plan;
-        })()
-      : null;
-
     return {
       id: row.id,
       userId: row.userId,
@@ -34,7 +19,7 @@ export const JobMapper = {
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       contractRevision: row.contractRevision,
       planRevision: row.planRevision,
-      extractionPlan,
+      extractionPlan: row.extractionPlan ?? null,
       status: parseEnumValue(JobStatus, row.status, 'job status'),
       lastError: row.lastError ?? null,
       failureCount: row.failureCount,

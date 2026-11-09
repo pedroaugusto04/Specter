@@ -172,111 +172,58 @@ export const executionStrategySchema = z
   .strict();
 
 export function normalizeExtractionCandidate(raw: unknown): unknown {
-  if (raw && typeof raw === 'object' && 'strategy' in raw) {
-    const plan = raw as { strategy?: unknown; intent?: unknown };
-    let nextStrategy = plan.strategy;
-    let nextIntent = plan.intent;
-    let modified = false;
+  if (!raw || typeof raw !== 'object' || !('strategy' in raw) || !('intent' in raw)) {
+    return raw;
+  }
+  const plan = raw as { strategy: any; intent: any };
+  const s = plan.strategy;
+  const intent = plan.intent;
+  if (!s || typeof s !== 'object' || !intent || typeof intent !== 'object') {
+    return raw;
+  }
 
-    if (nextStrategy && typeof nextStrategy === 'object') {
-      const s = { ...(nextStrategy as Record<string, unknown>) } as unknown as ExecutionStrategy;
-      if (s.transport === Transport.Http && requiresBrowser(s)) {
-        s.transport = Transport.Browser;
-        modified = true;
-      }
+  if (s.transport === Transport.Http && requiresBrowser(s)) {
+    s.transport = Transport.Browser;
+  }
 
-      if (!Array.isArray(s.ready) || s.ready.length === 0) {
-        if (s.records && typeof s.records === 'object') {
-          if (s.records.kind === SourceKind.Dom && 'selector' in s.records && typeof s.records.selector === 'string') {
-            s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: s.records.selector } }];
-            modified = true;
-          } else if (s.records.kind === SourceKind.JsonLd) {
-            s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: 'script[type="application/ld+json"]' } }];
-            modified = true;
-          }
-        }
-      }
-
-      if (!Array.isArray(s.empty)) {
-        s.empty = [];
-        modified = true;
-      }
-
-      nextStrategy = s;
-    }
-
-    if (nextIntent && typeof nextIntent === 'object') {
-      const intentObj = { ...(nextIntent as Record<string, unknown>) };
-      const hasPagination = Boolean(
-        nextStrategy &&
-          typeof nextStrategy === 'object' &&
-          'pagination' in nextStrategy &&
-          (nextStrategy as { pagination?: unknown }).pagination
-      );
-
-      const targetScope = hasPagination ? ExtractionScope.Collection : ExtractionScope.Page;
-      if (intentObj.scope !== targetScope) {
-        intentObj.scope = targetScope;
-        modified = true;
-      }
-
-      if (hasPagination && intentObj.mode !== ExtractionMode.Collection) {
-        intentObj.mode = ExtractionMode.Collection;
-        modified = true;
-      }
-
-      if (intentObj.mode === ExtractionMode.Collection) {
-        let identities = Array.isArray(intentObj.identityFields) ? [...intentObj.identityFields] : [];
-        if (!identities.length && intentObj.fields && typeof intentObj.fields === 'object') {
-          identities = Object.keys(intentObj.fields as Record<string, unknown>);
-          intentObj.identityFields = identities;
-          modified = true;
-        }
-        if (identities.length > 0 && intentObj.fields && typeof intentObj.fields === 'object') {
-          const fieldsObj = { ...(intentObj.fields as Record<string, Record<string, unknown>>) };
-          let fieldsModified = false;
-          for (const idKey of identities) {
-            if (fieldsObj[idKey] && typeof fieldsObj[idKey] === 'object' && !fieldsObj[idKey].required) {
-              fieldsObj[idKey] = { ...fieldsObj[idKey], required: true };
-              fieldsModified = true;
-            }
-          }
-          if (fieldsModified) {
-            intentObj.fields = fieldsObj;
-            modified = true;
-          }
-        }
-      }
-
-      if (intentObj.fields && typeof intentObj.fields === 'object') {
-        const fieldsObj = { ...(intentObj.fields as Record<string, Record<string, unknown>>) };
-        let fieldsModified = false;
-        for (const [, field] of Object.entries(fieldsObj)) {
-          if (field && typeof field === 'object' && field.type === FieldType.Number && !field.locale) {
-            field.locale = 'pt-BR';
-            fieldsModified = true;
-          }
-        }
-        if (fieldsModified) {
-          intentObj.fields = fieldsObj;
-          modified = true;
-        }
-      }
-
-      if (modified) {
-        nextIntent = intentObj;
-      }
-    }
-
-    if (modified) {
-      return {
-        ...raw,
-        strategy: nextStrategy,
-        intent: nextIntent,
-      };
+  if (!Array.isArray(s.ready) || s.ready.length === 0) {
+    if (s.records?.kind === SourceKind.Dom && typeof s.records.selector === 'string') {
+      s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: s.records.selector } }];
+    } else if (s.records?.kind === SourceKind.JsonLd) {
+      s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: 'script[type="application/ld+json"]' } }];
     }
   }
-  return raw;
+
+  if (!Array.isArray(s.empty)) {
+    s.empty = [];
+  }
+
+  const hasPagination = Boolean(s.pagination);
+  intent.scope = hasPagination ? ExtractionScope.Collection : ExtractionScope.Page;
+  if (hasPagination) {
+    intent.mode = ExtractionMode.Collection;
+  }
+
+  if (intent.mode === ExtractionMode.Collection && intent.fields) {
+    if (!Array.isArray(intent.identityFields) || intent.identityFields.length === 0) {
+      intent.identityFields = Object.keys(intent.fields);
+    }
+    for (const key of intent.identityFields) {
+      if (intent.fields[key]) {
+        intent.fields[key].required = true;
+      }
+    }
+  }
+
+  if (intent.fields) {
+    for (const field of Object.values(intent.fields) as any[]) {
+      if (field?.type === FieldType.Number && !field.locale) {
+        field.locale = 'pt-BR';
+      }
+    }
+  }
+
+  return plan;
 }
 export const extractionPlanSchema = z
   .object({
