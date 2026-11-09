@@ -235,6 +235,12 @@ export function JobRunsDrawer({
                               currentUrl={currentScreenshot}
                               previousLabel="Previous"
                               currentLabel="Current"
+                              previousDate={
+                                priorScreenshotRun
+                                  ? formatDateTime(priorScreenshotRun.executedAt, timeZone)
+                                  : undefined
+                              }
+                              currentDate={formatDateTime(runs[0].executedAt, timeZone)}
                               onOpenZoom={(url) => setSelectedScreenshot(url)}
                             />
                           ) : (
