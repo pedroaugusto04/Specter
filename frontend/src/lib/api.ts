@@ -12,6 +12,7 @@ import type {
   UserIntegrationsDto,
 } from '@specter/contracts';
 export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
+export type { JobRunsDto } from '@specter/contracts';
 export type {
   ExtractionPlan,
   TriggerMatchMode,
@@ -238,8 +239,12 @@ export const api = {
     });
   },
 
-  getJobRuns(id: string): Promise<JobRunsDto> {
-    return request<JobRunsDto>(`/api/jobs/${id}/runs`);
+  getJobRuns(id: string, page = 1, pageSize = 20): Promise<JobRunsDto> {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return request<JobRunsDto>(`/api/jobs/${id}/runs?${params.toString()}`);
   },
 
   getSessions(): Promise<SessionDto[]> {

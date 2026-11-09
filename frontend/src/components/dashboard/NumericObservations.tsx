@@ -1,6 +1,12 @@
 'use client';
 import * as React from 'react';
-import { numericScale, axisLabels, SCALE_MODE, type Observation } from '@/lib/chartUtils';
+import {
+  numericScale,
+  axisLabels,
+  SCALE_MODE,
+  compressNumericObservations,
+  type Observation,
+} from '@/lib/chartUtils';
 
 export function NumericObservations({
   observations,
@@ -13,7 +19,16 @@ export function NumericObservations({
 }) {
   const [mode, setMode] = React.useState<string>(SCALE_MODE.Adjusted);
   const [hovered, setHovered] = React.useState<Observation | null>(null);
-  const points = observations.filter((p) => typeof p.value === 'number');
+
+  const points = React.useMemo(
+    () => observations.filter((p) => typeof p.value === 'number'),
+    [observations]
+  );
+  const displayPoints = React.useMemo(
+    () => compressNumericObservations(points),
+    [points]
+  );
+
   const { min, max, ticks } = numericScale(
     points.map((p) => p.value as number),
     mode === SCALE_MODE.Zero
@@ -23,29 +38,55 @@ export function NumericObservations({
   if (!points.length) return <p>No valid numeric readings.</p>;
   const start = Math.min(...times),
     end = Math.max(...times);
-  const magnitude = Math.max(Math.abs(min), Math.abs(max));
+  const magnitude = Math.max(Math.abs(min), Math.abs(max)) || 1;
   const y = (value: number) =>
     180 - ((value / magnitude - min / magnitude) / (max / magnitude - min / magnitude)) * 155;
+
+  const getX = (ts: number) =>
+    end === start ? 365 : 110 + ((ts - start) / (end - start)) * 510;
+
+  const stepPath = React.useMemo(() => {
+    if (displayPoints.length < 2) return '';
+    let d = `M ${getX(displayPoints[0]!.timestamp)} ${y(displayPoints[0]!.value as number)}`;
+    for (let i = 1; i < displayPoints.length; i++) {
+      const xCurr = getX(displayPoints[i]!.timestamp);
+      const yCurr = y(displayPoints[i]!.value as number);
+      d += ` H ${xCurr} V ${yCurr}`;
+    }
+    return d;
+  }, [displayPoints, start, end, magnitude, min, max]);
+
+  const areaPath = React.useMemo(() => {
+    if (!stepPath || displayPoints.length < 2) return '';
+    const firstX = getX(displayPoints[0]!.timestamp);
+    return `${stepPath} V 180 H ${firstX} Z`;
+  }, [stepPath, displayPoints, start, end]);
+
   return (
     <div className="space-y-3">
-      <label className="flex gap-2">
-        <input
-          type="checkbox"
-          checked={mode === SCALE_MODE.Zero}
-          onChange={(e) => setMode(e.target.checked ? SCALE_MODE.Zero : SCALE_MODE.Adjusted)}
-        />
-        Include zero
-      </label>
-      <p className="text-muted-foreground">
-        {mode === SCALE_MODE.Adjusted ? 'Scale adjusted to observed values' : 'Scale includes zero'}
-        . Points represent collection times; values between collections are unknown.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <label className="flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground">
+          <input
+            type="checkbox"
+            checked={mode === SCALE_MODE.Zero}
+            onChange={(e) => setMode(e.target.checked ? SCALE_MODE.Zero : SCALE_MODE.Adjusted)}
+            className="rounded border-border text-primary focus:ring-primary"
+          />
+          Include zero in Y-axis
+        </label>
+        {points.length > displayPoints.length && (
+          <span className="text-muted-foreground font-mono">
+            Compressed {points.length - displayPoints.length} plateau points
+          </span>
+        )}
+      </div>
+
       <div className="overflow-x-auto">
         <svg
           viewBox="0 0 640 225"
           className="w-full min-w-[32rem]"
           role="img"
-          aria-label="Observed numeric values over collection time. Exact readings in the table below."
+          aria-label="Observed numeric values over collection time."
         >
           {ticks.map((tick, index) => (
             <g key={index}>
@@ -62,23 +103,39 @@ export function NumericObservations({
               </text>
             </g>
           ))}
-          {points.map((point) => (
+
+          {/* Area fill */}
+          {areaPath && <path d={areaPath} fill="currentColor" opacity="0.08" />}
+
+          {/* Step line */}
+          {stepPath && (
+            <path
+              d={stepPath}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              opacity="0.85"
+            />
+          )}
+
+          {/* Change points */}
+          {displayPoints.map((point) => (
             <circle
               key={point.run.id}
-              cx={end === start ? 365 : 110 + ((point.timestamp - start) / (end - start)) * 510}
+              cx={getX(point.timestamp)}
               cy={y(point.value as number)}
               r="4"
               fill="currentColor"
-              className="cursor-pointer focus:outline-none focus-visible:stroke-primary"
+              className="cursor-pointer focus:outline-none focus-visible:stroke-primary hover:r-5 transition-all"
               tabIndex={0}
               onMouseEnter={() => setHovered(point)}
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(point)}
               onBlur={() => setHovered(null)}
               aria-label={`${formatTime(point.run.executedAt)}: ${formatValue(point.value as number)}`}
-            >
-            </circle>
+            />
           ))}
+
           <text x="110" y="215" fill="currentColor" fontSize="10">
             {formatTime(new Date(start).toISOString())}
           </text>
@@ -87,15 +144,14 @@ export function NumericObservations({
           </text>
         </svg>
       </div>
+
       {hovered && (
-        <div role="status" className="inline-block rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-          <span className="font-medium">{formatTime(hovered.run.executedAt)}</span>: {formatValue(hovered.value as number)}
+        <div
+          role="status"
+          className="inline-block rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md font-mono"
+        >
+          <span className="font-semibold">{formatTime(hovered.run.executedAt)}</span>: {formatValue(hovered.value as number)}
         </div>
-      )}
-      {points.length === 1 ? (
-        <p>Insufficient history for a trend.</p>
-      ) : (
-        points.every((p) => p.value === points[0].value) && <p>No observed variation.</p>
       )}
     </div>
   );

@@ -2,7 +2,12 @@ import { extractionPlanSchema } from '../src/types/extractionPlan.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
 import { describe, expect, it } from 'vitest';
 import { FieldType, RunStatus, ChangeStatus, Coverage, type JobRunDto } from '@specter/contracts';
-import { fieldObservations, numericScale, axisLabels } from '../../frontend/src/lib/chartUtils.js';
+import {
+  fieldObservations,
+  numericScale,
+  axisLabels,
+  compressNumericObservations,
+} from '../../frontend/src/lib/chartUtils.js';
 import { collectionEvents } from '../../frontend/src/lib/collectionHistory.js';
 import { evaluateSingleRule } from '../src/utils/triggerEvaluator.js';
 import { TriggerOperator } from '../src/types/enums.js';
@@ -159,5 +164,24 @@ describe('Typed observations and comparisons', () => {
     expect(events[2]!.reliable).toBe(false);
     expect(events[2]!.changes).toEqual([]);
     expect(events[3]!.changes).toHaveLength(2);
+  });
+
+  it('compresses consecutive plateau readings preserving boundary transition points', () => {
+    const rawRuns = [
+      reading('01', 100),
+      reading('02', 100),
+      reading('03', 100),
+      reading('04', 100),
+      reading('05', 120),
+      reading('06', 120),
+      reading('07', 120),
+      reading('08', 110),
+    ];
+    const obs = fieldObservations(rawRuns, 'value', FieldType.Number, 'revision');
+    const compressed = compressNumericObservations(obs);
+
+    // Initial 100, last 100 before transition, first 120, last 120 before transition, 110
+    expect(compressed.map((p) => p.run.id)).toEqual(['01', '04', '05', '07', '08']);
+    expect(compressed.map((p) => p.value)).toEqual([100, 100, 120, 120, 110]);
   });
 });

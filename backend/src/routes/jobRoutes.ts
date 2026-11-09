@@ -127,7 +127,12 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobRunsQuerySchema.parse(request.query);
-      const result = await jobService.getJobRuns(request.params.id, query.limit, user.id);
+      const result = await jobService.getJobRuns(
+        request.params.id,
+        query.page,
+        query.pageSize,
+        user.id
+      );
       return { data: result };
     }
   );

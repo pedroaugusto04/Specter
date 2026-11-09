@@ -125,12 +125,13 @@ export const jobStatusQuerySchema = z.object({
 });
 
 export const jobRunsQuerySchema = z.object({
-  limit: z.coerce
+  page: z.coerce.number().int().min(1, 'Page must be at least 1').default(1),
+  pageSize: z.coerce
     .number()
     .int()
-    .min(1, 'Limit must be at least 1')
-    .max(200, 'Limit cannot exceed 200')
-    .default(50),
+    .min(1, 'Page size must be at least 1')
+    .max(100, 'Page size cannot exceed 100')
+    .default(20),
 });
 
 export const authRegisterSchema = z.object({

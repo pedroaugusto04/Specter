@@ -63,6 +63,18 @@ export interface DashboardStats {
   DetectedChangesCount: number;
 }
 
+export interface JobRunsSummary {
+  totalRuns: number;
+  changedRuns: number;
+  lastChange: string | null;
+  averageDurationMs: number | null;
+}
+
+export interface PaginatedRunsResult {
+  runs: JobRunEntity[];
+  totalCount: number;
+}
+
 export interface IJobRepository {
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
   findById(id: string): Promise<ScrapingJobEntity | null>;
@@ -79,6 +91,12 @@ export interface IJobRepository {
   ): Promise<JobRunEntity>;
   purgeEvidence(cutoffDate: Date): Promise<void>;
   findRunsByJobId(jobId: string, limit?: number): Promise<JobRunEntity[]>;
+  findPaginatedRunsByJobId(
+    jobId: string,
+    page?: number,
+    pageSize?: number
+  ): Promise<PaginatedRunsResult>;
+  getJobRunsSummary(jobId: string): Promise<JobRunsSummary>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
   getStats(userId?: string): Promise<DashboardStats>;
@@ -254,6 +272,52 @@ export class DrizzleJobRepository implements IJobRepository {
       .limit(limit);
 
     return rows.map(JobMapper.runRowToEntity);
+  }
+
+  async findPaginatedRunsByJobId(
+    jobId: string,
+    page = 1,
+    pageSize = 20
+  ): Promise<PaginatedRunsResult> {
+    const offset = Math.max(0, (page - 1) * pageSize);
+
+    const [countResult, rows] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(jobRuns)
+        .where(eq(jobRuns.jobId, jobId)),
+      this.db
+        .select()
+        .from(jobRuns)
+        .where(eq(jobRuns.jobId, jobId))
+        .orderBy(desc(jobRuns.executedAt))
+        .limit(pageSize)
+        .offset(offset),
+    ]);
+
+    return {
+      runs: rows.map(JobMapper.runRowToEntity),
+      totalCount: countResult[0]?.count ?? 0,
+    };
+  }
+
+  async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {
+    const [stats] = await this.db
+      .select({
+        totalRuns: sql<number>`count(*)::int`,
+        changedRuns: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
+        lastChange: sql<Date | null>`max(case when ${jobRuns.hasChanges} = ${ChangeStatus.Changed} then ${jobRuns.executedAt} else null end)`,
+        averageDurationMs: sql<number | null>`round(avg(case when ${jobRuns.status} = ${RunStatus.Success} and ${jobRuns.durationMs} is not null then ${jobRuns.durationMs} else null end))::int`,
+      })
+      .from(jobRuns)
+      .where(eq(jobRuns.jobId, jobId));
+
+    return {
+      totalRuns: stats?.totalRuns ?? 0,
+      changedRuns: stats?.changedRuns ?? 0,
+      lastChange: stats?.lastChange ? new Date(stats.lastChange).toISOString() : null,
+      averageDurationMs: stats?.averageDurationMs ?? null,
+    };
   }
 
   async findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null> {

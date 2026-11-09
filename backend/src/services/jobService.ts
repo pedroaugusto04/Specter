@@ -8,7 +8,7 @@ import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
 import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
-import type { JobRunDto, ScrapingJobDto } from '@specter/contracts';
+import type { JobRunDto, JobRunsDto, ScrapingJobDto } from '@specter/contracts';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
@@ -358,15 +358,22 @@ export class JobService {
 
   async getJobRuns(
     jobId: string,
-    limit = 50,
+    page = 1,
+    pageSize = 20,
     userId?: string
-  ): Promise<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }> {
+  ): Promise<JobRunsDto> {
     const existing = await this.getOwnedJob(jobId, userId);
 
-    const runEntities = await this.jobRepository.findRunsByJobId(jobId, limit);
+    const [paginatedResult, summaryStats] = await Promise.all([
+      this.jobRepository.findPaginatedRunsByJobId(jobId, page, pageSize),
+      this.jobRepository.getJobRunsSummary(jobId),
+    ]);
+
+    const { runs: runEntities, totalCount } = paginatedResult;
     const runs = runEntities.map(JobMapper.runEntityToDto);
 
-    const successfulRuns = runEntities.filter(
+    const recentRuns = await this.jobRepository.findRunsByJobId(jobId, 5);
+    const successfulRuns = recentRuns.filter(
       (r) =>
         r.status === RunStatus.Success &&
         r.extractedData &&
@@ -390,7 +397,21 @@ export class JobService {
       );
     }
 
-    return { runs, latestDiff };
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+    return {
+      runs,
+      latestDiff,
+      pagination: {
+        page,
+        pageSize,
+        totalItems: totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+      summary: summaryStats,
+    };
   }
 
   async getDashboardStats(userId?: string): Promise<DashboardStats> {

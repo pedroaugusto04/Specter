@@ -115,9 +115,25 @@ export interface TriggerJobDto {
   queued: boolean;
   mode: 'scrape' | 'compile';
 }
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+export interface JobRunsSummaryDto {
+  totalRuns: number;
+  changedRuns: number;
+  lastChange: string | null;
+  averageDurationMs: number | null;
+}
 export interface JobRunsDto {
   runs: JobRunDto[];
   latestDiff: DiffSummary | null;
+  pagination: PaginationMeta;
+  summary: JobRunsSummaryDto;
 }
 export interface SessionCheckDto {
   hasSession: boolean;

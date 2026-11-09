@@ -367,5 +367,46 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(createdData.status).toBe('PENDING_COMPILATION');
     expect(repository.jobs.size).toBe(1);
     expect(scheduler.compilationQueue).toHaveLength(1);
+
+    // 6. Pagination & Summary on /api/jobs/:id/runs
+    for (let i = 1; i <= 25; i++) {
+      await repository.createRun({
+        jobId: createdData.id,
+        status: 'SUCCESS',
+        hasChanges: i % 2 === 0 ? 'YES' : 'NO',
+        durationMs: 100 * i,
+        executedAt: new Date(Date.now() - (25 - i) * 60000),
+      });
+    }
+
+    const runsPage1 = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/runs?page=1&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(runsPage1.statusCode).toBe(200);
+    const page1Data = runsPage1.json().data;
+    expect(page1Data.runs).toHaveLength(10);
+    expect(page1Data.pagination).toEqual({
+      page: 1,
+      pageSize: 10,
+      totalItems: 25,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPrevPage: false,
+    });
+    expect(page1Data.summary.totalRuns).toBe(25);
+    expect(page1Data.summary.changedRuns).toBe(12);
+
+    const runsPage3 = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/runs?page=3&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(runsPage3.statusCode).toBe(200);
+    const page3Data = runsPage3.json().data;
+    expect(page3Data.runs).toHaveLength(5);
+    expect(page3Data.pagination.hasNextPage).toBe(false);
+    expect(page3Data.pagination.hasPrevPage).toBe(true);
   });
 });

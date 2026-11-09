@@ -5,6 +5,7 @@ import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimeline
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
 import { USER_FAILURES, type IntentField } from '@specter/contracts';
@@ -55,9 +56,26 @@ export function JobRunsDrawer({
   onClose: () => void;
   timeZone?: string;
 }) {
-  const { data, isLoading: loading } = useJobRunsQuery(job?.id);
-  const runs = data?.runs || [];
-  const latestDiff = data?.latestDiff || null;
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(20);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [job?.id]);
+
+  const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
+  const { data: timelineData } = useJobRunsQuery(job?.id, 1, 50);
+
+  const runs: JobRunDto[] = data?.runs ?? [];
+  const timelineRuns: JobRunDto[] = timelineData?.runs ?? runs;
+  const latestDiff = data?.latestDiff ?? null;
+  const pagination = data?.pagination;
+  const summary = data?.summary ?? {
+    totalRuns: 0,
+    changedRuns: 0,
+    lastChange: null,
+    averageDurationMs: null,
+  };
   const extractionFields = job?.extractionPlan?.intent.fields ?? {};
   const fieldLabels = getExtractionFieldLabels(extractionFields);
   const latestReading = runs.find(
@@ -106,7 +124,7 @@ export function JobRunsDrawer({
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            Runs ({runs.length})
+            Runs ({summary.totalRuns})
           </button>
           <button
             type="button"
@@ -138,9 +156,9 @@ export function JobRunsDrawer({
         {activeTab === 'runs' && (
           <div className="space-y-6">
             {/* Timeline Strip (Status bar over time) */}
-            {runs.length > 0 && (
+            {timelineRuns.length > 0 && (
               <ExecutionTimelineStrip
-                runs={runs}
+                runs={timelineRuns}
                 timeZone={timeZone}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
@@ -266,7 +284,7 @@ export function JobRunsDrawer({
             {/* Execution History */}
             <section className="space-y-3.5">
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                Run History ({runs.length})
+                Run History ({summary.totalRuns})
               </h3>
 
               {loading ? (
@@ -386,6 +404,21 @@ export function JobRunsDrawer({
                   })}
                 </div>
               )}
+
+              {pagination && pagination.totalPages > 1 && (
+                <PaginationControls
+                  page={page}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setPage(1);
+                  }}
+                  itemLabel="runs"
+                />
+              )}
             </section>
           </div>
         )}
@@ -394,11 +427,12 @@ export function JobRunsDrawer({
         {activeTab === 'timeline' && (
           <ExecutionTimelineChart
             key={job.id}
-            runs={runs}
+            runs={timelineRuns}
             revision={job.contractRevision}
             identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
+            summary={summary}
           />
         )}
 

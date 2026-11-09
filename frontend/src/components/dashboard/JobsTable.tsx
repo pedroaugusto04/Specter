@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import {
   useDeleteJobMutation,
   useRecompileJobMutation,
@@ -185,6 +186,17 @@ export function JobsTable({
     });
   }, [jobs, filter, searchQuery]);
 
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(10);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [filter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedJobs = filteredJobs.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* Table Action Bar */}
@@ -302,7 +314,7 @@ export function JobsTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredJobs.map((job) => {
+              {paginatedJobs.map((job) => {
                 const currentAction = activeActions[job.id];
                 const isRunningExtraction = runningJobIds.has(job.id);
                 const isRunning = currentAction === 'run';
@@ -547,6 +559,24 @@ export function JobsTable({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="p-3 sm:p-4 bg-muted/10 border-t border-border">
+          <PaginationControls
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filteredJobs.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            itemLabel="monitors"
+            className="border-t-0 pt-0"
+          />
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import {
   type DashboardStats,
   type DiffSummary,
   type JobRunDto,
+  type JobRunsDto,
   type ScrapingJobDto,
   type SessionDto,
   type UserDto,
@@ -20,7 +21,7 @@ export const dashboardKeys = {
   user: ['auth', 'me'] as const,
   jobs: ['jobs'] as const,
   job: (id: string) => ['jobs', id] as const,
-  jobRuns: (id: string) => ['jobRuns', id] as const,
+  jobRuns: (id: string, page = 1, pageSize = 20) => ['jobRuns', id, page, pageSize] as const,
   stats: ['stats'] as const,
   integrations: ['integrations'] as const,
   sessions: ['sessions'] as const,
@@ -60,15 +61,35 @@ export function useStatsQuery() {
   });
 }
 
-export function useJobRunsQuery(jobId: string | null | undefined) {
-  return useQuery<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }>({
-    queryKey: jobId ? dashboardKeys.jobRuns(jobId) : ['jobRuns', 'none'],
+export function useJobRunsQuery(jobId: string | null | undefined, page = 1, pageSize = 20) {
+  return useQuery<JobRunsDto>({
+    queryKey: jobId ? dashboardKeys.jobRuns(jobId, page, pageSize) : ['jobRuns', 'none'],
     queryFn: async () => {
-      if (!jobId) return { runs: [], latestDiff: null };
-      return api.getJobRuns(jobId);
+      if (!jobId) {
+        return {
+          runs: [],
+          latestDiff: null,
+          pagination: {
+            page: 1,
+            pageSize,
+            totalItems: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+          summary: {
+            totalRuns: 0,
+            changedRuns: 0,
+            lastChange: null,
+            averageDurationMs: null,
+          },
+        };
+      }
+      return api.getJobRuns(jobId, page, pageSize);
     },
     enabled: Boolean(jobId),
     staleTime: 5 * 1000,
+    placeholderData: (prev) => prev,
   });
 }
 

@@ -21,6 +21,8 @@ import type {
   CreateJobRunInput,
   DashboardStats,
   IJobRepository,
+  JobRunsSummary,
+  PaginatedRunsResult,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
 import type {
@@ -197,6 +199,44 @@ export class InMemoryJobRepository implements IJobRepository {
       .filter((r) => r.jobId === jobId)
       .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime())
       .slice(0, limit);
+  }
+  async findPaginatedRunsByJobId(
+    jobId: string,
+    page = 1,
+    pageSize = 20
+  ): Promise<PaginatedRunsResult> {
+    const filtered = this.runs
+      .filter((r) => r.jobId === jobId)
+      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
+    const offset = Math.max(0, (page - 1) * pageSize);
+    return {
+      runs: filtered.slice(offset, offset + pageSize),
+      totalCount: filtered.length,
+    };
+  }
+  async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {
+    const jobRunsList = this.runs.filter((r) => r.jobId === jobId);
+    const changed = jobRunsList.filter((r) => r.hasChanges === 'YES');
+    const sortedChanged = [...changed].sort(
+      (a, b) => b.executedAt.getTime() - a.executedAt.getTime()
+    );
+    const successfulWithDuration = jobRunsList.filter(
+      (r) => r.status === 'SUCCESS' && typeof r.durationMs === 'number'
+    );
+    const averageDurationMs =
+      successfulWithDuration.length > 0
+        ? Math.round(
+            successfulWithDuration.reduce((acc, r) => acc + (r.durationMs ?? 0), 0) /
+              successfulWithDuration.length
+          )
+        : null;
+
+    return {
+      totalRuns: jobRunsList.length,
+      changedRuns: changed.length,
+      lastChange: sortedChanged[0]?.executedAt ? sortedChanged[0].executedAt.toISOString() : null,
+      averageDurationMs,
+    };
   }
   async findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null> {
     const matches = this.runs

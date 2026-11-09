@@ -20,10 +20,16 @@ export interface Observation {
   percent: number | null;
 }
 export function orderedRuns(runs: JobRunDto[]): JobRunDto[] {
-  const timestamp = (run: JobRunDto) =>
-    Number.isFinite(Date.parse(run.executedAt)) ? Date.parse(run.executedAt) : Infinity;
-  return [...runs].sort((a, b) => timestamp(a) - timestamp(b) || a.id.localeCompare(b.id));
+  return [...runs].sort(
+    (a, b) => Date.parse(a.executedAt) - Date.parse(b.executedAt) || a.id.localeCompare(b.id)
+  );
 }
+function matchesFieldType(val: unknown, type: IntentField['type']): boolean {
+  if (type === FieldType.Number) return typeof val === 'number' && Number.isFinite(val);
+  if (type === FieldType.Boolean) return typeof val === 'boolean';
+  return typeof val === 'string';
+}
+
 export function fieldObservations(
   runs: JobRunDto[],
   field: string,
@@ -34,25 +40,21 @@ export function fieldObservations(
   return orderedRuns(runs).map((run) => {
     const timestamp = Date.parse(run.executedAt);
     const data = run.extractedData;
-    const raw = data && !isCollectionPayload(data) ? data[field] : null;
-    const validType =
-      type === FieldType.Number
-        ? typeof raw === 'number' && Number.isFinite(raw)
-        : type === FieldType.Boolean
-          ? typeof raw === 'boolean'
-          : typeof raw === 'string';
-    const value =
-      revision !== null &&
-      run.contractRevision === revision &&
+    const isValidRun =
       run.status === RunStatus.Success &&
       Number.isFinite(timestamp) &&
-      validType
-        ? raw!
-        : null;
+      (!revision || run.contractRevision === revision) &&
+      data !== null &&
+      !isCollectionPayload(data);
+
+    const raw = isValidRun ? data[field] : null;
+    const value = matchesFieldType(raw, type) ? raw! : null;
+
     const delta =
       typeof value === 'number' && typeof previous?.value === 'number'
         ? value - previous.value
         : null;
+
     const percent =
       delta !== null &&
       typeof previous?.value === 'number' &&
@@ -61,14 +63,15 @@ export function fieldObservations(
       value * previous.value >= 0
         ? (delta / Math.abs(previous.value)) * 100
         : null;
+
     const observation: Observation = {
       run,
       timestamp,
       value,
       previous,
       changed: value !== null && previous !== null && value !== previous.value,
-      delta: delta !== null && Number.isFinite(delta) ? delta : null,
-      percent: percent !== null && Number.isFinite(percent) ? percent : null,
+      delta,
+      percent,
     };
     if (value !== null) previous = observation;
     return observation;
@@ -109,23 +112,25 @@ export function axisLabels(ticks: number[]): string[] {
   return ticks.map(String);
 }
 
-export function summarizeRuns(runs: JobRunDto[]) {
-  const changes = runs.filter((run) => run.hasChanges === ChangeStatus.Changed);
-  const durations = runs
-    .map((run) => run.durationMs)
-    .filter(
-      (duration): duration is number =>
-        duration !== null && Number.isFinite(duration) && duration >= 0
-    );
-  return {
-    total: runs.length,
-    changes: changes.length,
-    lastChange:
-      orderedRuns(changes)
-        .filter((run) => Number.isFinite(Date.parse(run.executedAt)))
-        .at(-1)?.executedAt ?? null,
-    averageDuration: durations.length
-      ? Math.round(durations.reduce((sum, duration) => sum + duration, 0) / durations.length)
-      : null,
-  };
+/**
+ * Compresses consecutive plateau points having the same value,
+ * preserving boundary points where values change.
+ */
+export function compressNumericObservations(points: Observation[]): Observation[] {
+  if (points.length <= 2) return points;
+
+  const compressed: Observation[] = [points[0]!];
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]!;
+    const curr = points[i]!;
+    const next = points[i + 1]!;
+
+    if (curr.value !== prev.value || curr.value !== next.value) {
+      compressed.push(curr);
+    }
+  }
+
+  compressed.push(points[points.length - 1]!);
+  return compressed;
 }

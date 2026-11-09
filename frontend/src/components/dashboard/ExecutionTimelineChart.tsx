@@ -1,8 +1,12 @@
 'use client';
 import * as React from 'react';
-import { isCollectionPayload, FieldType, type JobRunDto } from '@specter/contracts';
 import {
-  summarizeRuns,
+  isCollectionPayload,
+  FieldType,
+  type JobRunDto,
+  type JobRunsSummaryDto,
+} from '@specter/contracts';
+import {
   fieldObservations,
   orderedRuns,
   TEXT_MODE,
@@ -13,6 +17,9 @@ import { formatObservedNumber } from '@/lib/numberFormatting';
 import { NumericObservations } from './NumericObservations';
 import { StateObservations } from './StateObservations';
 import { CollectionHistory } from './CollectionHistory';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+
+export type ChartTimeRange = '24h' | '7d' | '30d' | 'all';
 
 interface Props {
   runs: JobRunDto[];
@@ -20,6 +27,7 @@ interface Props {
   revision: string | null;
   identityFields: string[];
   timeZone?: string;
+  summary: JobRunsSummaryDto;
 }
 export function ExecutionTimelineChart({
   runs,
@@ -27,57 +35,108 @@ export function ExecutionTimelineChart({
   revision,
   identityFields,
   timeZone = 'UTC',
+  summary,
 }: Props) {
   const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
   const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);
+  const [timeRange, setTimeRange] = React.useState<ChartTimeRange>('all');
+  const [obsPage, setObsPage] = React.useState(1);
+  const obsPageSize = 10;
+
+  const activeRuns = React.useMemo(() => {
+    if (timeRange === 'all') return runs;
+    const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 24 * 7 : 24 * 30;
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+    return runs.filter((r) => Date.parse(r.executedAt) >= cutoff);
+  }, [runs, timeRange]);
+
   const selected = fields[field] ? field : Object.keys(fields)[0];
   const definition = fields[selected];
   const observations = definition
-    ? fieldObservations(runs, selected, definition.type, revision)
+    ? fieldObservations(activeRuns, selected, definition.type, revision)
     : [];
+
+  const reversedObservations = React.useMemo(() => [...observations].reverse(), [observations]);
+  const obsTotalPages = Math.max(1, Math.ceil(reversedObservations.length / obsPageSize));
+  const safeObsPage = Math.min(obsPage, obsTotalPages);
+  const paginatedObservations = reversedObservations.slice(
+    (safeObsPage - 1) * obsPageSize,
+    safeObsPage * obsPageSize
+  );
+
+  React.useEffect(() => {
+    setObsPage(1);
+  }, [selected, timeRange]);
   const formatTime = (date: string) =>
     Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
   const formatValue = (value: string | number | boolean | null) =>
     definition?.type === FieldType.Number
       ? String(formatObservedNumber(value, definition.locale, definition.displayName || selected))
       : String(value);
-  const summary = summarizeRuns(runs);
-  const chronological = orderedRuns(runs);
+  const chronological = orderedRuns(activeRuns);
   const dated = chronological.filter((run) => Number.isFinite(Date.parse(run.executedAt)));
-  const collection = runs.some(
+  const collection = activeRuns.some(
     (run) =>
       run.contractRevision === revision &&
       run.extractedData &&
       isCollectionPayload(run.extractedData)
   );
+
   return (
     <div className="space-y-5 text-sm">
-      <p>
-        {runs.length} recent executions loaded
-        {dated.length
-          ? ` · ${formatTime(dated[0].executedAt)} — ${formatTime(dated[dated.length - 1].executedAt)}`
-          : ''}
-        . All summaries refer to this loaded history.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {summary.totalRuns} total executions ({activeRuns.length} in range)
+          {dated.length
+            ? ` · ${formatTime(dated[0].executedAt)} — ${formatTime(dated[dated.length - 1].executedAt)}`
+            : ''}
+          .
+        </p>
+
+        {/* Time range buttons */}
+        <div className="inline-flex items-center rounded-md border border-border bg-muted/40 p-0.5 text-xs font-mono">
+          {(
+            [
+              ['24h', '24h'],
+              ['7d', '7d'],
+              ['30d', '30d'],
+              ['all', 'All'],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setTimeRange(val)}
+              className={`rounded px-2.5 py-1 transition-colors cursor-pointer ${
+                timeRange === val
+                  ? 'bg-card text-foreground shadow-2xs font-medium border border-border/80'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          ['Total runs', summary.total],
-          ['Changed runs', summary.changes],
+          ['Total runs', summary.totalRuns],
+          ['Changed runs', summary.changedRuns],
           ['Last observed change', summary.lastChange ? formatTime(summary.lastChange) : 'None'],
           [
             'Average execution duration',
-            summary.averageDuration === null ? 'Unavailable' : `${summary.averageDuration} ms`,
+            summary.averageDurationMs === null ? 'Unavailable' : `${summary.averageDurationMs} ms`,
           ],
         ].map(([label, value]) => (
           <div key={label} className="border border-border rounded p-3">
             <div className="text-xs text-muted-foreground">{label}</div>
-            <div>{value}</div>
+            <div className="font-semibold text-foreground">{value}</div>
           </div>
         ))}
       </div>
       {collection ? (
         <CollectionHistory
-          runs={runs}
+          runs={activeRuns}
           revision={revision}
           identityFields={identityFields}
           formatTime={formatTime}
@@ -141,7 +200,7 @@ export function ExecutionTimelineChart({
                 </tr>
               </thead>
               <tbody>
-                {[...observations].reverse().map((p) => (
+                {paginatedObservations.map((p) => (
                   <tr key={p.run.id} className="border-t border-border">
                     <td className="px-3 py-2">{formatTime(p.run.executedAt)}</td>
                     <td
@@ -170,6 +229,16 @@ export function ExecutionTimelineChart({
               </tbody>
             </table>
           </div>
+          {obsTotalPages > 1 && (
+            <PaginationControls
+              page={safeObsPage}
+              totalPages={obsTotalPages}
+              totalItems={reversedObservations.length}
+              pageSize={obsPageSize}
+              onPageChange={setObsPage}
+              itemLabel="readings"
+            />
+          )}
         </section>
       ) : (
         <p>No field contract available.</p>

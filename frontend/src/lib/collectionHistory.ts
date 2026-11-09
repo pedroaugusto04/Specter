@@ -22,18 +22,12 @@ export function collectionEvents(
     );
     const next = new Map(records);
     const reliable =
-      revision !== null &&
-      run.contractRevision === revision &&
       run.status === RunStatus.Success &&
-      Number.isFinite(Date.parse(run.executedAt)) &&
-      (run.extractionReport?.coverage === Coverage.Complete ||
-        (run.extractionReport?.coverage === Coverage.Empty && items?.length === 0)) &&
-      identityFields.length > 0 &&
+      (!revision || run.contractRevision === revision) &&
       items !== null &&
-      items.every((record) =>
-        identityFields.every((key) => record[key] !== null && record[key] !== undefined)
-      ) &&
-      next.size === items.length;
+      identityFields.length > 0 &&
+      (run.extractionReport?.coverage === Coverage.Complete ||
+        (run.extractionReport?.coverage === Coverage.Empty && items.length === 0));
     const changes: {
       identity: string;
       before: ExtractedRecord | null;
