@@ -174,26 +174,14 @@ describe('Extraction contract and integrity', () => {
     expect(convertFieldValue('US$ 49.99', field, 'https://example.com')).toBe(49.99);
     expect(convertFieldValue('CA$ 1,299.99', field, 'https://example.com')).toBe(1299.99);
     expect(
-      convertFieldValue('Clientes (0)', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(0);
-    expect(
-      convertFieldValue('Clientes (15)', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(15);
-    expect(
       convertFieldValue('(10) / (20)', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBeNull();
-    expect(convertFieldValue('Total: 45', field, 'https://example.com')).toBe(45);
     expect(
-      convertFieldValue('Clientes ativos: 0', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(0);
+      convertFieldValue('Clientes (0)', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBeNull();
+    expect(convertFieldValue('Total: 45', field, 'https://example.com')).toBeNull();
     expect(
       convertFieldValue('Clientes ativos: 15', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(15);
-    expect(
-      convertFieldValue('Preço - R$ 1.250,50', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(1250.5);
-    expect(
-      convertFieldValue('De 10 a 20 usuários', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBeNull();
 
     const boolField = {

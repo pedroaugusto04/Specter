@@ -124,30 +124,7 @@ export function convertFieldValue(value: unknown, field: IntentField, baseUrl: s
       return parseDateValue(text, field.locale);
     case FieldType.Number: {
       if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-      const direct = tryParseNumber(text, field.locale);
-      if (direct !== null) return direct;
-
-      // Single parenthesized number with label outside (e.g. "Clientes (15)")
-      const parenMatches = [...text.matchAll(/\(\s*([+-]?[\d.,\s]+)\s*\)/g)];
-      if (parenMatches.length === 1 && parenMatches[0]?.[1]) {
-        const outside = text.replace(parenMatches[0][0], '').trim();
-        if (/[a-zA-ZÀ-ÿ]/.test(outside)) {
-          const candidate = parenMatches[0][1].trim();
-          const parsed = tryParseNumber(candidate, field.locale);
-          if (parsed !== null) return parsed;
-        }
-      }
-
-      // Key-value separated numeric token (e.g. "Total: 45", "Clientes ativos: 0", "Estoque - 15")
-      const kvMatch = text.match(
-        /^([a-zA-ZÀ-ÿ\s/_-]+)[:–—-]\s*([+-]?(?:(?:[A-Z]{1,3}\$|\$|€|£|¥|₹|R\$)\s*)?[\d.,%]+)$/u
-      );
-      if (kvMatch?.[1] && kvMatch[2]) {
-        const parsed = tryParseNumber(kvMatch[2].trim(), field.locale);
-        if (parsed !== null) return parsed;
-      }
-
-      return null;
+      return tryParseNumber(text, field.locale);
     }
   }
 }

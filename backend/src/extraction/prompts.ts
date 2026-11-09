@@ -1,7 +1,7 @@
 /** Stage-specific rules; providers supply shared safety and output instructions. */
 export const configurationInstructions = `
 Investigate the user's URL and original request, then produce a reproducible extraction plan.
-Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and fewest conditions required to reliably extract the target data.
+Generate the minimal adequate strategy required to reliably extract the target data.
 
 ### Workflow
 1. Return kind "candidate" with a complete plan when observed evidence suffices. Otherwise return kind "tool" with the smallest useful observation: inspect(selector), query(selector, attribute), structured(), responses(urlPattern), interact(action).
@@ -17,7 +17,7 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 ### Strategy & Transport
 - Choose transport based on extraction requirements:
   - Use transport: "http" ONLY when records and fields are extracted directly from static DOM (kind: "dom") or JSON-LD (kind: "jsonld") without setup interactions or network responses.
-  - Use transport: "browser" ALWAYS when the strategy uses network responses (records, fields, or ready conditions of kind "response"), user interactions (setup: click/type/wait), scroll/click pagination, frames, shadow DOM, or visible conditions.
+  - Use transport: "browser" ALWAYS for dynamic SPAs, dashboards, or when the strategy uses network responses, user interactions (setup: click/type/wait), scroll/click pagination, frames, shadow DOM, or visible conditions.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
 - ready requires at least one condition (exists on container/element, field, or response) to confirm data is present before extraction. Use empty: [] when there is no positive evidence of empty results.
 
@@ -25,7 +25,11 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 - Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.
 - Strategy fields must match intent fields exactly. Map to observed data by meaning and entity context.
 - Records use kind dom with selector, jsonld with type, or response with match and path.
-- Field sources must strictly match the records kind unless using an explicit association: when records are "dom", all field sources must be "dom" with selector and attribute ("text" to read DOM textContent; optional "pattern" regex to extract a target token/number from surrounding label text, e.g. "\\d+" or "(\\d+)"); when records are "jsonld", all field sources must be "jsonld" with path array; when records are "response", all field sources must be "response" with path array. Never mix DOM selectors inside a JSON-LD record.
+- Field sources must strictly match the records kind unless using an explicit association:
+  - When records are "dom": all field sources must be "dom" with selector and attribute ("text" to read DOM textContent; use "pattern" regex with capture group or match when the node contains surrounding label words or units, e.g. "(\\d+)" or "Total:\\s*(\\d+)").
+  - When records are "jsonld": all field sources must be "jsonld" with path array.
+  - When records are "response": all field sources must be "response" with path array.
+  Never mix DOM selectors inside a JSON-LD record.
 - If JSON-LD is missing target fields or fails extraction, switch both records (kind "dom" with container selector or "body") and all field sources to "dom".
 - Locators: {"kind":"css","selector":".item"} or {"kind":"role","role":"button","name":"OK"}.
 - Selectors priority: Prefer resilient selectors:
