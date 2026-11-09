@@ -15,9 +15,9 @@ Generate the minimal adequate strategy required to reliably extract the target d
 - Preserve requested filters, alert conditions and scope.
 
 ### Strategy & Transport
-- Choose transport based on extraction requirements:
-  - Use transport: "http" ONLY when records and fields are extracted directly from static DOM (kind: "dom") or JSON-LD (kind: "jsonld") without setup interactions or network responses.
-  - Use transport: "browser" ALWAYS for dynamic SPAs, dashboards, or when the strategy uses network responses, user interactions (setup: click/type/wait), scroll/click pagination, frames, shadow DOM, or visible conditions.
+- Choose transport based on where target data lives:
+  - Use transport: "http" whenever target data is already present in the initial HTML (static or server-side rendered SSR) or embedded JSON-LD, without requiring JavaScript execution, browser interactions, or API response capture. This is the fastest, lowest-memory transport.
+  - Use transport: "browser" when target data requires client-side JavaScript execution (pure CSR), background API network responses (kind "response"), user interactions (click/wait/scroll), frames, or shadow DOM.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
 - ready requires at least one condition (exists on container/element, field, or response) to confirm data is present before extraction. Use empty: [] when there is no positive evidence of empty results.
 
