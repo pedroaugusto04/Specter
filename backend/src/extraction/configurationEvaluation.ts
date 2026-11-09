@@ -361,9 +361,7 @@ export async function evaluateConfigurationCorpus(
       if (item.expectChange === true) missedAlerts++;
       if (error instanceof ConfigurationFailure && item.expectedSemanticStatus)
         check('semantic', error.semanticReview?.status === item.expectedSemanticStatus);
-      for (const trace of error && typeof error === 'object' && 'trace' in error
-        ? (error.trace as Array<{ stage: string; durationMs: number; status: string }>)
-        : []) {
+      for (const trace of error instanceof ConfigurationFailure ? error.trace : []) {
         const metric = (stageTotals[trace.stage] ??= { calls: 0, failures: 0, durationMs: 0 });
         metric.calls++;
         metric.failures += Number(trace.status === 'FAILED');

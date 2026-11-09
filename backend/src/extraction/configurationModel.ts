@@ -1,6 +1,6 @@
 import { env } from '../config/env.js';
 import { CompilerValidationError } from '../errors/domainErrors.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ConfigurationModel, IModelProvider, ModelInput, StageInput } from './model.js';
 import { configurationInstructions, semanticInstructions } from './prompts.js';
@@ -91,8 +91,7 @@ async function task(
       durationMs: Date.now() - started,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : String(error),
-      errorCode:
-        error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined,
+      errorCode: (error as any)?.code,
     });
     logger.warn('Model task failed', {
       jobId: input.jobId,
@@ -100,10 +99,7 @@ async function task(
       task: kind,
       durationMs: Date.now() - started,
       status: 'FAILED',
-      errorCode:
-        error && typeof error === 'object' && 'code' in error
-          ? String(error.code)
-          : 'MODEL_TASK_FAILED',
+      errorCode: (error as any)?.code ?? 'MODEL_TASK_FAILED',
     });
     throw error;
   }
@@ -128,8 +124,7 @@ function validateOutput<T>(
       task: kind,
       output,
       validationError: error instanceof Error ? error.message : String(error),
-      validationIssues:
-        error && typeof error === 'object' && 'issues' in error ? error.issues : undefined,
+      validationIssues: error instanceof z.ZodError ? error.issues : undefined,
     });
     throw error;
   }

@@ -122,7 +122,7 @@ export class CompilationService {
         logContext: 'compilation',
         subjectSuffix: ' (Self-healing)',
       });
-      const durationMs = prepared.run.durationMs ?? undefined;
+      const durationMs = prepared.run.durationMs ?? 0;
       const repeatableKey = await this.deps.jobScheduler.scheduleRepeatableJob(
         job.id,
         job.cronExpression

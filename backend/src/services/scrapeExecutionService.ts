@@ -172,7 +172,7 @@ export class ScrapeExecutionService {
         { status: JobStatus.Active, failureCount: 0, lastError: null },
         job.updatedAt
       );
-      const durationMs = prepared.run.durationMs ?? undefined;
+      const durationMs = prepared.run.durationMs ?? 0;
       const hasChanges = prepared.run.hasChanges;
       logger.info('Deterministic scrape execution completed', {
         jobId: job.id,

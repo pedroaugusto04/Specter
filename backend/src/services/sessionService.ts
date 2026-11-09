@@ -50,7 +50,7 @@ export class SessionService {
   async syncSession(userId: string, input: SyncSessionInput): Promise<SessionDto> {
     const domain = normalizeDomain(input.domain);
 
-    if (!Array.isArray(input.cookies) || input.cookies.length === 0) {
+    if (!input.cookies?.length) {
       throw new ValidationError('At least one cookie is required to sync a session.', [
         { field: 'cookies', message: 'Cookies array cannot be empty.' },
       ]);

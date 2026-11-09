@@ -68,11 +68,7 @@ export async function evaluateIsolatedStages(
     });
     await grade(ConfigurationStage.Semantic, async () => {
       const gold = item.responses.configure.find(
-        (entry) =>
-          entry &&
-          typeof entry === 'object' &&
-          'kind' in entry &&
-          entry.kind === ConfigurationDecisionKind.Candidate
+        (entry: any) => entry?.kind === ConfigurationDecisionKind.Candidate
       ) as { plan: unknown } | undefined;
       if (!gold) return false;
       const plan = extractionPlanSchema.parse(gold.plan);

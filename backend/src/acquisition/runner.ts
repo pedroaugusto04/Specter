@@ -44,12 +44,7 @@ export async function acquire<T>(
         runId: context.runId,
         provider: candidate.name,
         category: category ?? AccessFailure.Provider,
-        errorCode:
-          error && typeof error === 'object' && 'code' in error
-            ? String(error.code)
-            : error instanceof Error
-              ? error.name
-              : 'UNKNOWN_ERROR',
+        errorCode: (error as any)?.code ?? (error instanceof Error ? error.name : 'UNKNOWN_ERROR'),
         errorMessage: error instanceof Error ? error.message : String(error),
         causeMessage:
           error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
