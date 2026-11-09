@@ -536,6 +536,34 @@ describe('Extraction contract and integrity', () => {
     const parsed = extractionPlanSchema.parse(normalized);
     expect(parsed.intent.scope).toBe('page');
   });
+  it('allows intent without scope or filters, defaulting them cleanly', () => {
+    const minimalPlan = {
+      intent: {
+        entity: 'product',
+        mode: 'single',
+        fields: {
+          price: {
+            description: 'Product price',
+            type: 'number',
+            required: true,
+          },
+        },
+      },
+      strategy: {
+        transport: 'http',
+        records: { kind: 'dom', selector: '.product' },
+        fields: {
+          price: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+        },
+      },
+    };
+    const normalized = normalizeExtractionCandidate(minimalPlan);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.intent.scope).toBe('page');
+    expect(parsed.intent.filters).toEqual([]);
+    expect(parsed.intent.fields.price?.locale).toBe('pt-BR');
+    expect(parsed.strategy.ready.length).toBeGreaterThanOrEqual(1);
+  });
 });
 describe('Common execution and comparisons', () => {
   it('follows same-origin links and verifies completion', async () => {

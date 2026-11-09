@@ -10,16 +10,18 @@ Generate the minimal adequate strategy required to reliably extract the target d
 
 ### Intent Rules
 - Field IDs: English snake_case. displayName: user's language. observedLabel: literal observed label only.
-- Include required fields, stable collection identities, filters and triggerRules (empty lists when absent).
-- Numbers require observed locale inferred from formatting or currency (e.g. "pt-BR" for R$, "en-US" for $). Booleans require explicit booleanValues mappings. Use string when type is unsupported by evidence.
-- Preserve requested filters, alert conditions and scope.
+- Set mode: "collection" when extracting lists/tables of items; set mode: "single" when extracting a single entity.
+- Include required fields and stable collection identityFields (empty list for single entity).
+- Numbers: infer locale from formatting or currency (e.g. "pt-BR" for R$ or comma decimal, "en-US" for $). Booleans require explicit booleanValues mappings. Use string when type is unsupported by evidence.
+- Preserve requested alert triggerRules.
 
 ### Strategy & Transport
 - Choose transport based on where target data lives:
   - Use transport: "http" whenever target data is already present in the initial HTML (static or server-side rendered SSR) or embedded JSON-LD, without requiring JavaScript execution, browser interactions, or API response capture. This is the fastest, lowest-memory transport.
   - Use transport: "browser" when target data requires client-side JavaScript execution (pure CSR), background API network responses (kind "response"), user interactions (click/wait/scroll), frames, or shadow DOM.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
-- ready requires at least one condition (exists on container/element, field, or response) to confirm data is present before extraction. Use empty: [] when there is no positive evidence of empty results.
+- ready: condition (exists on container/element, field, or response) confirming data presence before extraction. Use empty: [] when there is no positive evidence of empty results.
+- Pagination: when extracting a collection across multiple pages or infinite scroll, provide strategy.pagination (scroll, click, or link). Omit pagination when extracting only the current page.
 
 ### Syntax Contracts
 - Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.
@@ -38,12 +40,11 @@ Generate the minimal adequate strategy required to reliably extract the target d
   3. Literal class names as fallback when no resilient alternative uniquely identifies the element.
 - Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals). Never use jsonld or dom as condition kinds.
 - Setup actions: click (locator), scroll (optional selector), wait (condition). Never submit forms, log in, purchase or change settings.
-- Collections: when extracting across pages or infinite scroll, include strategy.pagination with intent.scope: "collection" and mode: "collection". When extracting records from the current page without pagination, use intent.scope: "page" and omit strategy.pagination.
 - Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
 - Associations require observed exact key matches: localField must be required and directly sourced from the primary record; match exactly one foreign record.
-- Apply filters after conversion; declare their fields as required. Keep intent and strategy field keys aligned and do not repeat a rejected strategy unchanged.
+- Optional strategy.filters: filter extracted records (e.g. price < 100) using operator and threshold value. Keep intent and strategy field keys aligned and do not repeat a rejected strategy unchanged.
 `;
 
 export const semanticInstructions = `
-Check data and provenance against the original request and proposed intent. Score entity, field meaning, filters, identity, and scope from 0 to 2 each. Cite evidence in reasons and evidenceRefs; explain uncertainty. A value from the wrong entity is a substantive error.
+Check data and provenance against the original request and proposed intent. Score entity, field meaning, filters, and identity from 0 to 2 each. Cite evidence in reasons and evidenceRefs; explain uncertainty. A value from the wrong entity is a substantive error.
 `;

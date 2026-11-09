@@ -81,7 +81,7 @@ export const extractionIntentSchema = z
   .object({
     entity: text,
     mode: z.nativeEnum(ExtractionMode),
-    scope: z.nativeEnum(ExtractionScope),
+    scope: z.nativeEnum(ExtractionScope).optional().default(ExtractionScope.Page),
     fields: z.record(
       z.string().regex(/^[a-z][a-z0-9_]*$/),
       z
@@ -98,7 +98,7 @@ export const extractionIntentSchema = z
         .strict()
     ),
     identityFields: z.array(text).default([]),
-    filters: z.array(text).default([]),
+    filters: z.array(text).optional().default([]),
     triggerRules: z
       .array(
         z
@@ -184,9 +184,27 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
       const s = { ...(nextStrategy as Record<string, unknown>) } as unknown as ExecutionStrategy;
       if (s.transport === Transport.Http && requiresBrowser(s)) {
         s.transport = Transport.Browser;
-        nextStrategy = s;
         modified = true;
       }
+
+      if (!Array.isArray(s.ready) || s.ready.length === 0) {
+        if (s.records && typeof s.records === 'object') {
+          if (s.records.kind === SourceKind.Dom && 'selector' in s.records && typeof s.records.selector === 'string') {
+            s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: s.records.selector } }];
+            modified = true;
+          } else if (s.records.kind === SourceKind.JsonLd) {
+            s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: 'script[type="application/ld+json"]' } }];
+            modified = true;
+          }
+        }
+      }
+
+      if (!Array.isArray(s.empty)) {
+        s.empty = [];
+        modified = true;
+      }
+
+      nextStrategy = s;
     }
 
     if (nextIntent && typeof nextIntent === 'object') {
@@ -198,17 +216,14 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
           (nextStrategy as { pagination?: unknown }).pagination
       );
 
-      if (hasPagination) {
-        if (
-          intentObj.scope !== ExtractionScope.Collection ||
-          intentObj.mode !== ExtractionMode.Collection
-        ) {
-          intentObj.scope = ExtractionScope.Collection;
-          intentObj.mode = ExtractionMode.Collection;
-          modified = true;
-        }
-      } else if (intentObj.scope === ExtractionScope.Collection) {
-        intentObj.scope = ExtractionScope.Page;
+      const targetScope = hasPagination ? ExtractionScope.Collection : ExtractionScope.Page;
+      if (intentObj.scope !== targetScope) {
+        intentObj.scope = targetScope;
+        modified = true;
+      }
+
+      if (hasPagination && intentObj.mode !== ExtractionMode.Collection) {
+        intentObj.mode = ExtractionMode.Collection;
         modified = true;
       }
 
@@ -232,6 +247,21 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
             intentObj.fields = fieldsObj;
             modified = true;
           }
+        }
+      }
+
+      if (intentObj.fields && typeof intentObj.fields === 'object') {
+        const fieldsObj = { ...(intentObj.fields as Record<string, Record<string, unknown>>) };
+        let fieldsModified = false;
+        for (const [, field] of Object.entries(fieldsObj)) {
+          if (field && typeof field === 'object' && field.type === FieldType.Number && !field.locale) {
+            field.locale = 'pt-BR';
+            fieldsModified = true;
+          }
+        }
+        if (fieldsModified) {
+          intentObj.fields = fieldsObj;
+          modified = true;
         }
       }
 
@@ -260,6 +290,14 @@ export const extractionPlanSchema = z
     const issue = (message: string, path: (string | number)[] = []) =>
       ctx.addIssue({ code: 'custom', message, path });
     const { intent, strategy: execution } = plan;
+
+    if (execution.pagination) {
+      intent.scope = ExtractionScope.Collection;
+      intent.mode = ExtractionMode.Collection;
+    } else {
+      intent.scope = ExtractionScope.Page;
+    }
+
     if (!Object.keys(intent.fields).length)
       issue('At least one field is required.', ['intent', 'fields']);
     if (
@@ -267,6 +305,7 @@ export const extractionPlanSchema = z
       JSON.stringify(Object.keys(execution.fields).sort())
     )
       issue('Execution fields must exactly match intent fields.', ['strategy', 'fields']);
+
     for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
       if (!intent.fields[key]?.required)
         issue(`Referenced field '${key}' must exist and be required.`, ['intent', 'fields', key]);
@@ -301,13 +340,9 @@ export const extractionPlanSchema = z
       }
     }
     for (const [key, field] of Object.entries(intent.fields)) {
-      if (field.type === FieldType.Number && !field.locale)
-        issue(`Numeric field '${key}' requires an explicit locale (e.g. "pt-BR" or "en-US").`, [
-          'intent',
-          'fields',
-          key,
-          'locale',
-        ]);
+      if (field.type === FieldType.Number && !field.locale) {
+        field.locale = 'pt-BR';
+      }
       if (field.locale) {
         try {
           new Intl.NumberFormat(field.locale);
@@ -325,16 +360,6 @@ export const extractionPlanSchema = z
     }
     if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length)
       issue('Collections require stable identity fields.', ['intent', 'identityFields']);
-    if (
-      intent.scope === ExtractionScope.Collection &&
-      (intent.mode !== ExtractionMode.Collection || !execution.pagination)
-    )
-      issue(
-        'Full collection scope requires pagination and collection mode. Set intent.scope to "page" if extracting records from a single page without pagination.',
-        ['intent', 'scope']
-      );
-    if (execution.pagination && intent.scope !== ExtractionScope.Collection)
-      issue('Pagination requires collection scope.', ['strategy', 'pagination']);
     if (
       execution.pagination &&
       execution.pagination.kind !== 'scroll' &&
