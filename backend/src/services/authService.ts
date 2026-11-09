@@ -244,7 +244,10 @@ export class AuthService {
     return null;
   }
 
-  createGoogleAuthorizationUrl(resolvedCallbackUrl?: string): {
+  createGoogleAuthorizationUrl(
+    resolvedCallbackUrl?: string,
+    extraStateData?: Record<string, unknown>
+  ): {
     authUrl: string;
     stateToken: string;
   } {
@@ -258,7 +261,11 @@ export class AuthService {
     }
 
     const nonce = crypto.randomBytes(16).toString('hex');
-    const stateToken = signJwt({ sub: nonce, type: 'oauth_state' }, this.jwtSecret, 600);
+    const stateToken = signJwt(
+      { sub: nonce, type: 'oauth_state', ...(extraStateData || {}) },
+      this.jwtSecret,
+      600
+    );
 
     const params = new URLSearchParams({
       client_id: this.googleClientId,
@@ -280,7 +287,7 @@ export class AuthService {
     state: string;
     expectedStateCookie?: string;
     resolvedCallbackUrl?: string;
-  }): Promise<{ user: UserDto; tokens: AuthTokenPair }> {
+  }): Promise<{ user: UserDto; tokens: AuthTokenPair; statePayload: JwtPayload }> {
     if (!this.isGoogleConfigured()) {
       throw new ValidationError('Google Sign-In is not configured on this server.');
     }
@@ -361,6 +368,6 @@ export class AuthService {
 
     const userDto = UserMapper.entityToDto(user);
     const tokens = this.issueTokens(user);
-    return { user: userDto, tokens };
+    return { user: userDto, tokens, statePayload };
   }
 }
