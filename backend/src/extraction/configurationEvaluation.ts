@@ -9,7 +9,11 @@ import { ExtractionExecutor } from './executor.js';
 import { PageExtractor } from './pageExtractor.js';
 import { standardSourceReaders } from './sources.js';
 import { createConfigurationModel } from './configurationModel.js';
-import { extractionIntentSchema, extractionPlanSchema } from '../types/extractionPlan.js';
+import {
+  extractionIntentSchema,
+  extractionPlanSchema,
+  normalizeExtractionCandidate,
+} from '../types/extractionPlan.js';
 import type {
   DocumentAdapter,
   DocumentSnapshot,
@@ -246,7 +250,9 @@ export async function evaluateConfigurationCorpus(
       stages.decide = async (input, intent) => {
         const decision = await decide(input, intent);
         if (decision.kind === ConfigurationDecisionKind.Candidate && item.expectedIntent) {
-          const candidate = extractionPlanSchema.safeParse(decision.plan);
+          const candidate = extractionPlanSchema.safeParse(
+            normalizeExtractionCandidate(decision.plan)
+          );
           if (candidate.success)
             check(
               'intent',

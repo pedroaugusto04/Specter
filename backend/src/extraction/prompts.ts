@@ -15,10 +15,11 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 - Preserve requested filters, alert conditions and scope.
 
 ### Strategy & Transport
-- Default to transport: "http". Always use HTTP when records and fields can be extracted directly from the observed HTML or structured data.
-- Use transport: "browser" strictly when execution requires user interactions (setup: click/type), scroll/click pagination, frames, shadow DOM, or network response capture.
+- Choose transport based on extraction requirements:
+  - Use transport: "http" ONLY when records and fields are extracted directly from static DOM (kind: "dom") or JSON-LD (kind: "jsonld") without setup interactions or network responses.
+  - Use transport: "browser" ALWAYS when the strategy uses network responses (records, fields, or ready conditions of kind "response"), user interactions (setup: click/type/wait), scroll/click pagination, frames, shadow DOM, or visible conditions.
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
-- ready confirms that extraction can proceed and requires at least one condition: use an exists condition on a stable container or element (e.g. {"kind":"exists","locator":{"kind":"css","selector":".price"}}), or a field condition (e.g. {"kind":"field","field":"price"}). Use visible only with browser transport when waiting for an element that is hidden until interacted with. Use empty: [] when there is no positive evidence of empty results.
+- ready confirms that extraction can proceed and requires at least one condition: use an exists condition on a stable container or element (e.g. {"kind":"exists","locator":{"kind":"css","selector":".price"}}), or a field condition (e.g. {"kind":"field","field":"price"}). Use visible only with browser transport when waiting for an element that is hidden until interacted with. When ready uses kind "response", transport must be "browser". Use empty: [] when there is no positive evidence of empty results.
 
 ### Syntax Contracts
 - Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.

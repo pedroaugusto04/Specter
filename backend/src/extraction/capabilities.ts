@@ -6,23 +6,27 @@ import type {
   ExecutionStrategy,
 } from './contracts.js';
 /** Single capability rule shared by schema validation and acquisition selection. */
-export function requiresBrowser(strategy: ExecutionStrategy): boolean {
-  const conditions = [...strategy.ready, ...strategy.empty, ...(strategy.pagination?.end ?? [])];
+export function requiresBrowser(strategy: Partial<ExecutionStrategy>): boolean {
+  const conditions = [
+    ...(strategy.ready ?? []),
+    ...(strategy.empty ?? []),
+    ...(strategy.pagination?.end ?? []),
+  ];
   return Boolean(
     strategy.setup?.length ||
     strategy.document ||
-    strategy.records.kind === 'response' ||
-    Object.values(strategy.fields)
+    strategy.records?.kind === 'response' ||
+    Object.values(strategy.fields ?? {})
       .flat()
-      .some((source) => source.kind === 'response') ||
-    Object.values(strategy.associations ?? {}).some((item) => item.records.kind === 'response') ||
+      .some((source) => source?.kind === 'response') ||
+    Object.values(strategy.associations ?? {}).some((item) => item?.records?.kind === 'response') ||
     strategy.pagination?.kind === 'click' ||
     strategy.pagination?.kind === 'scroll' ||
     conditions.some(
       (item) =>
-        item.kind === 'visible' ||
-        item.kind === 'response' ||
-        ('locator' in item && item.locator.kind === 'role')
+        item?.kind === 'visible' ||
+        item?.kind === 'response' ||
+        ('locator' in item && item.locator?.kind === 'role')
     )
   );
 }

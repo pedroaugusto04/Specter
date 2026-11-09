@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Specter Companion — Web Session Sync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Securely sync authenticated web sessions from your browser directly to Specter scraping bots.",
   "action": {
     "default_popup": "popup.html",

@@ -1,5 +1,6 @@
 import { triggerOperatorsForType } from '@specter/contracts';
 import { requiresBrowser } from '../extraction/capabilities.js';
+import type { ExecutionStrategy } from '../extraction/contracts.js';
 import {
   ExtractionMode,
   ExtractionScope,
@@ -15,6 +16,7 @@ export { ExtractionQuality };
 export type {
   ExtractionPlan,
   ExtractionIntent,
+  ExecutionStrategy,
   IntentField as ExtractionField,
   TriggerRule,
   ExtractionReport,
@@ -169,6 +171,25 @@ export const executionStrategySchema = z
       .optional(),
   })
   .strict();
+
+export function normalizeExtractionCandidate(raw: unknown): unknown {
+  if (raw && typeof raw === 'object' && 'strategy' in raw) {
+    const plan = raw as { strategy?: unknown };
+    if (plan.strategy && typeof plan.strategy === 'object') {
+      const s = plan.strategy as ExecutionStrategy;
+      if (s.transport === Transport.Http && requiresBrowser(s)) {
+        return {
+          ...raw,
+          strategy: {
+            ...s,
+            transport: Transport.Browser,
+          },
+        };
+      }
+    }
+  }
+  return raw;
+}
 export const extractionPlanSchema = z
   .object({
     intent: extractionIntentSchema,
@@ -176,17 +197,19 @@ export const extractionPlanSchema = z
   })
   .strict()
   .superRefine((plan, ctx) => {
-    const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
+    const issue = (message: string, path: (string | number)[] = []) =>
+      ctx.addIssue({ code: 'custom', message, path });
     const { intent, strategy: execution } = plan;
-    if (!Object.keys(intent.fields).length) issue('At least one field is required.');
+    if (!Object.keys(intent.fields).length)
+      issue('At least one field is required.', ['intent', 'fields']);
     if (
       JSON.stringify(Object.keys(intent.fields).sort()) !==
       JSON.stringify(Object.keys(execution.fields).sort())
     )
-      issue('Execution fields must exactly match intent fields.');
+      issue('Execution fields must exactly match intent fields.', ['strategy', 'fields']);
     for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
       if (!intent.fields[key]?.required)
-        issue(`Referenced field '${key}' must exist and be required.`);
+        issue(`Referenced field '${key}' must exist and be required.`, ['intent', 'fields', key]);
     for (const rule of intent.triggerRules) {
       const field = intent.fields[rule.field];
       if (!field) continue;
@@ -219,32 +242,45 @@ export const extractionPlanSchema = z
     }
     for (const [key, field] of Object.entries(intent.fields)) {
       if (field.type === FieldType.Number && !field.locale)
-        issue(`Numeric field '${key}' requires an explicit locale.`);
+        issue(`Numeric field '${key}' requires an explicit locale (e.g. "pt-BR" or "en-US").`, [
+          'intent',
+          'fields',
+          key,
+          'locale',
+        ]);
       if (field.locale) {
         try {
           new Intl.NumberFormat(field.locale);
         } catch {
-          issue(`Invalid locale for '${key}'.`);
+          issue(`Invalid locale for '${key}'.`, ['intent', 'fields', key, 'locale']);
         }
       }
       if (field.type === FieldType.Boolean && !Object.keys(field.booleanValues ?? {}).length)
-        issue(`Boolean field '${key}' requires an explicit value mapping.`);
+        issue(`Boolean field '${key}' requires an explicit value mapping.`, [
+          'intent',
+          'fields',
+          key,
+          'booleanValues',
+        ]);
     }
     if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length)
-      issue('Collections require stable identity fields.');
+      issue('Collections require stable identity fields.', ['intent', 'identityFields']);
     if (
       intent.scope === ExtractionScope.Collection &&
       (intent.mode !== ExtractionMode.Collection || !execution.pagination)
     )
-      issue('Full collection scope requires pagination and collection mode.');
+      issue(
+        'Full collection scope requires pagination and collection mode. Set intent.scope to "page" if extracting records from a single page without pagination.',
+        ['intent', 'scope']
+      );
     if (execution.pagination && intent.scope !== ExtractionScope.Collection)
-      issue('Pagination requires collection scope.');
+      issue('Pagination requires collection scope.', ['strategy', 'pagination']);
     if (
       execution.pagination &&
       execution.pagination.kind !== 'scroll' &&
       !execution.pagination.next
     )
-      issue('Link and click pagination require a next locator.');
+      issue('Link and click pagination require a next locator.', ['strategy', 'pagination', 'next']);
     for (const filter of execution.filters ?? [])
       if (!intent.fields[filter.field]?.required)
         issue('Record filters require a declared, required field.');
@@ -281,5 +317,8 @@ export const extractionPlanSchema = z
       if (item.kind === 'field' && !intent.fields[item.field])
         issue(`Condition references missing field '${item.field}'.`);
     if (execution.transport === Transport.Http && requiresBrowser(execution))
-      issue('The selected strategy requires browser capabilities.');
+      issue(
+        'The selected strategy requires browser capabilities (due to network responses, setup actions, or visibility conditions). Set "strategy.transport" to "browser".',
+        ['strategy', 'transport']
+      );
   });

@@ -5,7 +5,7 @@ import type { ConfigurationEvaluationCase } from './configurationEvaluation.js';
 import { fixtureExecutor } from './configurationEvaluation.js';
 import type { IModelProvider, StageInput } from './model.js';
 import { createConfigurationModel } from './configurationModel.js';
-import { extractionPlanSchema } from '../types/extractionPlan.js';
+import { extractionPlanSchema, normalizeExtractionCandidate } from '../types/extractionPlan.js';
 import { observation } from './configurationTools.js';
 import { canonicalJson } from '../utils/diffHasher.js';
 
@@ -54,7 +54,7 @@ export async function evaluateIsolatedStages(
       const decision = await createConfigurationModel(provider(item)).decide(input);
       const expected = item.responses.configure[0];
       if (decision.kind === ConfigurationDecisionKind.Tool) return equal(decision, expected);
-      const plan = extractionPlanSchema.parse(decision.plan);
+      const plan = extractionPlanSchema.parse(normalizeExtractionCandidate(decision.plan));
       if (!equal(plan.intent, item.expectedIntent)) return false;
       const execution = await fixtureExecutor(item.snapshot, item.interactions).execute(
         item.snapshot.url,

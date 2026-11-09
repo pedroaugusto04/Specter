@@ -2,7 +2,7 @@ import { ExtractionExecutor } from '../src/extraction/executor.js';
 import type { DocumentAdapter } from '../src/extraction/contracts.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { describe, it, expect } from 'vitest';
-import { extractionPlanSchema } from '../src/types/extractionPlan.js';
+import { extractionPlanSchema, normalizeExtractionCandidate } from '../src/types/extractionPlan.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../src/extraction/values.js';
 import { evaluateTriggerRules } from '../src/utils/triggerEvaluator.js';
@@ -261,6 +261,101 @@ describe('Extraction contract and integrity', () => {
       },
     };
     expect(extractionPlanSchema.safeParse(mixed).success).toBe(false);
+  });
+  it('auto-promotes transport to browser when network response records or ready conditions are used', () => {
+    const responsePlan = {
+      intent: {
+        entity: 'active_clients',
+        mode: 'single',
+        scope: 'page',
+        fields: {
+          clients_count: {
+            description: 'Count of active clients',
+            type: 'number',
+            required: true,
+            locale: 'pt-BR',
+          },
+        },
+        identityFields: [],
+        filters: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+      },
+      strategy: {
+        transport: 'http',
+        records: {
+          kind: 'response',
+          match: { urlPattern: 'https://example.com/api/overview', method: 'GET' },
+          path: ['data'],
+        },
+        fields: {
+          clients_count: [{ kind: 'response', path: ['count'] }],
+        },
+        ready: [
+          {
+            kind: 'response',
+            match: { urlPattern: 'https://example.com/api/overview', method: 'GET' },
+            path: ['success'],
+            equals: true,
+          },
+        ],
+        empty: [],
+      },
+    };
+    // Direct safeParse without normalization fails validation with actionable error
+    const directResult = extractionPlanSchema.safeParse(responsePlan);
+    expect(directResult.success).toBe(false);
+    if (!directResult.success) {
+      expect(directResult.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['strategy', 'transport'],
+          message: expect.stringContaining('The selected strategy requires browser capabilities'),
+        })
+      );
+    }
+
+    // Normalizing candidate promotes transport to browser and passes schema parsing
+    const normalized = normalizeExtractionCandidate(responsePlan);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.strategy.transport).toBe('browser');
+  });
+  it('auto-promotes transport to browser when setup interactions are used', () => {
+    const interactivePlan = {
+      intent: {
+        entity: 'active_clients',
+        mode: 'single',
+        scope: 'page',
+        fields: {
+          clients_count: {
+            description: 'Count of active clients',
+            type: 'number',
+            required: true,
+            locale: 'pt-BR',
+          },
+        },
+        identityFields: [],
+        filters: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+      },
+      strategy: {
+        transport: 'http',
+        setup: [{ kind: 'click', locator: { kind: 'css', selector: 'button.clients' } }],
+        records: { kind: 'dom', selector: 'body' },
+        fields: {
+          clients_count: [{ kind: 'dom', selector: '.clients-count', attribute: 'text' }],
+        },
+        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.clients-count' } }],
+        empty: [],
+      },
+    };
+    const normalized = normalizeExtractionCandidate(interactivePlan);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.strategy.transport).toBe('browser');
+  });
+  it('preserves http transport when strategy has no browser-specific requirements', () => {
+    const parsed = extractionPlanSchema.parse(plan);
+    expect(parsed.strategy.transport).toBe('http');
   });
 });
 describe('Common execution and comparisons', () => {

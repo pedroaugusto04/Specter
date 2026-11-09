@@ -349,7 +349,7 @@ if (btnGoogle) {
               currentToken = cookie.value;
 
               if (authWindow?.id) {
-                chrome.windows.remove(authWindow.id).catch(() => {});
+                chrome.windows.remove(authWindow.id).catch(() => { });
               }
 
               renderConnected(user.email);

@@ -12,7 +12,7 @@ import type {
 import type { ConfigurationModel, StageInput } from './model.js';
 import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
-import { extractionPlanSchema } from '../types/extractionPlan.js';
+import { extractionPlanSchema, normalizeExtractionCandidate } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { observationPacket } from './configurationTools.js';
 import { logger } from '../utils/logger.js';
@@ -186,7 +186,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           }
           progress.reset();
           attempts++;
-          const plan = extractionPlanSchema.parse(decision.plan);
+          const plan = extractionPlanSchema.parse(normalizeExtractionCandidate(decision.plan));
           if (request.intent && !sameIntent(request.intent, plan.intent))
             fail('Recovery cannot change extraction intent.');
           const key = canonicalJson(plan);
