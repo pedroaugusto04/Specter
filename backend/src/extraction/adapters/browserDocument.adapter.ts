@@ -224,17 +224,9 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         execution.check();
         if (!settled) {
           settled = true;
-          const idleTimeout = Math.min(2500, timeout());
+          const idleTimeout = Math.max(1, Math.min(execution.remaining(), 20000));
           if (idleTimeout > 0) {
             await page.waitForLoadState?.('networkidle', { timeout: idleTimeout })?.catch(() => {});
-          }
-          const loadingTimeout = Math.min(1500, timeout());
-          if (loadingTimeout > 0) {
-            await page
-              .locator?.('[aria-busy="true"], .animate-pulse, [class*="skeleton"], [role="progressbar"]')
-              ?.first?.()
-              ?.waitFor?.({ state: 'hidden', timeout: loadingTimeout })
-              ?.catch(() => {});
           }
         }
         await Promise.allSettled([...responseTasks]);
@@ -335,7 +327,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           );
         if (unsafe) throw new Error('Form interactions are not supported.');
         await target.first().click({ timeout: timeout() });
-        const postClickTimeout = Math.min(1500, timeout());
+        const postClickTimeout = Math.max(1, Math.min(execution.remaining(), 15000));
         if (postClickTimeout > 0) {
           await page.waitForLoadState?.('networkidle', { timeout: postClickTimeout })?.catch(() => {});
         }
