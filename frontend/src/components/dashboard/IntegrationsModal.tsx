@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { useModal } from '@/components/ui/modal-dialog';
 import {
   useDeleteSessionMutation,
   useIntegrationsQuery,
@@ -86,6 +87,7 @@ export function IntegrationsModal({
 
   // Initial pristine snapshot for isDirty check
   const [initialData, setInitialData] = React.useState<UserIntegrationsDto | null>(null);
+  const modal = useModal();
   const integrationsQuery = useIntegrationsQuery(isOpen);
   const sessionsQuery = useSessionsQuery(isOpen);
   const updateIntegrationsMutation = useUpdateIntegrationsMutation();
@@ -133,11 +135,21 @@ export function IntegrationsModal({
     }
   }, []);
 
-  const handleDeleteSession = async (id: string) => {
-    setDeletingSessionId(id);
+  const handleDeleteSession = async (session: SessionDto) => {
+    const sessionLabel = session.name || session.domain;
+    const confirmed = await modal.confirm({
+      title: 'Revoke Session',
+      message: `Are you sure you want to revoke the authenticated session for "${sessionLabel}"?`,
+      confirmLabel: 'Revoke',
+      cancelLabel: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
+
+    setDeletingSessionId(session.id);
     try {
-      await deleteSessionMutation.mutateAsync(id);
-      setSessions((prev) => prev.filter((s) => s.id !== id));
+      await deleteSessionMutation.mutateAsync(session.id);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Falha ao revogar sessão.');
     } finally {
@@ -804,7 +816,7 @@ export function IntegrationsModal({
                             variant="outline"
                             size="sm"
                             disabled={deletingSessionId === sess.id}
-                            onClick={() => void handleDeleteSession(sess.id)}
+                            onClick={() => void handleDeleteSession(sess)}
                             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-border"
                             title="Revoke this session"
                           >
