@@ -17,7 +17,7 @@ import type {
   IJobRepository,
   UpdateJobPatch,
 } from '../repositories/jobRepository.js';
-import type { DiffSummary } from '../types/domain.js';
+import type { DiffSummary, ScrapingJobEntity } from '../types/domain.js';
 import { JobStatus, RunStatus } from '../types/enums.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
@@ -104,15 +104,7 @@ export class JobService {
     const webhookUrl = request.webhookUrl?.trim()
       ? await assertSafeUrl(request.webhookUrl.trim(), 'webhookUrl')
       : null;
-    const cronExpression = (request.cronExpression ?? '0 */6 * * *').trim();
-
-    const cronCheck = validateCronFrequency(cronExpression);
-    if (!cronCheck.valid) {
-      const msg =
-        cronCheck.error ??
-        'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
-      throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
-    }
+    const cronExpression = this.assertValidCron(request.cronExpression ?? '0 */6 * * *');
 
     const existingJobs = await this.jobRepository.findAll(undefined, request.userId);
     const name = request.name?.trim() || this.nextMonitorName(existingJobs.map((job) => job.name));
@@ -151,10 +143,7 @@ export class JobService {
   }
 
   async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
-    const entity = await this.jobRepository.findById(id);
-    if (!entity || (userId && entity.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const entity = await this.getOwnedJob(id, userId);
     return this.presenter.present(entity);
   }
 
@@ -163,10 +152,7 @@ export class JobService {
     request: UpdateScrapingJobRequest,
     userId?: string
   ): Promise<ScrapingJobDto> {
-    const existing = await this.jobRepository.findById(id);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const existing = await this.getOwnedJob(id, userId);
 
     const patch: UpdateJobPatch = {};
 
@@ -197,15 +183,7 @@ export class JobService {
       patch.captureScreenshotOnChange = request.captureScreenshotOnChange;
     }
     if (request.cronExpression !== undefined) {
-      const trimmedCron = request.cronExpression.trim();
-      const cronCheck = validateCronFrequency(trimmedCron);
-      if (!cronCheck.valid) {
-        const msg =
-          cronCheck.error ??
-          'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
-        throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
-      }
-      patch.cronExpression = trimmedCron;
+      patch.cronExpression = this.assertValidCron(request.cronExpression);
     }
 
     if (request.triggerRules !== undefined || request.triggerMatchMode !== undefined) {
@@ -239,10 +217,12 @@ export class JobService {
       (patch.userPrompt !== undefined && patch.userPrompt !== existing.userPrompt);
 
     if (needsRecompile) {
-      if (existing.bullmqRepeatableKey) {
-        await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      }
+      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       patch.bullmqRepeatableKey = null;
+      patch.status = JobStatus.PendingCompilation;
+      patch.extractionPlan = null;
+      patch.failureCount = 0;
+      patch.lastError = null;
     } else if (patch.cronExpression !== undefined && existing.status === JobStatus.Active) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
@@ -251,27 +231,38 @@ export class JobService {
       );
     }
 
-    if (patch.extractionPlan)
-      patch.extractionPlan = extractionPlanSchema.parse(patch.extractionPlan);
     const updated = await this.jobRepository.updateJob(id, patch);
     if (!updated) {
       throw new NotFoundError(`Monitoring job not found: ${id}`);
     }
 
     if (needsRecompile) {
-      await this.jobRepository.updateJob(id, {
-        status: JobStatus.PendingCompilation,
-        extractionPlan: null,
-        failureCount: 0,
-        lastError: null,
-      });
       await this.jobScheduler.enqueueCompilation(id, CompilationReason.Manual);
     }
 
-    const finalEntity = await this.jobRepository.findById(id);
-    const resultDto = await this.presenter.present(finalEntity ?? updated);
+    const resultDto = await this.presenter.present(updated);
     await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
+  }
+
+  private async getOwnedJob(id: string, userId?: string): Promise<ScrapingJobEntity> {
+    const entity = await this.jobRepository.findById(id);
+    if (!entity || (userId && entity.userId !== userId)) {
+      throw new NotFoundError(`Monitoring job not found: ${id}`);
+    }
+    return entity;
+  }
+
+  private assertValidCron(cronExpression: string): string {
+    const trimmed = cronExpression.trim();
+    const cronCheck = validateCronFrequency(trimmed);
+    if (!cronCheck.valid) {
+      const msg =
+        cronCheck.error ??
+        'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
+      throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
+    }
+    return trimmed;
   }
 
   private nextMonitorName(existingNames: string[]): string {
@@ -289,15 +280,10 @@ export class JobService {
   }
 
   async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
-    const existing = await this.jobRepository.findById(id);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const existing = await this.getOwnedJob(id, userId);
 
     if (paused) {
-      if (existing.bullmqRepeatableKey) {
-        await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      }
+      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       const updated = await this.jobRepository.updateJob(id, {
         status: JobStatus.Paused,
         bullmqRepeatableKey: null,
@@ -334,10 +320,7 @@ export class JobService {
     id: string,
     userId?: string
   ): Promise<{ queued: boolean; mode: 'scrape' | 'compile' }> {
-    const existing = await this.jobRepository.findById(id);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const existing = await this.getOwnedJob(id, userId);
 
     if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
       await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
@@ -351,10 +334,7 @@ export class JobService {
   }
 
   async triggerManualRecompile(id: string, userId?: string): Promise<ScrapingJobDto> {
-    const existing = await this.jobRepository.findById(id);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const existing = await this.getOwnedJob(id, userId);
 
     const updated = await this.jobRepository.updateJob(id, {
       status: JobStatus.Healing,
@@ -369,10 +349,7 @@ export class JobService {
   }
 
   async deleteJob(id: string, userId?: string): Promise<void> {
-    const existing = await this.jobRepository.findById(id);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const existing = await this.getOwnedJob(id, userId);
 
     await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
     await this.jobRepository.deleteJob(id);
@@ -384,10 +361,7 @@ export class JobService {
     limit = 50,
     userId?: string
   ): Promise<{ runs: JobRunDto[]; latestDiff: DiffSummary | null }> {
-    const existing = await this.jobRepository.findById(jobId);
-    if (!existing || (userId && existing.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${jobId}`);
-    }
+    const existing = await this.getOwnedJob(jobId, userId);
 
     const runEntities = await this.jobRepository.findRunsByJobId(jobId, limit);
     const runs = runEntities.map(JobMapper.runEntityToDto);

@@ -57,10 +57,10 @@ export class SessionService {
     }
 
     const sanitizedCookies: PlaywrightStorageCookie[] = input.cookies.map((c) => ({
-      name: String(c.name || '').trim(),
-      value: String(c.value || ''),
-      domain: String(c.domain || domain).trim(),
-      path: String(c.path || '/'),
+      name: (c.name || '').trim(),
+      value: c.value || '',
+      domain: (c.domain || domain).trim(),
+      path: c.path || '/',
       expires: typeof c.expires === 'number' && c.expires > 0 ? c.expires : -1,
       httpOnly: Boolean(c.httpOnly),
       secure: Boolean(c.secure),
@@ -69,7 +69,7 @@ export class SessionService {
 
     const storageState: PlaywrightStorageState = {
       cookies: sanitizedCookies,
-      origins: Array.isArray(input.origins) ? input.origins : [],
+      origins: input.origins ?? [],
     };
 
     const entity = await this.sessionRepository.upsert(userId, {

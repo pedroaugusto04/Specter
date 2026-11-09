@@ -262,7 +262,7 @@ export class AuthService {
 
     const nonce = crypto.randomBytes(16).toString('hex');
     const stateToken = signJwt(
-      { sub: nonce, type: 'oauth_state', ...(extraStateData || {}) },
+      { sub: nonce, type: 'oauth_state', ...extraStateData },
       this.jwtSecret,
       600
     );

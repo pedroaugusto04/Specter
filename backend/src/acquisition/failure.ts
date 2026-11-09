@@ -1,6 +1,6 @@
 import { isTimeoutError } from '../utils/networkErrors.js';
 import { AccessFailure } from '../types/access.js';
-export { AccessFailure } from '../types/access.js';
+export { AccessFailure };
 import { ExtractionQuality, FailureCode } from '../extraction/constants.js';
 import type { ExtractionReport } from '../extraction/contracts.js';
 import {

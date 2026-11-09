@@ -7,8 +7,6 @@ import type { UserWebSessionEntity } from '../types/domain.js';
 import { extractDomainCandidates } from '../utils/urlNormalizer.js';
 import { encryptJson } from '../utils/crypto.js';
 
-export { extractDomainCandidates };
-
 export interface UpsertSessionInput {
   domain: string;
   name: string;

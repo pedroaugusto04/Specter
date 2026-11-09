@@ -9,24 +9,12 @@ export const SCRAPE_EXECUTION_QUEUE_NAME = 'scrape-execution-queue';
 export const MAINTENANCE_QUEUE_NAME = 'maintenance-queue';
 
 export function getRedisConnectionOptions(): ConnectionOptions {
-  if (env.REDIS_URL) {
-    try {
-      const parsed = new URL(env.REDIS_URL);
-      return {
-        host: parsed.hostname || env.REDIS_HOST,
-        port: parsed.port ? Number(parsed.port) : env.REDIS_PORT,
-        password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
-        username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-        maxRetriesPerRequest: null,
-      };
-    } catch {
-      // Fallback to host/port
-    }
-  }
-
+  const parsed = new URL(env.REDIS_URL);
   return {
-    host: env.REDIS_HOST,
-    port: env.REDIS_PORT,
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 6379,
+    password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+    username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
     maxRetriesPerRequest: null,
   };
 }

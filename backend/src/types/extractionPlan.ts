@@ -110,8 +110,7 @@ export const extractionIntentSchema = z
       )
       .default([]),
     triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
-  })
-  .strict();
+  });
 export const executionStrategySchema = z
   .object({
     transport: z.nativeEnum(Transport),

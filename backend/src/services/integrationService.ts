@@ -74,9 +74,6 @@ export class IntegrationService {
   }
 
   async getBotUsername(): Promise<string | null> {
-    if (typeof this.telegramProvider.getBotUsername === 'function') {
-      return this.telegramProvider.getBotUsername();
-    }
-    return null;
+    return (await this.telegramProvider.getBotUsername?.()) ?? null;
   }
 }

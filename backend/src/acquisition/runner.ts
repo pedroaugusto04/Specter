@@ -1,8 +1,7 @@
 import type { ExecutionContext, StageTrace } from '../extraction/contracts.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { AcquisitionFailureError, classifyAccessFailure } from './failure.js';
-import { AccessFailure } from './failure.js';
+import { AccessFailure, AcquisitionFailureError, classifyAccessFailure } from './failure.js';
 import { AcquisitionOutcome } from '../types/access.js';
 import { TraceStatus } from '../extraction/constants.js';
 

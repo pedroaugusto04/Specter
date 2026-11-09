@@ -63,10 +63,8 @@ export class WorkerManager {
       async (job: Job<{ jobId: string }>) => {
         const { jobId } = job.data;
         if (await this.deps.scrapeExecutionService.isAccessSuspended(jobId)) return;
-        await this.runMonitor(
-          jobId,
-          () => this.deps.scrapeExecutionService.executeScrape(jobId),
-          () => this.deps.scrapeExecutionService.isAccessSuspended(jobId)
+        await this.runMonitor(jobId, () =>
+          this.deps.scrapeExecutionService.executeScrape(jobId)
         );
       },
       {

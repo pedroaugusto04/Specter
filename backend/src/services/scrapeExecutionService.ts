@@ -243,48 +243,18 @@ export class ScrapeExecutionService {
         durationMs,
       });
 
-      // 1. Anti-bot / WAF block (HTTP 403/429): DO NOT trigger layout self-healing
-      if (accessFailure === AccessFailure.Blocked) {
-        await this.deps.jobRepository.updateJob(job.id, {
-          lastError: userMessage,
-          failureCount: 0,
-        });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
-        return null;
-      }
-
-      if (error instanceof AcquisitionFailureError) {
-        await this.deps.jobRepository.updateJob(job.id, {
-          lastError: userMessage,
-          failureCount: 0,
-        });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
-        throw error;
-      }
-
-      // 2. Navigation / Network Timeout: DO NOT recompile; rethrow for BullMQ exponential backoff
-      if (
-        error instanceof NavigationTimeoutError ||
-        (error instanceof DomainError && error.isRetryable)
-      ) {
-        await this.deps.jobRepository.updateJob(job.id, {
-          lastError: userMessage,
-          failureCount: 0,
-        });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
-        throw error;
-      }
-
-      // 3. Selector Mismatch (HTTP 200 OK, but layout changed): Self-Healing state machine
+      // 1. Selector Mismatch (HTTP 200 OK, but layout changed): Self-Healing state machine
       if (error instanceof SelectorMismatchError) {
+        const inHealingWindow = Boolean(
+          job.healingWindowStartedAt &&
+            Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
+        );
+        const currentHealingAttempts = inHealingWindow ? (job.healingAttempts ?? 0) : 0;
         const newFailureCount = job.failureCount + 1;
 
         if (
           newFailureCount >= this.consecutiveFailuresForHealing &&
-          (job.healingWindowStartedAt &&
-          Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
-            ? (job.healingAttempts ?? 0)
-            : 0) >= this.maxHealingRetries
+          currentHealingAttempts >= this.maxHealingRetries
         ) {
           // Cap maximum self-healing retries to prevent infinite recompilation loops
           await this.deps.jobRepository.updateJob(job.id, {
@@ -304,16 +274,8 @@ export class ScrapeExecutionService {
         if (newFailureCount >= this.consecutiveFailuresForHealing) {
           await this.deps.jobRepository.updateJob(job.id, {
             status: JobStatus.Healing,
-            healingAttempts:
-              (job.healingWindowStartedAt &&
-              Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
-                ? (job.healingAttempts ?? 0)
-                : 0) + 1,
-            healingWindowStartedAt:
-              job.healingWindowStartedAt &&
-              Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
-                ? job.healingWindowStartedAt
-                : new Date(),
+            healingAttempts: currentHealingAttempts + 1,
+            healingWindowStartedAt: inHealingWindow ? job.healingWindowStartedAt : new Date(),
             failureCount: newFailureCount,
             lastError: userMessage,
           });
@@ -339,12 +301,18 @@ export class ScrapeExecutionService {
         return null;
       }
 
-      // Unexpected errors: record lastError
+      // 2. All other failures (Anti-bot block, acquisition failures, timeouts, domain/network errors):
+      // Record failure for audit, reset failureCount, and rethrow (or return null if blocked)
       await this.deps.jobRepository.updateJob(job.id, {
         lastError: userMessage,
         failureCount: 0,
       });
       await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+
+      if (accessFailure === AccessFailure.Blocked) {
+        return null;
+      }
+
       throw error;
     }
   }

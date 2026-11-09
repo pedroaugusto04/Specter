@@ -20,7 +20,7 @@ export class PlanExecutionService implements IPlanExecutor {
     plan: ExtractionPlan,
     options: ScrapeOptions = {}
   ): Promise<PlanExecutionResult> {
-    const result = await this.executor.execute(url, extractionPlanSchema.parse(plan), options);
+    const result = await this.executor.execute(url, plan, options);
     return {
       data: result.data,
       report: result.report,
