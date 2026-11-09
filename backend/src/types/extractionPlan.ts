@@ -77,7 +77,7 @@ export const sourceSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal(SourceKind.Response), path, association: text.optional() }).strict(),
 ]);
-const baseExtractionIntentSchema = z
+export const extractionIntentSchema = z
   .object({
     entity: text,
     mode: z.nativeEnum(ExtractionMode),
@@ -112,14 +112,6 @@ const baseExtractionIntentSchema = z
     triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
   })
   .strict();
-
-export const extractionIntentSchema = z.preprocess((val) => {
-  if (val && typeof val === 'object' && 'filters' in val) {
-    const { filters: _, ...rest } = val as Record<string, unknown>;
-    return rest;
-  }
-  return val;
-}, baseExtractionIntentSchema);
 export const executionStrategySchema = z
   .object({
     transport: z.nativeEnum(Transport),
@@ -216,10 +208,6 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
 
     if (nextIntent && typeof nextIntent === 'object') {
       const intentObj = { ...(nextIntent as Record<string, unknown>) };
-      if ('filters' in intentObj) {
-        delete intentObj.filters;
-        modified = true;
-      }
       const hasPagination = Boolean(
         nextStrategy &&
           typeof nextStrategy === 'object' &&

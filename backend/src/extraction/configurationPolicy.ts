@@ -3,11 +3,7 @@ import { canonicalJson } from '../utils/diffHasher.js';
 import { MaxConsecutiveOperationRepeats } from './configurationConstants.js';
 
 export function sameIntent(a: ExtractionIntent, b: ExtractionIntent): boolean {
-  const clean = (obj: ExtractionIntent) => {
-    const { filters: _, ...rest } = obj as unknown as Record<string, unknown>;
-    return rest;
-  };
-  return canonicalJson(clean(a)) === canonicalJson(clean(b));
+  return canonicalJson(a) === canonicalJson(b);
 }
 /** Tracks meaningful tool results, rather than unrelated document mutations. */
 export class ConfigurationProgress {

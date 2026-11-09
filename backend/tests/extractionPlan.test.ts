@@ -532,7 +532,7 @@ describe('Extraction contract and integrity', () => {
     const parsed = extractionPlanSchema.parse(normalized);
     expect(parsed.intent.scope).toBe('page');
   });
-  it('allows intent without scope or filters, defaulting them cleanly', () => {
+  it('allows intent without scope, defaulting it cleanly', () => {
     const minimalPlan = {
       intent: {
         entity: 'product',
@@ -556,7 +556,6 @@ describe('Extraction contract and integrity', () => {
     const normalized = normalizeExtractionCandidate(minimalPlan);
     const parsed = extractionPlanSchema.parse(normalized);
     expect(parsed.intent.scope).toBe('page');
-    expect('filters' in parsed.intent).toBe(false);
     expect(parsed.intent.fields.price?.locale).toBe('pt-BR');
     expect(parsed.strategy.ready.length).toBeGreaterThanOrEqual(1);
   });
