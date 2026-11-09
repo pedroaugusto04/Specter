@@ -182,6 +182,19 @@ describe('Extraction contract and integrity', () => {
     expect(
       convertFieldValue('(10) / (20)', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBeNull();
+    expect(convertFieldValue('Total: 45', field, 'https://example.com')).toBe(45);
+    expect(
+      convertFieldValue('Clientes ativos: 0', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBe(0);
+    expect(
+      convertFieldValue('Clientes ativos: 15', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBe(15);
+    expect(
+      convertFieldValue('Preço - R$ 1.250,50', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBe(1250.5);
+    expect(
+      convertFieldValue('De 10 a 20 usuários', { ...field, locale: 'pt-BR' }, 'https://example.com')
+    ).toBeNull();
 
     const boolField = {
       type: 'boolean' as const,
@@ -219,6 +232,26 @@ describe('Extraction contract and integrity', () => {
       )
     ).toBe(1234.56);
     expect(convertFieldValue('(1,234.56)', field, 'https://example.com')).toBeNull();
+  });
+  it('converts ISO and regional dates based on locale', () => {
+    const dateField = { type: 'date' as const, description: 'created_at', required: true };
+    expect(convertFieldValue('2024-05-10', dateField, 'https://example.com')).toBe(
+      '2024-05-10T00:00:00.000Z'
+    );
+    expect(convertFieldValue('2024-05-10T12:00:00Z', dateField, 'https://example.com')).toBe(
+      '2024-05-10T12:00:00.000Z'
+    );
+    expect(
+      convertFieldValue('09/11/2024', { ...dateField, locale: 'pt-BR' }, 'https://example.com')
+    ).toBe('2024-11-09T00:00:00.000Z');
+    expect(
+      convertFieldValue('11/09/2024', { ...dateField, locale: 'en-US' }, 'https://example.com')
+    ).toBe('2024-11-09T00:00:00.000Z');
+    expect(convertFieldValue('25/12/2024', dateField, 'https://example.com')).toBe(
+      '2024-12-25T00:00:00.000Z'
+    );
+    expect(convertFieldValue('invalid date', dateField, 'https://example.com')).toBeNull();
+    expect(convertFieldValue('31/02/2024', dateField, 'https://example.com')).toBeNull();
   });
   it('keeps graph/list entities distinct and recognizes Schema.org URLs', () => {
     const structured = fixturePlan({

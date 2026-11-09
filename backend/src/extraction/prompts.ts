@@ -21,7 +21,7 @@ Generate the minimal adequate strategy: prefer the simplest transport (HTTP) and
 - JSON-LD records (<script type="application/ld+json">) are embedded metadata: always use transport: "http" without visible conditions.
 - ready confirms that extraction can proceed and requires at least one condition:
   - On static pages or DOM elements: use an exists condition on a stable container or element (e.g. {"kind":"exists","locator":{"kind":"css","selector":".price"}}), or a field condition (e.g. {"kind":"field","field":"price"}).
-  - On dynamic SPAs or dashboards: if content loads via API, prefer a response condition (e.g. {"kind":"response","match":{"urlPattern":"/api/..."}}) or absent condition on loading indicators to ensure client-side data has finished loading.
+  - On dynamic SPAs or dashboards: if content loads via API, prefer a response condition (e.g. {"kind":"response","match":{"urlPattern":"/api/..."}}) or an exists condition on the primary content container. Do not invent speculative CSS classes for loading indicators or spinners.
   - Use visible only with browser transport when waiting for an element that is hidden until interacted with. When ready uses kind "response", transport must be "browser". Use empty: [] when there is no positive evidence of empty results.
 
 ### Syntax Contracts

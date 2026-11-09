@@ -200,6 +200,14 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       });
       httpStatus = response?.status() ?? 200;
       let settled = false;
+      const ensureSettled = async () => {
+        if (settled) return;
+        settled = true;
+        const idleTimeout = Math.max(1, Math.min(execution.remaining(), 20000));
+        if (idleTimeout > 0) {
+          await page.waitForLoadState?.('networkidle', { timeout: idleTimeout })?.catch(() => {});
+        }
+      };
       const documentRoot = () =>
         request.strategy?.document?.frame
           ? page.frameLocator(request.strategy?.document.frame)
@@ -222,13 +230,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       const snapshot = async () => {
         execution.check();
-        if (!settled) {
-          settled = true;
-          const idleTimeout = Math.max(1, Math.min(execution.remaining(), 20000));
-          if (idleTimeout > 0) {
-            await page.waitForLoadState?.('networkidle', { timeout: idleTimeout })?.catch(() => {});
-          }
-        }
+        await ensureSettled();
         await Promise.allSettled([...responseTasks]);
         // Browser projection includes open shadow trees, which page.content() cannot serialize.
         const documentElement = request.strategy?.document?.shadow
@@ -270,6 +272,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       };
       const check = async (condition: Condition): Promise<boolean | undefined> => {
         if (condition.kind === 'field') return undefined;
+        await ensureSettled();
         if (condition.kind === SourceKind.Response) {
           await Promise.allSettled([...responseTasks]);
           return evaluateCondition(
