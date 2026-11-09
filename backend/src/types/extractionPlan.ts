@@ -175,18 +175,77 @@ export const executionStrategySchema = z
 
 export function normalizeExtractionCandidate(raw: unknown): unknown {
   if (raw && typeof raw === 'object' && 'strategy' in raw) {
-    const plan = raw as { strategy?: unknown };
-    if (plan.strategy && typeof plan.strategy === 'object') {
-      const s = plan.strategy as ExecutionStrategy;
+    const plan = raw as { strategy?: unknown; intent?: unknown };
+    let nextStrategy = plan.strategy;
+    let nextIntent = plan.intent;
+    let modified = false;
+
+    if (nextStrategy && typeof nextStrategy === 'object') {
+      const s = { ...(nextStrategy as Record<string, unknown>) } as unknown as ExecutionStrategy;
       if (s.transport === Transport.Http && requiresBrowser(s)) {
-        return {
-          ...raw,
-          strategy: {
-            ...s,
-            transport: Transport.Browser,
-          },
-        };
+        s.transport = Transport.Browser;
+        nextStrategy = s;
+        modified = true;
       }
+    }
+
+    if (nextIntent && typeof nextIntent === 'object') {
+      const intentObj = { ...(nextIntent as Record<string, unknown>) };
+      const hasPagination = Boolean(
+        nextStrategy &&
+          typeof nextStrategy === 'object' &&
+          'pagination' in nextStrategy &&
+          (nextStrategy as { pagination?: unknown }).pagination
+      );
+
+      if (hasPagination) {
+        if (
+          intentObj.scope !== ExtractionScope.Collection ||
+          intentObj.mode !== ExtractionMode.Collection
+        ) {
+          intentObj.scope = ExtractionScope.Collection;
+          intentObj.mode = ExtractionMode.Collection;
+          modified = true;
+        }
+      } else if (intentObj.scope === ExtractionScope.Collection) {
+        intentObj.scope = ExtractionScope.Page;
+        modified = true;
+      }
+
+      if (intentObj.mode === ExtractionMode.Collection) {
+        let identities = Array.isArray(intentObj.identityFields) ? [...intentObj.identityFields] : [];
+        if (!identities.length && intentObj.fields && typeof intentObj.fields === 'object') {
+          identities = Object.keys(intentObj.fields as Record<string, unknown>);
+          intentObj.identityFields = identities;
+          modified = true;
+        }
+        if (identities.length > 0 && intentObj.fields && typeof intentObj.fields === 'object') {
+          const fieldsObj = { ...(intentObj.fields as Record<string, Record<string, unknown>>) };
+          let fieldsModified = false;
+          for (const idKey of identities) {
+            if (fieldsObj[idKey] && typeof fieldsObj[idKey] === 'object' && !fieldsObj[idKey].required) {
+              fieldsObj[idKey] = { ...fieldsObj[idKey], required: true };
+              fieldsModified = true;
+            }
+          }
+          if (fieldsModified) {
+            intentObj.fields = fieldsObj;
+            modified = true;
+          }
+        }
+      }
+
+      if (modified) {
+        nextIntent = intentObj;
+      }
+    }
+
+    if (modified) {
+      return {
+        ...raw,
+        strategy: nextStrategy,
+        intent: nextIntent,
+      };
     }
   }
   return raw;

@@ -439,6 +439,103 @@ describe('Extraction contract and integrity', () => {
     const parsed = extractionPlanSchema.parse(plan);
     expect(parsed.strategy.transport).toBe('http');
   });
+  it('auto-reconciles collection scope and mode when pagination is configured with page scope', () => {
+    const sigaaCandidate = {
+      intent: {
+        entity: 'latest_update',
+        mode: 'collection',
+        scope: 'page',
+        fields: {
+          date: {
+            displayName: 'Data',
+            observedLabel: '28/10/2026 -',
+            description: 'Data da atualização',
+            type: 'string',
+            required: true,
+          },
+          course: {
+            displayName: 'Curso',
+            observedLabel: 'INTRODUÇÃO À SOCIOLOGIA (2026.2)',
+            description: 'Nome da turma ou disciplina associada à atualização',
+            type: 'string',
+            required: true,
+          },
+          description: {
+            displayName: 'Descrição',
+            observedLabel: 'Nova Notícia: Ausência em aula do dia 29/10/2026',
+            description: 'Conteúdo ou descrição da atualização',
+            type: 'string',
+            required: true,
+          },
+        },
+        identityFields: ['date', 'course', 'description'],
+        filters: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+      },
+      strategy: {
+        transport: 'browser',
+        records: { kind: 'dom', selector: '#atualizacoes-turma .rotator table' },
+        fields: {
+          date: [
+            {
+              kind: 'dom',
+              selector: 'tr:nth-child(1) td',
+              attribute: 'text',
+              pattern: '(\\d{2}/\\d{2}/\\d{4})',
+            },
+          ],
+          course: [{ kind: 'dom', selector: 'tr:nth-child(1) td a', attribute: 'text' }],
+          description: [{ kind: 'dom', selector: 'tr:nth-child(2) td', attribute: 'text' }],
+        },
+        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '#atualizacoes-turma' } }],
+        empty: [],
+        pagination: {
+          kind: 'scroll',
+          end: [{ kind: 'exists', locator: { kind: 'css', selector: '#atualizacoes-turma' } }],
+        },
+      },
+    };
+    const normalized = normalizeExtractionCandidate(sigaaCandidate);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.intent.scope).toBe('collection');
+    expect(parsed.intent.mode).toBe('collection');
+    expect(parsed.strategy.pagination?.kind).toBe('scroll');
+  });
+  it('auto-reconciles scope to page when collection scope is declared without pagination', () => {
+    const unpaginatedCollection = {
+      intent: {
+        entity: 'items',
+        mode: 'collection',
+        scope: 'collection',
+        fields: {
+          title: {
+            displayName: 'Title',
+            observedLabel: 'Item 1',
+            description: 'Item title',
+            type: 'string',
+            required: true,
+          },
+        },
+        identityFields: ['title'],
+        filters: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+      },
+      strategy: {
+        transport: 'http',
+        records: { kind: 'dom', selector: '.item' },
+        fields: {
+          title: [{ kind: 'dom', selector: 'h2', attribute: 'text' }],
+        },
+        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.item' } }],
+        empty: [],
+      },
+    };
+    const normalized = normalizeExtractionCandidate(unpaginatedCollection);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.intent.scope).toBe('page');
+  });
 });
 describe('Common execution and comparisons', () => {
   it('follows same-origin links and verifies completion', async () => {

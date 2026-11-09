@@ -38,7 +38,8 @@ Generate the minimal adequate strategy required to reliably extract the target d
   3. Literal class names as fallback when no resilient alternative uniquely identifies the element.
 - Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals). Never use jsonld or dom as condition kinds.
 - Setup actions: click (locator), scroll (optional selector), wait (condition). Never submit forms, log in, purchase or change settings.
-- Collections: paginate with positive end evidence. Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
+- Collections: when extracting across pages or infinite scroll, include strategy.pagination with intent.scope: "collection" and mode: "collection". When extracting records from the current page without pagination, use intent.scope: "page" and omit strategy.pagination.
+- Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
 - Associations require observed exact key matches: localField must be required and directly sourced from the primary record; match exactly one foreign record.
 - Apply filters after conversion; declare their fields as required. Keep intent and strategy field keys aligned and do not repeat a rejected strategy unchanged.
 `;
