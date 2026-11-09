@@ -6,8 +6,8 @@ import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { PaginationControls } from '@/components/ui/PaginationControls';
-import { useJobRunsQuery } from '@/hooks/useDashboardQueries';
-import type { JobRunDto, ScrapingJobDto } from '@/lib/api';
+import { useJobRunsQuery, useJobTimeseriesQuery } from '@/hooks/useDashboardQueries';
+import type { JobRunDto, ScrapingJobDto, TimeseriesRange } from '@/lib/api';
 import { USER_FAILURES, type IntentField } from '@specter/contracts';
 import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
@@ -58,16 +58,20 @@ export function JobRunsDrawer({
 }) {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(20);
+  const [chartRange, setChartRange] = React.useState<TimeseriesRange>('all');
 
   React.useEffect(() => {
     setPage(1);
   }, [job?.id]);
 
   const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
-  const { data: timelineData } = useJobRunsQuery(job?.id, 1, 50);
+  const { data: timeseriesData, isLoading: timeseriesLoading } = useJobTimeseriesQuery(
+    job?.id,
+    chartRange
+  );
 
   const runs: JobRunDto[] = data?.runs ?? [];
-  const timelineRuns: JobRunDto[] = timelineData?.runs ?? runs;
+  const timeseriesPoints = timeseriesData?.points ?? [];
   const latestDiff = data?.latestDiff ?? null;
   const pagination = data?.pagination;
   const summary = data?.summary ?? {
@@ -90,7 +94,7 @@ export function JobRunsDrawer({
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
 
-  const handleSelectRun = (run: JobRunDto) => {
+  const handleSelectRun = (run: { id: string }) => {
     setSelectedRunId(run.id);
     setActiveTab('runs');
 
@@ -156,9 +160,9 @@ export function JobRunsDrawer({
         {activeTab === 'runs' && (
           <div className="space-y-6">
             {/* Timeline Strip (Status bar over time) */}
-            {timelineRuns.length > 0 && (
+            {(timeseriesPoints.length > 0 || runs.length > 0) && (
               <ExecutionTimelineStrip
-                runs={timelineRuns}
+                runs={timeseriesPoints.length > 0 ? timeseriesPoints : runs}
                 timeZone={timeZone}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
@@ -427,12 +431,16 @@ export function JobRunsDrawer({
         {activeTab === 'timeline' && (
           <ExecutionTimelineChart
             key={job.id}
-            runs={timelineRuns}
+            runs={runs}
+            points={timeseriesPoints}
             revision={job.contractRevision}
             identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
             summary={summary}
+            timeRange={chartRange}
+            onTimeRangeChange={setChartRange}
+            isLoading={timeseriesLoading}
           />
         )}
 

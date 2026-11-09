@@ -8,7 +8,13 @@ import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
 import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
-import type { JobRunDto, JobRunsDto, ScrapingJobDto } from '@specter/contracts';
+import type {
+  JobRunDto,
+  JobRunsDto,
+  JobTimeseriesDto,
+  ScrapingJobDto,
+  TimeseriesRange,
+} from '@specter/contracts';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
@@ -416,5 +422,23 @@ export class JobService {
 
   async getDashboardStats(userId?: string): Promise<DashboardStats> {
     return DashboardMapper.toDto(await this.jobRepository.getStats(userId));
+  }
+
+  async getJobTimeseries(
+    jobId: string,
+    range: TimeseriesRange = 'all',
+    userId?: string
+  ): Promise<JobTimeseriesDto> {
+    await this.getOwnedJob(jobId, userId);
+
+    const rows = await this.jobRepository.findTimeseriesByJobId(jobId, range);
+    const points = rows.map(JobMapper.timeseriesPointToDto);
+
+    return {
+      jobId,
+      range,
+      totalPoints: points.length,
+      points,
+    };
   }
 }

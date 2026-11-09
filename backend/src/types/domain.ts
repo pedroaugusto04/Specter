@@ -79,4 +79,15 @@ export interface JobRunEntity {
   executedAt: Date;
 }
 
+export interface TimeseriesRowEntity {
+  id: string;
+  executedAt: Date;
+  status: RunStatus;
+  hasChanges: ChangeStatus;
+  durationMs: number | null;
+  contractRevision: string | null;
+  errorMessage: string | null;
+  extractedData: ExtractedPayload | null;
+}
+
 export type { DiffChangeEntry, DiffSummary } from '@specter/contracts';

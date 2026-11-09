@@ -95,6 +95,38 @@ describe('Typed observations and comparisons', () => {
     expect(result[3]!.previous?.run.id).toBe('1');
     expect(result[3]!.timestamp - result[0]!.timestamp).toBe(3 * 60 * 60 * 1000);
   });
+
+  it('maps lightweight timeseries points directly via their scalar values projection', () => {
+    const points = [
+      {
+        id: 'p1',
+        executedAt: '2026-11-05T01:00:00Z',
+        status: RunStatus.Success,
+        hasChanges: ChangeStatus.Initial,
+        durationMs: 120,
+        contractRevision: 'revision',
+        errorMessage: null,
+        values: { value: 50 },
+      },
+      {
+        id: 'p2',
+        executedAt: '2026-11-05T02:00:00Z',
+        status: RunStatus.Success,
+        hasChanges: ChangeStatus.Changed,
+        durationMs: 110,
+        contractRevision: 'revision',
+        errorMessage: null,
+        values: { value: 75 },
+      },
+    ];
+
+    const result = fieldObservations(points, 'value', FieldType.Number, 'revision');
+    expect(result.map((p) => p.value)).toEqual([50, 75]);
+    expect(result[1]!.delta).toBe(25);
+    expect(result[1]!.percent).toBe(50);
+    expect(result[1]!.changed).toBe(true);
+    expect(result[1]!.previous?.run.id).toBe('p1');
+  });
   it('does not fabricate readings from failures or invalid dates, or percentages from zero', () => {
     const result = fieldObservations(
       [

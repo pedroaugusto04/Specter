@@ -1,4 +1,5 @@
 import type { AlertPayload } from './notification.interface.js';
+import { env } from '../../config/env.js';
 
 function escapeHtml(value: unknown): string {
   if (value === null || value === undefined) return '—';
@@ -40,6 +41,11 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     ...payload.diffSummary.added,
     ...payload.diffSummary.removed,
   ];
+
+  const specterBaseUrl = (env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const specterUrl =
+    payload.specterUrl ??
+    (payload.jobId ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}` : specterBaseUrl);
 
   const diffRowsHtml = allChanges
     .map((change) => {
@@ -181,6 +187,17 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
                 </table>
               </div>
 
+              <!-- ACTION LINK: REDIRECT TO SPECTER -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 28px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="${escapeHtml(specterUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:#09090b;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:6px;letter-spacing:-0.2px;">
+                      See more on Specter &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
               <!-- FULL SNAPSHOT (JSON ACCORDION) -->
               <details style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
                 <summary style="font-size:13px;font-weight:600;color:#3f3f46;cursor:pointer;user-select:none;">
@@ -246,6 +263,8 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     `CHANGE SUMMARY:`,
     `------------------------------------------------------------`,
     payload.diffSummary.summaryText,
+    ``,
+    `See more on Specter: ${specterUrl}`,
     ``,
     `------------------------------------------------------------`,
     `Specter`,

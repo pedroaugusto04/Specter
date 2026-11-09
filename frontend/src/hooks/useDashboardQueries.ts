@@ -7,8 +7,10 @@ import {
   type DiffSummary,
   type JobRunDto,
   type JobRunsDto,
+  type JobTimeseriesDto,
   type ScrapingJobDto,
   type SessionDto,
+  type TimeseriesRange,
   type UserDto,
   type UserIntegrationsDto,
 } from '@/lib/api';
@@ -22,6 +24,7 @@ export const dashboardKeys = {
   jobs: ['jobs'] as const,
   job: (id: string) => ['jobs', id] as const,
   jobRuns: (id: string, page = 1, pageSize = 20) => ['jobRuns', id, page, pageSize] as const,
+  timeseries: (id: string, range: string) => ['timeseries', id, range] as const,
   stats: ['stats'] as const,
   integrations: ['integrations'] as const,
   sessions: ['sessions'] as const,
@@ -89,6 +92,24 @@ export function useJobRunsQuery(jobId: string | null | undefined, page = 1, page
     },
     enabled: Boolean(jobId),
     staleTime: 5 * 1000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useJobTimeseriesQuery(
+  jobId: string | null | undefined,
+  range: TimeseriesRange = 'all'
+) {
+  return useQuery<JobTimeseriesDto>({
+    queryKey: jobId ? dashboardKeys.timeseries(jobId, range) : ['timeseries', 'none'],
+    queryFn: async () => {
+      if (!jobId) {
+        return { jobId: '', range, totalPoints: 0, points: [] };
+      }
+      return api.getJobTimeseries(jobId, range);
+    },
+    enabled: Boolean(jobId),
+    staleTime: 15 * 1000,
     placeholderData: (prev) => prev,
   });
 }

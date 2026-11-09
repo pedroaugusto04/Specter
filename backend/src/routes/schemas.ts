@@ -134,6 +134,10 @@ export const jobRunsQuerySchema = z.object({
     .default(20),
 });
 
+export const jobTimeseriesQuerySchema = z.object({
+  range: z.enum(['24h', '7d', '30d', 'all']).default('all'),
+});
+
 export const authRegisterSchema = z.object({
   email: z
     .string({ required_error: 'Email is required' })

@@ -7,6 +7,7 @@ import {
   jobPauseSchema,
   jobProbeSchema,
   jobRunsQuerySchema,
+  jobTimeseriesQuerySchema,
   jobStatusQuerySchema,
   jobUpdateSchema,
 } from './schemas.js';
@@ -131,6 +132,21 @@ export function registerJobRoutes(
         request.params.id,
         query.page,
         query.pageSize,
+        user.id
+      );
+      return { data: result };
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/api/jobs/:id/timeseries',
+    { preHandler: [withAuth] },
+    async (request) => {
+      const user = requireUser(request);
+      const query = jobTimeseriesQuerySchema.parse(request.query);
+      const result = await jobService.getJobTimeseries(
+        request.params.id,
+        query.range,
         user.id
       );
       return { data: result };

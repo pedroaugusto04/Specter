@@ -16,6 +16,7 @@ export interface AlertPayload {
   webhookUrl?: string | null;
   triggerReasons?: string[];
   screenshotUrl?: string;
+  specterUrl?: string;
 }
 
 export interface INotificationProvider {

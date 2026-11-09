@@ -25,6 +25,8 @@ import type {
   PaginatedRunsResult,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
+import type { TimeseriesRowEntity } from '../../src/types/domain.js';
+import type { TimeseriesRange } from '@specter/contracts';
 import type {
   CreateUserInput,
   IUserRepository,
@@ -213,6 +215,27 @@ export class InMemoryJobRepository implements IJobRepository {
       runs: filtered.slice(offset, offset + pageSize),
       totalCount: filtered.length,
     };
+  }
+  async findTimeseriesByJobId(
+    jobId: string,
+    range: TimeseriesRange = 'all'
+  ): Promise<TimeseriesRowEntity[]> {
+    const hours =
+      range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
+    const cutoff = hours ? Date.now() - hours * 3600 * 1000 : null;
+    return this.runs
+      .filter((r) => r.jobId === jobId && (!cutoff || r.executedAt.getTime() >= cutoff))
+      .sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime())
+      .map((r) => ({
+        id: r.id,
+        executedAt: r.executedAt,
+        status: r.status,
+        hasChanges: r.hasChanges,
+        durationMs: r.durationMs,
+        contractRevision: r.contractRevision ?? null,
+        errorMessage: r.errorMessage,
+        extractedData: r.extractedData,
+      }));
   }
   async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {
     const jobRunsList = this.runs.filter((r) => r.jobId === jobId);

@@ -5,12 +5,14 @@ import {
   FieldType,
   type JobRunDto,
   type JobRunsSummaryDto,
+  type JobTimeseriesPointDto,
 } from '@specter/contracts';
 import {
   fieldObservations,
   orderedRuns,
   TEXT_MODE,
   type TimelineFields,
+  type RunObservationSource,
 } from '@/lib/chartUtils';
 import { formatDateTime } from '@/lib/utils';
 import { formatObservedNumber } from '@/lib/numberFormatting';
@@ -22,33 +24,49 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 export type ChartTimeRange = '24h' | '7d' | '30d' | 'all';
 
 interface Props {
-  runs: JobRunDto[];
+  runs?: JobRunDto[];
+  points?: JobTimeseriesPointDto[];
   fields: TimelineFields;
   revision: string | null;
   identityFields: string[];
   timeZone?: string;
   summary: JobRunsSummaryDto;
+  timeRange?: ChartTimeRange;
+  onTimeRangeChange?: (range: ChartTimeRange) => void;
+  isLoading?: boolean;
 }
 export function ExecutionTimelineChart({
-  runs,
+  runs = [],
+  points,
   fields,
   revision,
   identityFields,
   timeZone = 'UTC',
   summary,
+  timeRange: controlledTimeRange,
+  onTimeRangeChange,
+  isLoading = false,
 }: Props) {
   const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
   const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);
-  const [timeRange, setTimeRange] = React.useState<ChartTimeRange>('all');
+  const [internalTimeRange, setInternalTimeRange] = React.useState<ChartTimeRange>('all');
   const [obsPage, setObsPage] = React.useState(1);
   const obsPageSize = 10;
 
-  const activeRuns = React.useMemo(() => {
+  const timeRange = controlledTimeRange ?? internalTimeRange;
+
+  const handleTimeRangeChange = (val: ChartTimeRange) => {
+    setInternalTimeRange(val);
+    onTimeRangeChange?.(val);
+  };
+
+  const activeRuns: RunObservationSource[] = React.useMemo(() => {
+    if (points) return points;
     if (timeRange === 'all') return runs;
     const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 24 * 7 : 24 * 30;
     const cutoff = Date.now() - hours * 60 * 60 * 1000;
     return runs.filter((r) => Date.parse(r.executedAt) >= cutoff);
-  }, [runs, timeRange]);
+  }, [points, runs, timeRange]);
 
   const selected = fields[field] ? field : Object.keys(fields)[0];
   const definition = fields[selected];
@@ -75,7 +93,7 @@ export function ExecutionTimelineChart({
       : String(value);
   const chronological = orderedRuns(activeRuns);
   const dated = chronological.filter((run) => Number.isFinite(Date.parse(run.executedAt)));
-  const collection = activeRuns.some(
+  const collection = runs.some(
     (run) =>
       run.contractRevision === revision &&
       run.extractedData &&
@@ -106,7 +124,7 @@ export function ExecutionTimelineChart({
             <button
               key={val}
               type="button"
-              onClick={() => setTimeRange(val)}
+              onClick={() => handleTimeRangeChange(val)}
               className={`rounded px-2.5 py-1 transition-colors cursor-pointer ${
                 timeRange === val
                   ? 'bg-card text-foreground shadow-2xs font-medium border border-border/80'
@@ -136,7 +154,7 @@ export function ExecutionTimelineChart({
       </div>
       {collection ? (
         <CollectionHistory
-          runs={activeRuns}
+          runs={runs}
           revision={revision}
           identityFields={identityFields}
           formatTime={formatTime}

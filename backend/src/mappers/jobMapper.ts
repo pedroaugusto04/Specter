@@ -1,8 +1,8 @@
 import { presentStoredError } from '../utils/errorSanitizer.js';
-import type { ScrapingJobDto, JobRunDto } from '@specter/contracts';
+import type { ScrapingJobDto, JobRunDto, JobTimeseriesPointDto, ExtractedPayload } from '@specter/contracts';
 import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
-import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
+import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
 
 export const JobMapper = {
@@ -104,6 +104,40 @@ export const JobMapper = {
       durationMs: entity.durationMs,
       screenshotUrl: entity.screenshotUrl,
       executedAt: entity.executedAt.toISOString(),
+    };
+  },
+
+  extractScalarValues(
+    payload: ExtractedPayload | null
+  ): Record<string, string | number | boolean | null> {
+    if (!payload || typeof payload !== 'object') return {};
+    if ('items' in payload && Array.isArray(payload.items)) {
+      return { itemCount: payload.items.length };
+    }
+    const result: Record<string, string | number | boolean | null> = {};
+    for (const [key, val] of Object.entries(payload)) {
+      if (
+        typeof val === 'number' ||
+        typeof val === 'boolean' ||
+        typeof val === 'string' ||
+        val === null
+      ) {
+        result[key] = val;
+      }
+    }
+    return result;
+  },
+
+  timeseriesPointToDto(entity: TimeseriesRowEntity): JobTimeseriesPointDto {
+    return {
+      id: entity.id,
+      executedAt: entity.executedAt.toISOString(),
+      status: entity.status,
+      hasChanges: entity.hasChanges,
+      durationMs: entity.durationMs,
+      contractRevision: entity.contractRevision ?? null,
+      errorMessage: presentStoredError(entity.errorMessage),
+      values: JobMapper.extractScalarValues(entity.extractedData),
     };
   },
 };

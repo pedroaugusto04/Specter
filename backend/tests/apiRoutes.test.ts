@@ -375,6 +375,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
         status: 'SUCCESS',
         hasChanges: i % 2 === 0 ? 'YES' : 'NO',
         durationMs: 100 * i,
+        extractedData: { price: 100 + i },
         executedAt: new Date(Date.now() - (25 - i) * 60000),
       });
     }
@@ -408,5 +409,24 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(page3Data.runs).toHaveLength(5);
     expect(page3Data.pagination.hasNextPage).toBe(false);
     expect(page3Data.pagination.hasPrevPage).toBe(true);
+
+    // 7. Dedicated lightweight timeseries endpoint
+    const timeseriesRes = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/timeseries?range=all`,
+      headers: { cookie: authCookie },
+    });
+    expect(timeseriesRes.statusCode).toBe(200);
+    const timeseriesData = timeseriesRes.json().data;
+    expect(timeseriesData.jobId).toBe(createdData.id);
+    expect(timeseriesData.range).toBe('all');
+    expect(timeseriesData.totalPoints).toBe(25);
+    expect(timeseriesData.points).toHaveLength(25);
+    const samplePoint = timeseriesData.points[0];
+    expect(samplePoint.id).toBeDefined();
+    expect(samplePoint.executedAt).toBeDefined();
+    expect(samplePoint.values).toEqual({ price: 101 });
+    expect(samplePoint.screenshotUrl).toBeUndefined();
+    expect(samplePoint.extractionReport).toBeUndefined();
   });
 });

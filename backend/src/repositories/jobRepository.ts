@@ -1,13 +1,14 @@
 import type { AlertDelivery } from '../notifications/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { jobRuns, scrapingJobs, alertDeliveries } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
-import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
+import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
-import { ChangeStatus, JobStatus, RunStatus } from '../types/enums.js';
+import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
+import type { TimeseriesRange } from '@specter/contracts';
 
 export interface CreateJobInput {
   userId?: string;
@@ -96,6 +97,10 @@ export interface IJobRepository {
     page?: number,
     pageSize?: number
   ): Promise<PaginatedRunsResult>;
+  findTimeseriesByJobId(
+    jobId: string,
+    range?: TimeseriesRange
+  ): Promise<TimeseriesRowEntity[]>;
   getJobRunsSummary(jobId: string): Promise<JobRunsSummary>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
@@ -299,6 +304,47 @@ export class DrizzleJobRepository implements IJobRepository {
       runs: rows.map(JobMapper.runRowToEntity),
       totalCount: countResult[0]?.count ?? 0,
     };
+  }
+
+  async findTimeseriesByJobId(
+    jobId: string,
+    range: TimeseriesRange = 'all'
+  ): Promise<TimeseriesRowEntity[]> {
+    const hours =
+      range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
+    const cutoffDate = hours ? new Date(Date.now() - hours * 3600 * 1000) : null;
+
+    const conditions = [eq(jobRuns.jobId, jobId)];
+    if (cutoffDate) {
+      conditions.push(gte(jobRuns.executedAt, cutoffDate));
+    }
+
+    const rows = await this.db
+      .select({
+        id: jobRuns.id,
+        executedAt: jobRuns.executedAt,
+        status: jobRuns.status,
+        hasChanges: jobRuns.hasChanges,
+        durationMs: jobRuns.durationMs,
+        contractRevision: jobRuns.contractRevision,
+        errorMessage: jobRuns.errorMessage,
+        extractedData: jobRuns.extractedData,
+      })
+      .from(jobRuns)
+      .where(and(...conditions))
+      .orderBy(asc(jobRuns.executedAt))
+      .limit(1000);
+
+    return rows.map((row) => ({
+      id: row.id,
+      executedAt: row.executedAt,
+      status: parseEnumValue(RunStatus, row.status, 'run status'),
+      hasChanges: parseEnumValue(ChangeStatus, row.hasChanges, 'change status'),
+      durationMs: row.durationMs,
+      contractRevision: row.contractRevision,
+      errorMessage: row.errorMessage,
+      extractedData: row.extractedData,
+    }));
   }
 
   async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {

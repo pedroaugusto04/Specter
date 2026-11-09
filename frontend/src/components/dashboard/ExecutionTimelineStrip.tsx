@@ -2,15 +2,17 @@
 
 import { orderedRuns } from '@/lib/chartUtils';
 import * as React from 'react';
-import type { JobRunDto } from '@/lib/api';
+import type { JobRunDto, JobTimeseriesPointDto } from '@/lib/api';
 import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { formatCompactDate, formatDateTime } from '@/lib/utils';
 
+export type TimelineStripPoint = JobRunDto | JobTimeseriesPointDto;
+
 interface ExecutionTimelineStripProps {
-  runs: JobRunDto[];
+  runs: TimelineStripPoint[];
   timeZone?: string;
   selectedRunId?: string | null;
-  onSelectRun?: (run: JobRunDto) => void;
+  onSelectRun?: (run: TimelineStripPoint) => void;
 }
 
 export function ExecutionTimelineStrip({
@@ -20,7 +22,7 @@ export function ExecutionTimelineStrip({
   onSelectRun,
 }: ExecutionTimelineStripProps) {
   const [tooltipState, setTooltipState] = React.useState<{
-    run: JobRunDto;
+    run: TimelineStripPoint;
     x: number;
     y: number;
     align: 'left' | 'center' | 'right';
@@ -169,7 +171,9 @@ export function ExecutionTimelineStrip({
             </div>
             <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
               {tooltipState.run.durationMs !== null && <span>{tooltipState.run.durationMs}ms</span>}
-              {tooltipState.run.httpStatus && <span>HTTP {tooltipState.run.httpStatus}</span>}
+              {'httpStatus' in tooltipState.run && tooltipState.run.httpStatus ? (
+                <span>HTTP {tooltipState.run.httpStatus}</span>
+              ) : null}
               <span className="text-primary underline">Click to inspect</span>
             </div>
           </div>

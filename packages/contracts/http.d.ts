@@ -135,6 +135,23 @@ export interface JobRunsDto {
   pagination: PaginationMeta;
   summary: JobRunsSummaryDto;
 }
+export type TimeseriesRange = '24h' | '7d' | '30d' | 'all';
+export interface JobTimeseriesPointDto {
+  id: string;
+  executedAt: string;
+  status: RunStatus;
+  hasChanges: ChangeStatus;
+  durationMs: number | null;
+  contractRevision: string | null;
+  errorMessage: string | null;
+  values: Record<string, string | number | boolean | null>;
+}
+export interface JobTimeseriesDto {
+  jobId: string;
+  range: TimeseriesRange;
+  totalPoints: number;
+  points: JobTimeseriesPointDto[];
+}
 export interface SessionCheckDto {
   hasSession: boolean;
   session: SessionDto | null;

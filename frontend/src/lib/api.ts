@@ -2,17 +2,24 @@ import type {
   CreateJobRequest,
   DashboardStatsDto as DashboardStats,
   JobRunsDto,
+  JobTimeseriesDto,
   JobStatus,
   ProbeUrlDto,
   ScrapingJobDto,
   SessionDto,
+  TimeseriesRange,
   UpdateIntegrationsRequest,
   UpdateJobRequest,
   UserDto,
   UserIntegrationsDto,
 } from '@specter/contracts';
 export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
-export type { JobRunsDto } from '@specter/contracts';
+export type {
+  JobRunsDto,
+  JobTimeseriesDto,
+  JobTimeseriesPointDto,
+  TimeseriesRange,
+} from '@specter/contracts';
 export type {
   ExtractionPlan,
   TriggerMatchMode,
@@ -245,6 +252,10 @@ export const api = {
       pageSize: String(pageSize),
     });
     return request<JobRunsDto>(`/api/jobs/${id}/runs?${params.toString()}`);
+  },
+
+  getJobTimeseries(id: string, range: TimeseriesRange = 'all'): Promise<JobTimeseriesDto> {
+    return request<JobTimeseriesDto>(`/api/jobs/${id}/timeseries?range=${range}`);
   },
 
   getSessions(): Promise<SessionDto[]> {

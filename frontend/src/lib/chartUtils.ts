@@ -4,14 +4,17 @@ import {
   FieldType,
   RunStatus,
   type JobRunDto,
+  type JobTimeseriesPointDto,
   type IntentField,
 } from '@specter/contracts';
 
 export const SCALE_MODE = { Adjusted: 'adjusted', Zero: 'zero' } as const;
 export const TEXT_MODE = { Events: 'events', States: 'states' } as const;
 export type TimelineFields = Record<string, Pick<IntentField, 'type' | 'displayName' | 'locale'>>;
+export type RunObservationSource = JobRunDto | JobTimeseriesPointDto;
+
 export interface Observation {
-  run: JobRunDto;
+  run: RunObservationSource;
   timestamp: number;
   value: string | number | boolean | null;
   previous: Observation | null;
@@ -19,7 +22,7 @@ export interface Observation {
   delta: number | null;
   percent: number | null;
 }
-export function orderedRuns(runs: JobRunDto[]): JobRunDto[] {
+export function orderedRuns<T extends { executedAt: string; id: string }>(runs: T[]): T[] {
   return [...runs].sort(
     (a, b) => Date.parse(a.executedAt) - Date.parse(b.executedAt) || a.id.localeCompare(b.id)
   );
@@ -31,7 +34,7 @@ function matchesFieldType(val: unknown, type: IntentField['type']): boolean {
 }
 
 export function fieldObservations(
-  runs: JobRunDto[],
+  runs: RunObservationSource[],
   field: string,
   type: IntentField['type'],
   revision: string | null
@@ -39,16 +42,25 @@ export function fieldObservations(
   let previous: Observation | null = null;
   return orderedRuns(runs).map((run) => {
     const timestamp = Date.parse(run.executedAt);
-    const data = run.extractedData;
     const isValidRun =
       run.status === RunStatus.Success &&
       Number.isFinite(timestamp) &&
-      (!revision || run.contractRevision === revision) &&
-      data !== null &&
-      !isCollectionPayload(data);
+      (!revision || run.contractRevision === revision);
 
-    const raw = isValidRun ? data[field] : null;
-    const value = matchesFieldType(raw, type) ? raw! : null;
+    let raw: unknown = null;
+    if (isValidRun) {
+      if ('values' in run && run.values) {
+        raw = run.values[field];
+      } else if (
+        'extractedData' in run &&
+        run.extractedData !== null &&
+        !isCollectionPayload(run.extractedData)
+      ) {
+        raw = (run.extractedData as Record<string, unknown>)[field];
+      }
+    }
+
+    const value = matchesFieldType(raw, type) ? (raw as string | number | boolean) : null;
 
     const delta =
       typeof value === 'number' && typeof previous?.value === 'number'

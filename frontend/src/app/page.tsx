@@ -118,6 +118,19 @@ export default function DashboardPage() {
     }
   }, [user, invalidateJobsAndStats]);
 
+  // Automatically open job drawer if redirected via email alert with ?jobId=...
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !jobs.length || modals.selectedJob) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetJobId = params.get('jobId');
+    if (!targetJobId) return;
+
+    const matched = jobs.find((j) => j.id === targetJobId);
+    if (matched) {
+      modals.openJobHistory(matched);
+    }
+  }, [jobs, modals.selectedJob, modals.openJobHistory]);
+
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([refetchJobs(), refetchStats()]);
   }, [refetchJobs, refetchStats]);

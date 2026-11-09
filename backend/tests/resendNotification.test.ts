@@ -67,7 +67,8 @@ describe('Specter Resend Notifications & Email Template', () => {
       // Target Metadata
       expect(html).toContain('https://store.example.com/product/123');
       expect(html).toContain('Extract title, promotional price and stock availability');
-      expect(html).not.toContain('01923456-789a-bcde-f012-3456789abcde');
+      expect(html).not.toContain('Job ID:');
+      expect(html).toContain('See more on Specter');
 
       // Change Badges & Values
       expect(html).toContain('Modified');
@@ -91,6 +92,7 @@ describe('Specter Resend Notifications & Email Template', () => {
       expect(text).toContain('[SPECTER]');
       expect(text).toContain('https://store.example.com/product/123');
       expect(text).toContain('price: "$ 499.00" → "$ 399.00"');
+      expect(text).toContain('See more on Specter:');
       expect(text).not.toContain('Job ID:');
     });
 
