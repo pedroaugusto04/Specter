@@ -11,9 +11,17 @@ export function matchesRecord(record: Record<string, Scalar>, filters: RecordFil
       case TriggerOperator.NotEqual:
         return actual !== value;
       case TriggerOperator.Contains:
-        return typeof actual === 'string' && typeof value === 'string' && actual.includes(value);
+        return (
+          typeof actual === 'string' &&
+          typeof value === 'string' &&
+          actual.toLowerCase().includes(value.toLowerCase())
+        );
       case TriggerOperator.NotContains:
-        return typeof actual === 'string' && typeof value === 'string' && !actual.includes(value);
+        return (
+          typeof actual === 'string' &&
+          typeof value === 'string' &&
+          !actual.toLowerCase().includes(value.toLowerCase())
+        );
       case TriggerOperator.LessThan:
         return typeof actual === 'number' && typeof value === 'number' && actual < value;
       case TriggerOperator.LessThanOrEqual:

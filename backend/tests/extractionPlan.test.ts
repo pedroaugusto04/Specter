@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { extractionPlanSchema, normalizeExtractionCandidate } from '../src/types/extractionPlan.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../src/extraction/values.js';
+import { matchesRecord } from '../src/extraction/recordFilter.js';
 import { evaluateTriggerRules } from '../src/utils/triggerEvaluator.js';
 import { fixtureExecutor, fixturePlan, fixturePolicy } from './helpers/extractionFixtures.js';
 
@@ -274,6 +275,23 @@ describe('Extraction contract and integrity', () => {
       input
     );
     expect(result.records[0]).toEqual({ count: 42, active: 99 });
+  });
+  it('evaluates contains and not_contains filters case-insensitively', () => {
+    expect(
+      matchesRecord({ status: 'EM ESTOQUE' }, [
+        { field: 'status', operator: 'contains', value: 'em estoque' },
+      ])
+    ).toBe(true);
+    expect(
+      matchesRecord({ status: 'Disponível' }, [
+        { field: 'status', operator: 'not_contains', value: 'indisponível' },
+      ])
+    ).toBe(true);
+    expect(
+      matchesRecord({ status: 'Esgotado' }, [
+        { field: 'status', operator: 'contains', value: 'em estoque' },
+      ])
+    ).toBe(false);
   });
   it('keeps graph/list entities distinct and recognizes Schema.org URLs', () => {
     const structured = fixturePlan({

@@ -169,10 +169,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           response.request().frame() === page.mainFrame()
         )
           httpStatus = response.status();
-        if (
-          responses.length + responseTasks.size >= 20 ||
-          !(response.headers()['content-type'] ?? '').includes('json')
-        )
+        if (!(response.headers()['content-type'] ?? '').includes('json'))
           return;
         const task = (async () => {
           try {
