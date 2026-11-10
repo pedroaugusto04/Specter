@@ -297,13 +297,20 @@ export function JobRunsDrawer({
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {runs.map((run) => {
+                  {runs.map((run, index) => {
                     const parsedError = run.errorMessage
                       ? parseErrorMessage(run.errorMessage)
                       : run.status === RUN_STATUS.Failed
                         ? USER_FAILURES.requestFailed
                         : null;
                     const isSelected = selectedRunId === run.id;
+
+                    const priorRun = runs.slice(index + 1).find((r) => Boolean(r.screenshotUrl));
+                    const previousScreenshot = priorRun?.screenshotUrl;
+                    const isChangeWithDiff =
+                      run.hasChanges === CHANGE_STATUS.Changed &&
+                      Boolean(run.screenshotUrl) &&
+                      Boolean(previousScreenshot);
 
                     return (
                       <div
@@ -363,9 +370,18 @@ export function JobRunsDrawer({
                         {run.screenshotUrl && (
                           <div className="mt-3 overflow-hidden rounded-md border border-border bg-muted/20">
                             <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                              <span className="flex items-center gap-1.5">
-                                <Camera className="h-3.5 w-3.5 text-primary" />
-                                Visual Diff Screenshot
+                              <span className="flex items-center gap-1.5 font-mono">
+                                {isChangeWithDiff ? (
+                                  <>
+                                    <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                                    Visual Diff (Before vs After)
+                                  </>
+                                ) : (
+                                  <>
+                                    <Camera className="h-3.5 w-3.5 text-primary" />
+                                    Visual Snapshot Proof
+                                  </>
+                                )}
                               </span>
                               <button
                                 type="button"
@@ -376,16 +392,34 @@ export function JobRunsDrawer({
                                 Zoom
                               </button>
                             </div>
-                            <div
-                              className="relative cursor-pointer overflow-hidden max-h-48"
-                              onClick={() => setSelectedScreenshot(run.screenshotUrl)}
-                            >
-                              <img
-                                src={run.screenshotUrl}
-                                alt="Visual snapshot"
-                                className="w-full object-cover object-top"
-                                loading="lazy"
-                              />
+                            <div className="p-3">
+                              {isChangeWithDiff && previousScreenshot ? (
+                                <VisualDiffSlider
+                                  previousUrl={previousScreenshot}
+                                  currentUrl={run.screenshotUrl}
+                                  previousLabel="Previous"
+                                  currentLabel="Current"
+                                  previousDate={
+                                    priorRun
+                                      ? formatDateTime(priorRun.executedAt, timeZone)
+                                      : undefined
+                                  }
+                                  currentDate={formatDateTime(run.executedAt, timeZone)}
+                                  onOpenZoom={(url) => setSelectedScreenshot(url)}
+                                />
+                              ) : (
+                                <div
+                                  className="relative cursor-pointer overflow-hidden rounded-lg max-h-60"
+                                  onClick={() => setSelectedScreenshot(run.screenshotUrl)}
+                                >
+                                  <img
+                                    src={run.screenshotUrl}
+                                    alt="Visual snapshot"
+                                    className="w-full object-cover object-top"
+                                    loading="lazy"
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
