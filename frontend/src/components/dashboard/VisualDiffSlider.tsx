@@ -115,7 +115,6 @@ export function VisualDiffSlider({
 
       {/* Helper caption & Range Slider fallback for accessibility / precise touch */}
       <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground px-1">
-        <span>Arraste para a direita para revelar o Atual (Direita: Atual • Esquerda: Anterior)</span>
         {onOpenZoom && (
           <div className="flex items-center gap-2">
             <button
@@ -123,7 +122,7 @@ export function VisualDiffSlider({
               onClick={() => onOpenZoom(previousUrl)}
               className="hover:text-primary transition-colors cursor-pointer"
             >
-              Zoom Anterior
+              View Previous
             </button>
             <span>•</span>
             <button
@@ -131,7 +130,7 @@ export function VisualDiffSlider({
               onClick={() => onOpenZoom(currentUrl)}
               className="hover:text-primary transition-colors cursor-pointer"
             >
-              Zoom Atual
+              View Current
             </button>
           </div>
         )}
