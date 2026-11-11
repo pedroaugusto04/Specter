@@ -189,7 +189,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(webhookSent).toBe(true);
   });
 
-  it('NotificationDispatcher respects job-specific webhookUrl override and signs with user integration secret', async () => {
+  it('NotificationDispatcher respects job-specific webhookUrl override and does not fall back to global secret when monitor has no secret', async () => {
     const emailProvider = new MockNotificationProvider();
     const integrationRepo = new InMemoryIntegrationRepository();
     await integrationRepo.upsert('user-123', {
@@ -221,6 +221,41 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
 
     expect(deliveredUrl).toBe('https://custom-job-webhook.org/endpoint');
+    expect(deliveredSignature).toBe('');
+  });
+
+  it('NotificationDispatcher signs with user integration secret when using global webhook URL', async () => {
+    const emailProvider = new MockNotificationProvider();
+    const integrationRepo = new InMemoryIntegrationRepository();
+    await integrationRepo.upsert('user-123', {
+      webhookEnabled: true,
+      webhookUrl: 'https://global-webhook.org/endpoint',
+      webhookSecret: 'my-integration-secret',
+    });
+
+    let deliveredUrl = '';
+    let deliveredSignature = '';
+    global.fetch = vi.fn().mockImplementation(async (url, init) => {
+      deliveredUrl = String(url);
+      deliveredSignature =
+        (init?.headers as Record<string, string>)?.['X-Specter-Signature-256'] ?? '';
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+
+    const dispatcher = new NotificationDispatcher({
+      emailProvider,
+      telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
+      webhookProvider: new WebhookNotificationProvider(),
+      integrationRepository: integrationRepo,
+    });
+
+    const deliveries = await dispatcher.prepare({
+      ...sampleAlert,
+      to: '',
+    });
+    for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
+
+    expect(deliveredUrl).toBe('https://global-webhook.org/endpoint');
     expect(deliveredSignature).toMatch(/^sha256=[0-9a-f]{64}$/);
   });
 

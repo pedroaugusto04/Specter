@@ -41,12 +41,17 @@ export class NotificationDispatcher implements IAlertRouter, IAlertSender {
     if (delivery.channel === 'telegram')
       return this.deps.telegramProvider.sendAlert(payload, { chatId: delivery.destination });
     if (delivery.channel === 'webhook') {
-      const integration = payload.userId
-        ? await this.deps.integrationRepository.findByUserId(payload.userId)
-        : null;
+      const hasCustomWebhookUrl = Boolean(payload.webhookUrl?.trim());
+      const integration =
+        !hasCustomWebhookUrl && payload.userId
+          ? await this.deps.integrationRepository.findByUserId(payload.userId)
+          : null;
+      const secret = hasCustomWebhookUrl
+        ? payload.webhookSecret?.trim() || undefined
+        : integration?.webhookSecret?.trim() || undefined;
       return this.deps.webhookProvider.sendAlert(payload, {
         webhookUrl: delivery.destination,
-        secret: payload.webhookSecret ?? integration?.webhookSecret,
+        secret,
       });
     }
     const unsupported: never = delivery.channel;
