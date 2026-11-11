@@ -50,7 +50,7 @@ export class IntegrationService {
     return { ...dto, botUsername };
   }
 
-  async testTelegram(input: { chatId: string }): Promise<TelegramTestResult> {
+  async testTelegram(input: { chatId: string; timezone?: string }): Promise<TelegramTestResult> {
     return this.telegramProvider.sendTestMessage(input);
   }
 

@@ -1,5 +1,6 @@
 import type { AlertPayload } from './notification.interface.js';
 import { env } from '../../config/env.js';
+import { formatEmailDateTime } from '../../utils/dateFormatter.js';
 
 function escapeHtml(value: unknown): string {
   if (value === null || value === undefined) return '—';
@@ -12,27 +13,12 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-function formatDate(date: Date | string | undefined): string {
-  const d = date ? new Date(date) : new Date();
-  try {
-    return (
-      new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'medium',
-        timeZone: 'UTC',
-      }).format(d) + ' (UTC)'
-    );
-  } catch {
-    return d.toISOString();
-  }
-}
-
 /**
  * Builds a responsive, enterprise-grade HTML email with Specter brand identity,
  * clean typography, change comparison tables, and full snapshot details.
  */
 export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; text: string } {
-  const formattedDate = formatDate(payload.detectedAt);
+  const formattedDate = formatEmailDateTime(payload.detectedAt, payload.timezone);
   const totalChanges = payload.diffSummary.totalChanges;
   const changeNoun = totalChanges === 1 ? 'change detected' : 'changes detected';
 
@@ -45,7 +31,9 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
   const specterBaseUrl = (env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
   const specterUrl =
     payload.specterUrl ??
-    (payload.jobId ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}` : specterBaseUrl);
+    (payload.jobId
+      ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}`
+      : specterBaseUrl);
 
   const diffRowsHtml = allChanges
     .map((change) => {

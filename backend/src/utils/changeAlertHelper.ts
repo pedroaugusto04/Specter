@@ -25,6 +25,7 @@ export interface BuildChangeAlertOptions {
   triggerMatchMode?: TriggerMatchMode;
   screenshotUrl?: string | null;
   subjectSuffix?: string; // e.g. ' (Self-healing)'
+  timezone?: string;
 }
 
 /**
@@ -84,5 +85,6 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
     data: currentData,
     triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
     screenshotUrl: screenshotUrl ?? undefined,
+    timezone: options.timezone,
   };
 }

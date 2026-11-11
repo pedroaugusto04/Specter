@@ -94,6 +94,23 @@ describe('Specter Resend Notifications & Email Template', () => {
       expect(text).toContain('price: "$ 499.00" → "$ 399.00"');
       expect(text).toContain('See more on Specter:');
       expect(text).not.toContain('Job ID:');
+      // Date formatting defaults to America/Sao_Paulo instead of UTC
+      expect(html).toContain('(America/Sao_Paulo)');
+      expect(text).toContain('(America/Sao_Paulo)');
+      expect(html).not.toContain('(UTC)');
+      expect(text).not.toContain('(UTC)');
+    });
+
+    it('formats change date using the provided user timezone', () => {
+      const nyPayload: AlertPayload = {
+        ...samplePayload,
+        timezone: 'America/New_York',
+      };
+      const { html, text } = buildSpecterAlertEmail(nyPayload);
+      expect(html).toContain('(America/New_York)');
+      expect(text).toContain('(America/New_York)');
+      // 10:30 UTC is 05:30 in America/New_York (EST)
+      expect(html).toMatch(/5:30:00\s*(AM)?/i);
     });
 
     it('escapes unsafe HTML to prevent injection vulnerabilities', () => {

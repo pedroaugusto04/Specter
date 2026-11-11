@@ -87,6 +87,7 @@ async function bootstrap(): Promise<void> {
     telegramProvider,
     webhookProvider,
     integrationRepository,
+    userRepository,
   });
 
   const compilationService = new CompilationService({

@@ -14,7 +14,7 @@ import {
   type TimelineFields,
   type RunObservationSource,
 } from '@/lib/chartUtils';
-import { formatDateTime } from '@/lib/utils';
+import { DEFAULT_TIMEZONE, formatDateTime } from '@/lib/utils';
 import { formatObservedNumber } from '@/lib/numberFormatting';
 import { NumericObservations } from './NumericObservations';
 import { StateObservations } from './StateObservations';
@@ -41,7 +41,7 @@ export function ExecutionTimelineChart({
   fields,
   revision,
   identityFields,
-  timeZone = 'UTC',
+  timeZone = DEFAULT_TIMEZONE,
   summary,
   timeRange: controlledTimeRange,
   onTimeRangeChange,

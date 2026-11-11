@@ -13,6 +13,7 @@ export interface AlertPayload {
   diffSummary: DiffSummary;
   data: ExtractedPayload;
   userId?: string;
+  timezone?: string;
   webhookUrl?: string | null;
   webhookSecret?: string | null;
   triggerReasons?: string[];
@@ -27,6 +28,7 @@ export interface INotificationProvider {
 
 export interface TelegramSendOptions {
   chatId: string;
+  timezone?: string;
 }
 
 export interface TelegramTestResult {
@@ -37,7 +39,7 @@ export interface TelegramTestResult {
 export interface ITelegramNotificationProvider {
   readonly name: string;
   sendAlert(payload: AlertPayload, options: TelegramSendOptions): Promise<void>;
-  sendTestMessage(input: { chatId: string }): Promise<TelegramTestResult>;
+  sendTestMessage(input: TelegramSendOptions): Promise<TelegramTestResult>;
   getBotUsername?(): Promise<string | null>;
 }
 

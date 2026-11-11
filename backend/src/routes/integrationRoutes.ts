@@ -41,8 +41,12 @@ export function registerIntegrationRoutes(
     '/api/integrations/telegram/test',
     { preHandler: [withAuth] },
     async (request, reply) => {
+      const user = requireUser(request);
       const input = testTelegramSchema.parse(request.body);
-      const result = await integrationService.testTelegram(input);
+      const result = await integrationService.testTelegram({
+        ...input,
+        timezone: user.timezone,
+      });
 
       if (!result.ok) {
         return reply.status(400).send({

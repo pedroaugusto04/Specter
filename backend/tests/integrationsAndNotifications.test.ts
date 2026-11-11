@@ -77,21 +77,48 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(capturedBody!.parse_mode).toBe('HTML');
     expect(capturedBody!.text).toContain('<b>[Specter] 1 change detected</b>');
     expect(capturedBody!.text).toContain('<s>$100</s> ➔ <b>$80</b>');
+    // Telegram alert defaults to America/Sao_Paulo
+    expect(capturedBody!.text).toContain('(America/Sao_Paulo)');
+    expect(capturedBody!.text).not.toContain('UTC');
+  });
+
+  it('TelegramNotificationProvider formats alert with custom payload timezone', async () => {
+    let capturedBody: Record<string, unknown> | null = null;
+    global.fetch = vi.fn().mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse(init.body as string);
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+
+    const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
+    await telegramProvider.sendAlert(
+      { ...sampleAlert, timezone: 'America/New_York' },
+      { chatId: '987654321' }
+    );
+
+    expect(capturedBody!.text).toContain('(America/New_York)');
+    expect(capturedBody!.text).not.toContain('UTC');
   });
 
   it('TelegramNotificationProvider sends a test message successfully', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ ok: true }),
+    let capturedBody: Record<string, unknown> | null = null;
+    global.fetch = vi.fn().mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse(init.body as string);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      };
     });
 
     const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
     const result = await telegramProvider.sendTestMessage({
       chatId: '12345',
+      timezone: 'America/Sao_Paulo',
     });
 
     expect(result.ok).toBe(true);
+    expect(capturedBody!.text).toContain('(America/Sao_Paulo)');
+    expect(capturedBody!.text).not.toContain('UTC');
   });
 
   it('WebhookNotificationProvider dispatches payload with HMAC-SHA256 signature when secret is provided', async () => {
@@ -187,6 +214,45 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(emailProvider.sentAlerts).toHaveLength(1);
     expect(telegramSent).toBe(true);
     expect(webhookSent).toBe(true);
+  });
+
+  it('NotificationDispatcher enriches deliveries with user timezone from userRepository and falls back to America/Sao_Paulo', async () => {
+    const emailProvider = new MockNotificationProvider();
+    const integrationRepo = new InMemoryIntegrationRepository();
+    const userRepo = new InMemoryUserRepository();
+    const user = await userRepo.createUser({
+      email: 'user-tz@example.com',
+      timezone: 'Europe/Lisbon',
+    });
+
+    const dispatcher = new NotificationDispatcher({
+      emailProvider,
+      telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
+      webhookProvider: new WebhookNotificationProvider(),
+      integrationRepository: integrationRepo,
+      userRepository: userRepo,
+    });
+
+    const deliveries = await dispatcher.prepare({
+      ...sampleAlert,
+      userId: user.id,
+      timezone: undefined,
+    });
+
+    expect(deliveries.length).toBeGreaterThan(0);
+    expect(deliveries[0]!.payload.timezone).toBe('Europe/Lisbon');
+
+    // Deliver and verify email provider receives payload with resolved timezone
+    await dispatcher.deliver(deliveries[0]!, crypto.randomUUID());
+    expect(emailProvider.sentAlerts[0]!.timezone).toBe('Europe/Lisbon');
+
+    // Without user in repository, falls back to America/Sao_Paulo
+    const fallbackDeliveries = await dispatcher.prepare({
+      ...sampleAlert,
+      userId: 'non-existent-user',
+      timezone: undefined,
+    });
+    expect(fallbackDeliveries[0]!.payload.timezone).toBe('America/Sao_Paulo');
   });
 
   it('NotificationDispatcher respects job-specific webhookUrl override and does not fall back to global secret when monitor has no secret', async () => {

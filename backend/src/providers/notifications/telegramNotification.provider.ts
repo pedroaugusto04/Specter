@@ -1,5 +1,6 @@
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
+import { formatNotificationDateTime } from '../../utils/dateFormatter.js';
 import type {
   AlertPayload,
   ITelegramNotificationProvider,
@@ -99,9 +100,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       }
     }
 
-    const detectedTime = payload.detectedAt
-      ? payload.detectedAt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
-      : new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    const detectedTime = formatNotificationDateTime(payload.detectedAt, payload.timezone);
     lines.push(`⏱ <b>Time:</b> ${detectedTime}`);
     lines.push('');
     lines.push('<b>Detected Changes:</b>');
@@ -150,13 +149,14 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
   async sendTestMessage(options: TelegramSendOptions): Promise<TelegramTestResult> {
     try {
       const token = this.resolveToken();
+      const sentAt = formatNotificationDateTime(new Date(), options.timezone);
       const text = [
         '✅ <b>Specter Telegram Integration Test</b>',
         '',
         'Your Telegram notification channel is successfully connected to <b>Specter</b>!',
         'Future monitor alerts and self-healing updates will be delivered here in real time.',
         '',
-        `<i>Sent at: ${new Date().toISOString()}</i>`,
+        `<i>Sent at: ${sentAt}</i>`,
       ].join('\n');
 
       await this.postMessage(token, options.chatId, text);

@@ -23,6 +23,7 @@ interface SuccessfulRunInput {
   startedAt: number;
   logContext: string;
   subjectSuffix?: string;
+  timezone?: string;
 }
 /** Common preparation; callers retain lifecycle decisions and the atomic commit. */
 export class SuccessfulRunService {
@@ -55,6 +56,7 @@ export class SuccessfulRunService {
             triggerMatchMode: plan.intent.triggerMatchMode,
             screenshotUrl,
             subjectSuffix: input.subjectSuffix,
+            timezone: input.timezone,
           })
         : null;
     const deliveries = alert ? await this.deps.alertRouter.prepare(alert) : [];
