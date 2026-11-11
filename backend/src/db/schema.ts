@@ -69,6 +69,7 @@ export const scrapingJobs = pgTable(
     userPrompt: text('user_prompt').notNull(),
     notificationEmail: text('notification_email'),
     webhookUrl: text('webhook_url'),
+    webhookSecret: text('webhook_secret'),
 
     // Scheduling
     cronExpression: text('cron_expression').notNull().default('0 */6 * * *'),

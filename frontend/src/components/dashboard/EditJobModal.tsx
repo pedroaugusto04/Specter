@@ -35,6 +35,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     setNotificationEmail,
     setShowCustomWebhook,
     setWebhookUrl,
+    setWebhookSecret,
     setCaptureScreenshotOnChange,
     setTriggerRules,
     setTriggerMatchMode,
@@ -47,6 +48,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     notificationEmail,
     showCustomWebhook,
     webhookUrl,
+    webhookSecret,
     captureScreenshotOnChange,
     cronPreset,
     customCron,
@@ -56,6 +58,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   } = values;
   const updateJobMutation = useUpdateJobMutation();
   const [showTriggerHelp, setShowTriggerHelp] = React.useState(false);
+  const [clearWebhookSecret, setClearWebhookSecret] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -64,7 +67,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   React.useEffect(() => {
     if (job && isOpen) {
       resetForm(jobToForm(job, user?.email));
-
+      setClearWebhookSecret(false);
       setFieldErrors({});
       setGlobalError(null);
     }
@@ -91,9 +94,11 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       userPrompt.trim() !== job.userPrompt ||
       (sendEmailAlerts ? notificationEmail.trim() : '') !== (job.notificationEmail || '') ||
       sendEmailAlerts !==
-      Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
+        Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
       (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
       showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
+      Boolean(webhookSecret.trim()) ||
+      clearWebhookSecret ||
       captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
       effectiveCron.trim() !== job.cronExpression ||
       rulesChanged)
@@ -157,7 +162,10 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
 
     setLoading(true);
     try {
-      await updateJobMutation.mutateAsync({ id: job.id, payload: formToUpdateJob(values) });
+      await updateJobMutation.mutateAsync({
+        id: job.id,
+        payload: formToUpdateJob(values, { clearWebhookSecret }),
+      });
 
       onUpdated();
       onClose();
@@ -459,7 +467,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                             operator: newOp,
                             value:
                               job?.extractionPlan?.intent.fields[rule.field]?.type ===
-                                FieldType.Boolean
+                              FieldType.Boolean
                                 ? false
                                 : '',
                           };
@@ -688,6 +696,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                 setShowCustomWebhook(e.target.checked);
                 if (!e.target.checked) {
                   setWebhookUrl('');
+                  setWebhookSecret('');
+                  setClearWebhookSecret(false);
                 }
               }}
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
@@ -698,19 +708,58 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
           </label>
 
           {showCustomWebhook && (
-            <FormField
-              label="Custom Webhook URL"
-              htmlFor="edit-job-webhook"
-              hint="Optional. Custom endpoint URL for this specific monitor."
-            >
-              <Input
-                id="edit-job-webhook"
-                type="url"
-                placeholder="https://your-domain.com/webhook (optional)"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-              />
-            </FormField>
+            <div className="space-y-4">
+              <FormField
+                label="Custom Webhook URL"
+                htmlFor="edit-job-webhook"
+                hint="Optional. Custom endpoint URL for this specific monitor."
+              >
+                <Input
+                  id="edit-job-webhook"
+                  type="url"
+                  placeholder="https://your-domain.com/webhook (optional)"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                />
+              </FormField>
+
+              <FormField
+                label="Signing Secret (Optional HMAC-SHA256)"
+                htmlFor="edit-job-webhook-secret"
+                hint="When configured, payloads are signed with header X-Specter-Signature-256 for integrity verification."
+              >
+                <Input
+                  id="edit-job-webhook-secret"
+                  type="password"
+                  placeholder={
+                    job?.hasWebhookSecret
+                      ? 'Secret configured; leave blank to keep it'
+                      : 'whsec_xxxxxxxxxxxxxxxx (optional)'
+                  }
+                  value={webhookSecret}
+                  onChange={(e) => {
+                    setWebhookSecret(e.target.value);
+                    setClearWebhookSecret(false);
+                  }}
+                  className="font-mono text-xs sm:text-sm"
+                />
+              </FormField>
+
+              {job?.hasWebhookSecret && (
+                <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={clearWebhookSecret}
+                    onChange={(event) => {
+                      setClearWebhookSecret(event.target.checked);
+                      setWebhookSecret('');
+                    }}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+                  />
+                  Remove the configured signing secret
+                </label>
+              )}
+            </div>
           )}
 
           <label className="flex items-center gap-2 cursor-pointer select-none">

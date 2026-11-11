@@ -1,4 +1,4 @@
-import { CRON_PRESETS } from '@/lib/cronPresets';
+import { CRON_PRESETS, type CronPreset } from '../lib/cronPresets.js';
 import type {
   CreateJobRequest,
   ScrapingJobDto,
@@ -16,6 +16,7 @@ export interface JobFormValues {
   notificationEmail: string;
   showCustomWebhook: boolean;
   webhookUrl: string;
+  webhookSecret: string;
   captureScreenshotOnChange: boolean;
   cronPreset: string;
   customCron: string;
@@ -32,6 +33,7 @@ export function emptyJobForm(): JobFormValues {
     notificationEmail: '',
     showCustomWebhook: false,
     webhookUrl: '',
+    webhookSecret: '',
     captureScreenshotOnChange: false,
     cronPreset: DEFAULT_JOB_CRON,
     customCron: DEFAULT_JOB_CRON,
@@ -41,7 +43,7 @@ export function emptyJobForm(): JobFormValues {
   };
 }
 export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
-  const preset = CRON_PRESETS.some((item) => item.value === job.cronExpression);
+  const preset = CRON_PRESETS.some((item: CronPreset) => item.value === job.cronExpression);
   return {
     url: job.url,
     name: job.name,
@@ -50,6 +52,7 @@ export function jobToForm(job: ScrapingJobDto, email = ''): JobFormValues {
     notificationEmail: job.notificationEmail || email,
     showCustomWebhook: Boolean(job.webhookUrl?.trim()),
     webhookUrl: job.webhookUrl ?? '',
+    webhookSecret: '',
     captureScreenshotOnChange: job.captureScreenshotOnChange,
     cronPreset: preset ? job.cronExpression : DEFAULT_JOB_CRON,
     customCron: job.cronExpression,
@@ -65,13 +68,23 @@ export function formToCreateJob(form: JobFormValues, fallbackEmail = ''): Create
     userPrompt: form.userPrompt.trim(),
     notificationEmail: form.sendEmailAlerts ? form.notificationEmail.trim() || fallbackEmail : '',
     webhookUrl: form.showCustomWebhook ? form.webhookUrl.trim() || null : null,
+    webhookSecret: form.showCustomWebhook ? form.webhookSecret.trim() || null : null,
     cronExpression: (form.useCustomCron ? form.customCron : form.cronPreset).trim(),
     captureScreenshotOnChange: form.captureScreenshotOnChange,
   };
 }
-export function formToUpdateJob(form: JobFormValues): UpdateJobRequest {
+export function formToUpdateJob(
+  form: JobFormValues,
+  options?: { clearWebhookSecret?: boolean }
+): UpdateJobRequest {
+  const base = formToCreateJob(form);
+  if (form.showCustomWebhook && !options?.clearWebhookSecret && !form.webhookSecret.trim()) {
+    delete base.webhookSecret;
+  } else if (options?.clearWebhookSecret) {
+    base.webhookSecret = null;
+  }
   return {
-    ...formToCreateJob(form),
+    ...base,
     triggerRules: form.triggerRules,
     triggerMatchMode: form.triggerMatchMode,
   };

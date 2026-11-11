@@ -43,6 +43,7 @@ export interface ScrapingJobDto {
   userPrompt: string;
   notificationEmail: string;
   webhookUrl: string | null;
+  hasWebhookSecret?: boolean;
   cronExpression: string;
   extractionPlan: {
     intent: Pick<
@@ -92,6 +93,7 @@ export interface CreateJobRequest {
   userPrompt: string;
   notificationEmail?: string | null;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
 }

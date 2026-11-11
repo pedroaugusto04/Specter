@@ -86,7 +86,7 @@ async function setup() {
     .join('; ');
   const sessionOwner = registration.json().data.id;
   const headers = { cookie };
-  return { app, headers, userId: sessionOwner, integrations };
+  return { app, headers, userId: sessionOwner, integrations, jobs };
 }
 describe('API credential boundaries', () => {
   it('keeps credentials and session cookies out of API responses', async () => {
@@ -129,5 +129,52 @@ describe('API credential boundaries', () => {
       payload: { telegramEnabled: false, webhookEnabled: true, webhookSecret: null },
     });
     expect(clear.json().data.hasWebhookSecret).toBe(false);
+  });
+  it('keeps monitor webhookSecret out of API responses, preserves it on update, and clears it explicitly', async () => {
+    const { app, headers, jobs } = await setup();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      headers,
+      payload: {
+        name: 'Secret Webhook Monitor',
+        url: 'https://example.com/target',
+        userPrompt: 'Track item prices',
+        webhookUrl: 'https://custom-webhook.com/alerts',
+        webhookSecret: 'my-job-hmac-secret-xyz',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json().data;
+    expect(created.hasWebhookSecret).toBe(true);
+    expect(created).not.toHaveProperty('webhookSecret');
+    expect(createRes.body).not.toContain('my-job-hmac-secret-xyz');
+
+    const jobEntity = await jobs.findById(created.id);
+    expect(jobEntity?.webhookSecret).toBe('my-job-hmac-secret-xyz');
+
+    const updateRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${created.id}`,
+      headers,
+      payload: {
+        name: 'Renamed Monitor',
+      },
+    });
+    expect(updateRes.statusCode).toBe(200);
+    expect(updateRes.json().data.hasWebhookSecret).toBe(true);
+    expect((await jobs.findById(created.id))?.webhookSecret).toBe('my-job-hmac-secret-xyz');
+
+    const clearRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${created.id}`,
+      headers,
+      payload: {
+        webhookSecret: null,
+      },
+    });
+    expect(clearRes.statusCode).toBe(200);
+    expect(clearRes.json().data.hasWebhookSecret).toBe(false);
+    expect((await jobs.findById(created.id))?.webhookSecret).toBeNull();
   });
 });

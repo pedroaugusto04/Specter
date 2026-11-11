@@ -26,6 +26,7 @@ export function useJobForm() {
       setShowCustomWebhook: (value: SetStateAction<boolean>) =>
         setField('showCustomWebhook', value),
       setWebhookUrl: (value: SetStateAction<string>) => setField('webhookUrl', value),
+      setWebhookSecret: (value: SetStateAction<string>) => setField('webhookSecret', value),
       setCaptureScreenshotOnChange: (value: SetStateAction<boolean>) =>
         setField('captureScreenshotOnChange', value),
       setTriggerRules: (value: SetStateAction<JobFormValues['triggerRules']>) =>

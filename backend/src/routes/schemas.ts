@@ -39,7 +39,12 @@ export const jobProbeSchema = z.object({
 });
 
 export const jobInputSchema = z.object({
-  name: z.string().trim().min(1, 'Monitor name is required').max(80, 'Monitor name must be 80 characters or fewer').optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Monitor name is required')
+    .max(80, 'Monitor name must be 80 characters or fewer')
+    .optional(),
   userId: z.string().trim().min(1).optional(),
   url: z
     .string({ required_error: 'Target URL is required' })
@@ -71,12 +76,23 @@ export const jobInputSchema = z.object({
     .optional()
     .or(z.literal(''))
     .nullable(),
+  webhookSecret: z
+    .string()
+    .trim()
+    .max(256, 'Webhook secret must not exceed 256 characters')
+    .optional()
+    .nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
   captureScreenshotOnChange: z.boolean().default(false),
 });
 
 export const jobUpdateSchema = z.object({
-  name: z.string().trim().min(1, 'Monitor name is required').max(80, 'Monitor name must be 80 characters or fewer').optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Monitor name is required')
+    .max(80, 'Monitor name must be 80 characters or fewer')
+    .optional(),
   url: z
     .string()
     .trim()
@@ -107,6 +123,12 @@ export const jobUpdateSchema = z.object({
     })
     .optional()
     .or(z.literal(''))
+    .nullable(),
+  webhookSecret: z
+    .string()
+    .trim()
+    .max(256, 'Webhook secret must not exceed 256 characters')
+    .optional()
     .nullable(),
   cronExpression: cronExpressionSchema.optional(),
   captureScreenshotOnChange: z.boolean().optional(),

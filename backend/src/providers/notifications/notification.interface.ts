@@ -14,6 +14,7 @@ export interface AlertPayload {
   data: ExtractedPayload;
   userId?: string;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   triggerReasons?: string[];
   screenshotUrl?: string;
   specterUrl?: string;

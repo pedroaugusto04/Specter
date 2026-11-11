@@ -126,6 +126,7 @@ export class InMemoryJobRepository implements IJobRepository {
       userPrompt: input.userPrompt,
       notificationEmail: input.notificationEmail ?? null,
       webhookUrl: input.webhookUrl ?? null,
+      webhookSecret: input.webhookSecret ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
       extractionPlan: null,
@@ -165,6 +166,10 @@ export class InMemoryJobRepository implements IJobRepository {
         patch.notificationEmail !== undefined
           ? (patch.notificationEmail ?? null)
           : existing.notificationEmail,
+      webhookSecret:
+        patch.webhookSecret !== undefined
+          ? (patch.webhookSecret ?? null)
+          : (existing.webhookSecret ?? null),
       updatedAt: new Date(),
     };
     this.jobs.set(id, updated);
@@ -220,8 +225,7 @@ export class InMemoryJobRepository implements IJobRepository {
     jobId: string,
     range: TimeseriesRange = 'all'
   ): Promise<TimeseriesRowEntity[]> {
-    const hours =
-      range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
+    const hours = range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
     const cutoff = hours ? Date.now() - hours * 3600 * 1000 : null;
     return this.runs
       .filter((r) => r.jobId === jobId && (!cutoff || r.executedAt.getTime() >= cutoff))

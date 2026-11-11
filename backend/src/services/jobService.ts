@@ -9,7 +9,6 @@ import { logger } from '../utils/logger.js';
 import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type {
-  JobRunDto,
   JobRunsDto,
   JobTimeseriesDto,
   ScrapingJobDto,
@@ -114,7 +113,10 @@ export class JobService {
 
     const existingJobs = await this.jobRepository.findAll(undefined, request.userId);
     const name = request.name?.trim() || this.nextMonitorName(existingJobs.map((job) => job.name));
-    this.assertUniqueMonitorName(name, existingJobs.map((job) => job.name));
+    this.assertUniqueMonitorName(
+      name,
+      existingJobs.map((job) => job.name)
+    );
     const createdEntity = await this.jobRepository.createJob({
       userId: request.userId,
       name,
@@ -122,6 +124,7 @@ export class JobService {
       userPrompt: request.userPrompt.trim(),
       notificationEmail: request.notificationEmail?.trim() || null,
       webhookUrl,
+      webhookSecret: request.webhookSecret?.trim() || null,
       cronExpression,
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
@@ -184,6 +187,9 @@ export class JobService {
       patch.webhookUrl = request.webhookUrl?.trim()
         ? await assertSafeUrl(request.webhookUrl.trim(), 'webhookUrl')
         : null;
+    }
+    if (request.webhookSecret !== undefined) {
+      patch.webhookSecret = request.webhookSecret?.trim() || null;
     }
     if (request.captureScreenshotOnChange !== undefined) {
       patch.captureScreenshotOnChange = request.captureScreenshotOnChange;
@@ -279,7 +285,11 @@ export class JobService {
   }
 
   private assertUniqueMonitorName(name: string, existingNames: string[]): void {
-    if (existingNames.some((existing) => existing.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
+    if (
+      existingNames.some(
+        (existing) => existing.trim().toLocaleLowerCase() === name.toLocaleLowerCase()
+      )
+    ) {
       const message = 'A monitor with this name already exists. Choose a unique name.';
       throw new ValidationError(message, [{ field: 'name', message }]);
     }
@@ -362,12 +372,7 @@ export class JobService {
     await this.realtimeService?.notifyJobDeleted(existing.userId, existing.id);
   }
 
-  async getJobRuns(
-    jobId: string,
-    page = 1,
-    pageSize = 20,
-    userId?: string
-  ): Promise<JobRunsDto> {
+  async getJobRuns(jobId: string, page = 1, pageSize = 20, userId?: string): Promise<JobRunsDto> {
     const existing = await this.getOwnedJob(jobId, userId);
 
     const [paginatedResult, summaryStats] = await Promise.all([

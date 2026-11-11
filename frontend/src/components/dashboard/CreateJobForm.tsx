@@ -51,6 +51,7 @@ export function CreateJobForm({
     setNotificationEmail,
     setShowCustomWebhook,
     setWebhookUrl,
+    setWebhookSecret,
     setCaptureScreenshotOnChange,
   } = useJobForm();
   const {
@@ -61,6 +62,7 @@ export function CreateJobForm({
     notificationEmail,
     showCustomWebhook,
     webhookUrl,
+    webhookSecret,
     captureScreenshotOnChange,
     cronPreset,
     customCron,
@@ -110,7 +112,7 @@ export function CreateJobForm({
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
     (sendEmailAlerts && notificationEmail.trim().length > 0) ||
-    (showCustomWebhook && webhookUrl.trim().length > 0) ||
+    (showCustomWebhook && (webhookUrl.trim().length > 0 || webhookSecret.trim().length > 0)) ||
     captureScreenshotOnChange ||
     (useCustomCron && customCron !== '0 */6 * * *')
   );
@@ -286,6 +288,7 @@ export function CreateJobForm({
                   userPrompt: userPrompt.trim(),
                   notificationEmail: sendEmailAlerts ? notificationEmail.trim() : '',
                   webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
+                  webhookSecret: showCustomWebhook ? webhookSecret.trim() || null : null,
                   cronExpression: effectiveCron.trim(),
                 })
               );
@@ -572,6 +575,7 @@ export function CreateJobForm({
               setShowCustomWebhook(e.target.checked);
               if (!e.target.checked) {
                 setWebhookUrl('');
+                setWebhookSecret('');
               }
             }}
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
@@ -582,19 +586,36 @@ export function CreateJobForm({
         </label>
 
         {showCustomWebhook && (
-          <FormField
-            label="Custom Webhook URL"
-            htmlFor="job-webhook"
-            hint="Optional. Destination endpoint URL for this specific monitor."
-          >
-            <Input
-              id="job-webhook"
-              type="url"
-              placeholder="https://your-domain.com/webhook (optional)"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-          </FormField>
+          <div className="space-y-4">
+            <FormField
+              label="Custom Webhook URL"
+              htmlFor="job-webhook"
+              hint="Optional. Destination endpoint URL for this specific monitor."
+            >
+              <Input
+                id="job-webhook"
+                type="url"
+                placeholder="https://your-domain.com/webhook (optional)"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+              />
+            </FormField>
+
+            <FormField
+              label="Signing Secret (Optional HMAC-SHA256)"
+              htmlFor="job-webhook-secret"
+              hint="When configured, payloads are signed with header X-Specter-Signature-256 for integrity verification."
+            >
+              <Input
+                id="job-webhook-secret"
+                type="password"
+                placeholder="whsec_xxxxxxxxxxxxxxxx (optional)"
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                className="font-mono text-xs sm:text-sm"
+              />
+            </FormField>
+          </div>
         )}
       </div>
 

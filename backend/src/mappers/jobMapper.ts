@@ -1,5 +1,11 @@
 import { presentStoredError } from '../utils/errorSanitizer.js';
-import type { ScrapingJobDto, JobRunDto, JobTimeseriesPointDto, ExtractedPayload } from '@specter/contracts';
+import { decryptText } from '../utils/crypto.js';
+import type {
+  ScrapingJobDto,
+  JobRunDto,
+  JobTimeseriesPointDto,
+  ExtractedPayload,
+} from '@specter/contracts';
 import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
 import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
@@ -15,6 +21,7 @@ export const JobMapper = {
       userPrompt: row.userPrompt,
       notificationEmail: row.notificationEmail ?? null,
       webhookUrl: row.webhookUrl ?? null,
+      webhookSecret: decryptText(row.webhookSecret),
       cronExpression: row.cronExpression,
       bullmqRepeatableKey: row.bullmqRepeatableKey ?? null,
       contractRevision: row.contractRevision,
@@ -42,6 +49,7 @@ export const JobMapper = {
       userPrompt: entity.userPrompt,
       notificationEmail: entity.notificationEmail ?? '',
       webhookUrl: entity.webhookUrl ?? null,
+      hasWebhookSecret: Boolean(entity.webhookSecret),
       cronExpression: entity.cronExpression,
       extractionPlan: entity.extractionPlan
         ? {

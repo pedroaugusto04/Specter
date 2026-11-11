@@ -224,6 +224,49 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     expect(deliveredSignature).toMatch(/^sha256=[0-9a-f]{64}$/);
   });
 
+  it('NotificationDispatcher prioritizes job-specific webhookSecret over user integration secret', async () => {
+    const emailProvider = new MockNotificationProvider();
+    const integrationRepo = new InMemoryIntegrationRepository();
+    await integrationRepo.upsert('user-123', {
+      webhookEnabled: true,
+      webhookSecret: 'global-integration-secret',
+    });
+
+    let deliveredUrl = '';
+    let deliveredBody = '';
+    let deliveredSignature = '';
+    global.fetch = vi.fn().mockImplementation(async (url, init) => {
+      deliveredUrl = String(url);
+      deliveredBody = String(init?.body ?? '');
+      deliveredSignature =
+        (init?.headers as Record<string, string>)?.['X-Specter-Signature-256'] ?? '';
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+
+    const dispatcher = new NotificationDispatcher({
+      emailProvider,
+      telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
+      webhookProvider: new WebhookNotificationProvider(),
+      integrationRepository: integrationRepo,
+    });
+
+    const jobSecret = 'job-specific-secret-123';
+    const deliveries = await dispatcher.prepare({
+      ...sampleAlert,
+      to: '',
+      webhookUrl: 'https://job-specific.org/endpoint',
+      webhookSecret: jobSecret,
+    });
+    for (const delivery of deliveries) await dispatcher.deliver(delivery, crypto.randomUUID());
+
+    expect(deliveredUrl).toBe('https://job-specific.org/endpoint');
+    const expectedSignature = `sha256=${crypto
+      .createHmac('sha256', jobSecret)
+      .update(deliveredBody)
+      .digest('hex')}`;
+    expect(deliveredSignature).toBe(expectedSignature);
+  });
+
   it('Integration HTTP REST endpoints allow retrieving and updating integration settings', async () => {
     const jobRepo = new InMemoryJobRepository();
     const jobScheduler = new MockJobScheduler();

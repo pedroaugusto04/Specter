@@ -1,0 +1,1 @@
+ALTER TABLE "scraping_jobs" ADD COLUMN "webhook_secret" text;

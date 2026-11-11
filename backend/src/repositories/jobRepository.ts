@@ -9,6 +9,7 @@ import type { ExtractionPlan } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
 import type { TimeseriesRange } from '@specter/contracts';
+import { encryptText } from '../utils/crypto.js';
 
 export interface CreateJobInput {
   userId?: string;
@@ -17,6 +18,7 @@ export interface CreateJobInput {
   userPrompt: string;
   notificationEmail?: string | null;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   cronExpression: string;
   captureScreenshotOnChange?: boolean;
 }
@@ -27,6 +29,7 @@ export interface UpdateJobPatch {
   userPrompt?: string;
   notificationEmail?: string | null;
   webhookUrl?: string | null;
+  webhookSecret?: string | null;
   cronExpression?: string;
   bullmqRepeatableKey?: string | null;
   contractRevision?: string | null;
@@ -97,10 +100,7 @@ export interface IJobRepository {
     page?: number,
     pageSize?: number
   ): Promise<PaginatedRunsResult>;
-  findTimeseriesByJobId(
-    jobId: string,
-    range?: TimeseriesRange
-  ): Promise<TimeseriesRowEntity[]>;
+  findTimeseriesByJobId(jobId: string, range?: TimeseriesRange): Promise<TimeseriesRowEntity[]>;
   getJobRunsSummary(jobId: string): Promise<JobRunsSummary>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
@@ -124,6 +124,7 @@ export class DrizzleJobRepository implements IJobRepository {
         userPrompt: input.userPrompt,
         notificationEmail: input.notificationEmail ?? null,
         webhookUrl: input.webhookUrl ?? null,
+        webhookSecret: input.webhookSecret != null ? encryptText(input.webhookSecret) : null,
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
         status: JobStatus.PendingCompilation,
@@ -175,10 +176,19 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null> {
+    const encryptedPatch = {
+      ...patch,
+      ...(patch.webhookSecret !== undefined
+        ? {
+            webhookSecret: patch.webhookSecret != null ? encryptText(patch.webhookSecret) : null,
+          }
+        : {}),
+    };
+
     const [row] = await this.db
       .update(scrapingJobs)
       .set({
-        ...patch,
+        ...encryptedPatch,
         updatedAt: new Date(),
       })
       .where(eq(scrapingJobs.id, id))
@@ -310,8 +320,7 @@ export class DrizzleJobRepository implements IJobRepository {
     jobId: string,
     range: TimeseriesRange = 'all'
   ): Promise<TimeseriesRowEntity[]> {
-    const hours =
-      range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
+    const hours = range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
     const cutoffDate = hours ? new Date(Date.now() - hours * 3600 * 1000) : null;
 
     const conditions = [eq(jobRuns.jobId, jobId)];
@@ -353,7 +362,9 @@ export class DrizzleJobRepository implements IJobRepository {
         totalRuns: sql<number>`count(*)::int`,
         changedRuns: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
         lastChange: sql<Date | null>`max(case when ${jobRuns.hasChanges} = ${ChangeStatus.Changed} then ${jobRuns.executedAt} else null end)`,
-        averageDurationMs: sql<number | null>`round(avg(case when ${jobRuns.status} = ${RunStatus.Success} and ${jobRuns.durationMs} is not null then ${jobRuns.durationMs} else null end))::int`,
+        averageDurationMs: sql<
+          number | null
+        >`round(avg(case when ${jobRuns.status} = ${RunStatus.Success} and ${jobRuns.durationMs} is not null then ${jobRuns.durationMs} else null end))::int`,
       })
       .from(jobRuns)
       .where(eq(jobRuns.jobId, jobId));
