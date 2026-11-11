@@ -25,6 +25,20 @@ export function VisualDiffSlider({
   const [sliderPosition, setSliderPosition] = React.useState(50);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const isDragging = React.useRef(false);
+  const [containerWidth, setContainerWidth] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    setContainerWidth(containerRef.current.clientWidth);
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const updatePosition = React.useCallback((clientX: number) => {
     if (!containerRef.current) return;
@@ -64,7 +78,7 @@ export function VisualDiffSlider({
         onPointerCancel={handlePointerUp}
         className="relative select-none overflow-hidden rounded-lg border border-border bg-muted/30 shadow-inner group cursor-ew-resize h-64 sm:h-80"
       >
-        {/* Previous Image (Background / Left) */}
+        {/* Previous Image (Background / Revealed when slider moves left) */}
         <img
           src={previousUrl}
           alt="Previous visual capture"
@@ -72,17 +86,16 @@ export function VisualDiffSlider({
           loading="lazy"
         />
 
-        {/* Current Image (Clipped / Right) */}
+        {/* Current Image (Overlay curtain / Revealed when slider moves right) */}
         <div
-          className="absolute inset-y-0 right-0 overflow-hidden border-l-2 border-primary shadow-[0_0_12px_rgba(0,0,0,0.5)]"
-          style={{ width: `${100 - sliderPosition}%` }}
+          className="absolute inset-y-0 left-0 overflow-hidden border-r-2 border-primary shadow-[0_0_12px_rgba(0,0,0,0.5)]"
+          style={{ width: `${sliderPosition}%` }}
         >
           <div
             className="absolute inset-0 h-full pointer-events-none"
             style={{
-              width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100%',
-              right: 0,
-              left: 'auto',
+              width: containerWidth ? `${containerWidth}px` : '100%',
+              left: 0,
             }}
           >
             <img
@@ -94,7 +107,7 @@ export function VisualDiffSlider({
           </div>
         </div>
 
-        {/* Floating Badges with explicit positional guidance */}
+        {/* Floating Badges with explicit directional guidance */}
         <span className="absolute top-2.5 left-2.5 z-10 rounded bg-background/85 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm border border-border shadow-sm pointer-events-none">
           ← {previousLabel} {previousDate && `(${previousDate})`}
         </span>
