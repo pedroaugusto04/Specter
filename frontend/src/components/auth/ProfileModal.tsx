@@ -89,7 +89,7 @@ export function ProfileModal({
       onClose={onClose}
       title="User Profile"
       description="Manage your account details and view system access status."
-      maxWidthClass="max-w-md sm:max-w-lg"
+      maxWidthClass="max-w-xl sm:max-w-2xl"
     >
       <div className="space-y-6 py-1">
         {/* Profile Card Header */}
@@ -189,7 +189,7 @@ export function ProfileModal({
                 <Mail className="h-3.5 w-3.5" />
                 <span>Email Address</span>
               </div>
-              <span className="font-mono text-foreground truncate max-w-[200px]" title={user.email}>
+              <span className="font-mono text-foreground truncate max-w-xs sm:max-w-sm" title={user.email}>
                 {user.email}
               </span>
             </div>
