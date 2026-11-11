@@ -34,7 +34,10 @@ RUN npm ci --omit=dev --no-audit --no-fund
 RUN npm install --global @openai/codex@0.163.0
 
 # Install Playwright browser binaries with system dependencies
-RUN npx playwright install --with-deps chromium
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    apt-get update && \
+    npx playwright install --with-deps chromium && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy compiled files and migrations
 COPY --from=builder /app/dist ./dist
