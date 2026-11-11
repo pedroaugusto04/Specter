@@ -1,4 +1,4 @@
-import { CRON_PRESETS, type CronPreset } from '../lib/cronPresets.js';
+import { CRON_PRESETS, type CronPreset } from '@/lib/cronPresets';
 import type {
   CreateJobRequest,
   ScrapingJobDto,
