@@ -12,7 +12,7 @@ Generate the minimal adequate strategy required to reliably extract the target d
 - Field IDs: English snake_case. displayName: user's language. observedLabel: literal observed label only.
 - Set mode: "collection" when extracting lists/tables of items; set mode: "single" when extracting a single entity.
 - Include required fields and stable collection identityFields (empty list for single entity).
-- Numbers: infer locale from formatting or currency (e.g. "pt-BR" for R$ or comma decimal, "en-US" for $). Booleans require explicit booleanValues mappings. Use string when type is unsupported by evidence.
+- Numbers: ALWAYS provide the 'locale' property on the field intent (e.g. "en-US" for English pages or comma-separated thousands like "1,000", "pt-BR" for Brazilian currency/numbers like "1.000,00"). Infer locale from page language, currency, or observed formatting. Booleans require explicit booleanValues mappings. Use string when type is unsupported by evidence.
 - Preserve requested alert triggerRules.
 
 ### Strategy & Transport

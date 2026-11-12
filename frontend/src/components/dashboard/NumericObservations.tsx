@@ -35,9 +35,8 @@ export function NumericObservations({
   );
   const labels = axisLabels(ticks);
   const times = observations.map((p) => p.timestamp).filter(Number.isFinite);
-  if (!points.length) return <p>No valid numeric readings.</p>;
-  const start = Math.min(...times),
-    end = Math.max(...times);
+  const start = times.length ? Math.min(...times) : 0;
+  const end = times.length ? Math.max(...times) : 0;
   const magnitude = Math.max(Math.abs(min), Math.abs(max)) || 1;
   const y = (value: number) =>
     180 - ((value / magnitude - min / magnitude) / (max / magnitude - min / magnitude)) * 155;
@@ -61,6 +60,8 @@ export function NumericObservations({
     const firstX = getX(displayPoints[0]!.timestamp);
     return `${stepPath} V 180 H ${firstX} Z`;
   }, [stepPath, displayPoints, start, end]);
+
+  if (!points.length) return <p className="text-sm text-muted-foreground">No valid numeric readings.</p>;
 
   return (
     <div className="space-y-3">

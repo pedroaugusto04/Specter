@@ -1,16 +1,11 @@
 import 'dotenv/config';
-import * as cheerio from 'cheerio';
 import { ConfigurationPipeline } from '../src/extraction/configuration.js';
 import { createConfigurationModel } from '../src/extraction/configurationModel.js';
 import { createCompilerProvider } from '../src/providers/compilers/compiler.factory.js';
-import { ExtractionExecutor } from '../src/extraction/executor.js';
-import { PageExtractor } from '../src/extraction/pageExtractor.js';
-import { standardSourceReaders } from '../src/extraction/sources.js';
-import { executionPolicy } from '../src/extraction/policy.js';
-import { BrowserDocumentAdapter } from '../src/extraction/adapters/browserDocument.adapter.js';
+import { composeExtraction } from '../src/extraction/composition.js';
+import { createHttpCandidates } from '../src/providers/scraping/scraper.factory.js';
 import { BrowserCapacity } from '../src/resources/browserCapacity.js';
 import type { ILeaseStore, ResourceLease } from '../src/resources/lease.js';
-import type { DocumentAdapter, DocumentSnapshot } from '../src/extraction/contracts.js';
 
 class SimpleLeaseStore implements ILeaseStore {
   readonly held = new Map<string, AbortController>();
@@ -141,58 +136,79 @@ export const liveBenchmarkSuite: LiveBenchmarkTest[] = [
     description: 'Página tradicional renderizada no servidor para teste baseline de extração de coleção sem execução de JavaScript.',
     expectedFields: ['text', 'author'],
   },
-];
 
-async function fetchLiveDocument(url: string): Promise<DocumentSnapshot> {
-  const resp = await fetch(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-    },
-  });
-
-  if (!resp.ok) {
-    throw new Error(`Falha ao buscar URL ${url}: HTTP ${resp.status} ${resp.statusText}`);
-  }
-
-  const html = await resp.text();
-  return {
+  // 9. Mercado Livre Brasil (Catálogo de Marketplace com Preços BRL e Selos)
+  {
+    id: 'mercadolivre',
+    name: '9. Mercado Livre (Marketplace Brasileiro Real)',
+    category: 'ECOMMERCE_MICRODATA',
     transport: 'http',
-    html,
-    url: resp.url || url,
-    httpStatus: resp.status,
-    responses: [],
-  };
-}
+    url: 'https://lista.mercadolivre.com.br/monitor-gamer',
+    prompt: 'Extraia os monitores com o nome do produto e o preço em reais',
+    description: 'Marketplace de altíssimo volume com precificação em Reais (BRL), centavos separados, parcelamentos e selos de frete.',
+    expectedFields: ['title', 'price'],
+  },
 
-function createHttpAdapter(snapshot: DocumentSnapshot): DocumentAdapter {
-  return {
-    async open() {
-      return {
-        capabilities: { interactions: true, networkResponses: true, scopedDocuments: true },
-        snapshot: async () => structuredClone(snapshot),
-        check: async () => undefined,
-        advance: async () => {},
-        discover: async (action) => {
-          if (action.kind === 'inspect') {
-            const $ = cheerio.load(snapshot.html);
-            const inspectedHtml = $(action.selector)
-              .map((_, el) => $.html(el))
-              .get()
-              .join('\n');
-            return { ...snapshot, html: inspectedHtml || snapshot.html };
-          }
-          return structuredClone(snapshot);
-        },
-        screenshot: async () => undefined,
-        close: async () => {},
-      };
-    },
-  };
-}
+  // 10. Reddit Tecnologia (Fórum / Mídia Social com Upvotes e Discussões)
+  {
+    id: 'reddit-tech',
+    name: '10. Reddit Technology (Fórum / Rede Social)',
+    category: 'TECHNICAL_FEED',
+    transport: 'http',
+    url: 'https://old.reddit.com/r/technology/',
+    prompt: 'Extraia os posts com o título da publicação e o número de votos',
+    description: 'Agregador de comunidade com pontuações numéricas, links de submissões e metadados de fórum.',
+    expectedFields: ['title', 'votes'],
+  },
+
+  // 11. CoinMarketCap (Criptomoedas / Tabela Financeira Global)
+  {
+    id: 'coinmarketcap',
+    name: '11. CoinMarketCap (Criptomoedas e Finanças)',
+    category: 'HEAVY_TABLE',
+    transport: 'http',
+    url: 'https://coinmarketcap.com/',
+    prompt: 'Extraia as criptomoedas com o nome da moeda e o preço atual em dólares',
+    description: 'Tabela financeira densa com dezenas de colunas, formatação de moeda em USD e variações numéricas.',
+    expectedFields: ['name', 'price'],
+  },
+
+  // 12. Wikipedia PIB Nominal (Tabela Complexa com Colspan/Rowspan de Dados Públicos)
+  {
+    id: 'wikipedia-gdp',
+    name: '12. Wikipedia GDP (Dados Públicos em Tabela Complexa)',
+    category: 'HEAVY_TABLE',
+    transport: 'http',
+    url: 'https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)',
+    prompt: 'Extraia os países e o valor do PIB nominal',
+    description: 'Tabela de dados estatísticos complexa da Wikipedia (wikitable sortable) com múltiplos cabeçalhos e notas.',
+    expectedFields: ['country', 'gdp'],
+  },
+
+  // 13. RemoteOK (Job Board / Vagas de Emprego Remotas)
+  {
+    id: 'remoteok',
+    name: '13. Remote OK (Job Board de Emprego Remoto)',
+    category: 'MULTI_FIELD_CATALOG',
+    transport: 'http',
+    url: 'https://remoteok.com/',
+    prompt: 'Extraia as vagas de trabalho remoto com o cargo e o nome da empresa',
+    description: 'Plataforma de contratação remota global com cards de empresas, tags e cargos de tecnologia.',
+    expectedFields: ['role', 'company'],
+  },
+
+  // 14. BBC News (Portal Internacional de Notícias)
+  {
+    id: 'bbc-news',
+    name: '14. BBC News (Portal de Notícias Global)',
+    category: 'NEWS_PORTAL',
+    transport: 'http',
+    url: 'https://www.bbc.com/news',
+    prompt: 'Extraia as principais notícias com a manchete e o link da reportagem',
+    description: 'Portal jornalístico britânico de escala global com manchetes responsivas e links editoriais.',
+    expectedFields: ['headline', 'link'],
+  },
+];
 
 export async function runLiveBenchmark(filterId?: string) {
   console.log('========================================================================');
@@ -200,6 +216,7 @@ export async function runLiveBenchmark(filterId?: string) {
   console.log('========================================================================');
   console.log(`Provider: ${process.env.COMPILER_PROVIDER ?? 'api'}`);
   console.log(`Model:    ${process.env.COMPILER_API_MODEL ?? 'gemini-3.5-flash-lite'}`);
+  console.log('Architecture: 100% Production Extraction Stack (composeExtraction + discovery + unblockers)');
   console.log('------------------------------------------------------------------------\n');
 
   let passedTotal = 0;
@@ -216,10 +233,27 @@ export async function runLiveBenchmark(filterId?: string) {
     error?: string;
   }> = [];
 
-  const policy = executionPolicy();
   const leaseStore = new SimpleLeaseStore();
   const browserCapacity = new BrowserCapacity(leaseStore, 2);
-  const browserAdapter = new BrowserDocumentAdapter(policy, browserCapacity);
+  const candidates = createHttpCandidates();
+  const extraction = composeExtraction(candidates, browserCapacity);
+  const modelProvider = createCompilerProvider();
+  const stages = createConfigurationModel(modelProvider);
+
+  const pipeline = new ConfigurationPipeline(
+    stages,
+    extraction.discovery,
+    extraction.executor,
+    {
+      budgetMs: 120000,
+      maxAttempts: 3,
+      maxDecisions: 10,
+      reviewReserveMs: 5000,
+      evidenceLimit: 30000,
+      semanticEnabled: true,
+      semanticThreshold: 4,
+    }
+  );
 
   for (const site of liveBenchmarkSuite) {
     if (filterId && site.id !== filterId) continue;
@@ -233,39 +267,7 @@ export async function runLiveBenchmark(filterId?: string) {
 
     const start = Date.now();
     try {
-      let activeAdapter: DocumentAdapter;
-
-      if (site.transport === 'browser') {
-        console.log('  1. Usando BrowserDocumentAdapter (Playwright Chromium Real)...');
-        activeAdapter = browserAdapter;
-      } else {
-        console.log('  1. Fazendo fetch HTTP ao vivo...');
-        const fetchStart = Date.now();
-        const snapshot = await fetchLiveDocument(site.url);
-        console.log(
-          `     HTML recebido: ${(snapshot.html.length / 1024).toFixed(1)} KB em ${Date.now() - fetchStart}ms`
-        );
-        activeAdapter = createHttpAdapter(snapshot);
-      }
-
-      console.log('  2. Executando ConfigurationPipeline (Investigação + Decisão + Validação + Review)...');
-      const modelProvider = createCompilerProvider();
-      const stages = createConfigurationModel(modelProvider);
-      const executor = new ExtractionExecutor(
-        { http: activeAdapter, browser: browserAdapter },
-        new PageExtractor(standardSourceReaders()),
-        policy
-      );
-
-      const pipeline = new ConfigurationPipeline(stages, activeAdapter, executor, {
-        budgetMs: 120000,
-        maxAttempts: 3,
-        maxDecisions: 10,
-        reviewReserveMs: 5000,
-        evidenceLimit: 30000,
-        semanticEnabled: true,
-        semanticThreshold: 4,
-      });
+      console.log('  1. Executando ConfigurationPipeline (Investigação Discovery + Decisão + Validação + Review)...');
 
       const res = await pipeline.configure({
         jobId: `stress-${site.id}`,
