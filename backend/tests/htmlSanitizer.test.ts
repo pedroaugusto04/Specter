@@ -3,7 +3,7 @@ import { buildCompilerEvidence } from '../src/utils/compilerEvidence.js';
 import { sanitizeHtml } from '../src/utils/htmlSanitizer.js';
 
 describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
-  it('strips scripts, styles, SVGs, iframes, noscript, meta, link, canvas, and HTML comments', () => {
+  it('strips scripts, styles, SVGs, iframes, noscript, meta, link, canvas, template, and HTML comments', () => {
     const rawHtml = `
       <!DOCTYPE html>
       <html>
@@ -19,6 +19,7 @@ describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
           <iframe src="https://ads.example.com"></iframe>
           <canvas id="chart"></canvas>
           <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" /></svg>
+          <template id="inert-template"><div class="hidden-skeleton">Loading...</div></template>
           <main id="content">
             <h1 data-testid="headline">Oferta Especial</h1>
           </main>
@@ -36,6 +37,8 @@ describe('HTML DOM Sanitization & Node Pruning (sanitizeHtml)', () => {
     expect(sanitized).not.toContain('<link');
     expect(sanitized).not.toContain('<meta');
     expect(sanitized).not.toContain('<canvas');
+    expect(sanitized).not.toContain('<template');
+    expect(sanitized).not.toContain('Loading...');
     expect(sanitized).not.toContain('internal developer comment');
     expect(sanitized).toContain('data-testid="headline"');
     expect(sanitized).toContain('Oferta Especial');

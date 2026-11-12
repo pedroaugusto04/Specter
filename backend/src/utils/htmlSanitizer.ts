@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
 
-const TAGS_TO_STRIP = 'style, svg, noscript, iframe, link, track, canvas, object, embed';
+const TAGS_TO_STRIP = 'template, style, svg, noscript, iframe, link, track, canvas, object, embed';
 
 const TRACKING_ATTR_PREFIXES = [
   'data-tracking',
