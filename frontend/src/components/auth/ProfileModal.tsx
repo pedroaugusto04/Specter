@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   Calendar,
   Check,
+  Cpu,
   Gauge,
   Globe,
   Layers,
@@ -12,7 +13,6 @@ import {
   Play,
   Save,
   Shield,
-  Sparkles,
   User,
 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
@@ -219,10 +219,10 @@ export function ProfileModal({
                 helper="Running, healing, or pending monitors"
               />
 
-              {/* AI Compilations */}
+              {/* Compilations */}
               <QuotaBar
-                icon={Sparkles}
-                label="AI Compilations"
+                icon={Cpu}
+                label="Compilations"
                 subLabel="(This Month)"
                 used={quotas.monthlyCompilations.used}
                 limit={quotas.monthlyCompilations.limit}
