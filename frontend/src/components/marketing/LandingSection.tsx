@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import type { UserDto } from '@/lib/api';
-import { ArrowRight, Bell, Clock, Layers, Plus, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { ArrowRight, Bell, Clock, Layers, Plus } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 
@@ -15,20 +15,20 @@ interface LandingSectionProps {
 export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSectionProps) {
   const faqs = [
     {
-      q: 'How does Specter detect visual and structured changes?',
-      a: 'Specter executes scheduled browser crawls to capture full-page snapshots, extract targeted data structures, and compare pixel-level visual differences between runs.',
+      q: 'How does Specter detect changes?',
+      a: 'Specter takes periodic snapshots of your target pages and compares them side-by-side to highlight visual and content differences the moment they happen.',
     },
     {
-      q: 'Can Specter monitor dynamic, single-page applications (SPAs)?',
-      a: 'Yes. Powered by Playwright headless engines, Specter waits for network idle and dynamic JavaScript hydration before evaluating content.',
+      q: 'Can Specter monitor dynamic modern websites?',
+      a: 'Yes. Specter fully renders modern dynamic pages and JavaScript before checking for updates.',
     },
     {
       q: 'Which notification channels are supported?',
-      a: 'You can configure instant alerts through Telegram bots, custom Webhooks (Discord, Slack, Zapier), and direct email notifications whenever a meaningful change is detected.',
+      a: 'You can receive instant notifications via Telegram, custom Webhooks (Discord, Slack, Zapier), and email alerts whenever changes are detected.',
     },
     {
-      q: 'How frequently can monitors be scheduled?',
-      a: 'Specter supports cron expressions ranging from every 15 minutes to hourly, daily, or custom business intervals with built-in failure recovery.',
+      q: 'How frequently can monitors run?',
+      a: 'You can schedule automated checks from every 15 minutes to hourly, daily, or custom business intervals.',
     },
   ];
 
@@ -37,13 +37,12 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
       {/* Hero Section */}
       <section className="text-center space-y-6 max-w-3xl mx-auto pt-6 sm:pt-10">
         <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-          Web Change Detection &amp; Structured Data Extraction
+          Automated Website Change Detection
         </h1>
 
         <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-          Monitor critical websites automatically. Track visual diffs side-by-side, extract clean
-          structured data without writing code, and receive instant alerts via Telegram and
-          Webhooks.
+          Track updates on any website effortlessly. Compare visual snapshots side-by-side and
+          receive instant alerts via Telegram and Webhooks whenever content changes.
         </p>
 
         {/* Central Action Buttons */}
@@ -96,34 +95,34 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
       <section className="space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            Engineered for precision web tracking
+            Built for reliable website tracking
           </h2>
           <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-            Everything you need to automate competitive intelligence, regulatory monitoring, and
-            website change audits.
+            Stay informed on competitor pricing, regulatory updates, content changes, and page
+            modifications.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-xl border border-border bg-card/60 backdrop-blur-xs space-y-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Zap className="h-5 w-5" />
+              <Layers className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">No-Code Extraction</h3>
+            <h3 className="text-base font-semibold text-foreground">Visual Diff Slider</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Describe what information you need in simple language. Specter automatically
-              identifies and extracts clean structured data records from any dynamic web page.
+              Compare sequential page snapshots with an interactive split-slider to inspect exact
+              modifications and visual shifts side-by-side.
             </p>
           </div>
 
           <div className="p-6 rounded-xl border border-border bg-card/60 backdrop-blur-xs space-y-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Layers className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">Visual Diff Slider</h3>
+            <h3 className="text-base font-semibold text-foreground">Scheduled Monitoring</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Compare sequential page screenshots with an interactive split-slider to inspect exact
-              visual modifications and layout shifts.
+              Automate periodic checks on your custom schedule—from every 15 minutes to
+              daily—without ever having to manually refresh or inspect pages.
             </p>
           </div>
 
@@ -131,10 +130,10 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Bell className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">Multi-Channel Alerts</h3>
+            <h3 className="text-base font-semibold text-foreground">Instant Alerts</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Receive real-time notifications via Telegram, Discord, Slack or custom Webhook
-              payloads the moment actionable changes occur.
+              Get notified immediately through Telegram, Discord, Slack, or custom Webhooks the
+              moment actionable changes occur.
             </p>
           </div>
         </div>
@@ -144,37 +143,33 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
       <section className="p-6 sm:p-8 rounded-xl border border-border bg-card/40 space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            How Specter Works
+            How It Works
           </h2>
-          <p className="text-sm text-muted-foreground">
-            From URL input to automated change notifications in three steps.
-          </p>
+          <p className="text-sm text-muted-foreground">Set up monitoring in three simple steps.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-2">
           <div className="space-y-2">
-            <div className="text-xs font-mono font-semibold text-primary">01 / SETUP</div>
-            <h4 className="text-sm font-semibold text-foreground">Define URL &amp; Goal</h4>
+            <div className="text-xs font-mono font-semibold text-primary">01 / TARGET</div>
+            <h4 className="text-sm font-semibold text-foreground">Enter URL</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Paste the target web address and choose what elements or structured data you want to
-              track.
+              Paste the webpage you want to monitor and specify what you want to track.
             </p>
           </div>
 
           <div className="space-y-2">
             <div className="text-xs font-mono font-semibold text-primary">02 / SCHEDULE</div>
-            <h4 className="text-sm font-semibold text-foreground">Automated Crawls</h4>
+            <h4 className="text-sm font-semibold text-foreground">Set Frequency</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Specter runs scheduled headless browser crawls, taking screenshots and computing
-              content hash diffs.
+              Pick how often Specter checks the site for updates and captures new snapshots.
             </p>
           </div>
 
           <div className="space-y-2">
             <div className="text-xs font-mono font-semibold text-primary">03 / NOTIFY</div>
-            <h4 className="text-sm font-semibold text-foreground">Actionable Alerts</h4>
+            <h4 className="text-sm font-semibold text-foreground">Receive Alerts</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Get notified immediately through Telegram or Webhooks with the exact change breakdown.
+              Get an instant notification with visual comparisons whenever a change is detected.
             </p>
           </div>
         </div>
@@ -187,7 +182,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             Frequently Asked Questions
           </h2>
           <p className="text-sm text-muted-foreground">
-            Common questions about Specter web change monitoring.
+            Common questions about website change monitoring.
           </p>
         </div>
 
@@ -210,8 +205,8 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
           Ready to track changes in real time?
         </h2>
         <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-          Start monitoring pages, comparing visual snapshots, and extracting structured web data
-          today.
+          Start monitoring pages, comparing visual snapshots, and staying notified of critical
+          updates today.
         </p>
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
           {user ? (

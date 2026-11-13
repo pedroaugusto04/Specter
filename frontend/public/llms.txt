@@ -1,21 +1,20 @@
 # Specter
 
-> Minimalist web change monitor & automated structured data extraction.
+> Automated website change monitor & visual diff tracking.
 
-Specter is an automated website monitoring tool that detects visual and structural changes on any public web page. It combines automated browser monitoring with structured data extraction to track web modifications on scheduled cron intervals and deliver instant alerts.
+Specter is an automated website monitoring tool that detects visual and content changes across any public web page on scheduled intervals and delivers instant alerts.
 
 ## Key Capabilities
-- **Visual Diff Tracking**: Capture full-page screenshots and compare them side-by-side with an interactive visual diff slider.
-- **No-Code Structured Extraction**: Define what data you need in plain language to automatically pull clean JSON data records from dynamic web pages.
-- **Flexible Scheduling**: Configure cron expressions from every 15 minutes to custom intervals with automatic failure recovery.
-- **Instant Alerts**: Dispatch notifications to Telegram channels/bots, custom Webhook endpoints (Discord, Slack), and email.
-- **Dynamic JavaScript Support**: Powered by headless Playwright engines that wait for network idle and client hydration.
+- **Visual Diff Tracking**: Capture page snapshots and compare them side-by-side with an interactive comparison slider.
+- **Scheduled Monitoring**: Configure automated checks on your custom schedule—from every 15 minutes to daily intervals.
+- **Instant Alerts**: Dispatch notifications to Telegram channels/bots, custom Webhook endpoints (Discord, Slack, Zapier), and email.
+- **Dynamic Modern Web Support**: Fully renders dynamic web pages and interactive content before evaluating changes.
 
 ## Target Use Cases
 - Tracking competitor pricing and product availability changes.
 - Monitoring regulatory, compliance, and legal terms updates.
-- Detecting website defacement and layout regressions.
-- Automating web scraping pipelines without building custom scrapers.
+- Detecting website defacement, unexpected visual changes, and layout regressions.
+- Keeping track of critical page modifications without manual inspection.
 
 ## Canonical URLs
 - Website: https://specterdev.online

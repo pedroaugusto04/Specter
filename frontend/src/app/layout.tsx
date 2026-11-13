@@ -13,11 +13,11 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Specter — Web Change Monitor & Structured Extraction',
+    default: 'Specter — Website Change Monitor & Visual Diff Tracking',
     template: '%s | Specter',
   },
   description:
-    'Minimalist web monitoring, structured change detection, and automated alerts via Telegram and Webhooks.',
+    'Track visual and content changes across any website. Automated scheduled monitoring and instant alerts via Telegram and Webhooks.',
   applicationName: 'Specter',
   authors: [{ name: 'Specter Team' }],
   generator: 'Next.js',
@@ -27,8 +27,7 @@ export const metadata: Metadata = {
     'website monitoring',
     'visual diff tracker',
     'web change detector',
-    'automated web scraping',
-    'data extraction',
+    'website change detection',
     'cron scheduler',
     'telegram alerts',
   ],
@@ -63,21 +62,21 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: siteUrl,
     siteName: 'Specter',
-    title: 'Specter — Web Change Monitor & Structured Extraction',
-    description: 'Scheduled web extraction, visual change detection, and automated notifications.',
+    title: 'Specter — Website Change Monitor & Visual Diff Tracking',
+    description: 'Track visual and content changes across any website with automated alerts.',
     images: [
       {
         url: `${basePath}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: 'Specter — Web Change Monitor & Structured Extraction',
+        alt: 'Specter — Website Change Monitor',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Specter — Web Change Monitor',
-    description: 'Minimalist web monitoring and structured change detection.',
+    title: 'Specter — Website Change Monitor',
+    description: 'Track visual and content changes across any website with automated alerts.',
     images: [`${basePath}/og-image.png`],
   },
   verification: {
@@ -94,18 +93,16 @@ const jsonLd = {
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'All',
       url: siteUrl,
-      description:
-        'Minimalist web monitoring and structured change detection with visual diffs and automated alerts.',
+      description: 'Website change monitoring and visual diff tracking with automated alerts.',
       offers: {
         '@type': 'Offer',
         price: '0',
         priceCurrency: 'USD',
       },
       featureList: [
-        'Automated Web Scraping and Monitoring',
+        'Website Change Monitoring',
         'Visual Diff Slider & Screenshot Comparison',
-        'No-Code Structured Data Extraction',
-        'Scheduled Cron Jobs',
+        'Scheduled Cron Monitoring',
         'Telegram and Webhook Alert Integrations',
       ],
     },
@@ -117,7 +114,7 @@ const jsonLd = {
           name: 'What is Specter?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Specter is an automated website change monitoring and structured data extraction tool that tracks visual differences and extracts structured data on scheduled cron intervals.',
+            text: 'Specter is an automated website change monitoring tool that tracks visual and content differences on scheduled intervals.',
           },
         },
         {
@@ -125,7 +122,7 @@ const jsonLd = {
           name: 'How does Specter detect website changes?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Specter runs scheduled headless browser crawls to take page snapshots, analyze content hash differences, compare visual diffs side-by-side, and extract targeted data structures.',
+            text: 'Specter takes periodic snapshots of your target pages and compares them side-by-side to highlight visual and content differences the moment they happen.',
           },
         },
         {
@@ -133,7 +130,7 @@ const jsonLd = {
           name: 'Can Specter monitor dynamic JavaScript websites?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Yes. Specter uses Playwright headless browser engines that wait for network idle and dynamic JavaScript hydration before inspecting the page.',
+            text: 'Yes. Specter fully renders modern dynamic pages and JavaScript before checking for updates.',
           },
         },
         {
@@ -141,7 +138,7 @@ const jsonLd = {
           name: 'What notification channels does Specter support for change alerts?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Specter supports instant notifications via Telegram bots, custom Webhooks (for Discord, Slack, Zapier), and direct email alerts.',
+            text: 'Specter supports instant notifications via Telegram, custom Webhooks (Discord, Slack, Zapier), and email alerts.',
           },
         },
       ],
