@@ -1,12 +1,12 @@
 # Specter
 
-> Minimalist web change monitor & structured AI data extraction.
+> Minimalist web change monitor & automated structured data extraction.
 
-Specter is an automated website monitoring tool that detects visual and structural changes on any public web page. It combines headless browser automation with AI data extraction to track web modifications on scheduled cron intervals and deliver instant alerts.
+Specter is an automated website monitoring tool that detects visual and structural changes on any public web page. It combines automated browser monitoring with structured data extraction to track web modifications on scheduled cron intervals and deliver instant alerts.
 
 ## Key Capabilities
 - **Visual Diff Tracking**: Capture full-page screenshots and compare them side-by-side with an interactive visual diff slider.
-- **AI-Powered Structured Extraction**: Define extraction schemas in plain English to automatically pull clean JSON data from dynamic web pages.
+- **No-Code Structured Extraction**: Define what data you need in plain language to automatically pull clean JSON data records from dynamic web pages.
 - **Flexible Scheduling**: Configure cron expressions from every 15 minutes to custom intervals with automatic failure recovery.
 - **Instant Alerts**: Dispatch notifications to Telegram channels/bots, custom Webhook endpoints (Discord, Slack), and email.
 - **Dynamic JavaScript Support**: Powered by headless Playwright engines that wait for network idle and client hydration.

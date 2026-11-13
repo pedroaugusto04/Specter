@@ -16,7 +16,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
   const faqs = [
     {
       q: 'How does Specter detect visual and structured changes?',
-      a: 'Specter executes scheduled headless browser crawls to capture full-page snapshots, extract targeted data structures using AI, and compare pixel-level visual differences between runs.',
+      a: 'Specter executes scheduled browser crawls to capture full-page snapshots, extract targeted data structures, and compare pixel-level visual differences between runs.',
     },
     {
       q: 'Can Specter monitor dynamic, single-page applications (SPAs)?',
@@ -42,7 +42,8 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
 
         <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
           Monitor critical websites automatically. Track visual diffs side-by-side, extract clean
-          structured data with AI, and receive instant alerts via Telegram and Webhooks.
+          structured data without writing code, and receive instant alerts via Telegram and
+          Webhooks.
         </p>
 
         {/* Central Action Buttons */}
@@ -106,12 +107,12 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-xl border border-border bg-card/60 backdrop-blur-xs space-y-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Sparkles className="h-5 w-5" />
+              <Zap className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">AI-Driven Extraction</h3>
+            <h3 className="text-base font-semibold text-foreground">No-Code Extraction</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Describe what information you need in plain language. Specter compiles headless
-              scraping routines to isolate clean structured data.
+              Describe what information you need in simple language. Specter automatically
+              identifies and extracts clean structured data records from any dynamic web page.
             </p>
           </div>
 

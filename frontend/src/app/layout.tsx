@@ -104,7 +104,7 @@ const jsonLd = {
       featureList: [
         'Automated Web Scraping and Monitoring',
         'Visual Diff Slider & Screenshot Comparison',
-        'AI-powered Structured Data Extraction',
+        'No-Code Structured Data Extraction',
         'Scheduled Cron Jobs',
         'Telegram and Webhook Alert Integrations',
       ],
@@ -117,7 +117,7 @@ const jsonLd = {
           name: 'What is Specter?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Specter is an automated website change monitoring and structured data extraction tool that tracks visual differences and extracts structured data using AI on scheduled cron intervals.',
+            text: 'Specter is an automated website change monitoring and structured data extraction tool that tracks visual differences and extracts structured data on scheduled cron intervals.',
           },
         },
         {
