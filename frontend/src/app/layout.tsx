@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: '%s | Specter',
   },
   description:
-    'Track visual and content changes across any website. Automated scheduled monitoring and instant alerts via Telegram and Webhooks.',
+    'Track visual and content changes across any website. Automated scheduled monitoring and instant alerts whenever updates occur.',
   applicationName: 'Specter',
   authors: [{ name: 'Specter Team' }],
   generator: 'Next.js',

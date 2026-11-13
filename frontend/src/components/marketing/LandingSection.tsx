@@ -42,7 +42,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
 
         <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
           Track updates on any website effortlessly. Compare visual snapshots side-by-side and
-          receive instant alerts via Telegram and Webhooks whenever content changes.
+          receive instant alerts whenever content changes.
         </p>
 
         {/* Central Action Buttons */}
@@ -108,10 +108,10 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Layers className="h-5 w-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">Visual Diff Slider</h3>
+            <h3 className="text-base font-semibold text-foreground">Visual Comparisons</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Compare sequential page snapshots with an interactive split-slider to inspect exact
-              modifications and visual shifts side-by-side.
+              Compare sequential page snapshots side-by-side to inspect exact modifications and
+              visual updates.
             </p>
           </div>
 
@@ -121,8 +121,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             </div>
             <h3 className="text-base font-semibold text-foreground">Scheduled Monitoring</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Automate periodic checks on your custom schedule—from every 15 minutes to
-              daily—without ever having to manually refresh or inspect pages.
+              Automate periodic checks on your custom schedule—from every 15 minutes to daily.
             </p>
           </div>
 
@@ -132,8 +131,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             </div>
             <h3 className="text-base font-semibold text-foreground">Instant Alerts</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Get notified immediately through Telegram, Discord, Slack, or custom Webhooks the
-              moment actionable changes occur.
+              Get notified immediately the moment actionable changes occur.
             </p>
           </div>
         </div>
