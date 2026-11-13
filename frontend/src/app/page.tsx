@@ -68,7 +68,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             <ThemeToggle />
 
             {user ? (
@@ -102,7 +102,8 @@ export default function HomePage() {
                   className="h-9 px-3.5 sm:px-4 text-xs sm:text-sm font-medium gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Create Monitor</span>
+                  <span className="sm:hidden">Create</span>
+                  <span className="hidden sm:inline">Create Monitor</span>
                 </Button>
               </>
             )}

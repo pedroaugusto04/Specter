@@ -78,7 +78,7 @@ function SectionHeader({
 
 export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSectionProps) {
   const primaryAction = user ? (
-    <Link href="/dashboard">
+    <Link href="/dashboard" className="block w-full sm:w-auto">
       <Button size="lg" className="w-full sm:w-auto">
         <span>Go to Dashboard</span>
         <ArrowRight className="h-4 w-4" />
@@ -94,9 +94,9 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
   return (
     <div className="divide-y divide-border">
       {/* Hero */}
-      <section className="py-20 sm:py-28 text-center">
-        <div className="mx-auto max-w-3xl space-y-6">
-          <h1 className="text-4xl sm:text-6xl font-semibold tracking-tighter text-foreground leading-[1.05] text-balance">
+      <section className="py-14 sm:py-28 text-center">
+        <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
+          <h1 className="text-3xl min-[400px]:text-4xl sm:text-6xl font-semibold tracking-tighter text-foreground leading-[1.05] text-balance">
             Automated website change detection
           </h1>
 
@@ -105,7 +105,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             alerts whenever content changes.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-2">
             {primaryAction}
             {user ? (
               <Button
@@ -191,7 +191,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
               Start monitoring pages and get notified of critical updates today.
             </p>
           </div>
-          <div className="shrink-0">{primaryAction}</div>
+          <div className="shrink-0 md:w-auto">{primaryAction}</div>
         </div>
       </section>
     </div>
