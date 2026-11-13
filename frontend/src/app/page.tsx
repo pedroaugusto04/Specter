@@ -91,18 +91,18 @@ export default function HomePage() {
             ) : (
               <>
                 <Button
+                  variant="ghost"
+                  onClick={modals.openAuthModal}
+                  className="h-9 px-3.5 text-xs sm:text-sm font-medium"
+                >
+                  Sign In
+                </Button>
+                <Button
                   onClick={modals.openCreateModal}
                   className="h-9 px-3.5 sm:px-4 text-xs sm:text-sm font-medium gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Create Monitor</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={modals.openAuthModal}
-                  className="h-9 px-3.5 text-xs sm:text-sm font-medium"
-                >
-                  Sign In
                 </Button>
               </>
             )}
@@ -111,7 +111,7 @@ export default function HomePage() {
       </header>
 
       {/* Main Landing Workspace */}
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:py-8 sm:px-6 lg:px-8">
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <LandingSection
           user={user}
           onGetStarted={modals.openAuthModal}
