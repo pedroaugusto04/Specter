@@ -2,17 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import type { UserDto } from '@/lib/api';
-import {
-  ArrowRight,
-  Bell,
-  CheckCircle2,
-  Clock,
-  Layers,
-  Plus,
-  ShieldCheck,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
+import { ArrowRight, Bell, Clock, Layers, Plus, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 
@@ -45,12 +35,7 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
   return (
     <div className="space-y-16 sm:space-y-24 py-4 sm:py-8">
       {/* Hero Section */}
-      <section className="text-center space-y-6 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-muted/50 text-xs font-mono text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span>Automated Web Intelligence &amp; Structured Tracking</span>
-        </div>
-
+      <section className="text-center space-y-6 max-w-3xl mx-auto pt-6 sm:pt-10">
         <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
           Web Change Detection &amp; Structured Data Extraction
         </h1>
@@ -103,21 +88,6 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
               </Button>
             </>
           )}
-        </div>
-
-        <div className="pt-4 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground font-mono">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            No credit card required
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            Visual Diff Slider
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            Instant Telegram Alerts
-          </span>
         </div>
       </section>
 
