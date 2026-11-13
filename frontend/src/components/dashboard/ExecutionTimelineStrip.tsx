@@ -13,6 +13,8 @@ interface ExecutionTimelineStripProps {
   timeZone?: string;
   selectedRunId?: string | null;
   onSelectRun?: (run: TimelineStripPoint) => void;
+  title?: string;
+  interactive?: boolean;
 }
 
 export function ExecutionTimelineStrip({
@@ -20,6 +22,8 @@ export function ExecutionTimelineStrip({
   timeZone,
   selectedRunId,
   onSelectRun,
+  title,
+  interactive = true,
 }: ExecutionTimelineStripProps) {
   const [tooltipState, setTooltipState] = React.useState<{
     run: TimelineStripPoint;
@@ -49,7 +53,8 @@ export function ExecutionTimelineStrip({
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-          Execution sequence — equally spaced observations (Recent {chronologicalRuns.length})
+          {title ??
+            `Execution sequence — equally spaced observations (Recent ${chronologicalRuns.length})`}
         </span>
 
         {/* Legend */}
@@ -99,6 +104,7 @@ export function ExecutionTimelineStrip({
               <button
                 key={run.id}
                 type="button"
+                disabled={!interactive || !onSelectRun}
                 onClick={() => onSelectRun?.(run)}
                 onMouseEnter={(e) => {
                   const targetRect = e.currentTarget.getBoundingClientRect();
@@ -121,7 +127,9 @@ export function ExecutionTimelineStrip({
                 onMouseLeave={() => {
                   setTooltipState(null);
                 }}
-                className={`relative flex-1 h-full rounded-xs transition-all cursor-pointer ${barBg} ${
+                className={`relative flex-1 h-full rounded-xs transition-all ${
+                  interactive && onSelectRun ? 'cursor-pointer' : 'cursor-default'
+                } ${barBg} ${
                   isSelected
                     ? 'ring-2 ring-primary ring-offset-1 ring-offset-background z-10 scale-y-110'
                     : ''
@@ -174,7 +182,9 @@ export function ExecutionTimelineStrip({
               {'httpStatus' in tooltipState.run && tooltipState.run.httpStatus ? (
                 <span>HTTP {tooltipState.run.httpStatus}</span>
               ) : null}
-              <span className="text-primary underline">Click to inspect</span>
+              {interactive && onSelectRun && (
+                <span className="text-primary underline">Click to inspect</span>
+              )}
             </div>
           </div>
         )}

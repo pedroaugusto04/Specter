@@ -1,5 +1,6 @@
 'use client';
 
+import { ProductPreview } from '@/components/marketing/ProductPreview';
 import { Button } from '@/components/ui/button';
 import type { UserDto } from '@/lib/api';
 import { ArrowRight, Bell, Clock, Globe, Plus } from 'lucide-react';
@@ -160,6 +161,16 @@ export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSect
             );
           })}
         </div>
+      </section>
+
+      {/* Product preview */}
+      <section className="py-16 sm:py-20 grid gap-8 lg:grid-cols-[280px_1fr] lg:gap-12">
+        <SectionHeader
+          eyebrow="In action"
+          title="Know exactly what changed"
+          description="Every check is recorded. When a tracked value changes, you get an alert with the before and after, plus the full history."
+        />
+        <ProductPreview />
       </section>
 
       {/* FAQ */}
