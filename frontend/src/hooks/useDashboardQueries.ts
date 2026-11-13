@@ -21,6 +21,7 @@ export type UpdateJobInput = Parameters<typeof api.updateJob>[1];
 export const dashboardKeys = {
   all: ['dashboard'] as const,
   user: ['auth', 'me'] as const,
+  quotas: ['quotas'] as const,
   jobs: ['jobs'] as const,
   job: (id: string) => ['jobs', id] as const,
   jobRuns: (id: string, page = 1, pageSize = 20) => ['jobRuns', id, page, pageSize] as const,
@@ -111,6 +112,15 @@ export function useJobTimeseriesQuery(
     enabled: Boolean(jobId),
     staleTime: 15 * 1000,
     placeholderData: (prev) => prev,
+  });
+}
+
+export function useUserQuotasQuery(enabled = true) {
+  return useQuery({
+    queryKey: dashboardKeys.quotas,
+    queryFn: () => api.getUserQuotas(),
+    enabled,
+    staleTime: 30 * 1000,
   });
 }
 
@@ -236,6 +246,7 @@ export function useCreateJobMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
     },
   });
 }
@@ -262,6 +273,7 @@ export function useDeleteJobMutation() {
     onSuccess: (_, jobId) => {
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
       queryClient.removeQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
     },
   });
@@ -276,6 +288,7 @@ export function useTogglePauseMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
     },
   });
 }

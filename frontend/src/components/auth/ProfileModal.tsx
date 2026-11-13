@@ -1,14 +1,28 @@
 'use client';
 
 import * as React from 'react';
-import { Calendar, Check, Globe, Layers, LogOut, Mail, Save, Shield, User } from 'lucide-react';
+import {
+  Calendar,
+  Check,
+  Gauge,
+  Globe,
+  Layers,
+  LogOut,
+  Mail,
+  Play,
+  Save,
+  Shield,
+  Sparkles,
+  User,
+} from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
-import { useUpdateProfileMutation } from '@/hooks/useDashboardQueries';
+import { useUpdateProfileMutation, useUserQuotasQuery } from '@/hooks/useDashboardQueries';
 import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from '@/lib/utils';
 import type { UserDto } from '@/lib/api';
+import { QuotaBar } from '@/components/dashboard/QuotaBar';
 
 export interface ProfileModalProps {
   isOpen: boolean;
@@ -28,6 +42,7 @@ export function ProfileModal({
   monitorsCount = 0,
 }: ProfileModalProps) {
   const updateProfileMutation = useUpdateProfileMutation();
+  const { data: quotas, isLoading: isLoadingQuotas } = useUserQuotasQuery(isOpen && Boolean(user));
   const [name, setName] = React.useState('');
   const [timezone, setTimezone] = React.useState(DEFAULT_TIMEZONE);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -176,6 +191,61 @@ export function ProfileModal({
           </div>
         </form>
 
+        {/* Usage & Monthly Quotas */}
+        <div className="space-y-3.5 rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Gauge className="h-3.5 w-3.5" />
+              <span>Usage & Quotas</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground">Resets 1st of every month</span>
+          </div>
+
+          {isLoadingQuotas ? (
+            <div className="space-y-3 py-1.5 animate-pulse">
+              <div className="h-3.5 bg-muted/60 rounded w-1/3" />
+              <div className="h-1.5 bg-muted/40 rounded w-full" />
+              <div className="h-3.5 bg-muted/60 rounded w-1/3" />
+              <div className="h-1.5 bg-muted/40 rounded w-full" />
+            </div>
+          ) : quotas ? (
+            <div className="space-y-3.5 pt-0.5">
+              {/* Active Monitors */}
+              <QuotaBar
+                icon={Layers}
+                label="Active Monitors"
+                used={quotas.activeMonitors.used}
+                limit={quotas.activeMonitors.limit}
+                helper="Running, healing, or pending monitors"
+              />
+
+              {/* AI Compilations */}
+              <QuotaBar
+                icon={Sparkles}
+                label="AI Compilations"
+                subLabel="(This Month)"
+                used={quotas.monthlyCompilations.used}
+                limit={quotas.monthlyCompilations.limit}
+                helper="Initial monitor configurations & self-healing runs"
+              />
+
+              {/* Scrape Executions */}
+              <QuotaBar
+                icon={Play}
+                label="Scrape Executions"
+                subLabel="(This Month)"
+                used={quotas.monthlyExecutions.used}
+                limit={quotas.monthlyExecutions.limit}
+                helper="Total scheduled and manual scrape runs"
+              />
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-[11px]">
+              Unable to load quota details at this time.
+            </div>
+          )}
+        </div>
+
         {/* Account Details Overview */}
         <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -189,7 +259,10 @@ export function ProfileModal({
                 <Mail className="h-3.5 w-3.5" />
                 <span>Email Address</span>
               </div>
-              <span className="font-mono text-foreground truncate max-w-xs sm:max-w-sm" title={user.email}>
+              <span
+                className="font-mono text-foreground truncate max-w-xs sm:max-w-sm"
+                title={user.email}
+              >
                 {user.email}
               </span>
             </div>

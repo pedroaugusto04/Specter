@@ -35,6 +35,7 @@ export interface CreateScrapingJobRequest extends CreateJobRequest {
 export type UpdateScrapingJobRequest = UpdateJobRequest;
 
 import type { RealtimeService } from './realtimeService.js';
+import type { QuotaService } from './quotaService.js';
 
 export class JobService {
   private readonly jobRepository: IJobRepository;
@@ -42,6 +43,7 @@ export class JobService {
   private readonly scraperEngine?: IScraperEngine;
   private readonly sessionRepository?: ISessionRepository;
   private readonly realtimeService?: RealtimeService;
+  private readonly quotaService?: QuotaService;
 
   constructor(
     jobRepository: IJobRepository,
@@ -49,13 +51,15 @@ export class JobService {
     scraperEngine?: IScraperEngine,
     sessionRepository?: ISessionRepository,
     realtimeService?: RealtimeService,
-    private readonly presenter: JobPresenter = new JobPresenter()
+    private readonly presenter: JobPresenter = new JobPresenter(),
+    quotaService?: QuotaService
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
     this.scraperEngine = scraperEngine;
     this.sessionRepository = sessionRepository;
     this.realtimeService = realtimeService;
+    this.quotaService = quotaService;
   }
 
   async probeUrl(
@@ -117,6 +121,12 @@ export class JobService {
       name,
       existingJobs.map((job) => job.name)
     );
+
+    if (this.quotaService && request.userId) {
+      await this.quotaService.assertCanActivateMonitor(request.userId);
+      await this.quotaService.assertCanCompile(request.userId);
+    }
+
     const createdEntity = await this.jobRepository.createJob({
       userId: request.userId,
       name,
@@ -307,6 +317,13 @@ export class JobService {
       const resultDto = await this.presenter.present(updated ?? existing);
       await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
       return resultDto;
+    }
+
+    if (this.quotaService && existing.userId && existing.status === JobStatus.Paused) {
+      await this.quotaService.assertCanActivateMonitor(existing.userId);
+      if (!existing.extractionPlan) {
+        await this.quotaService.assertCanCompile(existing.userId);
+      }
     }
 
     if (!existing.extractionPlan) {

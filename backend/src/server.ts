@@ -30,6 +30,9 @@ import { DrizzleIntegrationRepository } from './repositories/integrationReposito
 import { DrizzleJobRepository } from './repositories/jobRepository.js';
 import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
 import { DrizzleUserRepository } from './repositories/userRepository.js';
+import { DrizzleUsageRepository } from './repositories/usageRepository.js';
+import { EnvPlanLimitResolver } from './services/quotas/envPlanLimitResolver.js';
+import { QuotaService } from './services/quotaService.js';
 import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
 import { IntegrationService } from './services/integrationService.js';
@@ -46,6 +49,13 @@ async function bootstrap(): Promise<void> {
   const accessRedis = new Redis(env.REDIS_URL);
   const jobRepository = new DrizzleJobRepository();
   const userRepository = new DrizzleUserRepository();
+  const usageRepository = new DrizzleUsageRepository();
+  const planLimitResolver = new EnvPlanLimitResolver();
+  const quotaService = new QuotaService({
+    jobRepository,
+    usageRepository,
+    planLimitResolver,
+  });
   const integrationRepository = new DrizzleIntegrationRepository();
   const sessionRepository = new DrizzleSessionRepository();
   const schedules = new ScheduleCoordinator(jobRepository, userRepository);
@@ -98,6 +108,7 @@ async function bootstrap(): Promise<void> {
     storageProvider,
     sessionRepository,
     realtimeService,
+    quotaService,
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
@@ -109,6 +120,7 @@ async function bootstrap(): Promise<void> {
     storageProvider,
     sessionRepository,
     realtimeService,
+    quotaService,
   });
 
   const retentionService = new RetentionService(jobRepository);
@@ -118,7 +130,8 @@ async function bootstrap(): Promise<void> {
     scraperEngine,
     sessionRepository,
     realtimeService,
-    new JobPresenter(accessCooldown)
+    new JobPresenter(accessCooldown),
+    quotaService
   );
   const authService = new AuthService(userRepository, {
     onTimezoneChanged: (userId) => schedules.refreshUserSchedules(userId, jobScheduler),
@@ -181,6 +194,7 @@ async function bootstrap(): Promise<void> {
     integrationService,
     sessionService,
     realtimeService,
+    quotaService,
   });
 
   const shutdown = async (signal: string) => {

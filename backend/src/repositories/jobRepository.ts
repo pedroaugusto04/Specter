@@ -1,6 +1,6 @@
 import type { AlertDelivery } from '../notifications/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
-import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lt, sql, ne } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { jobRuns, scrapingJobs, alertDeliveries } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
@@ -105,6 +105,7 @@ export interface IJobRepository {
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
   getStats(userId?: string): Promise<DashboardStats>;
+  countActiveJobsByUserId(userId: string): Promise<number>;
 }
 
 export class DrizzleJobRepository implements IJobRepository {
@@ -442,5 +443,21 @@ export class DrizzleJobRepository implements IJobRepository {
       totalRuns: runCounts?.totalRuns ?? 0,
       DetectedChangesCount: runCounts?.changesCount ?? 0,
     };
+  }
+
+  async countActiveJobsByUserId(userId: string): Promise<number> {
+    const [row] = await this.db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(scrapingJobs)
+      .where(
+        and(
+          eq(scrapingJobs.userId, userId),
+          ne(scrapingJobs.status, JobStatus.Paused)
+        )
+      );
+
+    return row?.count ?? 0;
   }
 }

@@ -13,6 +13,7 @@ import {
   DomainError,
   NavigationTimeoutError,
   NotFoundError,
+  QuotaExceededError,
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
@@ -31,6 +32,7 @@ import {
 } from '../types/enums.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
+import type { QuotaService } from './quotaService.js';
 
 export interface ScrapeExecutionServiceDeps {
   accessCooldown?: AccessCooldownService;
@@ -41,6 +43,7 @@ export interface ScrapeExecutionServiceDeps {
   storageProvider: IStorageProvider;
   sessionRepository?: ISessionRepository;
   realtimeService?: RealtimeService;
+  quotaService?: QuotaService;
   consecutiveFailuresForHealing?: number;
   maxHealingRetries?: number;
 }
@@ -76,6 +79,23 @@ export class ScrapeExecutionService {
       return null;
     }
 
+    if (this.deps.quotaService && job.userId) {
+      try {
+        await this.deps.quotaService.assertCanExecuteScrape(job.userId);
+      } catch (quotaErr) {
+        if (quotaErr instanceof QuotaExceededError) {
+          logger.warn('Skipping scrape execution: monthly execution quota reached', {
+            jobId: job.id,
+            userId: job.userId,
+            quotaLimit: quotaErr.limit,
+            current: quotaErr.current,
+          });
+          return null;
+        }
+        throw quotaErr;
+      }
+    }
+
     const access = await this.deps.accessCooldown?.forMonitor(job);
     if (await access?.state()) return null;
 
@@ -105,6 +125,10 @@ export class ScrapeExecutionService {
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });
+
+      if (this.deps.quotaService && job.userId) {
+        await this.deps.quotaService.recordExecution(job.userId);
+      }
       extractionReport = execution.report;
       const scrapeResult = execution.scrape;
       const extractedData = execution.data;

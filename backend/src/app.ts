@@ -13,6 +13,7 @@ import { registerSessionRoutes } from './routes/sessionRoutes.js';
 import type { AuthService } from './services/authService.js';
 import type { IntegrationService } from './services/integrationService.js';
 import type { JobService } from './services/jobService.js';
+import type { QuotaService } from './services/quotaService.js';
 import { RealtimeService } from './services/realtimeService.js';
 import { SessionService } from './services/sessionService.js';
 
@@ -22,6 +23,7 @@ export interface BuildAppOptions {
   integrationService: IntegrationService;
   sessionService?: SessionService;
   realtimeService?: RealtimeService;
+  quotaService?: QuotaService;
   enableLogger?: boolean;
 }
 
@@ -82,7 +84,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   registerAuthRoutes(app, options.authService);
   registerIntegrationRoutes(app, options.integrationService, options.authService);
-  registerJobRoutes(app, options.jobService, options.authService);
+  registerJobRoutes(app, options.jobService, options.authService, options.quotaService);
   registerSessionRoutes(app, sessionService, options.authService);
   registerRealtimeRoutes(app, realtimeService, options.authService);
 

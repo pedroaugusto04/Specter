@@ -11,6 +11,7 @@ import {
   CompilerValidationError,
   DomainError,
   NavigationTimeoutError,
+  QuotaExceededError,
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
 
@@ -21,6 +22,7 @@ const USER_ERROR_MESSAGES = Object.fromEntries(
 /** Maps internal exceptions to short user-facing messages without exposing technical details. */
 export function formatUserErrorMessage(error: unknown): string {
   if (error instanceof BrowserCapacityError) return USER_ERROR_MESSAGES.resourceUnavailable;
+  if (error instanceof QuotaExceededError) return error.message;
   // Setup deadlines must not be mistaken for website navigation timeouts.
   if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
   if (error instanceof CompilerApiRequestError)

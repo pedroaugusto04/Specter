@@ -4,6 +4,7 @@ import type {
   JobRunsDto,
   JobTimeseriesDto,
   JobStatus,
+  MetricQuotaSummary,
   ProbeUrlDto,
   ScrapingJobDto,
   SessionDto,
@@ -12,6 +13,7 @@ import type {
   UpdateJobRequest,
   UserDto,
   UserIntegrationsDto,
+  UserQuotaSummary,
 } from '@specter/contracts';
 export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
 export type {
@@ -32,11 +34,14 @@ export type {
   DiffChangeEntry,
   DiffSummary,
   JobRunDto,
+  MetricQuotaSummary,
   ScrapingJobDto,
   SessionDto,
   UserDto,
   UserIntegrationsDto,
+  UserQuotaSummary,
 } from '@specter/contracts';
+
 export interface ApiValidationErrorDetail {
   field: string;
   message: string;
@@ -272,5 +277,9 @@ export const api = {
     return request<void>(`/api/sessions/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  getUserQuotas(): Promise<UserQuotaSummary> {
+    return request<UserQuotaSummary>('/api/quotas');
   },
 };

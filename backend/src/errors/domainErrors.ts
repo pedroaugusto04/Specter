@@ -217,3 +217,31 @@ export class DecryptionError extends DomainError {
     });
   }
 }
+
+export type QuotaType = 'ACTIVE_MONITORS' | 'COMPILATIONS' | 'EXECUTIONS';
+
+export class QuotaExceededError extends DomainError {
+  public readonly quotaType: QuotaType;
+  public readonly current: number;
+  public readonly limit: number;
+
+  constructor(
+    message: string,
+    options: {
+      quotaType: QuotaType;
+      current: number;
+      limit: number;
+      cause?: unknown;
+    }
+  ) {
+    super(message, {
+      code: 'QUOTA_EXCEEDED',
+      statusCode: 403,
+      isRetryable: false,
+      cause: options.cause,
+    });
+    this.quotaType = options.quotaType;
+    this.current = options.current;
+    this.limit = options.limit;
+  }
+}

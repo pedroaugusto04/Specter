@@ -296,6 +296,11 @@ export class InMemoryJobRepository implements IJobRepository {
       DetectedChangesCount: userRuns.filter((r) => r.hasChanges === 'YES').length,
     };
   }
+  async countActiveJobsByUserId(userId: string): Promise<number> {
+    return Array.from(this.jobs.values()).filter(
+      (j) => j.userId === userId && j.status !== 'PAUSED'
+    ).length;
+  }
 }
 export class MockCompilerProvider implements ICompilerProvider {
   public readonly name = 'mock-compiler';

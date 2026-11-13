@@ -104,6 +104,11 @@ export const envSchema = z.object({
   MAX_HEALING_RETRIES: z.coerce.number().int().min(1).default(3),
   RETENTION_DAYS_UNCHANGED: z.coerce.number().int().min(1).default(14),
 
+  // Quotas & Usage Limits
+  DEFAULT_MAX_ACTIVE_MONITORS: z.coerce.number().int().min(1).default(5),
+  DEFAULT_MAX_MONTHLY_COMPILATIONS: z.coerce.number().int().min(1).default(20),
+  DEFAULT_MAX_MONTHLY_EXECUTIONS: z.coerce.number().int().min(1).default(1000),
+
   // Notifications
   NOTIFICATION_PROVIDER: z.enum(['resend', 'console']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),

@@ -11,6 +11,7 @@ import {
   DomainError,
   NotFoundError,
   CompilerValidationError,
+  QuotaExceededError,
 } from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
@@ -23,6 +24,7 @@ import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { logger } from '../utils/logger.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
+import type { QuotaService } from './quotaService.js';
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
@@ -32,6 +34,7 @@ export interface CompilationServiceDeps {
   storageProvider: IStorageProvider;
   sessionRepository?: ISessionRepository;
   realtimeService?: RealtimeService;
+  quotaService?: QuotaService;
 }
 
 export class CompilationService {
@@ -54,6 +57,34 @@ export class CompilationService {
       (reason !== undefined && job.status === JobStatus.Active && job.extractionPlan)
     )
       return job;
+
+    if (this.deps.quotaService && job.userId) {
+      try {
+        await this.deps.quotaService.assertCanCompile(job.userId);
+      } catch (quotaErr) {
+        if (quotaErr instanceof QuotaExceededError) {
+          logger.warn('Skipping compilation: monthly compilation quota reached', {
+            jobId: job.id,
+            userId: job.userId,
+            reason,
+          });
+          if (reason === CompilationReason.Healing) {
+            await this.deps.jobRepository.updateJob(job.id, {
+              status: JobStatus.Failed,
+              lastError: quotaErr.message,
+            });
+            await this.deps.realtimeService?.notifyJobUpdated(
+              job.userId,
+              job.id,
+              JobStatus.Failed
+            );
+            return (await this.deps.jobRepository.findById(job.id)) ?? job;
+          }
+          throw quotaErr;
+        }
+        throw quotaErr;
+      }
+    }
 
     let httpStatus: number | null = null;
 
@@ -142,6 +173,10 @@ export class CompilationService {
         job.updatedAt
       );
       const updatedJob = await this.deps.jobRepository.findById(job.id);
+
+      if (this.deps.quotaService && job.userId) {
+        await this.deps.quotaService.recordCompilation(job.userId);
+      }
 
       logger.info('Job compilation and smoke-test succeeded; job is now ACTIVE', {
         jobId: job.id,

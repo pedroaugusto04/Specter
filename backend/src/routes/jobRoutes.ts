@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { JobService } from '../services/jobService.js';
+import type { QuotaService } from '../services/quotaService.js';
 import {
   jobInputSchema,
   jobPauseSchema,
@@ -15,7 +16,8 @@ import {
 export function registerJobRoutes(
   app: FastifyInstance,
   jobService: JobService,
-  authService: AuthService
+  authService: AuthService,
+  quotaService?: QuotaService
 ): void {
   const withAuth = requireAuth(authService);
   const withOptionalAuth = optionalAuth(authService);
@@ -24,6 +26,15 @@ export function registerJobRoutes(
     status: 'ok',
     timestamp: new Date().toISOString(),
   }));
+
+  app.get('/api/quotas', { preHandler: [withAuth] }, async (request) => {
+    const user = requireUser(request);
+    if (!quotaService) {
+      return { data: null };
+    }
+    const summary = await quotaService.getQuotaSummary(user.id);
+    return { data: summary };
+  });
 
   app.get('/api/stats', { preHandler: [withOptionalAuth] }, async (request) => {
     const user = request.user;

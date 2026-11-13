@@ -87,6 +87,18 @@ export interface DashboardStatsDto {
   DetectedChangesCount: number;
 }
 
+export interface MetricQuotaSummary {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface UserQuotaSummary {
+  activeMonitors: MetricQuotaSummary;
+  monthlyCompilations: MetricQuotaSummary;
+  monthlyExecutions: MetricQuotaSummary;
+}
+
 export interface CreateJobRequest {
   name?: string;
   url: string;

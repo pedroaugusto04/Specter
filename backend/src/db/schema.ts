@@ -166,6 +166,28 @@ export type NewUserIntegrationRow = typeof userIntegrations.$inferInsert;
 export type UserWebSessionRow = typeof userWebSessions.$inferSelect;
 export type NewUserWebSessionRow = typeof userWebSessions.$inferInsert;
 
+export const userMonthlyUsage = pgTable(
+  'user_monthly_usage',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    period: text('period').notNull(),
+    compilationsCount: integer('compilations_count').default(0).notNull(),
+    executionsCount: integer('executions_count').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_user_monthly_usage_user_period').on(table.userId, table.period),
+    index('idx_user_monthly_usage_user_id').on(table.userId),
+  ]
+);
+
+export type UserMonthlyUsageRow = typeof userMonthlyUsage.$inferSelect;
+export type NewUserMonthlyUsageRow = typeof userMonthlyUsage.$inferInsert;
+
 export const alertDeliveries = pgTable(
   'alert_deliveries',
   {
