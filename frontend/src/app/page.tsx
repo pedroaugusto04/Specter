@@ -11,6 +11,7 @@ import { IntegrationsModal } from '@/components/dashboard/IntegrationsModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
 import { JobsTable } from '@/components/dashboard/JobsTable';
 import { StatsCards } from '@/components/dashboard/StatsCards';
+import { LandingSection } from '@/components/marketing/LandingSection';
 import { ThemeToggle } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { useDashboardModals } from '@/hooks/useDashboardModals';
@@ -53,32 +54,49 @@ export default function DashboardPage() {
   const connectionError = jobsError || statsError;
   const [runningJobIds, setRunningJobIds] = React.useState<Set<string>>(() => new Set());
   const runningTimers = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  React.useEffect(() => () => {
-    for (const timer of runningTimers.current.values()) clearTimeout(timer);
-    runningTimers.current.clear();
-  }, []);
+  React.useEffect(
+    () => () => {
+      for (const timer of runningTimers.current.values()) clearTimeout(timer);
+      runningTimers.current.clear();
+    },
+    []
+  );
 
   // Real-time server-sent events with auto-invalidation
   const { connectionMode } = useRealtimeEvents({
     enabled: Boolean(user),
-    onJobEvent: React.useCallback((event: RealtimeEventPayload) => {
-      if (event.type === 'JOB_UPDATED' && event.status === 'RUNNING') {
-        const old = runningTimers.current.get(event.jobId);
-        if (old) clearTimeout(old);
-        setRunningJobIds((current) => new Set(current).add(event.jobId));
-        runningTimers.current.set(event.jobId, setTimeout(() => {
+    onJobEvent: React.useCallback(
+      (event: RealtimeEventPayload) => {
+        if (event.type === 'JOB_UPDATED' && event.status === 'RUNNING') {
+          const old = runningTimers.current.get(event.jobId);
+          if (old) clearTimeout(old);
+          setRunningJobIds((current) => new Set(current).add(event.jobId));
+          runningTimers.current.set(
+            event.jobId,
+            setTimeout(() => {
+              runningTimers.current.delete(event.jobId);
+              setRunningJobIds((current) => {
+                const next = new Set(current);
+                next.delete(event.jobId);
+                return next;
+              });
+              void invalidateJobsAndStats();
+            }, 120_000)
+          );
+        } else if (event.jobId) {
+          const old = runningTimers.current.get(event.jobId);
+          if (old) clearTimeout(old);
           runningTimers.current.delete(event.jobId);
-          setRunningJobIds((current) => { const next = new Set(current); next.delete(event.jobId); return next; });
-          void invalidateJobsAndStats();
-        }, 120_000));
-      } else if (event.jobId) {
-        const old = runningTimers.current.get(event.jobId);
-        if (old) clearTimeout(old);
-        runningTimers.current.delete(event.jobId);
-        setRunningJobIds((current) => { const next = new Set(current); next.delete(event.jobId); return next; });
-      }
-      void invalidateJobsAndStats();
-    }, [invalidateJobsAndStats]),
+          setRunningJobIds((current) => {
+            const next = new Set(current);
+            next.delete(event.jobId);
+            return next;
+          });
+        }
+        void invalidateJobsAndStats();
+      },
+      [invalidateJobsAndStats]
+    ),
     onReconnect: React.useCallback(() => {
       for (const timer of runningTimers.current.values()) clearTimeout(timer);
       runningTimers.current.clear();
@@ -199,57 +217,66 @@ export default function DashboardPage() {
 
       {/* Main Workspace */}
       <main className="flex-1 mx-auto w-full max-w-7xl space-y-6 sm:space-y-8 px-4 py-6 sm:py-8 sm:px-6 lg:px-8">
-        {/* Section Heading */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
-              Monitors
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Scheduled web extraction and structured diff tracking.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-mono">
-            {connectionMode === 'connecting' && (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" />
-                <span>Connecting...</span>
-              </span>
-            )}
-            {connectionMode === 'disconnected' && (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/30" />
-                <span>Offline</span>
-              </span>
-            )}
-          </div>
-        </div>
+        {user ? (
+          <>
+            {/* Section Heading */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+                  Monitors
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Scheduled web extraction and structured diff tracking.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-mono">
+                {connectionMode === 'connecting' && (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" />
+                    <span>Connecting...</span>
+                  </span>
+                )}
+                {connectionMode === 'disconnected' && (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/30" />
+                    <span>Offline</span>
+                  </span>
+                )}
+              </div>
+            </div>
 
-        {connectionError && (
-          <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs sm:text-sm text-foreground flex items-center justify-between">
-            <span>
-              Unable to connect to the backend service. Please verify that the API is running.
-            </span>
-            <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Offline
-            </span>
-          </div>
+            {connectionError && (
+              <div className="rounded-md border border-border bg-muted/60 px-4 py-3 text-xs sm:text-sm text-foreground flex items-center justify-between">
+                <span>
+                  Unable to connect to the backend service. Please verify that the API is running.
+                </span>
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  Offline
+                </span>
+              </div>
+            )}
+
+            {/* Architectural Metric Strip */}
+            <StatsCards stats={stats} />
+
+            {/* Central Monitoring Table */}
+            <JobsTable
+              jobs={jobs}
+              runningJobIds={runningJobIds}
+              onRefresh={handleRefresh}
+              isRefreshing={isRefreshing}
+              onSelectJobForHistory={modals.openJobHistory}
+              onEditJob={modals.openEditJob}
+              onCreateClick={modals.openCreateModal}
+              timeZone={user?.timezone || 'America/Sao_Paulo'}
+            />
+          </>
+        ) : (
+          <LandingSection
+            onGetStarted={modals.openAuthModal}
+            onOpenCreate={modals.openCreateModal}
+          />
         )}
-
-        {/* Architectural Metric Strip */}
-        <StatsCards stats={stats} />
-
-        {/* Central Monitoring Table */}
-        <JobsTable
-          jobs={jobs}
-            runningJobIds={runningJobIds}
-          onRefresh={handleRefresh}
-          isRefreshing={isRefreshing}
-          onSelectJobForHistory={modals.openJobHistory}
-          onEditJob={modals.openEditJob}
-          onCreateClick={modals.openCreateModal}
-          timeZone={user?.timezone || 'America/Sao_Paulo'}
-        />
       </main>
 
       {/* Minimal Footer */}
