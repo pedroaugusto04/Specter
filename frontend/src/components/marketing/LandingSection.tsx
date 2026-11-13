@@ -1,24 +1,28 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import type { UserDto } from '@/lib/api';
 import {
   ArrowRight,
   Bell,
   CheckCircle2,
   Clock,
   Layers,
+  Plus,
   ShieldCheck,
   Sparkles,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 import * as React from 'react';
 
 interface LandingSectionProps {
+  user: UserDto | null;
   onGetStarted: () => void;
   onOpenCreate: () => void;
 }
 
-export function LandingSection({ onGetStarted, onOpenCreate }: LandingSectionProps) {
+export function LandingSection({ user, onGetStarted, onOpenCreate }: LandingSectionProps) {
   const faqs = [
     {
       q: 'How does Specter detect visual and structured changes?',
@@ -56,23 +60,49 @@ export function LandingSection({ onGetStarted, onOpenCreate }: LandingSectionPro
           structured data with AI, and receive instant alerts via Telegram and Webhooks.
         </p>
 
+        {/* Central Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <Button
-            size="lg"
-            onClick={onOpenCreate}
-            className="w-full sm:w-auto h-11 px-6 font-medium gap-2 text-sm shadow-sm"
-          >
-            <span>Start Monitoring Free</span>
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={onGetStarted}
-            className="w-full sm:w-auto h-11 px-6 font-medium text-sm"
-          >
-            Sign In to Dashboard
-          </Button>
+          {user ? (
+            <>
+              <Link href="/dashboard">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto h-11 px-6 font-medium gap-2 text-sm shadow-sm"
+                >
+                  <span>Go to Dashboard</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={onOpenCreate}
+                className="w-full sm:w-auto h-11 px-6 font-medium text-sm gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create Monitor</span>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="lg"
+                onClick={onOpenCreate}
+                className="w-full sm:w-auto h-11 px-6 font-medium gap-2 text-sm shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create Monitor</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={onGetStarted}
+                className="w-full sm:w-auto h-11 px-6 font-medium text-sm"
+              >
+                Sign In to Dashboard
+              </Button>
+            </>
+          )}
         </div>
 
         <div className="pt-4 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground font-mono">
@@ -212,11 +242,24 @@ export function LandingSection({ onGetStarted, onOpenCreate }: LandingSectionPro
           Start monitoring pages, comparing visual snapshots, and extracting structured web data
           today.
         </p>
-        <div className="pt-2">
-          <Button size="lg" onClick={onOpenCreate} className="h-11 px-6 font-medium gap-2 text-sm">
-            <span>Create Your First Monitor</span>
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {user ? (
+            <Link href="/dashboard">
+              <Button size="lg" className="h-11 px-6 font-medium gap-2 text-sm">
+                <span>Go to Dashboard</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              size="lg"
+              onClick={onOpenCreate}
+              className="h-11 px-6 font-medium gap-2 text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create Monitor</span>
+            </Button>
+          )}
         </div>
       </section>
     </div>

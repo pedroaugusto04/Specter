@@ -20,7 +20,7 @@ export default function TermsPage() {
 
           <div className="flex items-center gap-2.5">
             <ThemeToggle />
-            <Link href="/">
+            <Link href="/dashboard">
               <Button
                 variant="outline"
                 size="sm"
