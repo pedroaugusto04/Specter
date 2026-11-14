@@ -374,19 +374,48 @@ export const extractionPlanSchema = z
       );
   });
 
-/** Wrap a lone valid source in the canonical array shape; leave all other input untouched. */
+function normalizeCondition(cond: unknown): unknown {
+  if (!cond || typeof cond !== 'object') return cond;
+  const c = cond as Record<string, unknown>;
+  if (typeof c.locator === 'string') {
+    return { ...c, locator: { selector: c.locator } };
+  }
+  return cond;
+}
+
+/** Wrap a lone valid source in the canonical array shape and normalize string locators; leave all other input untouched. */
 export function normalizeSingleFieldSources(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object' || !('strategy' in raw)) return raw;
   const plan = raw as { strategy?: unknown };
-  if (!plan.strategy || typeof plan.strategy !== 'object' || !('fields' in plan.strategy))
-    return raw;
-  const strategy = plan.strategy as { fields?: unknown };
-  if (!strategy.fields || typeof strategy.fields !== 'object' || Array.isArray(strategy.fields))
-    return raw;
-  const fields = Object.fromEntries(
-    Object.entries(strategy.fields).map(([key, value]) =>
-      !Array.isArray(value) && sourceSchema.safeParse(value).success ? [key, [value]] : [key, value]
-    )
-  );
-  return { ...plan, strategy: { ...strategy, fields } };
+  if (!plan.strategy || typeof plan.strategy !== 'object') return raw;
+  const strategy = { ...(plan.strategy as Record<string, unknown>) };
+
+  if (strategy.fields && typeof strategy.fields === 'object' && !Array.isArray(strategy.fields)) {
+    strategy.fields = Object.fromEntries(
+      Object.entries(strategy.fields).map(([key, value]) =>
+        !Array.isArray(value) && sourceSchema.safeParse(value).success ? [key, [value]] : [key, value]
+      )
+    );
+  }
+
+  if (Array.isArray(strategy.ready)) {
+    strategy.ready = strategy.ready.map(normalizeCondition);
+  }
+
+  if (Array.isArray(strategy.empty)) {
+    strategy.empty = strategy.empty.map(normalizeCondition);
+  }
+
+  if (strategy.pagination && typeof strategy.pagination === 'object') {
+    const pag = { ...(strategy.pagination as Record<string, unknown>) };
+    if (typeof pag.next === 'string') {
+      pag.next = { selector: pag.next };
+    }
+    if (Array.isArray(pag.end)) {
+      pag.end = pag.end.map(normalizeCondition);
+    }
+    strategy.pagination = pag;
+  }
+
+  return { ...plan, strategy };
 }

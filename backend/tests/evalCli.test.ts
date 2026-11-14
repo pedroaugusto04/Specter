@@ -15,6 +15,13 @@ describe('parseEvalArgs', () => {
     expect(opts.runs).toBe(3);
   });
 
+  it('parses --concurrency option', () => {
+    const opts = parseEvalArgs(['--concurrency=1']);
+    expect(opts.concurrency).toBe(1);
+    expect(() => parseEvalArgs(['--concurrency=0'])).toThrow('--concurrency must be a positive integer.');
+    expect(() => parseEvalArgs(['--concurrency=abc'])).toThrow('--concurrency must be a positive integer.');
+  });
+
   it('parses --case with comma-separated values', () => {
     const opts = parseEvalArgs(['--case=a,b']);
     expect(opts.cases).toEqual(['a', 'b']);

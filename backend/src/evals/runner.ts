@@ -1,3 +1,5 @@
+import { appendFile, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { classifyEvalError } from './outcomes.js';
 import { describeFilters, resolveProviderInfo, type EvalCliOptions } from './cli.js';
 import { writeEvalReport, type WrittenEvalReport } from './report.js';
@@ -23,24 +25,43 @@ export interface EvalSuiteOptions<T extends EvalCaseDefinition> {
   execute: (item: T, run: number) => Promise<EvalExecution>;
   /** Pause between executions (e.g. provider rate limits). */
   delayMs?: number;
+  /** Maximum simultaneous executions. Defaults to 1. */
+  concurrency?: number;
   log?: (line: string) => void;
 }
 
-/** Runs every selected case `runs` times sequentially, classifies errors and writes the report. */
+/** Runs every selected case the requested number of times with bounded concurrency. */
 export async function runEvalSuite<T extends EvalCaseDefinition>(
   suite: EvalSuiteOptions<T>
 ): Promise<WrittenEvalReport> {
   const log = suite.log ?? ((line: string) => process.stdout.write(line + '\n'));
   const provider = resolveProviderInfo();
   const startedAt = new Date().toISOString();
-  const results: EvalCaseResult[] = [];
   const total = suite.cases.length * suite.options.runs;
+  const concurrency = Math.max(1, Math.min(total, suite.concurrency ?? 1));
+  if (!Number.isInteger(concurrency)) throw new Error('Eval concurrency must be a positive integer.');
+  const results: EvalCaseResult[] = new Array(total);
+  let completed = 0;
+  let nextIndex = 0;
+  let nextStartAt = 0;
   log(
-    `▶ ${suite.suite} (${suite.tier}) · provider=${provider.name}${provider.model ? ` model=${provider.model}` : ''} · ${suite.cases.length} casos × ${suite.options.runs} runs`
+    `▶ ${suite.suite} (${suite.tier}) · provider=${provider.name}${provider.model ? ` model=${provider.model}` : ''} · ${suite.cases.length} casos × ${suite.options.runs} runs · concorrência=${concurrency}`
   );
 
-  for (let run = 1; run <= suite.options.runs; run++) {
-    for (const item of suite.cases) {
+  const waitForStartSlot = async () => {
+    if (!suite.delayMs) return;
+    const now = Date.now();
+    const startAt = Math.max(now, nextStartAt);
+    nextStartAt = startAt + suite.delayMs;
+    if (startAt > now) await new Promise((resolve) => setTimeout(resolve, startAt - now));
+  };
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= total) return;
+      const item = suite.cases[index % suite.cases.length]!;
+      const run = Math.floor(index / suite.cases.length) + 1;
+      await waitForStartSlot();
       const started = Date.now();
       let execution: EvalExecution;
       try {
@@ -56,15 +77,22 @@ export async function runEvalSuite<T extends EvalCaseDefinition>(
         durationMs: Date.now() - started,
         ...execution,
       };
-      results.push(result);
+      results[index] = result;
+      completed++;
       const mark = SuccessfulOutcomes.has(result.outcome) ? '✔' : '✖';
       log(
-        `  ${mark} [${results.length}/${total}] ${item.id} run=${run} ${result.outcome} ${result.durationMs}ms${result.reason && mark === '✖' ? ` · ${result.reason.slice(0, 160)}` : ''}`
+        `  ${mark} [${completed}/${total}] ${item.id} run=${run} ${result.outcome} ${result.durationMs}ms${result.reason && mark === '✖' ? ` · ${result.reason.slice(0, 160)}` : ''}`
       );
-      if (suite.delayMs && results.length < total)
-        await new Promise((resolve) => setTimeout(resolve, suite.delayMs));
+      try {
+        const outDir = resolve(suite.options.outputDir ?? 'reports/evals');
+        await mkdir(outDir, { recursive: true });
+        await appendFile(resolve(outDir, 'live-stream.jsonl'), JSON.stringify(result) + '\n');
+      } catch {
+        // non-blocking progressive log
+      }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
   const report = await writeEvalReport(
     {

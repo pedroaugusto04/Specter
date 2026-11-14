@@ -1321,6 +1321,7 @@ async function main() {
     tier: 'T3',
     cases: selectEvalCases(liveBenchmarkSuite, options),
     options,
+    concurrency: options.concurrency ?? 2,
     delayMs: 1500,
     execute: async (site, run) => {
       const counted = new CountingModelProvider(modelProvider);

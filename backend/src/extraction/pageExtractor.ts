@@ -148,44 +148,94 @@ export class PageExtractor implements IPageExtractor {
           record[name] = value;
         }
         candidates.push(record);
-        if (
-          Object.entries(intent.fields).every(
-            ([key, field]) => !field.required || record[key] !== null
-          )
-        )
-          result.validatedSourceRecords++;
         const identityFields = intent.identityFields ?? [];
-        if (identityFields.some((key) => record[key] === null || record[key] === undefined))
-          fail('Source record has no stable identity.');
-        result.observedIdentities.push(recordIdentity(record, identityFields));
-        const filters = strategy.filters ?? [];
-        if (
-          filters.some(
-            (filter) => record[filter.field] === null || record[filter.field] === undefined
+
+        if (intent.mode === ExtractionMode.Single) {
+          if (
+            Object.entries(intent.fields).every(
+              ([key, field]) => !field.required || record[key] !== null
+            )
           )
-        )
-          fail('Cannot evaluate a filter without its required field.');
-        if (!matchesRecord(record, filters)) continue;
-        for (const [name, field] of definitions)
-          if (record[name] === null && field.required)
-            fail(
-              `Required field '${name}' is missing or invalid. Failed sources: ${JSON.stringify(redactObject(failures.get(name) ?? []))}`
+            result.validatedSourceRecords++;
+
+          if (identityFields.some((key) => record[key] === null || record[key] === undefined))
+            fail('Source record has no stable identity.');
+          result.observedIdentities.push(recordIdentity(record, identityFields));
+
+          const filters = strategy.filters ?? [];
+          if (
+            filters.some(
+              (filter) => record[filter.field] === null || record[filter.field] === undefined
+            )
+          )
+            fail('Cannot evaluate a filter without its required field.');
+          if (!matchesRecord(record, filters)) continue;
+
+          for (const [name, field] of definitions)
+            if (record[name] === null && field.required)
+              fail(
+                `Required field '${name}' is missing or invalid. Failed sources: ${JSON.stringify(redactObject(failures.get(name) ?? []))}`
+              );
+
+          if (hasUnhandledSourceError) continue;
+
+          const identity = recordIdentity(record, intent.identityFields);
+          evidence.forEach((entry) => {
+            entry.recordIdentity = redactText(identity);
+          });
+          result.evidence.push(...evidence);
+          result.records.push(record);
+        } else {
+          // Collection mode: tolerate spurious / layout / ad nodes.
+          const hasIdentity =
+            identityFields.length === 0 ||
+            identityFields.every(
+              (key) => record[key] !== null && record[key] !== undefined && record[key] !== ''
             );
-        if (hasUnhandledSourceError) continue;
-        const identity = recordIdentity(record, intent.identityFields);
-        evidence.forEach((entry) => {
-          entry.recordIdentity = redactText(identity);
-        });
-        result.evidence.push(...evidence);
-        result.records.push(record);
+          const missingRequired = definitions.some(
+            ([name, field]) =>
+              field.required &&
+              (record[name] === null || record[name] === undefined || record[name] === '')
+          );
+
+          if (!hasIdentity || missingRequired || hasUnhandledSourceError) {
+            continue;
+          }
+
+          result.validatedSourceRecords++;
+          const identity = recordIdentity(record, intent.identityFields);
+          result.observedIdentities.push(identity);
+
+          const filters = strategy.filters ?? [];
+          if (
+            filters.some(
+              (filter) => record[filter.field] === null || record[filter.field] === undefined
+            )
+          ) {
+            continue;
+          }
+          if (!matchesRecord(record, filters)) continue;
+
+          evidence.forEach((entry) => {
+            entry.recordIdentity = redactText(identity);
+          });
+          result.evidence.push(...evidence);
+          result.records.push(record);
+        }
       }
-      const seen = new Set<string>();
-      if (intent.mode === ExtractionMode.Collection)
+
+      if (intent.mode === ExtractionMode.Collection) {
+        if (contexts.length > 0 && result.validatedSourceRecords === 0) {
+          fail('No valid records could be extracted from candidate items.');
+        }
+
+        const seen = new Set<string>();
         for (const record of result.records) {
           const identity = recordIdentity(record, intent.identityFields);
           if (seen.has(identity)) fail('Duplicate collection identity.');
           seen.add(identity);
         }
+      }
       const all = (conditions: typeof strategy.ready) =>
         conditions.length > 0 &&
         conditions.every((condition) =>

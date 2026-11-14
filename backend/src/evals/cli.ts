@@ -6,6 +6,8 @@ export interface EvalCliOptions {
   /** Overrides COMPILER_API_MODEL for this process. */
   model?: string;
   runs: number;
+  /** Maximum simultaneous executions. */
+  concurrency?: number;
   /** Case ids to run (comma separated `--case`). */
   cases: string[];
   /** Tag filters (`--tag siteType=news`), all must match. */
@@ -35,6 +37,11 @@ export function parseEvalArgs(argv: string[]): EvalCliOptions {
   const last = (name: string) => flags.get(name)?.at(-1);
   const runs = Number(last('runs') ?? 1);
   if (!Number.isInteger(runs) || runs < 1) throw new Error('--runs must be a positive integer.');
+  const rawConcurrency = last('concurrency');
+  const concurrency = rawConcurrency !== undefined ? Number(rawConcurrency) : undefined;
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || concurrency < 1)) {
+    throw new Error('--concurrency must be a positive integer.');
+  }
   const tags: Record<string, string> = {};
   for (const entry of flags.get('tag') ?? []) {
     const [key, value] = entry.split('=', 2);
@@ -42,7 +49,8 @@ export function parseEvalArgs(argv: string[]): EvalCliOptions {
     tags[key] = value;
   }
   const unknown = [...flags.keys()].filter(
-    (name) => !['provider', 'model', 'runs', 'case', 'tag', 'out', 'resume'].includes(name)
+    (name) =>
+      !['provider', 'model', 'runs', 'concurrency', 'case', 'tag', 'out', 'resume'].includes(name)
   );
   if (unknown.length)
     throw new Error('Unknown option(s): ' + unknown.map((name) => '--' + name).join(', '));
@@ -59,6 +67,7 @@ export function parseEvalArgs(argv: string[]): EvalCliOptions {
     );
   return {
     runs,
+    ...(concurrency !== undefined ? { concurrency } : {}),
     cases,
     tags,
     ...(provider ? { provider } : {}),

@@ -2,7 +2,7 @@ import { ExtractionExecutor } from '../src/extraction/executor.js';
 import type { DocumentAdapter } from '../src/extraction/contracts.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { describe, it, expect } from 'vitest';
-import { extractionPlanSchema } from '../src/types/extractionPlan.js';
+import { extractionPlanSchema, normalizeSingleFieldSources } from '../src/types/extractionPlan.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../src/extraction/values.js';
 import { matchesRecord } from '../src/extraction/recordFilter.js';
@@ -580,5 +580,56 @@ describe('Common execution and comparisons', () => {
       evaluateTriggerRules({ code: 'A2' }, [{ field: 'code', operator: 'eq', value: 'B2' }])
         .triggered
     ).toBe(false);
+  });
+
+  it('normalizes string locators and lone field sources in extraction plan', () => {
+    const raw = {
+      intent: {
+        mode: 'collection',
+        scope: 'collection',
+        fields: { title: { type: 'string', description: 'Title', required: true } },
+        identityFields: ['title'],
+      },
+      strategy: {
+        transport: 'browser',
+        records: { kind: 'dom', selector: '.card' },
+        fields: {
+          title: { kind: 'dom', selector: 'h2', attribute: 'text' },
+        },
+        ready: [
+          { kind: 'exists', locator: '.card' },
+        ],
+        empty: [
+          { kind: 'exists', locator: '.empty' },
+        ],
+        pagination: {
+          kind: 'link',
+          next: '.next-page',
+          end: [{ kind: 'exists', locator: '.no-more' }],
+        },
+      },
+    };
+    const normalized = normalizeSingleFieldSources(raw) as any;
+    expect(Array.isArray(normalized.strategy.fields.title)).toBe(true);
+    expect(normalized.strategy.ready[0].locator).toEqual({ selector: '.card' });
+    expect(normalized.strategy.empty[0].locator).toEqual({ selector: '.empty' });
+    expect(normalized.strategy.pagination.next).toEqual({ selector: '.next-page' });
+    expect(normalized.strategy.pagination.end[0].locator).toEqual({ selector: '.no-more' });
+  });
+
+  it('drops incomplete items in a collection while preserving valid records', () => {
+    // 2 valid rows with id and price, and 1 ad/spacer row missing price
+    const html =
+      '<main>' +
+      row('item-1', '100') +
+      '<article data-id="ad-slot"><b class="other">Ad</b></article>' +
+      row('item-2', '200') +
+      '</main>';
+    const result = extract(html);
+    expect(result.quality).toBe('COMPLETE');
+    expect(result.records).toEqual([
+      { id: 'item-1', price: 100 },
+      { id: 'item-2', price: 200 },
+    ]);
   });
 });
