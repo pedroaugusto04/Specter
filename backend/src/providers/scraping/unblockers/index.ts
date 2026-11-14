@@ -3,4 +3,5 @@ export * from './zenRows.provider.js';
 export * from './scraperApi.provider.js';
 export * from './scrapingBee.provider.js';
 export * from './crawlbase.provider.js';
+export * from './decodo.provider.js';
 export * from './quotaChecker.js';

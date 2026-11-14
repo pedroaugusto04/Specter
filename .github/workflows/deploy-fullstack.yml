@@ -305,7 +305,9 @@ jobs:
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
           SCRAPINGBEE_API_KEY: ${{ secrets.SCRAPINGBEE_API_KEY }}
           CRAWLBASE_TOKEN: ${{ secrets.CRAWLBASE_TOKEN }}
+          DECODO_API_KEY: ${{ secrets.DECODO_API_KEY }}
           HTTP_PROXY: ${{ secrets.HTTP_PROXY || vars.HTTP_PROXY }}
+          HTTP_FALLBACK_PROXY: ${{ secrets.HTTP_FALLBACK_PROXY || vars.HTTP_FALLBACK_PROXY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           COOKIE_SECURE: ${{ vars.COOKIE_SECURE }}

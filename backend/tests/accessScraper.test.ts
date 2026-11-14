@@ -10,6 +10,7 @@ import { ZenRowsUnblockerProvider } from '../src/providers/scraping/unblockers/z
 import { ScraperApiUnblockerProvider } from '../src/providers/scraping/unblockers/scraperApi.provider.js';
 import { ScrapingBeeUnblockerProvider } from '../src/providers/scraping/unblockers/scrapingBee.provider.js';
 import { CrawlbaseUnblockerProvider } from '../src/providers/scraping/unblockers/crawlbase.provider.js';
+import { DecodoUnblockerProvider } from '../src/providers/scraping/unblockers/decodo.provider.js';
 
 describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
   describe('ZenRowsUnblockerProvider', () => {
@@ -448,6 +449,69 @@ describe('Anti-Bot Unblockers & Cascade Fallback Scraper Engine', () => {
         token: 'test-crawlbase-token',
         fetchFn: mockFetch,
       });
+      await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
+        UnblockerQuotaExhaustedError
+      );
+    });
+  });
+
+  describe('DecodoUnblockerProvider', () => {
+    it('is disabled when no API key is provided', () => {
+      const provider = new DecodoUnblockerProvider({ apiKey: '' });
+      expect(provider.isEnabled()).toBe(false);
+    });
+
+    it('fetches HTML successfully when enabled and status is 200', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              results: [
+                {
+                  content: '<html><body><h1>Decodo Data</h1></body></html>',
+                  status_code: 200,
+                },
+              ],
+            })
+          ),
+      } as unknown as Response);
+
+      const provider = new DecodoUnblockerProvider({
+        apiKey: 'test-decodo-key',
+        fetchFn: mockFetch,
+      });
+      expect(provider.isEnabled()).toBe(true);
+
+      const result = await provider.fetchHtml('https://example.com');
+      expect(result.httpStatus).toBe(200);
+      expect(result.rawHtml).toContain('Decodo Data');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [calledUrl, calledInit] = mockFetch.mock.calls[0]!;
+      expect(calledUrl).toBe('https://data.decodo.com/v1/scrape');
+      expect(calledInit.method).toBe('POST');
+      expect(calledInit.headers.Authorization).toBe('Bearer test-decodo-key');
+
+      const body = JSON.parse(calledInit.body);
+      expect(body.url).toBe('https://example.com');
+      expect(body.proxy_pool).toBe('standard');
+      expect(body.headless).toBe('html');
+    });
+
+    it('throws UnblockerQuotaExhaustedError when status is 429 or 401', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        status: 401,
+        ok: false,
+        text: () => Promise.resolve(JSON.stringify({ message: 'Invalid credentials or quota exhausted' })),
+      } as unknown as Response);
+
+      const provider = new DecodoUnblockerProvider({
+        apiKey: 'test-decodo-key',
+        fetchFn: mockFetch,
+      });
+
       await expect(provider.fetchHtml('https://example.com')).rejects.toThrow(
         UnblockerQuotaExhaustedError
       );

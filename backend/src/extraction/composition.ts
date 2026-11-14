@@ -25,6 +25,15 @@ export function composeExtraction(scrapers: ScraperCandidate[], capacity: IBrows
     });
   }
 
+  if (env.HTTP_FALLBACK_PROXY) {
+    browserCandidates.push({
+      name: 'browser-fallback-proxied',
+      external: false,
+      transport: Transport.Browser,
+      adapter: new BrowserDocumentAdapter(policy, capacity, env.HTTP_FALLBACK_PROXY),
+    });
+  }
+
   browserCandidates.push({
     name: 'browser',
     external: false,

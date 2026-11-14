@@ -58,10 +58,12 @@ export const envSchema = z.object({
 
   // Proxy & Anti-Bot Unblocker Providers (Optional Fallback Cascade)
   HTTP_PROXY: z.string().optional().default(''),
+  HTTP_FALLBACK_PROXY: z.string().optional().default(''),
   ZENROWS_API_KEY: z.string().optional().default(''),
   SCRAPERAPI_KEY: z.string().optional().default(''),
   SCRAPINGBEE_API_KEY: z.string().optional().default(''),
   CRAWLBASE_TOKEN: z.string().optional().default(''),
+  DECODO_API_KEY: z.string().optional().default(''),
   UNBLOCKER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120000),
 
   SEMANTIC_REVIEW_ENABLED: z

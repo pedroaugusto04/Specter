@@ -3,11 +3,13 @@ import { ZenRowsUnblockerProvider } from '../src/providers/scraping/unblockers/z
 import { ScraperApiUnblockerProvider } from '../src/providers/scraping/unblockers/scraperApi.provider.js';
 import { ScrapingBeeUnblockerProvider } from '../src/providers/scraping/unblockers/scrapingBee.provider.js';
 import { CrawlbaseUnblockerProvider } from '../src/providers/scraping/unblockers/crawlbase.provider.js';
+import { DecodoUnblockerProvider } from '../src/providers/scraping/unblockers/decodo.provider.js';
 const providers = [
   (fetchFn: typeof fetch) => new ZenRowsUnblockerProvider({ apiKey: 'fixture', fetchFn }),
   (fetchFn: typeof fetch) => new ScraperApiUnblockerProvider({ apiKey: 'fixture', fetchFn }),
   (fetchFn: typeof fetch) => new ScrapingBeeUnblockerProvider({ apiKey: 'fixture', fetchFn }),
   (fetchFn: typeof fetch) => new CrawlbaseUnblockerProvider({ token: 'fixture', fetchFn }),
+  (fetchFn: typeof fetch) => new DecodoUnblockerProvider({ apiKey: 'fixture', fetchFn }),
 ];
 for (const create of providers) {
   const name = create(vi.fn()).name;

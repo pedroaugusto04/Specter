@@ -8,6 +8,7 @@ import { PlaywrightScraperEngine } from './playwrightScraper.provider.js';
 import type { IScraperEngine } from './scraper.interface.js';
 import {
   CrawlbaseUnblockerProvider,
+  DecodoUnblockerProvider,
   ScraperApiUnblockerProvider,
   ScrapingBeeUnblockerProvider,
   ZenRowsUnblockerProvider,
@@ -30,6 +31,14 @@ export function createScraperEngine(
         )
       );
     }
+    if (env.HTTP_FALLBACK_PROXY) {
+      localEngines.push(
+        new PlaywrightScraperEngine(
+          new BrowserDocumentAdapter(executionPolicy(), capacity, env.HTTP_FALLBACK_PROXY),
+          executionPolicy()
+        )
+      );
+    }
     localEngines.push(
       new PlaywrightScraperEngine(
         new BrowserDocumentAdapter(executionPolicy(), capacity),
@@ -47,6 +56,7 @@ export function createUnblockers() {
   return [
     new CrawlbaseUnblockerProvider(),
     new ZenRowsUnblockerProvider(),
+    new DecodoUnblockerProvider(),
     new ScraperApiUnblockerProvider(),
     new ScrapingBeeUnblockerProvider(),
   ];

@@ -129,9 +129,9 @@ export async function checkCrawlbaseQuota(
   }
 
   try {
-    const url = new URL('https://api.crawlbase.com/');
+    const url = new URL('https://api.crawlbase.com/account');
     url.searchParams.set('token', token.trim());
-    url.searchParams.set('account', 'true');
+    url.searchParams.set('product', 'crawling-api');
 
     const res = await fetchFn(url.toString(), {
       method: 'GET',
@@ -140,6 +140,13 @@ export async function checkCrawlbaseQuota(
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+      if (res.status === 429 || body.includes('Rate limit exceeded')) {
+        return {
+          provider,
+          enabled: true,
+          details: 'Active Crawlbase account connected (rate limited on account stats API: 1 req/5 min)',
+        };
+      }
       return {
         provider,
         enabled: true,
@@ -148,14 +155,26 @@ export async function checkCrawlbaseQuota(
     }
 
     const data = (await res.json()) as {
+      remainingCredits?: number;
       remaining_requests?: number;
+      totalSuccess?: number;
       total_requests?: number;
+      totalFailed?: number;
       requests_count?: number;
+      error?: string;
     };
 
-    const remaining = data.remaining_requests;
+    if (data.error && data.error.includes('Rate limit')) {
+      return {
+        provider,
+        enabled: true,
+        details: 'Active Crawlbase account connected (rate limited on account stats API)',
+      };
+    }
+
+    const remaining = data.remainingCredits ?? data.remaining_requests;
     const limit = data.total_requests;
-    const used = data.requests_count;
+    const used = data.totalSuccess ?? data.requests_count;
 
     return {
       provider,
@@ -202,6 +221,14 @@ export async function checkAllProviderQuotas(
     });
   }
 
+  if (env.DECODO_API_KEY) {
+    results.push({
+      provider: 'decodo',
+      enabled: true,
+      details: 'Active (Decodo Web Data API with per-request quota headers)',
+    });
+  }
+
   if (env.HTTP_PROXY) {
     const parsed = parseProxyConfig(env.HTTP_PROXY);
     const masked = parsed
@@ -210,7 +237,19 @@ export async function checkAllProviderQuotas(
     results.push({
       provider: 'http_proxy',
       enabled: true,
-      details: `Active proxy tunnel: ${masked}`,
+      details: `Active primary proxy tunnel: ${masked}`,
+    });
+  }
+
+  if (env.HTTP_FALLBACK_PROXY) {
+    const parsed = parseProxyConfig(env.HTTP_FALLBACK_PROXY);
+    const masked = parsed
+      ? `${parsed.server}${parsed.username ? ` (user: ${parsed.username})` : ''}`
+      : 'HTTP/HTTPS fallback proxy configured';
+    results.push({
+      provider: 'http_fallback_proxy',
+      enabled: true,
+      details: `Active fallback proxy tunnel: ${masked}`,
     });
   }
 
