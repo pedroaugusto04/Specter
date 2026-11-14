@@ -559,6 +559,37 @@ describe('Extraction contract and integrity', () => {
     expect(parsed.intent.fields.price?.locale).toBe('pt-BR');
     expect(parsed.strategy.ready.length).toBeGreaterThanOrEqual(1);
   });
+  it('normalizes array fields and missing descriptions to valid schema objects', () => {
+    const candidateWithArrays = {
+      intent: {
+        entity: 'article',
+        mode: 'collection',
+        fields: [
+          { name: 'title', type: 'string', description: 'Article title', required: true },
+          { name: 'link', type: 'url', description: 'Article URL', required: true },
+        ],
+      },
+      strategy: {
+        transport: 'http',
+        records: { kind: 'dom', selector: 'article' },
+        fields: [
+          { name: 'title', sources: [{ kind: 'dom', selector: 'h2', attribute: 'text' }] },
+          { name: 'link', source: { kind: 'dom', selector: 'a', attribute: 'href' } },
+        ],
+      },
+    };
+    const normalized = normalizeExtractionCandidate(candidateWithArrays);
+    const parsed = extractionPlanSchema.parse(normalized);
+    expect(parsed.intent.fields.title?.required).toBe(true);
+    expect(parsed.intent.fields.link?.required).toBe(true);
+    const linkSources = parsed.strategy.fields.link;
+    expect(Array.isArray(linkSources)).toBe(true);
+    const firstLink = linkSources?.[0];
+    expect(firstLink?.kind).toBe('dom');
+    if (firstLink?.kind === 'dom') {
+      expect(firstLink.selector).toBe('a');
+    }
+  });
 });
 describe('Common execution and comparisons', () => {
   it('follows same-origin links and verifies completion', async () => {

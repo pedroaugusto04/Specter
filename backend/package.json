@@ -24,7 +24,12 @@
     "evaluate:configuration": "node dist/cli/evaluateConfiguration.js",
     "evaluate:regression": "node dist/cli/evaluateRegression.js",
     "test:benchmark": "tsx scripts/run-benchmark.ts",
-    "test:live": "tsx scripts/run-live-benchmark.ts"
+    "test:live": "tsx scripts/run-live-benchmark.ts",
+    "test:live:br": "tsx scripts/run-live-benchmark.ts --tag locale=pt-BR",
+    "test:live:global": "tsx scripts/run-live-benchmark.ts --tag locale=en-US",
+    "test:live:latam": "tsx scripts/run-live-benchmark.ts --tag locale=es-ES",
+    "test:live:news": "tsx scripts/run-live-benchmark.ts --tag siteType=news",
+    "test:live:ecommerce": "tsx scripts/run-live-benchmark.ts --tag siteType=ecommerce"
   },
   "dependencies": {
     "@fastify/cors": "^10.1.0",

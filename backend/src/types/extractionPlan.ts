@@ -182,6 +182,66 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
     return raw;
   }
 
+  if (Array.isArray(intent.fields)) {
+    const normalized: Record<string, any> = {};
+    for (const item of intent.fields) {
+      if (item && typeof item === 'object') {
+        const key = item.name || item.key || item.field || item.id;
+        if (typeof key === 'string' && key.trim()) {
+          const sanitizedKey = key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+          const fieldDef = { ...item };
+          delete fieldDef.name;
+          delete fieldDef.key;
+          delete fieldDef.field;
+          delete fieldDef.id;
+          normalized[sanitizedKey] = fieldDef;
+        }
+      }
+    }
+    intent.fields = normalized;
+  }
+
+  if (intent.fields && typeof intent.fields === 'object' && !Array.isArray(intent.fields)) {
+    for (const field of Object.values(intent.fields as Record<string, any>)) {
+      if (field && typeof field === 'object' && field.type === FieldType.Number && !field.locale) {
+        field.locale = 'pt-BR';
+      }
+    }
+  }
+
+  if (Array.isArray(s.fields)) {
+    const normalized: Record<string, any> = {};
+    for (const item of s.fields) {
+      if (item && typeof item === 'object') {
+        const key = item.name || item.key || item.field || item.id;
+        if (typeof key === 'string' && key.trim()) {
+          const sanitizedKey = key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+          const rawSources = item.sources || item.source || item.records;
+          const sources = rawSources !== undefined ? rawSources : item;
+          const cleanSources = (Array.isArray(sources) ? sources : [sources]).map((src: any) => {
+            if (src && typeof src === 'object') {
+              const cleaned = { ...src };
+              delete cleaned.name;
+              delete cleaned.key;
+              delete cleaned.field;
+              delete cleaned.id;
+              return cleaned;
+            }
+            return src;
+          });
+          normalized[sanitizedKey] = cleanSources;
+        }
+      }
+    }
+    s.fields = normalized;
+  } else if (s.fields && typeof s.fields === 'object' && !Array.isArray(s.fields)) {
+    for (const [key, val] of Object.entries(s.fields as Record<string, any>)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        s.fields[key] = [val];
+      }
+    }
+  }
+
   if (s.transport === Transport.Http && requiresBrowser(s)) {
     s.transport = Transport.Browser;
   }
@@ -215,13 +275,6 @@ export function normalizeExtractionCandidate(raw: unknown): unknown {
     }
   }
 
-  if (intent.fields) {
-    for (const field of Object.values(intent.fields) as any[]) {
-      if (field?.type === FieldType.Number && !field.locale) {
-        field.locale = 'pt-BR';
-      }
-    }
-  }
 
   return plan;
 }

@@ -5,6 +5,20 @@ export type { CliCompilerOptions } from './cliCompiler.provider.js';
 
 export class AgyCliCompilerProvider extends CliCompilerProvider {
   constructor(options: CliCompilerOptions = {}) {
-    super({ ...options, providerName: 'agy', cliCommand: options.cliCommand ?? env.AGY_CLI_PATH });
+    const model = options.model ?? process.env.AGY_MODEL;
+    super({
+      ...options,
+      providerName: 'agy',
+      cliCommand: options.cliCommand ?? env.AGY_CLI_PATH,
+      cliArgsBuilder:
+        options.cliArgsBuilder ??
+        ((promptFile: string) => [
+          '--print',
+          `Evaluate prompt file at "${promptFile}" and execute its instructions.`,
+          ...(model ? ['--model', model] : []),
+          '--sandbox',
+          '--disable-slash-commands',
+        ]),
+    });
   }
 }

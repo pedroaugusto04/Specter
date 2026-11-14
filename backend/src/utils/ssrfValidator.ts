@@ -46,8 +46,8 @@ export function isPrivateIp(ip: string): boolean {
     const parts = ip.split('.').map((p) => Number(p));
     if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
 
-    const [a, b] = parts;
-    if (a === undefined || b === undefined) return true;
+    const [a, b, c] = parts;
+    if (a === undefined || b === undefined || c === undefined) return true;
 
     // 0.0.0.0/8 (Current network)
     if (a === 0) return true;
@@ -68,20 +68,20 @@ export function isPrivateIp(ip: string): boolean {
     if (a === 172 && b >= 16 && b <= 31) return true;
 
     // 192.0.0.0/24 (IETF Protocol Assignments)
-    // 192.0.2.0/24 (TEST-NET-1)
-    if (a === 192 && b === 0) return true;
+    // 192.0.2.0/24 (TEST-NET-1 documentation)
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
 
     // 192.168.0.0/16 (Private network RFC 1918)
     if (a === 192 && b === 168) return true;
 
-    // 198.18.0.0/15 (Network benchmark)
+    // 198.18.0.0/15 (Network benchmark: 198.18.0.0 - 198.19.255.255)
     if (a === 198 && (b === 18 || b === 19)) return true;
 
-    // 198.51.100.0/24 (TEST-NET-2)
-    if (a === 198 && b === 51) return true;
+    // 198.51.100.0/24 (TEST-NET-2 documentation)
+    if (a === 198 && b === 51 && c === 100) return true;
 
-    // 203.0.113.0/24 (TEST-NET-3)
-    if (a === 203 && b === 0) return true;
+    // 203.0.113.0/24 (TEST-NET-3 documentation)
+    if (a === 203 && b === 0 && c === 113) return true;
 
     // 224.0.0.0/4 (Multicast: 224.0.0.0 - 239.255.255.255)
     // 240.0.0.0/4 (Reserved / Future use: 240.0.0.0 - 255.255.255.255)

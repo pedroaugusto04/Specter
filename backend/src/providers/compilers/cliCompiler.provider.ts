@@ -10,6 +10,7 @@ import { buildCliCompilerPrompt } from './compilerPrompt.js';
 export interface CliCompilerOptions {
   providerName?: string;
   cliCommand?: string;
+  model?: string;
   cliArgsBuilder?: (promptFile: string, outputFile: string) => string[];
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
   tempBaseDir?: string;

@@ -42,10 +42,18 @@ describe('SSRF Protection & URL Validation (ssrfValidator)', () => {
       expect(isPrivateIp('::ffff:192.168.1.1')).toBe(true);
     });
 
+    it('detects reserved documentation and protocol assignment blocks (RFC 6890 / 5735)', () => {
+      expect(isPrivateIp('192.0.0.1')).toBe(true);
+      expect(isPrivateIp('192.0.2.1')).toBe(true);
+      expect(isPrivateIp('198.51.100.1')).toBe(true);
+      expect(isPrivateIp('203.0.113.1')).toBe(true);
+    });
+
     it('allows valid public IPv4 and IPv6 addresses', () => {
       expect(isPrivateIp('8.8.8.8')).toBe(false);
       expect(isPrivateIp('1.1.1.1')).toBe(false);
       expect(isPrivateIp('93.184.216.34')).toBe(false);
+      expect(isPrivateIp('192.0.66.204')).toBe(false); // Automattic / WordPress VIP public block
       expect(isPrivateIp('2606:4700:4700::1111')).toBe(false);
     });
   });

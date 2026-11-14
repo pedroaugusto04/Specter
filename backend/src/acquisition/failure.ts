@@ -18,6 +18,18 @@ export class AcquisitionFailureError extends DomainError {
     super('Acquisition alternatives exhausted.', { code: 'ACQUISITION_' + category, cause });
   }
 }
+const PLAYWRIGHT_NETWORK_ERRORS = [
+  'ERR_TUNNEL_CONNECTION_FAILED',
+  'ERR_PROXY_CONNECTION_FAILED',
+  'ERR_CONNECTION_RESET',
+  'ERR_CONNECTION_REFUSED',
+  'ERR_NAME_NOT_RESOLVED',
+  'ERR_TIMED_OUT',
+  'ERR_EMPTY_RESPONSE',
+  'ERR_INTERNET_DISCONNECTED',
+  'ERR_ADDRESS_UNREACHABLE',
+];
+
 export function classifyAccessFailure(error: unknown): AccessFailure | undefined {
   if (error instanceof AcquisitionFailureError) return error.category;
   if (error instanceof AntiBotBlockedError) return AccessFailure.Blocked;
@@ -32,6 +44,9 @@ export function classifyAccessFailure(error: unknown): AccessFailure | undefined
       ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN'].includes(String(error.code))
     )
       return AccessFailure.Transient;
+    if (PLAYWRIGHT_NETWORK_ERRORS.some((pattern) => error.message.includes(pattern))) {
+      return AccessFailure.Transient;
+    }
   }
   return undefined;
 }

@@ -10,7 +10,7 @@ Generate the minimal adequate strategy required to reliably extract the target d
 
 ### Intent Rules
 - Field IDs: English snake_case. displayName: user's language. observedLabel: literal observed label only.
-- Set mode: "collection" when extracting lists/tables of items; set mode: "single" when extracting a single entity.
+- Set mode: "collection" when extracting lists/tables of items (target the main recurring container, avoid single hero/featured cards); set mode: "single" when extracting a single entity.
 - Include required fields and stable collection identityFields (empty list for single entity).
 - Numbers: ALWAYS provide the 'locale' property on the field intent (e.g. "en-US" for English pages or comma-separated thousands like "1,000", "pt-BR" for Brazilian currency/numbers like "1.000,00"). Infer locale from page language, currency, or observed formatting. Booleans require explicit booleanValues mappings. Use string when type is unsupported by evidence.
 - Preserve requested alert triggerRules.
@@ -24,7 +24,7 @@ Generate the minimal adequate strategy required to reliably extract the target d
 - Pagination: when extracting a collection across multiple pages or infinite scroll, provide strategy.pagination (scroll, click, or link). Omit pagination when extracting only the current page.
 
 ### Syntax Contracts
-- Follow the exact JSON schema and use only its property names and kind values. Omit properties that do not apply to the chosen kind; do not invent aliases.
+- Follow the exact JSON schema: "fields" is a key-value object map (e.g. {"title": {...}}), never an array. Omit properties that do not apply; do not invent aliases.
 - Strategy fields must match intent fields exactly. Map to observed data by meaning and entity context.
 - Records use kind dom with selector, jsonld with type, or response with match and path.
 - Field sources must strictly match the records kind unless using an explicit association:
@@ -41,6 +41,7 @@ Generate the minimal adequate strategy required to reliably extract the target d
 - Conditions: exists, visible, absent, disabled (require locator); attribute (locator, attribute, optional value); field (field name); response (match.urlPattern, optional path/equals). Never use jsonld or dom as condition kinds.
 - Setup actions: click (locator), scroll (optional selector), wait (condition). Never submit forms, log in, purchase or change settings.
 - Single entity: select one unambiguous record; each DOM field selector must match at most one element per record.
+- Links in collection records: when multiple links exist in a card (tag, author, headline), anchor the link selector to the title element (e.g. "h2 a[href]", "a:has(h2)") to avoid ambiguous DOM sources.
 - Associations require observed exact key matches: localField must be required and directly sourced from the primary record; match exactly one foreign record.
 - Optional strategy.filters: filter extracted records (e.g. price < 100) using operator and threshold value. Keep intent and strategy field keys aligned and do not repeat a rejected strategy unchanged.
 `;

@@ -78,6 +78,18 @@ describe('Shared acquisition policy', () => {
         .map((item) => item.code)
     ).toEqual(['BLOCKED', 'REJECTED', 'ACCEPTED']);
   });
+  it('falls back to remote unblockers when browser fails with ERR_TUNNEL_CONNECTION_FAILED', async () => {
+    const tunnelError = new Error(
+      'page.goto: net::ERR_TUNNEL_CONNECTION_FAILED at https://example.com'
+    );
+    expect(classifyAccessFailure(tunnelError)).toBe('TRANSIENT');
+    const result = await executor([
+      candidate('browser', false, tunnelError, 'browser'),
+      candidate('good', true, '<body><h1>recovered</h1></body>'),
+    ]).execute('https://example.com', fixturePlan());
+    expect(result.report.quality).toBe('COMPLETE');
+    expect(result.data).toEqual({ title: 'recovered' });
+  });
   it('does not pay for local selector failures', async () => {
     const remote = candidate('remote', true, '<h1>remote</h1>');
     const result = await executor([

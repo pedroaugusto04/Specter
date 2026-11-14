@@ -111,12 +111,16 @@ class FixtureModelProvider implements IModelProvider {
   }
 }
 
-class CountingModelProvider implements IModelProvider {
+export class CountingModelProvider implements IModelProvider {
   readonly name: string;
   readonly callsByTask: ConfigurationEvaluationReport['modelCallsByTask'] = {};
 
   constructor(private readonly provider: IModelProvider) {
     this.name = provider.name;
+  }
+
+  get totalCalls(): number {
+    return Object.values(this.callsByTask).reduce((total, metric) => total + metric.calls, 0);
   }
 
   async generate(input: ModelInput): Promise<unknown> {

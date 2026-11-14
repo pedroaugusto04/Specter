@@ -2,11 +2,21 @@ import { env } from '../../config/env.js';
 import { CliCompilerProvider, type CliCompilerOptions } from './cliCompiler.provider.js';
 import { buildCodexCliCompilerPrompt } from './compilerPrompt.js';
 
-export type CodexCompilerOptions = CliCompilerOptions;
+export interface CodexCompilerOptions extends CliCompilerOptions {
+  model?: string;
+  sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
+}
 
 /** Runs Codex CLI locally with read-only access to an isolated compilation directory. */
 export class CodexCompilerProvider extends CliCompilerProvider {
   constructor(options: CodexCompilerOptions = {}) {
+    const model = options.model ?? process.env.COMPILER_CODEX_MODEL;
+    const defaultSandbox =
+      process.env.NODE_ENV === 'test'
+        ? 'read-only'
+        : (process.env.CODEX_SANDBOX as 'read-only' | 'workspace-write' | 'danger-full-access' | undefined) ??
+          'danger-full-access';
+    const sandbox = options.sandbox ?? defaultSandbox;
     super({
       ...options,
       providerName: 'codex',
@@ -17,8 +27,9 @@ export class CodexCompilerProvider extends CliCompilerProvider {
           'exec',
           '--ephemeral',
           '--skip-git-repo-check',
+          ...(model ? ['-m', model] : []),
           '--sandbox',
-          'read-only',
+          sandbox,
           '--output-last-message',
           outputFile,
           `Read and follow the instructions in ${JSON.stringify(promptFile)}. Return the final result only.`,
