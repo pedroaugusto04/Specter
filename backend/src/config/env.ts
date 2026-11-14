@@ -53,7 +53,7 @@ export const envSchema = z.object({
     .enum(['read-only', 'workspace-write', 'danger-full-access'])
     .default('read-only'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
-  COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(600000),
+  COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(300000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),
 
   // Scraping Engine & Concurrency
@@ -76,7 +76,7 @@ export const envSchema = z.object({
     .default('true')
     .transform((value) => value === 'true'),
   SEMANTIC_REVIEW_THRESHOLD: z.coerce.number().int().min(0).max(10).default(4),
-  EXTRACTION_ACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  EXTRACTION_ACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
   EXTRACTION_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(250),
   EXTRACTION_MAX_EVIDENCE: z.coerce.number().int().positive().default(200),
   EXTRACTION_EVIDENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
