@@ -9,10 +9,23 @@ import { acquire } from '../../acquisition/runner.js';
 import { requiresBrowser } from '../capabilities.js';
 
 export class DiscoveryDocumentAdapter implements DocumentAdapter {
+  private readonly browsers: Array<{ name: string; external: boolean; adapter: DocumentAdapter }>;
+
   constructor(
-    private readonly browser: DocumentAdapter,
+    browser: DocumentAdapter | Array<{ name: string; external?: boolean; adapter: DocumentAdapter }>,
     private readonly passive: DocumentCandidate[]
-  ) {}
+  ) {
+    if (Array.isArray(browser)) {
+      this.browsers = browser.map((b) => ({
+        name: b.name,
+        external: b.external ?? false,
+        adapter: b.adapter,
+      }));
+    } else {
+      this.browsers = [{ name: 'browser', external: false, adapter: browser }];
+    }
+  }
+
   async open(
     url: string,
     request: DocumentRequest,
@@ -20,7 +33,7 @@ export class DiscoveryDocumentAdapter implements DocumentAdapter {
     options: { storageState?: unknown }
   ): Promise<DocumentSession> {
     const candidates = [
-      { name: 'browser', external: false, adapter: this.browser },
+      ...this.browsers,
       ...(request.strategy && requiresBrowser(request.strategy) ? [] : this.passive),
     ];
     return acquire(

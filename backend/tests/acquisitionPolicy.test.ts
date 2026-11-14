@@ -113,6 +113,25 @@ describe('Shared acquisition policy', () => {
     expect(passive.adapter.open).not.toHaveBeenCalled();
     expect(plan.strategy.transport).toBe('browser');
   });
+  it('falls back from proxied browser to direct browser on proxy failure in discovery', async () => {
+    const proxiedBrowser = candidate('browser-proxied', false, new Error('page.goto: net::ERR_TUNNEL_CONNECTION_FAILED'), 'browser');
+    const directBrowser = candidate('browser-direct', false, '<h1>rendered by direct browser</h1>', 'browser');
+    const passive = candidate('passive', true, '<h1>passive</h1>', 'http');
+
+    const session = await new DiscoveryDocumentAdapter(
+      [
+        { name: 'browser-proxied', adapter: proxiedBrowser.adapter },
+        { name: 'browser-direct', adapter: directBrowser.adapter },
+      ],
+      [passive]
+    ).open('https://example.com', fixturePlan(), createExecutionContext(1000), {});
+
+    const snapshot = await session.snapshot();
+    expect(snapshot.html).toBe('<h1>rendered by direct browser</h1>');
+    expect(proxiedBrowser.adapter.open).toHaveBeenCalledTimes(1);
+    expect(directBrowser.adapter.open).toHaveBeenCalledTimes(1);
+    expect(passive.adapter.open).not.toHaveBeenCalled();
+  });
   it('shares compatibility policy with discovery', async () => {
     const browser = candidate('browser', false, new AntiBotBlockedError('blocked'), 'browser');
     const passive = candidate('passive', true, '<h1>remote</h1>');

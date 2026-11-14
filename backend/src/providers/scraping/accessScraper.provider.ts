@@ -13,11 +13,14 @@ export interface ScraperCandidate {
 /** Access-only acquisition; validated plan execution consumes the candidate catalog. */
 export class AccessScraperEngine implements IScraperEngine {
   readonly name: string;
+  private readonly localEngines: IScraperEngine[];
+
   constructor(
-    private readonly localEngine: IScraperEngine,
+    localEngine: IScraperEngine | IScraperEngine[],
     private readonly unblockers: IUnblockerProvider[] = []
   ) {
-    this.name = `access(${localEngine.name})`;
+    this.localEngines = Array.isArray(localEngine) ? localEngine : [localEngine];
+    this.name = `access(${this.localEngines.map((e) => e.name).join(',')})`;
   }
   async fetchHtml(url: string, options: ScrapeOptions = {}): Promise<ScrapeResult> {
     const context = createExecutionContext(
@@ -26,7 +29,7 @@ export class AccessScraperEngine implements IScraperEngine {
     );
     return acquire(
       [
-        { engine: this.localEngine, external: false },
+        ...this.localEngines.map((engine) => ({ engine, external: false })),
         ...this.unblockers
           .filter((item) => item.isEnabled())
           .map((engine) => ({ engine, external: true })),

@@ -17,17 +17,30 @@ export function createScraperEngine(
   capacity: IBrowserCapacity,
   engineName: 'playwright' | 'cheerio' = env.SCRAPER_ENGINE
 ): IScraperEngine {
-  const localEngine =
-    engineName === 'cheerio'
-      ? new CheerioScraperEngine()
-      : new PlaywrightScraperEngine(
-          new BrowserDocumentAdapter(executionPolicy(), capacity, env.HTTP_PROXY || undefined),
+  const localEngines: IScraperEngine[] = [];
+
+  if (engineName === 'cheerio') {
+    localEngines.push(new CheerioScraperEngine());
+  } else {
+    if (env.HTTP_PROXY) {
+      localEngines.push(
+        new PlaywrightScraperEngine(
+          new BrowserDocumentAdapter(executionPolicy(), capacity, env.HTTP_PROXY),
           executionPolicy()
-        );
+        )
+      );
+    }
+    localEngines.push(
+      new PlaywrightScraperEngine(
+        new BrowserDocumentAdapter(executionPolicy(), capacity),
+        executionPolicy()
+      )
+    );
+  }
 
   const unblockers = createUnblockers();
 
-  return new AccessScraperEngine(localEngine, unblockers);
+  return new AccessScraperEngine(localEngines, unblockers);
 }
 
 export function createUnblockers() {

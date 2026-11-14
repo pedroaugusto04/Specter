@@ -6,28 +6,52 @@ import { env } from '../config/env.js';
 import { executionPolicy } from './policy.js';
 import { BrowserDocumentAdapter } from './adapters/browserDocument.adapter.js';
 import { HttpDocumentAdapter } from './adapters/httpDocument.adapter.js';
-import { CoordinatedExecutor } from '../acquisition/coordinatedExecutor.js';
+import { CoordinatedExecutor, type DocumentCandidate } from '../acquisition/coordinatedExecutor.js';
 import type { ScraperCandidate } from '../providers/scraping/accessScraper.provider.js';
 import { PageExtractor } from './pageExtractor.js';
 import { PlanExecutionService } from '../services/planExecutionService.js';
 
 export function composeExtraction(scrapers: ScraperCandidate[], capacity: IBrowserCapacity) {
   const policy = executionPolicy();
-  const browser = new BrowserDocumentAdapter(policy, capacity, env.HTTP_PROXY || undefined);
+  const defaultBrowser = new BrowserDocumentAdapter(policy, capacity);
+  const browserCandidates: DocumentCandidate[] = [];
+
+  if (env.HTTP_PROXY) {
+    browserCandidates.push({
+      name: 'browser-proxied',
+      external: false,
+      transport: Transport.Browser,
+      adapter: new BrowserDocumentAdapter(policy, capacity, env.HTTP_PROXY),
+    });
+  }
+
+  browserCandidates.push({
+    name: 'browser',
+    external: false,
+    transport: Transport.Browser,
+    adapter: defaultBrowser,
+  });
+
   const candidates = scrapers.map(({ engine, external }) => ({
     name: engine.name,
     external,
     transport: Transport.Http,
     adapter: new HttpDocumentAdapter(engine, external),
   }));
-  const discovery = new DiscoveryDocumentAdapter(browser, candidates);
+  const discovery = new DiscoveryDocumentAdapter(browserCandidates, candidates);
   const executor = new CoordinatedExecutor(
     [
-      { name: 'browser', external: false, transport: Transport.Browser, adapter: browser },
+      ...browserCandidates,
       ...candidates,
     ],
     new PageExtractor(standardSourceReaders()),
     policy
   );
-  return { executor, planExecutor: new PlanExecutionService(executor), browser, discovery, policy };
+  return {
+    executor,
+    planExecutor: new PlanExecutionService(executor),
+    browser: browserCandidates[0]?.adapter ?? defaultBrowser,
+    discovery,
+    policy,
+  };
 }
