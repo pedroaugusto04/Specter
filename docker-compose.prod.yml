@@ -63,7 +63,10 @@ services:
       COMPILATION_MAX_ATTEMPTS: ${COMPILATION_MAX_ATTEMPTS:-3}
       COMPILATION_QUEUE_MAX_ATTEMPTS: ${COMPILATION_QUEUE_MAX_ATTEMPTS:-3}
       AGY_CLI_PATH: /usr/local/bin/agy
+      AGY_MODEL: ${AGY_MODEL:-}
       CODEX_CLI_PATH: /usr/local/bin/codex
+      COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
+      CODEX_SANDBOX: ${CODEX_SANDBOX:-read-only}
       CODEX_HOME: /root/.codex
     ports:
       - '${PORT:-3001}:3001'

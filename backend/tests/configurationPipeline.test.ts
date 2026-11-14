@@ -172,6 +172,8 @@ describe('Bounded configuration with tools', () => {
     await expect(fixture.pipeline.configure(request)).rejects.toThrow('Repeated rejected');
     expect(fixture.execute).toHaveBeenCalledOnce();
     expect(fixture.inputs[1]).toContain('Missing required title');
+    expect(fixture.inputs[1]).toContain('validation');
+    expect(fixture.inputs[1]).toContain('identityFields');
   });
   it('replays interactions when reopening investigation after validation failure', async () => {
     const action = {

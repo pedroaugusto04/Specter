@@ -1,14 +1,7 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { classifyEvalError } from './outcomes.js';
 import { describeFilters, resolveProviderInfo, type EvalCliOptions } from './cli.js';
-import { DEFAULT_EVAL_REPORT_DIR, providerSlug, writeEvalReport, type WrittenEvalReport } from './report.js';
-import {
-  SuccessfulOutcomes,
-  type EvalCaseResult,
-  type EvalTags,
-  type EvalTier,
-} from './types.js';
+import { writeEvalReport, type WrittenEvalReport } from './report.js';
+import { SuccessfulOutcomes, type EvalCaseResult, type EvalTags, type EvalTier } from './types.js';
 
 export interface EvalCaseDefinition {
   id: string;
@@ -17,7 +10,10 @@ export interface EvalCaseDefinition {
 }
 
 /** What a suite reports for one execution; timing and identity are filled by the runner. */
-export type EvalExecution = Omit<EvalCaseResult, 'caseId' | 'caseName' | 'run' | 'tags' | 'durationMs'>;
+export type EvalExecution = Omit<
+  EvalCaseResult,
+  'caseId' | 'caseName' | 'run' | 'tags' | 'durationMs'
+>;
 
 export interface EvalSuiteOptions<T extends EvalCaseDefinition> {
   suite: string;
@@ -43,41 +39,8 @@ export async function runEvalSuite<T extends EvalCaseDefinition>(
     `▶ ${suite.suite} (${suite.tier}) · provider=${provider.name}${provider.model ? ` model=${provider.model}` : ''} · ${suite.cases.length} casos × ${suite.options.runs} runs`
   );
 
-  const resumeMap = new Map<string, EvalCaseResult>();
-  if (suite.options.resume) {
-    try {
-      const baseDir = suite.options.outputDir ?? DEFAULT_EVAL_REPORT_DIR;
-      const slugSuite = suite.suite
-        .toLowerCase()
-        .replace(/[^a-z0-9.]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      const latestPath = resolve(baseDir, providerSlug(provider), slugSuite, 'latest', 'results.jsonl');
-      const content = await readFile(latestPath, 'utf8');
-      for (const line of content.split('\n')) {
-        if (!line.trim()) continue;
-        const parsed = JSON.parse(line) as EvalCaseResult;
-        if (SuccessfulOutcomes.has(parsed.outcome)) {
-          resumeMap.set(`${parsed.caseId}:${parsed.run}`, parsed);
-        }
-      }
-      if (resumeMap.size > 0) {
-        log(`ℹ Retomando execução: ${resumeMap.size} casos bem-sucedidos anteriores preservados.`);
-      }
-    } catch {
-      // Continue without cached entries if file does not exist
-    }
-  }
-
   for (let run = 1; run <= suite.options.runs; run++) {
     for (const item of suite.cases) {
-      const resumeKey = `${item.id}:${run}`;
-      const cached = resumeMap.get(resumeKey);
-      if (cached) {
-        results.push(cached);
-        log(`  ✔ [${results.length}/${total}] ${item.id} run=${run} ${cached.outcome} (preservado)`);
-        continue;
-      }
-
       const started = Date.now();
       let execution: EvalExecution;
       try {

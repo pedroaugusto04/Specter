@@ -46,7 +46,12 @@ export const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   AGY_CLI_PATH: z.string().min(1).default('agy'),
+  AGY_MODEL: z.string().trim().default(''),
   CODEX_CLI_PATH: z.string().min(1).default('codex'),
+  COMPILER_CODEX_MODEL: z.string().trim().default(''),
+  CODEX_SANDBOX: z
+    .enum(['read-only', 'workspace-write', 'danger-full-access'])
+    .default('read-only'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
   COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(600000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),

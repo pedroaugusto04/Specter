@@ -18,6 +18,16 @@ async function fixture() {
 const evaluate = (item: ConfigurationEvaluationCase) =>
   evaluateConfigurationCorpus([item], (entry) => createFixtureModelProvider(entry.responses));
 
+const expectFailure = (
+  item: ConfigurationEvaluationCase,
+  expectedErrorIncludes: string
+): ConfigurationEvaluationCase => ({
+  ...item,
+  expectedQuality: 'FAILED',
+  expectedErrorCode: 'CONFIGURATION_REJECTED',
+  expectedErrorIncludes,
+});
+
 describe('Evaluation graders detect regressions', () => {
   it('detects the wrong intent even when extracted fields match', async () => {
     const item = await fixture();
@@ -29,9 +39,7 @@ describe('Evaluation graders detect regressions', () => {
   });
 
   it('counts a false activation independently of correct values', async () => {
-    const item = await fixture();
-    item.expectedQuality = 'FAILED';
-    item.expectedErrorCode = 'CONFIGURATION_REJECTED';
+    const item = expectFailure(await fixture(), 'Semantic review rejected');
     const report = await evaluate(item);
     expect(report.falseAcceptances).toBe(1);
     expect(report.results[0]!.passed).toBe(false);
@@ -48,8 +56,7 @@ describe('Evaluation graders detect regressions', () => {
   });
 
   it('does not accept an arbitrary exception as an expected rejection', async () => {
-    const item = await fixture();
-    item.expectedQuality = 'FAILED';
+    const item = expectFailure(await fixture(), 'expected rejection');
     const report = await evaluateConfigurationCorpus([item], {
       name: 'unavailable',
       generate: async () => {

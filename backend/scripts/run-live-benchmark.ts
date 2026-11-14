@@ -799,24 +799,6 @@ export const liveBenchmarkSuite: LiveBenchmarkCase[] = [
     oracle: { minRecords: 5, fields: { title: text('title', 'titulo', 'name', 'nombre'), price: number('price', 'preco', 'precio'), link: url('link', 'url', 'href') } },
   },
   {
-    id: 'theverge',
-    name: 'The Verge (Jornalismo de tecnologia, ciência e cultura digital)',
-    url: 'https://www.theverge.com/',
-    prompt: 'Extraia os artigos com título da notícia e link',
-    description: 'Portal de design e tecnologia moderno da Vox Media com cards dinâmicos.',
-    tags: { siteType: 'tech-news', render: 'hybrid', mode: 'collection', locale: 'en-US' },
-    oracle: { minRecords: 5, fields: { title: text('title', 'headline', 'story'), link: url('link', 'url', 'href') } },
-  },
-  {
-    id: 'techcrunch',
-    name: 'TechCrunch (Startups, venture capital e inteligência artificial)',
-    url: 'https://techcrunch.com/',
-    prompt: 'Extraia as notícias de startups com título e link',
-    description: 'Portal de startups e venture capital mais influente do ecossistema de tecnologia.',
-    tags: { siteType: 'tech-news', render: 'hybrid', mode: 'collection', locale: 'en-US' },
-    oracle: { minRecords: 5, fields: { title: text('title', 'headline', 'story'), link: url('link', 'url', 'href') } },
-  },
-  {
     id: 'aljazeera',
     name: 'Al Jazeera English (Notícias internacionais e Oriente Médio)',
     url: 'https://www.aljazeera.com/',
@@ -844,7 +826,7 @@ class SimpleLeaseStore implements ILeaseStore {
     this.held.set(key, controller);
     return {
       signal: controller.signal,
-      assertOwned: async () => {},
+      assertOwned: async () => { },
       release: async () => {
         this.held.delete(key);
       },

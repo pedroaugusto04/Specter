@@ -12,7 +12,7 @@ import type {
 import type { ConfigurationModel, StageInput } from './model.js';
 import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
-import { extractionPlanSchema, normalizeExtractionCandidate } from '../types/extractionPlan.js';
+import { extractionPlanSchema, normalizeSingleFieldSources } from '../types/extractionPlan.js';
 import { redactObject, redactText } from './evidence.js';
 import { observationPacket } from './configurationTools.js';
 import { logger } from '../utils/logger.js';
@@ -77,7 +77,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
     const trace: StageTrace[] = [];
     const history: unknown[] = [];
     let attempts = 0;
-    let feedback = 'Configuration budget exhausted.';
+    let feedback = '';
     const progress = new ConfigurationProgress();
     const rejected = new Set<string>();
     const fail = (message: string, review?: SemanticReview): never => {
@@ -186,7 +186,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           }
           progress.reset();
           attempts++;
-          const plan = extractionPlanSchema.parse(normalizeExtractionCandidate(decision.plan));
+          const plan = extractionPlanSchema.parse(normalizeSingleFieldSources(decision.plan));
           if (request.intent && !sameIntent(request.intent, plan.intent))
             fail('Recovery cannot change extraction intent.');
           const key = canonicalJson(plan);
@@ -203,8 +203,20 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               captureScreenshot: request.captureScreenshot,
             })
           );
-          if (!isAcceptedExtractionQuality(execution.report.quality))
+          if (!isAcceptedExtractionQuality(execution.report.quality)) {
+            history.push({
+              id: decisionIndex,
+              validation: redactObject({
+                records: plan.strategy.records,
+                identityFields: plan.intent.identityFields,
+                quality: execution.report.quality,
+                issues: execution.report.issues.slice(0, 8),
+                sourcesUsed: execution.report.sourcesUsed,
+                evidence: execution.report.evidence?.slice(0, 8),
+              }),
+            });
             throw new Error(execution.report.issues.join(' '));
+          }
           if (
             !request.intent &&
             execution.report.quality === ExtractionQuality.Empty &&

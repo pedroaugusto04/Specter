@@ -2,7 +2,7 @@ import { ExtractionExecutor } from '../src/extraction/executor.js';
 import type { DocumentAdapter } from '../src/extraction/contracts.js';
 import { standardSourceReaders } from '../src/extraction/sources.js';
 import { describe, it, expect } from 'vitest';
-import { extractionPlanSchema, normalizeExtractionCandidate } from '../src/types/extractionPlan.js';
+import { extractionPlanSchema } from '../src/types/extractionPlan.js';
 import { PageExtractor } from '../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../src/extraction/values.js';
 import { matchesRecord } from '../src/extraction/recordFilter.js';
@@ -32,6 +32,13 @@ const extract = (html: string, input = plan) =>
     input
   );
 describe('Extraction contract and integrity', () => {
+  it('rejects missing numeric locale instead of guessing a regional format', () => {
+    const candidate = structuredClone(plan);
+    delete candidate.intent.fields.price!.locale;
+    const normalized = candidate;
+    expect(extractionPlanSchema.safeParse(normalized).success).toBe(false);
+    expect(candidate.intent.fields.price!.locale).toBeUndefined();
+  });
   it('captures final records after live terminal checks', async () => {
     const input = structuredClone(plan);
     input.intent.scope = 'collection';
@@ -166,12 +173,12 @@ describe('Extraction contract and integrity', () => {
     expect(
       convertFieldValue('1.299,99', { ...field, locale: 'pt-BR' }, 'https://example.com')
     ).toBe(1299.99);
-    expect(
-      convertFieldValue('2789.10', { ...field, locale: 'pt-BR' }, 'https://example.com')
-    ).toBe(2789.1);
-    expect(
-      convertFieldValue('42', { ...field, locale: undefined }, 'https://example.com')
-    ).toBe(42);
+    expect(convertFieldValue('2789.10', { ...field, locale: 'pt-BR' }, 'https://example.com')).toBe(
+      2789.1
+    );
+    expect(convertFieldValue('42', { ...field, locale: undefined }, 'https://example.com')).toBe(
+      42
+    );
     expect(convertFieldValue('US$ 49.99', field, 'https://example.com')).toBe(49.99);
     expect(convertFieldValue('CA$ 1,299.99', field, 'https://example.com')).toBe(1299.99);
     expect(
@@ -344,251 +351,109 @@ describe('Extraction contract and integrity', () => {
     };
     expect(extractionPlanSchema.safeParse(mixed).success).toBe(false);
   });
-  it('auto-promotes transport to browser when network response records or ready conditions are used', () => {
-    const responsePlan = {
-      intent: {
-        entity: 'active_clients',
-        mode: 'single',
-        scope: 'page',
-        fields: {
-          clients_count: {
-            description: 'Count of active clients',
-            type: 'number',
-            required: true,
-            locale: 'pt-BR',
-          },
+  it('rejects contradictory plans without mutating them', () => {
+    const variants = [
+      {
+        ...plan,
+        strategy: {
+          ...plan.strategy,
+          transport: 'http',
+          setup: [{ kind: 'click', locator: { kind: 'css', selector: 'button' } }],
         },
-        identityFields: [],
-        triggerRules: [],
-        triggerMatchMode: 'all',
       },
-      strategy: {
-        transport: 'http',
-        records: {
-          kind: 'response',
-          match: { urlPattern: 'https://example.com/api/overview', method: 'GET' },
-          path: ['data'],
+      { ...plan, intent: { ...plan.intent, identityFields: [] } },
+      { ...plan, intent: { ...plan.intent, mode: 'single' } },
+      { ...plan, intent: { ...plan.intent, unknown: true } },
+      { ...plan, strategy: { ...plan.strategy, ready: [] } },
+      { ...plan, strategy: { ...plan.strategy, fields: Object.values(plan.strategy.fields) } },
+      {
+        ...plan,
+        strategy: {
+          ...plan.strategy,
+          filters: [{ field: 'price', operator: 'less_than', value: '100' }],
         },
-        fields: {
-          clients_count: [{ kind: 'response', path: ['count'] }],
-        },
-        ready: [
-          {
-            kind: 'response',
-            match: { urlPattern: 'https://example.com/api/overview', method: 'GET' },
-            path: ['success'],
-            equals: true,
-          },
-        ],
-        empty: [],
       },
-    };
-    // Direct safeParse without normalization fails validation with actionable error
-    const directResult = extractionPlanSchema.safeParse(responsePlan);
-    expect(directResult.success).toBe(false);
-    if (!directResult.success) {
-      expect(directResult.error.issues).toContainEqual(
-        expect.objectContaining({
-          path: ['strategy', 'transport'],
-          message: expect.stringContaining('The selected strategy requires browser capabilities'),
-        })
-      );
+    ];
+    for (const candidate of variants) {
+      const before = structuredClone(candidate);
+      expect(extractionPlanSchema.safeParse(candidate).success).toBe(false);
+      expect(candidate).toEqual(before);
     }
-
-    // Normalizing candidate promotes transport to browser and passes schema parsing
-    const normalized = normalizeExtractionCandidate(responsePlan);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.strategy.transport).toBe('browser');
   });
-  it('auto-promotes transport to browser when setup interactions are used', () => {
-    const interactivePlan = {
-      intent: {
-        entity: 'active_clients',
-        mode: 'single',
-        scope: 'page',
+  it('rejects unusable boolean mappings', () => {
+    const mappings: Record<string, boolean>[] = [
+      { 'In stock': true },
+      { ' in stock ': true },
+      { 'in  stock': true },
+      {},
+    ];
+    for (const booleanValues of mappings) {
+      const candidate = fixturePlan({
         fields: {
-          clients_count: {
-            description: 'Count of active clients',
-            type: 'number',
-            required: true,
-            locale: 'pt-BR',
+          available: {
+            type: 'boolean',
+            booleanValues,
+            sources: [{ kind: 'dom', selector: '.stock', attribute: 'text' }],
           },
         },
-        identityFields: [],
-        triggerRules: [],
-        triggerMatchMode: 'all',
-      },
-      strategy: {
-        transport: 'http',
-        setup: [{ kind: 'click', locator: { kind: 'css', selector: 'button.clients' } }],
-        records: { kind: 'dom', selector: 'body' },
-        fields: {
-          clients_count: [{ kind: 'dom', selector: '.clients-count', attribute: 'text' }],
-        },
-        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.clients-count' } }],
-        empty: [],
-      },
-    };
-    const normalized = normalizeExtractionCandidate(interactivePlan);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.strategy.transport).toBe('browser');
-  });
-  it('preserves http transport when strategy has no browser-specific requirements', () => {
-    const parsed = extractionPlanSchema.parse(plan);
-    expect(parsed.strategy.transport).toBe('http');
-  });
-  it('auto-reconciles collection scope and mode when pagination is configured with page scope', () => {
-    const sigaaCandidate = {
-      intent: {
-        entity: 'latest_update',
-        mode: 'collection',
-        scope: 'page',
-        fields: {
-          date: {
-            displayName: 'Data',
-            observedLabel: '28/10/2026 -',
-            description: 'Data da atualização',
-            type: 'string',
-            required: true,
-          },
-          course: {
-            displayName: 'Curso',
-            observedLabel: 'INTRODUÇÃO À SOCIOLOGIA (2026.2)',
-            description: 'Nome da turma ou disciplina associada à atualização',
-            type: 'string',
-            required: true,
-          },
-          description: {
-            displayName: 'Descrição',
-            observedLabel: 'Nova Notícia: Ausência em aula do dia 29/10/2026',
-            description: 'Conteúdo ou descrição da atualização',
-            type: 'string',
-            required: true,
-          },
-        },
-        identityFields: ['date', 'course', 'description'],
-        triggerRules: [],
-        triggerMatchMode: 'all',
-      },
-      strategy: {
-        transport: 'browser',
-        records: { kind: 'dom', selector: '#atualizacoes-turma .rotator table' },
-        fields: {
-          date: [
-            {
-              kind: 'dom',
-              selector: 'tr:nth-child(1) td',
-              attribute: 'text',
-              pattern: '(\\d{2}/\\d{2}/\\d{4})',
-            },
-          ],
-          course: [{ kind: 'dom', selector: 'tr:nth-child(1) td a', attribute: 'text' }],
-          description: [{ kind: 'dom', selector: 'tr:nth-child(2) td', attribute: 'text' }],
-        },
-        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '#atualizacoes-turma' } }],
-        empty: [],
-        pagination: {
-          kind: 'scroll',
-          end: [{ kind: 'exists', locator: { kind: 'css', selector: '#atualizacoes-turma' } }],
-        },
-      },
-    };
-    const normalized = normalizeExtractionCandidate(sigaaCandidate);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.intent.scope).toBe('collection');
-    expect(parsed.intent.mode).toBe('collection');
-    expect(parsed.strategy.pagination?.kind).toBe('scroll');
-  });
-  it('auto-reconciles scope to page when collection scope is declared without pagination', () => {
-    const unpaginatedCollection = {
-      intent: {
-        entity: 'items',
-        mode: 'collection',
-        scope: 'collection',
-        fields: {
-          title: {
-            displayName: 'Title',
-            observedLabel: 'Item 1',
-            description: 'Item title',
-            type: 'string',
-            required: true,
-          },
-        },
-        identityFields: ['title'],
-        triggerRules: [],
-        triggerMatchMode: 'all',
-      },
-      strategy: {
-        transport: 'http',
-        records: { kind: 'dom', selector: '.item' },
-        fields: {
-          title: [{ kind: 'dom', selector: 'h2', attribute: 'text' }],
-        },
-        ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.item' } }],
-        empty: [],
-      },
-    };
-    const normalized = normalizeExtractionCandidate(unpaginatedCollection);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.intent.scope).toBe('page');
-  });
-  it('allows intent without scope, defaulting it cleanly', () => {
-    const minimalPlan = {
-      intent: {
-        entity: 'product',
-        mode: 'single',
-        fields: {
-          price: {
-            description: 'Product price',
-            type: 'number',
-            required: true,
-          },
-        },
-      },
-      strategy: {
-        transport: 'http',
-        records: { kind: 'dom', selector: '.product' },
-        fields: {
-          price: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
-        },
-      },
-    };
-    const normalized = normalizeExtractionCandidate(minimalPlan);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.intent.scope).toBe('page');
-    expect(parsed.intent.fields.price?.locale).toBe('pt-BR');
-    expect(parsed.strategy.ready.length).toBeGreaterThanOrEqual(1);
-  });
-  it('normalizes array fields and missing descriptions to valid schema objects', () => {
-    const candidateWithArrays = {
-      intent: {
-        entity: 'article',
-        mode: 'collection',
-        fields: [
-          { name: 'title', type: 'string', description: 'Article title', required: true },
-          { name: 'link', type: 'url', description: 'Article URL', required: true },
-        ],
-      },
-      strategy: {
-        transport: 'http',
-        records: { kind: 'dom', selector: 'article' },
-        fields: [
-          { name: 'title', sources: [{ kind: 'dom', selector: 'h2', attribute: 'text' }] },
-          { name: 'link', source: { kind: 'dom', selector: 'a', attribute: 'href' } },
-        ],
-      },
-    };
-    const normalized = normalizeExtractionCandidate(candidateWithArrays);
-    const parsed = extractionPlanSchema.parse(normalized);
-    expect(parsed.intent.fields.title?.required).toBe(true);
-    expect(parsed.intent.fields.link?.required).toBe(true);
-    const linkSources = parsed.strategy.fields.link;
-    expect(Array.isArray(linkSources)).toBe(true);
-    const firstLink = linkSources?.[0];
-    expect(firstLink?.kind).toBe('dom');
-    if (firstLink?.kind === 'dom') {
-      expect(firstLink.selector).toBe('a');
+      });
+      expect(extractionPlanSchema.safeParse(candidate).success).toBe(false);
     }
+  });
+  it('rejects type-specific options that execution would ignore', () => {
+    const options: Record<string, unknown> = {
+      locale: 'en-US',
+      booleanValues: { yes: true },
+      normalizeVolatileText: true,
+    };
+    for (const type of ['string', 'url', 'date', 'number', 'boolean'] as const) {
+      const allowed =
+        type === 'number' || type === 'date'
+          ? ['locale']
+          : type === 'boolean'
+            ? ['booleanValues']
+            : type === 'string'
+              ? ['normalizeVolatileText']
+              : [];
+      const field = {
+        description: 'Value',
+        required: true,
+        type,
+        ...(type === 'number' ? { locale: 'en-US' } : {}),
+        ...(type === 'boolean' ? { booleanValues: { yes: true } } : {}),
+      };
+      const candidate = {
+        ...plan,
+        intent: { ...plan.intent, fields: { id: plan.intent.fields.id, price: field } },
+      };
+      expect(extractionPlanSchema.safeParse(candidate).success).toBe(true);
+      for (const [key, value] of Object.entries(options)) {
+        if (allowed.includes(key)) continue;
+        const invalid = {
+          ...candidate,
+          intent: {
+            ...candidate.intent,
+            fields: { ...candidate.intent.fields, price: { ...field, [key]: value } },
+          },
+        };
+        expect(extractionPlanSchema.safeParse(invalid).success).toBe(false);
+      }
+    }
+  });
+  it('preserves a valid canonical plan', () => {
+    expect(extractionPlanSchema.parse(plan)).toEqual(plan);
+    const completeCollectionOnOnePage = {
+      ...plan,
+      intent: { ...plan.intent, scope: 'collection' },
+    };
+    expect(extractionPlanSchema.parse(completeCollectionOnOnePage).intent.scope).toBe('collection');
+  });
+  it('rejects ambiguous dates without a locale', () => {
+    const field = { type: 'date' as const, description: 'Date', required: true };
+    expect(convertFieldValue('03/04/2026', field, 'https://example.com')).toBeNull();
+    expect(
+      convertFieldValue('03/04/2026', { ...field, locale: 'en-US' }, 'https://example.com')
+    ).toBe('2026-03-04T00:00:00.000Z');
   });
 });
 describe('Common execution and comparisons', () => {

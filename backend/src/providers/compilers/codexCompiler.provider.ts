@@ -10,13 +10,8 @@ export interface CodexCompilerOptions extends CliCompilerOptions {
 /** Runs Codex CLI locally with read-only access to an isolated compilation directory. */
 export class CodexCompilerProvider extends CliCompilerProvider {
   constructor(options: CodexCompilerOptions = {}) {
-    const model = options.model ?? process.env.COMPILER_CODEX_MODEL;
-    const defaultSandbox =
-      process.env.NODE_ENV === 'test'
-        ? 'read-only'
-        : (process.env.CODEX_SANDBOX as 'read-only' | 'workspace-write' | 'danger-full-access' | undefined) ??
-          'danger-full-access';
-    const sandbox = options.sandbox ?? defaultSandbox;
+    const model = options.model ?? env.COMPILER_CODEX_MODEL;
+    const sandbox = options.sandbox ?? env.CODEX_SANDBOX;
     super({
       ...options,
       providerName: 'codex',

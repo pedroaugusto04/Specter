@@ -73,13 +73,6 @@ export const USER_FAILURES = Object.freeze({
 });
 
 export function getUserFailure(message) {
-  const legacy = {
-    'Browser capacity is currently in use. Please try again later.':
-      USER_FAILURES.resourceUnavailable,
-    'The AI provider rate limit was reached. Please try again later.':
-      USER_FAILURES.compilerRateLimited,
-  };
-  if (Object.hasOwn(legacy, message)) return legacy[message];
   if (/^Self-healing retry limit exceeded \(\d+\): /.test(message)) {
     return USER_FAILURES.configurationRejected;
   }

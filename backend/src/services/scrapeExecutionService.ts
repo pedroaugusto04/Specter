@@ -159,15 +159,16 @@ export class ScrapeExecutionService {
             job.failureCount + 1 >= this.consecutiveFailuresForHealing)
         )
           throw new SelectorMismatchError(execution.report.issues.join(' '));
+        const invalidExtractionMessage = formatUserErrorMessage(
+          new SelectorMismatchError('Extraction could not be validated.')
+        );
         await this.deps.jobRepository.createRun({
           jobId: job.id,
           extractedData,
           hasChanges: ChangeStatus.Unchanged,
           status: RunStatus.Failed,
           extractionReport: presentExtractionReport(execution.report),
-          errorMessage: formatUserErrorMessage(
-            new SelectorMismatchError('Extraction could not be validated.')
-          ),
+          errorMessage: invalidExtractionMessage,
           httpStatus,
         });
         const selectorFailure =
@@ -175,9 +176,7 @@ export class ScrapeExecutionService {
           execution.report.failureCode === FailureCode.Readiness ||
           execution.report.failureCode === FailureCode.NoProgress;
         await this.deps.jobRepository.updateJob(job.id, {
-          lastError: formatUserErrorMessage(
-            new SelectorMismatchError('Extraction could not be validated.')
-          ),
+          lastError: invalidExtractionMessage,
           ...(selectorFailure ? { failureCount: job.failureCount + 1 } : { failureCount: 0 }),
         });
         return null;
@@ -271,7 +270,7 @@ export class ScrapeExecutionService {
       if (error instanceof SelectorMismatchError) {
         const inHealingWindow = Boolean(
           job.healingWindowStartedAt &&
-            Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
+          Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
         );
         const currentHealingAttempts = inHealingWindow ? (job.healingAttempts ?? 0) : 0;
         const newFailureCount = job.failureCount + 1;

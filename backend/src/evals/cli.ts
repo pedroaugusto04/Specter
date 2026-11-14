@@ -11,18 +11,17 @@ export interface EvalCliOptions {
   /** Tag filters (`--tag siteType=news`), all must match. */
   tags: Record<string, string>;
   outputDir?: string;
-  /** Skip already successful cases from previous run and merge results. */
-  resume?: boolean;
 }
 
 function readFlags(argv: string[]): Map<string, string[]> {
   const flags = new Map<string, string[]>();
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index]!;
-    if (!token.startsWith('--')) continue;
+    if (!token.startsWith('--')) throw new Error('Unexpected argument: ' + token);
     const [rawName, inline] = token.slice(2).split(/=(.*)/s, 2) as [string, string | undefined];
     const next = argv[index + 1];
-    const value = inline ?? (next !== undefined && !next.startsWith('--') ? (index++, next) : 'true');
+    const value =
+      inline ?? (next !== undefined && !next.startsWith('--') ? (index++, next) : 'true');
     flags.set(rawName, [...(flags.get(rawName) ?? []), value]);
   }
   return flags;
@@ -30,7 +29,6 @@ function readFlags(argv: string[]): Map<string, string[]> {
 
 /**
  * Parses shared eval flags. Supports `--flag=value` and `--flag value`.
- * Legacy aliases `--scenario` and `--site` map to `--case`.
  */
 export function parseEvalArgs(argv: string[]): EvalCliOptions {
   const flags = readFlags(argv);
@@ -43,15 +41,22 @@ export function parseEvalArgs(argv: string[]): EvalCliOptions {
     if (!key || !value) throw new Error(`Invalid --tag "${entry}". Use --tag dimension=value.`);
     tags[key] = value;
   }
-  const cases = ['case', 'scenario', 'site']
-    .flatMap((name) => flags.get(name) ?? [])
+  const unknown = [...flags.keys()].filter(
+    (name) => !['provider', 'model', 'runs', 'case', 'tag', 'out', 'resume'].includes(name)
+  );
+  if (unknown.length)
+    throw new Error('Unknown option(s): ' + unknown.map((name) => '--' + name).join(', '));
+  const cases = (flags.get('case') ?? [])
     .flatMap((value) => value.split(','))
     .map((value) => value.trim())
     .filter(Boolean);
   const provider = last('provider');
   const model = last('model');
   const outputDir = last('out');
-  const resume = flags.has('resume');
+  if (flags.has('resume'))
+    throw new Error(
+      '--resume is no longer supported: cached successes bias benchmark results. Run a fresh suite or select cases with --case.'
+    );
   return {
     runs,
     cases,
@@ -59,7 +64,6 @@ export function parseEvalArgs(argv: string[]): EvalCliOptions {
     ...(provider ? { provider } : {}),
     ...(model ? { model } : {}),
     ...(outputDir ? { outputDir } : {}),
-    ...(resume ? { resume: true } : {}),
   };
 }
 
@@ -86,6 +90,11 @@ export function selectEvalCases<T extends { id: string; tags: EvalTags }>(
   cases: T[],
   options: Pick<EvalCliOptions, 'cases' | 'tags'>
 ): T[] {
+  const seen = new Set<string>();
+  for (const item of cases) {
+    if (seen.has(item.id)) throw new Error(`Duplicate eval case id: ${item.id}`);
+    seen.add(item.id);
+  }
   const unknown = options.cases.filter((id) => !cases.some((item) => item.id === id));
   if (unknown.length) throw new Error(`Unknown eval case(s): ${unknown.join(', ')}.`);
   return cases.filter((item) => {
@@ -100,6 +109,8 @@ export function selectEvalCases<T extends { id: string; tags: EvalTags }>(
 export function describeFilters(options: Pick<EvalCliOptions, 'cases' | 'tags'>) {
   return {
     ...(options.cases.length ? { cases: options.cases } : {}),
-    ...(Object.keys(options.tags).length ? { tags: Object.entries(options.tags).map(([k, v]) => `${k}=${v}`) } : {}),
+    ...(Object.keys(options.tags).length
+      ? { tags: Object.entries(options.tags).map(([k, v]) => `${k}=${v}`) }
+      : {}),
   };
 }

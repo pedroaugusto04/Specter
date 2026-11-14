@@ -1,5 +1,6 @@
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { describe, expect, it } from 'vitest';
-import { extractionPlanSchema } from '../src/types/extractionPlan.js';
+import { extractionPlanSchema, extractionIntentSchema } from '../src/types/extractionPlan.js';
 import { fixturePlan } from './helpers/extractionFixtures.js';
 import { modelConfigurationDecisionSchema } from '../src/extraction/configurationSchemas.js';
 import { ConfigurationDecisionKind } from '../src/extraction/configurationConstants.js';
@@ -8,6 +9,34 @@ import { SemanticReviewStatus } from '../src/extraction/constants.js';
 import { observation } from '../src/extraction/configurationTools.js';
 
 describe('Single extraction contract', () => {
+  it('publishes numeric locale and boolean mapping requirements in the model JSON schema', () => {
+    const schema = zodToJsonSchema(extractionIntentSchema, { $refStrategy: 'none' }) as {
+      additionalProperties: boolean;
+      properties: {
+        fields: {
+          additionalProperties: {
+            anyOf: Array<{
+              properties: Record<string, unknown> & { type: { const: string } };
+              required: string[];
+            }>;
+          };
+        };
+      };
+    };
+    const variants = schema.properties.fields.additionalProperties.anyOf;
+    const number = variants.find((variant) => variant.properties.type.const === 'number');
+    const boolean = variants.find((variant) => variant.properties.type.const === 'boolean');
+    expect(number?.required).toContain('locale');
+    expect(boolean?.required).toContain('booleanValues');
+    expect(schema.additionalProperties).toBe(false);
+    for (const variant of variants) {
+      const type = variant.properties.type.const;
+      expect('booleanValues' in variant.properties).toBe(type === 'boolean');
+      expect('normalizeVolatileText' in variant.properties).toBe(type === 'string');
+      expect('locale' in variant.properties).toBe(type === 'number' || type === 'date');
+    }
+  });
+
   it('uses one strict plan shape in the domain and model output', () => {
     const plan = fixturePlan();
     expect(Object.keys(plan).sort()).toEqual(['intent', 'strategy']);

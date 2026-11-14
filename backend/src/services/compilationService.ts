@@ -26,6 +26,20 @@ import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
 
+function compilationFailureStatus(input: {
+  reason?: CompilationReason;
+  willRetry: boolean;
+  hasExistingPlan: boolean;
+  error: unknown;
+}): JobStatus {
+  const { reason, willRetry, hasExistingPlan, error } = input;
+  if (reason === CompilationReason.Healing)
+    return error instanceof DomainError && error.isRetryable ? JobStatus.Healing : JobStatus.Failed;
+  if (willRetry && error instanceof CompilerApiRequestError && error.statusCode === 429)
+    return JobStatus.PendingCompilation;
+  return hasExistingPlan ? JobStatus.Active : JobStatus.Failed;
+}
+
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
   configurationPipeline: IConfigurationPipeline;
@@ -73,11 +87,7 @@ export class CompilationService {
               status: JobStatus.Failed,
               lastError: quotaErr.message,
             });
-            await this.deps.realtimeService?.notifyJobUpdated(
-              job.userId,
-              job.id,
-              JobStatus.Failed
-            );
+            await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
             return (await this.deps.jobRepository.findById(job.id)) ?? job;
           }
           throw quotaErr;
@@ -237,16 +247,12 @@ export class CompilationService {
 
       const retryableHealingFailure =
         reason === CompilationReason.Healing && error instanceof DomainError && error.isRetryable;
-      const failureStatus =
-        reason === CompilationReason.Healing
-          ? retryableHealingFailure
-            ? JobStatus.Healing
-            : JobStatus.Failed
-          : willRetry && error instanceof CompilerApiRequestError && error.statusCode === 429
-            ? JobStatus.PendingCompilation
-            : job.extractionPlan
-              ? JobStatus.Active
-              : JobStatus.Failed;
+      const failureStatus = compilationFailureStatus({
+        reason,
+        willRetry,
+        hasExistingPlan: Boolean(job.extractionPlan),
+        error,
+      });
       await this.deps.jobRepository.updateJob(job.id, {
         status: failureStatus,
         lastError: userMessage,

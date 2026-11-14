@@ -31,6 +31,20 @@ describe('checkInvariants', () => {
     },
   };
 
+  it('rejects unconverted numeric strings and error messages containing digits', () => {
+    for (const price of ['error 404', '12.50', Infinity, NaN]) {
+      expect(
+        checkInvariants(
+          [
+            { title: 'A', price },
+            { title: 'B', price },
+          ],
+          oracle
+        ).outcome
+      ).toBe(EvalOutcome.WrongValue);
+    }
+  });
+
   it('passes when all invariants hold', () => {
     const records = [
       { title: 'Widget A', price: 29.9, link: 'https://example.com/a' },
@@ -54,10 +68,7 @@ describe('checkInvariants', () => {
   });
 
   it('returns PARTIAL when a required field is missing from all records', () => {
-    const records = [
-      { price: 10 },
-      { price: 20 },
-    ];
+    const records = [{ price: 10 }, { price: 20 }];
     // Neither has "title" or "name"
     expect(checkInvariants(records, oracle).outcome).toBe(EvalOutcome.Partial);
   });

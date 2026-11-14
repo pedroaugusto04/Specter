@@ -70,6 +70,9 @@ env:
   HEALING_WINDOW_MS: ${{ vars.HEALING_WINDOW_MS || '86400000' }}
   COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'agy' }}
   COMPILER_API_MODEL: ${{ vars.COMPILER_API_MODEL || '' }}
+  AGY_MODEL: ${{ vars.AGY_MODEL || '' }}
+  COMPILER_CODEX_MODEL: ${{ vars.COMPILER_CODEX_MODEL || '' }}
+  CODEX_SANDBOX: ${{ vars.CODEX_SANDBOX || 'read-only' }}
   COMPILER_API_BASE_URL: ${{ vars.COMPILER_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
   COMPILER_API_MAX_RETRIES: ${{ vars.COMPILER_API_MAX_RETRIES || '3' }}
   COMPILER_API_RETRY_BASE_DELAY_MS: ${{ vars.COMPILER_API_RETRY_BASE_DELAY_MS || '1000' }}
@@ -279,6 +282,9 @@ jobs:
           HEALING_WINDOW_MS: ${{ env.HEALING_WINDOW_MS }}
           COMPILER_PROVIDER: ${{ env.COMPILER_PROVIDER }}
           COMPILER_API_MODEL: ${{ env.COMPILER_API_MODEL }}
+          AGY_MODEL: ${{ env.AGY_MODEL }}
+          COMPILER_CODEX_MODEL: ${{ env.COMPILER_CODEX_MODEL }}
+          CODEX_SANDBOX: ${{ env.CODEX_SANDBOX }}
           COMPILER_API_KEY: ${{ secrets.COMPILER_API_KEY }}
           COMPILER_API_BASE_URL: ${{ env.COMPILER_API_BASE_URL }}
           COMPILER_API_MAX_RETRIES: ${{ env.COMPILER_API_MAX_RETRIES }}

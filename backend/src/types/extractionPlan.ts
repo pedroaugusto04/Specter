@@ -30,7 +30,12 @@ export const locatorSchema = z.discriminatedUnion('kind', [
     .object({ kind: z.literal('role'), role: text, name: text, exact: z.boolean().optional() })
     .strict(),
 ]);
-const match = z.object({ urlPattern: text, method: text.optional() }).strict();
+const match = z
+  .object({
+    urlPattern: text.describe('Literal URL substring, not a regex or glob.'),
+    method: text.optional(),
+  })
+  .strict();
 export const conditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('exists'), locator: locatorSchema }).strict(),
   z.object({ kind: z.literal('visible'), locator: locatorSchema }).strict(),
@@ -64,11 +69,17 @@ export const sourceSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal(SourceKind.Dom),
-      selector: text,
-      attribute: text.refine((attribute) => !['textContent', 'innerText'].includes(attribute), {
-        message: 'Use "text" to read DOM text.',
-      }),
-      pattern: text.optional(),
+      selector: text.describe(
+        'CSS selector relative to the record; :scope reads the record itself.'
+      ),
+      attribute: text
+        .describe('text reads textContent; otherwise use the HTML attribute name.')
+        .refine((attribute) => !['textContent', 'innerText'].includes(attribute), {
+          message: 'Use "text" to read DOM text.',
+        }),
+      pattern: text
+        .describe('Unicode regex: first capture group, or whole match when no group exists.')
+        .optional(),
       association: text.optional(),
     })
     .strict(),
@@ -77,25 +88,73 @@ export const sourceSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal(SourceKind.Response), path, association: text.optional() }).strict(),
 ]);
+const fieldProperties = {
+  displayName: text.optional(),
+  observedLabel: text.optional(),
+  description: text,
+  required: z.boolean(),
+};
 export const extractionIntentSchema = z
   .object({
     entity: text,
     mode: z.nativeEnum(ExtractionMode),
-    scope: z.nativeEnum(ExtractionScope).optional().default(ExtractionScope.Page),
+    scope: z
+      .nativeEnum(ExtractionScope)
+      .default(ExtractionScope.Page)
+      .describe(
+        'Requested coverage: page means the current page; collection means the complete logical collection. Pagination is only one possible strategy to achieve collection coverage.'
+      ),
     fields: z.record(
       z.string().regex(/^[a-z][a-z0-9_]*$/),
-      z
-        .object({
-          displayName: text.optional(),
-          observedLabel: text.optional(),
-          description: text,
-          type: z.nativeEnum(FieldType),
-          required: z.boolean(),
-          normalizeVolatileText: z.boolean().optional(),
-          locale: text.optional(),
-          booleanValues: z.record(z.boolean()).optional(),
-        })
-        .strict()
+      z.discriminatedUnion('type', [
+        z
+          .object({
+            ...fieldProperties,
+            type: z.literal(FieldType.String),
+            normalizeVolatileText: z
+              .boolean()
+              .describe(
+                'Normalize volatile text before comparison; enable only when requested meaning is preserved.'
+              )
+              .optional(),
+          })
+          .strict(),
+        z.object({ ...fieldProperties, type: z.literal(FieldType.Url) }).strict(),
+        z
+          .object({
+            ...fieldProperties,
+            type: z.literal(FieldType.Date),
+            locale: text
+              .describe(
+                'Determines day/month order for ambiguous numeric dates; does not parse month names.'
+              )
+              .optional(),
+          })
+          .strict(),
+        z
+          .object({
+            ...fieldProperties,
+            type: z.literal(FieldType.Number),
+            locale: text.describe('Observed numeric locale, e.g. en-US or pt-BR.'),
+          })
+          .strict(),
+        z
+          .object({
+            ...fieldProperties,
+            type: z.literal(FieldType.Boolean),
+            booleanValues: z.record(
+              z
+                .string()
+                .min(1)
+                .regex(/^[^A-Z]*$/, 'Mapping keys must be lowercase.')
+                .describe(
+                  'Exact observed text, lowercase, trimmed, with internal whitespace collapsed.'
+                ),
+              z.boolean()
+            ),
+          })
+          .strict(),
+      ])
     ),
     identityFields: z.array(text).default([]),
     triggerRules: z
@@ -110,7 +169,8 @@ export const extractionIntentSchema = z
       )
       .default([]),
     triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
-  });
+  })
+  .strict();
 export const executionStrategySchema = z
   .object({
     transport: z.nativeEnum(Transport),
@@ -171,113 +231,6 @@ export const executionStrategySchema = z
   })
   .strict();
 
-export function normalizeExtractionCandidate(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object' || !('strategy' in raw) || !('intent' in raw)) {
-    return raw;
-  }
-  const plan = raw as { strategy: any; intent: any };
-  const s = plan.strategy;
-  const intent = plan.intent;
-  if (!s || typeof s !== 'object' || !intent || typeof intent !== 'object') {
-    return raw;
-  }
-
-  if (Array.isArray(intent.fields)) {
-    const normalized: Record<string, any> = {};
-    for (const item of intent.fields) {
-      if (item && typeof item === 'object') {
-        const key = item.name || item.key || item.field || item.id;
-        if (typeof key === 'string' && key.trim()) {
-          const sanitizedKey = key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
-          const fieldDef = { ...item };
-          delete fieldDef.name;
-          delete fieldDef.key;
-          delete fieldDef.field;
-          delete fieldDef.id;
-          normalized[sanitizedKey] = fieldDef;
-        }
-      }
-    }
-    intent.fields = normalized;
-  }
-
-  if (intent.fields && typeof intent.fields === 'object' && !Array.isArray(intent.fields)) {
-    for (const field of Object.values(intent.fields as Record<string, any>)) {
-      if (field && typeof field === 'object' && field.type === FieldType.Number && !field.locale) {
-        field.locale = 'pt-BR';
-      }
-    }
-  }
-
-  if (Array.isArray(s.fields)) {
-    const normalized: Record<string, any> = {};
-    for (const item of s.fields) {
-      if (item && typeof item === 'object') {
-        const key = item.name || item.key || item.field || item.id;
-        if (typeof key === 'string' && key.trim()) {
-          const sanitizedKey = key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
-          const rawSources = item.sources || item.source || item.records;
-          const sources = rawSources !== undefined ? rawSources : item;
-          const cleanSources = (Array.isArray(sources) ? sources : [sources]).map((src: any) => {
-            if (src && typeof src === 'object') {
-              const cleaned = { ...src };
-              delete cleaned.name;
-              delete cleaned.key;
-              delete cleaned.field;
-              delete cleaned.id;
-              return cleaned;
-            }
-            return src;
-          });
-          normalized[sanitizedKey] = cleanSources;
-        }
-      }
-    }
-    s.fields = normalized;
-  } else if (s.fields && typeof s.fields === 'object' && !Array.isArray(s.fields)) {
-    for (const [key, val] of Object.entries(s.fields as Record<string, any>)) {
-      if (val && typeof val === 'object' && !Array.isArray(val)) {
-        s.fields[key] = [val];
-      }
-    }
-  }
-
-  if (s.transport === Transport.Http && requiresBrowser(s)) {
-    s.transport = Transport.Browser;
-  }
-
-  if (!Array.isArray(s.ready) || s.ready.length === 0) {
-    if (s.records?.kind === SourceKind.Dom && typeof s.records.selector === 'string') {
-      s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: s.records.selector } }];
-    } else if (s.records?.kind === SourceKind.JsonLd) {
-      s.ready = [{ kind: 'exists', locator: { kind: 'css', selector: 'script[type="application/ld+json"]' } }];
-    }
-  }
-
-  if (!Array.isArray(s.empty)) {
-    s.empty = [];
-  }
-
-  const hasPagination = Boolean(s.pagination);
-  intent.scope = hasPagination ? ExtractionScope.Collection : ExtractionScope.Page;
-  if (hasPagination) {
-    intent.mode = ExtractionMode.Collection;
-  }
-
-  if (intent.mode === ExtractionMode.Collection && intent.fields) {
-    if (!Array.isArray(intent.identityFields) || intent.identityFields.length === 0) {
-      intent.identityFields = Object.keys(intent.fields);
-    }
-    for (const key of intent.identityFields) {
-      if (intent.fields[key]) {
-        intent.fields[key].required = true;
-      }
-    }
-  }
-
-
-  return plan;
-}
 export const extractionPlanSchema = z
   .object({
     intent: extractionIntentSchema,
@@ -289,12 +242,19 @@ export const extractionPlanSchema = z
       ctx.addIssue({ code: 'custom', message, path });
     const { intent, strategy: execution } = plan;
 
-    if (execution.pagination) {
-      intent.scope = ExtractionScope.Collection;
-      intent.mode = ExtractionMode.Collection;
-    } else {
-      intent.scope = ExtractionScope.Page;
-    }
+    if (execution.pagination && intent.scope !== ExtractionScope.Collection)
+      issue('Pagination requires collection scope.', ['intent', 'scope']);
+    if (
+      intent.mode === ExtractionMode.Single &&
+      (intent.scope !== ExtractionScope.Page ||
+        execution.pagination ||
+        intent.identityFields.length)
+    )
+      issue('Single entities require page scope, no pagination, and empty identityFields.', [
+        'intent',
+      ]);
+    if (new Set(intent.identityFields).size !== intent.identityFields.length)
+      issue('Identity fields must not repeat.', ['intent', 'identityFields']);
 
     if (!Object.keys(intent.fields).length)
       issue('At least one field is required.', ['intent', 'fields']);
@@ -307,7 +267,7 @@ export const extractionPlanSchema = z
     for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
       if (!intent.fields[key]?.required)
         issue(`Referenced field '${key}' must exist and be required.`, ['intent', 'fields', key]);
-    for (const rule of intent.triggerRules) {
+    for (const rule of [...intent.triggerRules, ...(execution.filters ?? [])]) {
       const field = intent.fields[rule.field];
       if (!field) continue;
       if (!triggerOperatorsForType(field.type).includes(rule.operator))
@@ -338,10 +298,14 @@ export const extractionPlanSchema = z
       }
     }
     for (const [key, field] of Object.entries(intent.fields)) {
-      if (field.type === FieldType.Number && !field.locale) {
-        field.locale = 'pt-BR';
-      }
-      if (field.locale) {
+      if (
+        field.type === FieldType.Boolean &&
+        Object.keys(field.booleanValues).some(
+          (value) => value !== value.toLowerCase().replace(/\s+/g, ' ').trim() || !value
+        )
+      )
+        issue(`Boolean mapping keys for '${key}' must be lowercase with normalized whitespace.`);
+      if ((field.type === FieldType.Number || field.type === FieldType.Date) && field.locale) {
         try {
           new Intl.NumberFormat(field.locale);
         } catch {
@@ -363,7 +327,11 @@ export const extractionPlanSchema = z
       execution.pagination.kind !== 'scroll' &&
       !execution.pagination.next
     )
-      issue('Link and click pagination require a next locator.', ['strategy', 'pagination', 'next']);
+      issue('Link and click pagination require a next locator.', [
+        'strategy',
+        'pagination',
+        'next',
+      ]);
     for (const filter of execution.filters ?? [])
       if (!intent.fields[filter.field]?.required)
         issue('Record filters require a declared, required field.');
@@ -405,3 +373,20 @@ export const extractionPlanSchema = z
         ['strategy', 'transport']
       );
   });
+
+/** Wrap a lone valid source in the canonical array shape; leave all other input untouched. */
+export function normalizeSingleFieldSources(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || !('strategy' in raw)) return raw;
+  const plan = raw as { strategy?: unknown };
+  if (!plan.strategy || typeof plan.strategy !== 'object' || !('fields' in plan.strategy))
+    return raw;
+  const strategy = plan.strategy as { fields?: unknown };
+  if (!strategy.fields || typeof strategy.fields !== 'object' || Array.isArray(strategy.fields))
+    return raw;
+  const fields = Object.fromEntries(
+    Object.entries(strategy.fields).map(([key, value]) =>
+      !Array.isArray(value) && sourceSchema.safeParse(value).success ? [key, [value]] : [key, value]
+    )
+  );
+  return { ...plan, strategy: { ...strategy, fields } };
+}

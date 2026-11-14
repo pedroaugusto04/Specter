@@ -108,10 +108,7 @@ describe('public failure details', () => {
     expect(getUserFailure('secret token')).toEqual(USER_FAILURES.requestFailed);
   });
 
-  it('translates old public messages without exposing technical vocabulary', () => {
-    expect(
-      presentStoredError('The AI provider rate limit was reached. Please try again later.')
-    ).toBe(USER_FAILURES.compilerRateLimited.description);
+  it('maps stored retry-limit errors to approved public copy', () => {
     expect(presentStoredError('Self-healing retry limit exceeded (3): internal details')).toBe(
       USER_FAILURES.configurationRejected.description
     );

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseEvalArgs, selectEvalCases, resolveProviderInfo, applyProviderOverride } from '../src/evals/cli.js';
+import {
+  parseEvalArgs,
+  selectEvalCases,
+  resolveProviderInfo,
+  applyProviderOverride,
+} from '../src/evals/cli.js';
 import type { EvalTags } from '../src/evals/types.js';
 
 describe('parseEvalArgs', () => {
@@ -15,10 +20,10 @@ describe('parseEvalArgs', () => {
     expect(opts.cases).toEqual(['a', 'b']);
   });
 
-  it('accepts legacy --site and --scenario aliases', () => {
-    const opts = parseEvalArgs(['--site=x', '--scenario=y']);
-    expect(opts.cases).toContain('x');
-    expect(opts.cases).toContain('y');
+  it('rejects unknown and legacy options instead of silently ignoring them', () => {
+    expect(() => parseEvalArgs(['--site=x'])).toThrow('Unknown option');
+    expect(() => parseEvalArgs(['--scenario=x'])).toThrow('Unknown option');
+    expect(() => parseEvalArgs(['--case=x', '--typo=y'])).toThrow('--typo');
   });
 
   it('parses --tag dimension=value', () => {
@@ -33,9 +38,8 @@ describe('parseEvalArgs', () => {
     expect(Object.keys(opts.tags)).toHaveLength(0);
   });
 
-  it('parses --resume flag', () => {
-    const opts = parseEvalArgs(['--resume']);
-    expect(opts.resume).toBe(true);
+  it('rejects reuse of historical successes', () => {
+    expect(() => parseEvalArgs(['--resume'])).toThrow('cached successes');
   });
 
   it('rejects non-positive --runs', () => {
@@ -45,12 +49,21 @@ describe('parseEvalArgs', () => {
 });
 
 describe('selectEvalCases', () => {
-  interface MockCase { id: string; tags: EvalTags }
+  interface MockCase {
+    id: string;
+    tags: EvalTags;
+  }
   const cases: MockCase[] = [
     { id: 'news-1', tags: { siteType: 'news', locale: 'pt-BR' } },
     { id: 'ecom-1', tags: { siteType: 'ecommerce', locale: 'pt-BR' } },
     { id: 'ecom-2', tags: { siteType: 'ecommerce', locale: 'en-US' } },
   ];
+
+  it('rejects duplicate ids even when filtered out', () => {
+    expect(() => selectEvalCases([...cases, cases[0]!], { cases: ['ecom-1'], tags: {} })).toThrow(
+      'Duplicate eval case id'
+    );
+  });
 
   it('returns all cases when no filters', () => {
     expect(selectEvalCases(cases, { cases: [], tags: {} })).toHaveLength(3);
@@ -67,12 +80,17 @@ describe('selectEvalCases', () => {
   });
 
   it('combines case id and tag filters', () => {
-    const selected = selectEvalCases(cases, { cases: ['ecom-1', 'ecom-2'], tags: { locale: 'en-US' } });
+    const selected = selectEvalCases(cases, {
+      cases: ['ecom-1', 'ecom-2'],
+      tags: { locale: 'en-US' },
+    });
     expect(selected.map((c) => c.id)).toEqual(['ecom-2']);
   });
 
   it('throws on unknown case ids', () => {
-    expect(() => selectEvalCases(cases, { cases: ['nonexistent'], tags: {} })).toThrow('nonexistent');
+    expect(() => selectEvalCases(cases, { cases: ['nonexistent'], tags: {} })).toThrow(
+      'nonexistent'
+    );
   });
 });
 

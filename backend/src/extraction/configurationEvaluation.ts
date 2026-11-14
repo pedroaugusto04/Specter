@@ -13,7 +13,7 @@ import { createConfigurationModel } from './configurationModel.js';
 import {
   extractionIntentSchema,
   extractionPlanSchema,
-  normalizeExtractionCandidate,
+  normalizeSingleFieldSources,
 } from '../types/extractionPlan.js';
 import type {
   DocumentAdapter,
@@ -28,18 +28,15 @@ import type { IModelProvider, ModelInput } from './model.js';
 import type { ExecutionPolicy } from './contracts.js';
 import { ExtractionMode, isAcceptedExtractionQuality } from './constants.js';
 
-export interface ConfigurationEvaluationCase {
+interface ConfigurationEvaluationCaseBase {
   name: string;
   prompt: string;
   snapshot: DocumentSnapshot;
   responses: { configure: unknown[]; semantic: unknown };
   expectedRecords: Record<string, Scalar>[];
-  expectedQuality: 'COMPLETE' | 'EMPTY' | 'FAILED';
   category?: string;
   isolated?: boolean;
   expectedIntent?: ExtractionIntent;
-  expectedErrorCode?: string;
-  expectedErrorIncludes?: string;
   maxModelCalls?: Partial<Record<ModelInput['task'], number>>;
   interactions?: Array<{ action: DiscoveryAction; snapshot: DocumentSnapshot }>;
   routine?: Array<{
@@ -54,6 +51,20 @@ export interface ConfigurationEvaluationCase {
   previousRecords?: Record<string, Scalar>[];
   expectChange?: boolean;
 }
+
+export type ConfigurationEvaluationCase = ConfigurationEvaluationCaseBase &
+  (
+    | {
+        expectedQuality: 'FAILED';
+        expectedErrorCode: string;
+        expectedErrorIncludes: string;
+      }
+    | {
+        expectedQuality: 'COMPLETE' | 'EMPTY';
+        expectedErrorCode?: never;
+        expectedErrorIncludes?: never;
+      }
+  );
 
 export interface ConfigurationEvaluationReport {
   cases: number;
@@ -198,6 +209,18 @@ export function fixtureExecutor(
   );
 }
 
+function addStageMetrics(
+  totals: ConfigurationEvaluationReport['stages'],
+  traces: Array<{ stage: string; status: string; durationMs: number }>
+): void {
+  for (const trace of traces) {
+    const metric = (totals[trace.stage] ??= { calls: 0, failures: 0, durationMs: 0 });
+    metric.calls++;
+    metric.failures += Number(trace.status === 'FAILED');
+    metric.durationMs += trace.durationMs;
+  }
+}
+
 function alertFor(
   item: ConfigurationEvaluationCase,
   plan: ExtractionPlan,
@@ -256,13 +279,10 @@ export async function evaluateConfigurationCorpus(
         const decision = await decide(input, intent);
         if (decision.kind === ConfigurationDecisionKind.Candidate && item.expectedIntent) {
           const candidate = extractionPlanSchema.safeParse(
-            normalizeExtractionCandidate(decision.plan)
+            normalizeSingleFieldSources(decision.plan)
           );
           if (candidate.success)
-            check(
-              'intent',
-              sameIntent(candidate.data.intent, item.expectedIntent)
-            );
+            check('intent', sameIntent(candidate.data.intent, item.expectedIntent));
         }
         return decision;
       };
@@ -343,21 +363,15 @@ export async function evaluateConfigurationCorpus(
           'routineWithoutModels',
           JSON.stringify(countedProvider.callsByTask) === callsBeforeRoutine
         );
-      for (const trace of result.trace) {
-        const metric = (stageTotals[trace.stage] ??= { calls: 0, failures: 0, durationMs: 0 });
-        metric.calls++;
-        metric.failures += Number(trace.status === 'FAILED');
-        metric.durationMs += trace.durationMs;
-      }
+      addStageMetrics(stageTotals, result.trace);
     } catch (error) {
       errorName = error instanceof Error ? error.name : 'UnknownError';
       if (error instanceof ConfigurationFailure) semanticStatus = error.semanticReview?.status;
       const expectedFailure =
-        Boolean(item.expectedErrorCode && item.expectedErrorIncludes) &&
         item.expectedQuality === 'FAILED' &&
         error instanceof ConfigurationFailure &&
-        (!item.expectedErrorCode || error.code === item.expectedErrorCode) &&
-        (!item.expectedErrorIncludes || error.message.includes(item.expectedErrorIncludes));
+        error.code === item.expectedErrorCode &&
+        error.message.includes(item.expectedErrorIncludes);
       check('acceptance', expectedFailure);
       check('quality', expectedFailure);
       correctQuality += Number(expectedFailure);
@@ -365,12 +379,7 @@ export async function evaluateConfigurationCorpus(
       if (item.expectChange === true) missedAlerts++;
       if (error instanceof ConfigurationFailure && item.expectedSemanticStatus)
         check('semantic', error.semanticReview?.status === item.expectedSemanticStatus);
-      for (const trace of error instanceof ConfigurationFailure ? error.trace : []) {
-        const metric = (stageTotals[trace.stage] ??= { calls: 0, failures: 0, durationMs: 0 });
-        metric.calls++;
-        metric.failures += Number(trace.status === 'FAILED');
-        metric.durationMs += trace.durationMs;
-      }
+      if (error instanceof ConfigurationFailure) addStageMetrics(stageTotals, error.trace);
     }
     for (const [task, metric] of Object.entries(countedProvider.callsByTask)) {
       const total = (taskTotals[task] ??= { calls: 0, failures: 0, durationMs: 0 });

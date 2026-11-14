@@ -25,7 +25,10 @@ type EvalRecord = Record<string, unknown>;
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-function resolveKey(keys: string[], expectation: Pick<FieldExpectation, 'aliases'>): string | undefined {
+function resolveKey(
+  keys: string[],
+  expectation: Pick<FieldExpectation, 'aliases'>
+): string | undefined {
   const aliases = expectation.aliases.map(normalizeKey);
   const normalized = keys.map((key) => ({ key, normalized: normalizeKey(key) }));
   return (
@@ -46,9 +49,11 @@ function isValidValue(value: unknown, kind: FieldKind): boolean {
   if (typeof value === 'string' && !value.trim()) return false;
   switch (kind) {
     case 'number':
-      return typeof value === 'number' ? Number.isFinite(value) : /\d/.test(String(value));
+      return typeof value === 'number' && Number.isFinite(value);
     case 'url':
-      return typeof value === 'string' && (/^https?:\/\/\S+$/i.test(value) || value.startsWith('/'));
+      return (
+        typeof value === 'string' && (/^https?:\/\/\S+$/i.test(value) || value.startsWith('/'))
+      );
     case 'text':
       return typeof value === 'string' || typeof value === 'number';
     default:
