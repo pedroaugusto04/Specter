@@ -259,13 +259,25 @@ export class BrowserDocumentSession implements DocumentSession {
         await this.page.waitForTimeout(this.policy.pollIntervalMs);
       }
     } else if (action.kind === 'inspect') {
-      await this.rootLocator(action.selector)
-        .first()
-        .waitFor({ state: 'attached', timeout: Math.min(this.timeout(), 30000) });
+      const locator = this.rootLocator(action.selector);
+      let found: boolean;
+      try {
+        await locator
+          .first()
+          .waitFor({ state: 'attached', timeout: Math.min(this.timeout(), 3000) });
+        found = (await locator.count()) > 0;
+      } catch {
+        found = false;
+      }
+
       const inspected = await this.snapshot();
-      inspected.html = await this.rootLocator(action.selector).evaluateAll((elements) =>
-        elements.map((element) => element.outerHTML).join('\n')
-      );
+      if (found) {
+        inspected.html = await locator.evaluateAll((elements) =>
+          elements.map((element) => element.outerHTML).join('\n')
+        );
+      } else {
+        inspected.html = `<!-- Observation: 0 elements matched selector '${action.selector}'. The selector does not exist in the rendered DOM. Choose a different selector based on the page HTML. -->`;
+      }
       return inspected;
     }
 

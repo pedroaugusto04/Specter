@@ -54,6 +54,9 @@ export interface ConfigurationOptions {
   semanticThreshold: number;
 }
 
+const isToolHistory = (h: unknown): boolean =>
+  Boolean(h && typeof h === 'object' && 'tool' in h);
+
 export class ConfigurationPipeline implements IConfigurationPipeline {
   constructor(
     private readonly model: ConfigurationModel,
@@ -128,8 +131,15 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         const observationBudget = history.length
           ? Math.max(1000, Math.floor(available * 0.65))
           : available;
+
+        let activeFeedback = feedback;
+        const toolDecisionsCount = history.filter(isToolHistory).length;
+        if (!feedback && toolDecisionsCount >= 3) {
+          activeFeedback = `Decision budget notice: You have completed ${toolDecisionsCount} tool observations and have sufficient structural evidence. Do not call additional tools. In this turn, you MUST emit kind 'candidate' with your best extraction plan derived from observed evidence.`;
+        }
+
         const evidence = JSON.stringify({
-          feedback: redactText(feedback),
+          feedback: redactText(activeFeedback),
           observation: observationPacket(snapshot, observationBudget),
           history: redactObject([...history].reverse()),
         });
@@ -138,6 +148,15 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             this.model.decide(input(evidence), request.intent)
           );
           if (decision.kind === ConfigurationDecisionKind.Tool) {
+            const currentToolCount = history.filter(isToolHistory).length;
+            if (currentToolCount >= 5) {
+              feedback = `Observation budget limit reached (${currentToolCount} tools executed). Do not make further tool calls; emit kind 'candidate' with your best extraction plan now.`;
+              history.push({
+                id: decisionIndex,
+                rejection: feedback,
+              });
+              continue;
+            }
             try {
               const result = await run('tool:' + decision.tool.kind, () =>
                 session.execute(decision.tool)
