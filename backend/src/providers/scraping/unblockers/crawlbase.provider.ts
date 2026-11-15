@@ -1,23 +1,19 @@
-import { normalizeUnblockerError } from './unblockerErrors.js';
 import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
 import { AntiBotBlockedError } from '../../../errors/domainErrors.js';
-import { logger } from '../../../utils/logger.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
-import {
-  UnblockerError,
-  UnblockerQuotaExhaustedError,
-  type IUnblockerProvider,
-} from './unblocker.interface.js';
+import { UnblockerError, UnblockerQuotaExhaustedError } from './unblocker.interface.js';
+import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
-export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
+export class CrawlbaseUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'crawlbase';
   private readonly token: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(options: { token?: string; fetchFn?: typeof fetch } = {}) {
+    super();
     this.token = options.token ?? env.CRAWLBASE_TOKEN;
     this.fetchFn = options.fetchFn ?? fetch;
   }
@@ -26,7 +22,11 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
     return Boolean(this.token && this.token.trim().length > 0);
   }
 
-  private async executeAttempt(
+  protected override shouldEscalateToPremium(err: unknown): boolean {
+    return err instanceof AntiBotBlockedError;
+  }
+
+  protected async executeAttempt(
     targetUrl: string,
     usePremium: boolean,
     options: ScrapeOptions | undefined,
@@ -92,36 +92,5 @@ export class CrawlbaseUnblockerProvider implements IUnblockerProvider {
       durationMs: Date.now() - startTime,
       screenshot,
     };
-  }
-
-  async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
-    if (!this.isEnabled()) {
-      throw new UnblockerError(this.name, 'Token is not configured.');
-    }
-
-    const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-
-    try {
-      if (options?.premium !== undefined) {
-        return await this.executeAttempt(targetUrl, options.premium, options, signal, startTime);
-      }
-
-      try {
-        return await this.executeAttempt(targetUrl, false, options, signal, startTime);
-      } catch (err) {
-        if (err instanceof AntiBotBlockedError && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged by target; retrying with residential proxy...`, {
-            targetUrl,
-          });
-          return await this.executeAttempt(targetUrl, true, options, signal, startTime);
-        }
-        throw err;
-      }
-    } catch (err) {
-      throw normalizeUnblockerError(this.name, err, timeoutMs);
-    }
   }
 }

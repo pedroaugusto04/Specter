@@ -3,6 +3,8 @@
 import { ExecutionTimelineChart } from '@/components/dashboard/ExecutionTimelineChart';
 import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimelineStrip';
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
+import { ScreenshotLightbox } from '@/components/dashboard/ScreenshotLightbox';
+import { JobRunCard } from '@/components/dashboard/JobRunCard';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { PaginationControls } from '@/components/ui/PaginationControls';
@@ -12,7 +14,7 @@ import { USER_FAILURES, type IntentField } from '@specter/contracts';
 import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
 import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
-import { getExtractionFieldLabels, localizeExtractedPayload } from '@/lib/extractionDisplay';
+import { getExtractionFieldLabels } from '@/lib/extractionDisplay';
 import { formatObservedNumber } from '@/lib/numberFormatting';
 import {
   AlertCircle,
@@ -298,142 +300,20 @@ export function JobRunsDrawer({
               ) : (
                 <div className="space-y-3">
                   {runs.map((run, index) => {
-                    const parsedError = run.errorMessage
-                      ? parseErrorMessage(run.errorMessage)
-                      : run.status === RUN_STATUS.Failed
-                        ? USER_FAILURES.requestFailed
-                        : null;
-                    const isSelected = selectedRunId === run.id;
-
                     const priorRun = runs.slice(index + 1).find((r) => Boolean(r.screenshotUrl));
-                    const previousScreenshot = priorRun?.screenshotUrl;
-                    const isChangeWithDiff =
-                      run.hasChanges === CHANGE_STATUS.Changed &&
-                      Boolean(run.screenshotUrl) &&
-                      Boolean(previousScreenshot);
-
                     return (
-                      <div
+                      <JobRunCard
                         key={run.id}
-                        id={`run-card-${run.id}`}
-                        className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${
-                          isSelected
-                            ? 'border-primary ring-1 ring-primary/40 bg-muted/10'
-                            : 'border-border'
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2.5">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                run.status === RUN_STATUS.Success ? 'success' : 'destructive'
-                              }
-                            >
-                              {run.extractionReport?.quality ?? run.status}
-                            </Badge>
-                            <Badge
-                              variant={
-                                run.hasChanges === CHANGE_STATUS.Changed
-                                  ? 'warning'
-                                  : run.hasChanges === CHANGE_STATUS.Initial
-                                    ? 'default'
-                                    : 'secondary'
-                              }
-                            >
-                              Change: {run.hasChanges}
-                            </Badge>
-                            {run.httpStatus && (
-                              <span className="font-mono text-xs text-muted-foreground">
-                                HTTP {run.httpStatus}
-                              </span>
-                            )}
-                            {run.durationMs !== null && (
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {run.durationMs}ms
-                              </span>
-                            )}
-                          </div>
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {formatDateTime(run.executedAt, timeZone)}
-                          </span>
-                        </div>
-
-                        {parsedError && (
-                          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                            <div className="flex items-start gap-2.5">
-                              <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
-                              <FailureDetails failure={parsedError} />
-                            </div>
-                          </div>
-                        )}
-
-                        {run.screenshotUrl && (
-                          <div className="mt-3 overflow-hidden rounded-md border border-border bg-muted/20">
-                            <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                              <span className="flex items-center gap-1.5 font-mono">
-                                {isChangeWithDiff ? (
-                                  <>
-                                    <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
-                                    Visual Diff (Before vs After)
-                                  </>
-                                ) : (
-                                  <>
-                                    <Camera className="h-3.5 w-3.5 text-primary" />
-                                    Visual Snapshot Proof
-                                  </>
-                                )}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedScreenshot(run.screenshotUrl)}
-                                className="flex items-center gap-1 text-xs text-primary hover:underline font-mono cursor-pointer"
-                              >
-                                <ZoomIn className="h-3 w-3" />
-                                Zoom
-                              </button>
-                            </div>
-                            <div className="p-3">
-                              {isChangeWithDiff && previousScreenshot ? (
-                                <VisualDiffSlider
-                                  previousUrl={previousScreenshot}
-                                  currentUrl={run.screenshotUrl}
-                                  previousLabel="Previous"
-                                  currentLabel="Current"
-                                  previousDate={
-                                    priorRun
-                                      ? formatDateTime(priorRun.executedAt, timeZone)
-                                      : undefined
-                                  }
-                                  currentDate={formatDateTime(run.executedAt, timeZone)}
-                                  onOpenZoom={(url) => setSelectedScreenshot(url)}
-                                />
-                              ) : (
-                                <div
-                                  className="relative cursor-pointer overflow-hidden rounded-lg max-h-60"
-                                  onClick={() => setSelectedScreenshot(run.screenshotUrl)}
-                                >
-                                  <img
-                                    src={run.screenshotUrl}
-                                    alt="Visual snapshot"
-                                    className="w-full object-cover object-top"
-                                    loading="lazy"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {run.extractedData && (
-                          <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
-                            {JSON.stringify(
-                              localizeExtractedPayload(run.extractedData, extractionFields),
-                              null,
-                              2
-                            )}
-                          </pre>
-                        )}
-                      </div>
+                        run={run}
+                        isSelected={selectedRunId === run.id}
+                        timeZone={timeZone}
+                        extractionFields={extractionFields}
+                        previousScreenshot={priorRun?.screenshotUrl}
+                        previousRunDate={
+                          priorRun ? formatDateTime(priorRun.executedAt, timeZone) : undefined
+                        }
+                        onOpenScreenshot={(url) => setSelectedScreenshot(url)}
+                      />
                     );
                   })}
                 </div>
@@ -564,49 +444,10 @@ export function JobRunsDrawer({
         )}
 
         {/* Screenshot Modal / Lightbox */}
-        {selectedScreenshot && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-            onClick={() => setSelectedScreenshot(null)}
-          >
-            <div
-              className="relative max-h-[90vh] max-w-4xl w-full overflow-hidden rounded-xl border border-border bg-card p-2 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-border pb-2 px-2 text-xs font-mono">
-                <span className="flex items-center gap-1.5 text-foreground font-semibold">
-                  <Camera className="h-4 w-4 text-primary" />
-                  Visual Proof Snapshot
-                </span>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={selectedScreenshot}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Open full size
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedScreenshot(null)}
-                    className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-[80vh] overflow-auto p-2">
-                <img
-                  src={selectedScreenshot}
-                  alt="Visual Proof Snapshot Full"
-                  className="w-full rounded-lg object-contain shadow-sm"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        <ScreenshotLightbox
+          screenshotUrl={selectedScreenshot}
+          onClose={() => setSelectedScreenshot(null)}
+        />
       </div>
     </Drawer>
   );

@@ -109,6 +109,69 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
+function renderDiffSummaryText(changes: DiffChangeEntry[]): string {
+  if (changes.length === 0) {
+    return 'No significant changes detected across monitored fields.';
+  }
+
+  const lines: string[] = [];
+  for (const change of changes) {
+    if (change.changeType === 'MODIFIED') {
+      lines.push(
+        `• [Modified] ${change.field}: "${change.previousValue}" → "${change.currentValue}"`
+      );
+    } else if (change.changeType === 'ADDED') {
+      lines.push(`• [Added] ${change.field}: "${change.currentValue}"`);
+    } else {
+      lines.push(`• [Removed] ${change.field}: (previously "${change.previousValue}")`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function renderDiffSummaryHtml(changes: DiffChangeEntry[]): string {
+  if (changes.length === 0) {
+    return '<p style="color:#6b7280;">No significant changes detected.</p>';
+  }
+
+  const rowsHtml = changes
+    .map((change) => {
+      const badgeColor =
+        change.changeType === 'MODIFIED'
+          ? '#d97706'
+          : change.changeType === 'ADDED'
+            ? '#16a34a'
+            : '#dc2626';
+      const badgeLabel =
+        change.changeType === 'MODIFIED'
+          ? 'Modified'
+          : change.changeType === 'ADDED'
+            ? 'New'
+            : 'Removed';
+
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:13px;">${escapeHtml(change.field)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;"><span style="background:${badgeColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${badgeLabel}</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;">${escapeHtml(change.previousValue)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:13px;">${escapeHtml(change.currentValue)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+        <thead>
+          <tr style="background:#f9fafb;text-align:left;font-size:12px;color:#374151;">
+            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Field</th>
+            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Status</th>
+            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Previous Value</th>
+            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">New Value</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+}
+
 /**
  * Builds a human-readable and HTML-formatted diff summary between two payloads.
  */
@@ -160,68 +223,14 @@ export function buildDiffSummary(previousData: unknown, currentData: unknown): D
   const allChanges = [...modified, ...added, ...removed];
   const hasChanges = allChanges.length > 0;
 
-  const lines: string[] = [];
-  for (const change of allChanges) {
-    if (change.changeType === 'MODIFIED') {
-      lines.push(
-        `• [Modified] ${change.field}: "${change.previousValue}" → "${change.currentValue}"`
-      );
-    } else if (change.changeType === 'ADDED') {
-      lines.push(`• [Added] ${change.field}: "${change.currentValue}"`);
-    } else {
-      lines.push(`• [Removed] ${change.field}: (previously "${change.previousValue}")`);
-    }
-  }
-
-  const summaryText = hasChanges
-    ? lines.join('\n')
-    : 'No significant changes detected across monitored fields.';
-
-  const rowsHtml = allChanges
-    .map((change) => {
-      const badgeColor =
-        change.changeType === 'MODIFIED'
-          ? '#d97706'
-          : change.changeType === 'ADDED'
-            ? '#16a34a'
-            : '#dc2626';
-      const badgeLabel =
-        change.changeType === 'MODIFIED'
-          ? 'Modified'
-          : change.changeType === 'ADDED'
-            ? 'New'
-            : 'Removed';
-      return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:13px;">${escapeHtml(change.field)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;"><span style="background:${badgeColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${badgeLabel}</span></td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;">${escapeHtml(change.previousValue)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:13px;">${escapeHtml(change.currentValue)}</td>
-      </tr>`;
-    })
-    .join('');
-
-  const summaryHtml = hasChanges
-    ? `<table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
-        <thead>
-          <tr style="background:#f9fafb;text-align:left;font-size:12px;color:#374151;">
-            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Field</th>
-            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Status</th>
-            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">Previous Value</th>
-            <th style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">New Value</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>`
-    : '<p style="color:#6b7280;">No significant changes detected.</p>';
-
   return {
     hasChanges,
     totalChanges: allChanges.length,
     added,
     modified,
     removed,
-    summaryText,
-    summaryHtml,
+    summaryText: renderDiffSummaryText(allChanges),
+    summaryHtml: renderDiffSummaryHtml(allChanges),
   };
 }
 

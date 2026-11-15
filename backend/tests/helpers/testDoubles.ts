@@ -43,6 +43,15 @@ import type {
   IIntegrationRepository,
   UpsertIntegrationInput,
 } from '../../src/repositories/integrationRepository.js';
+import type {
+  ISessionRepository,
+  UpsertSessionInput,
+} from '../../src/repositories/sessionRepository.js';
+import type {
+  IUsageRepository,
+  MonthlyUsage,
+} from '../../src/repositories/usageRepository.js';
+import type { UserWebSessionEntity } from '../../src/types/domain.js';
 export class InMemoryUserRepository implements IUserRepository {
   public users = new Map<string, UserEntity>();
   async findById(id: string): Promise<UserEntity | null> {
@@ -433,5 +442,102 @@ export class InMemoryIntegrationRepository implements IIntegrationRepository {
     };
     this.integrations.set(userId, entity);
     return { ...entity };
+  }
+}
+
+export class InMemorySessionRepository implements ISessionRepository {
+  public sessions = new Map<string, UserWebSessionEntity>();
+
+  async findByUserAndDomain(
+    userId: string,
+    hostOrDomain: string
+  ): Promise<UserWebSessionEntity | null> {
+    const clean = hostOrDomain.trim().toLowerCase();
+    for (const s of this.sessions.values()) {
+      if (s.userId === userId && (s.domain === clean || clean.endsWith(`.${s.domain}`))) {
+        return { ...s };
+      }
+    }
+    return null;
+  }
+
+  async listByUserId(userId: string): Promise<UserWebSessionEntity[]> {
+    return Array.from(this.sessions.values()).filter((s) => s.userId === userId);
+  }
+
+  async findById(id: string): Promise<UserWebSessionEntity | null> {
+    const s = this.sessions.get(id);
+    return s ? { ...s } : null;
+  }
+
+  async upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity> {
+    const domain = input.domain.trim().toLowerCase();
+    for (const [id, s] of this.sessions.entries()) {
+      if (s.userId === userId && s.domain === domain) {
+        const updated: UserWebSessionEntity = {
+          ...s,
+          name: input.name || s.name,
+          storageState: input.storageState,
+          cookieCount: input.storageState.cookies?.length ?? 0,
+          updatedAt: new Date(),
+        };
+        this.sessions.set(id, updated);
+        return { ...updated };
+      }
+    }
+
+    const row: UserWebSessionEntity = {
+      id: crypto.randomUUID(),
+      userId,
+      domain,
+      name: input.name || domain,
+      storageState: input.storageState,
+      cookieCount: input.storageState.cookies?.length ?? 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.sessions.set(row.id, row);
+    return { ...row };
+  }
+
+  async delete(userId: string, id: string): Promise<boolean> {
+    const s = this.sessions.get(id);
+    if (s && s.userId === userId) {
+      this.sessions.delete(id);
+      return true;
+    }
+    return false;
+  }
+}
+
+export class InMemoryUsageRepository implements IUsageRepository {
+  public usage = new Map<string, MonthlyUsage>();
+
+  private key(userId: string, period?: string): string {
+    return `${userId}:${period ?? new Date().toISOString().slice(0, 7)}`;
+  }
+
+  async getUsage(userId: string, period?: string): Promise<MonthlyUsage> {
+    const current = this.usage.get(this.key(userId, period));
+    return {
+      compilationsCount: current?.compilationsCount ?? 0,
+      executionsCount: current?.executionsCount ?? 0,
+    };
+  }
+
+  async incrementCompilations(userId: string, period?: string): Promise<number> {
+    const k = this.key(userId, period);
+    const current = this.usage.get(k) ?? { compilationsCount: 0, executionsCount: 0 };
+    current.compilationsCount += 1;
+    this.usage.set(k, { ...current });
+    return current.compilationsCount;
+  }
+
+  async incrementExecutions(userId: string, period?: string): Promise<number> {
+    const k = this.key(userId, period);
+    const current = this.usage.get(k) ?? { compilationsCount: 0, executionsCount: 0 };
+    current.executionsCount += 1;
+    this.usage.set(k, { ...current });
+    return current.executionsCount;
   }
 }

@@ -1,6 +1,5 @@
 import { triggerOperatorsForType } from '@specter/contracts';
 import { requiresBrowser } from '../extraction/capabilities.js';
-import type { ExecutionStrategy } from '../extraction/contracts.js';
 import {
   ExtractionMode,
   ExtractionScope,
@@ -12,7 +11,9 @@ import {
 } from '../extraction/constants.js';
 import { z } from 'zod';
 import { ExtractionQuality } from './enums.js';
+
 export { ExtractionQuality };
+
 export type {
   ExtractionPlan,
   ExtractionIntent,
@@ -24,18 +25,21 @@ export type {
 
 const text = z.string().trim().min(1);
 const path = z.array(z.union([z.string(), z.number().int().nonnegative()]));
+
 export const locatorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('css'), selector: text }).strict(),
   z
     .object({ kind: z.literal('role'), role: text, name: text, exact: z.boolean().optional() })
     .strict(),
 ]);
+
 const match = z
   .object({
     urlPattern: text.describe('Literal URL substring, not a regex or glob.'),
     method: text.optional(),
   })
   .strict();
+
 export const conditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('exists'), locator: locatorSchema }).strict(),
   z.object({ kind: z.literal('visible'), locator: locatorSchema }).strict(),
@@ -59,12 +63,14 @@ export const conditionSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
 ]);
+
 export const discoveryActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('inspect'), selector: text }).strict(),
   z.object({ kind: z.literal('click'), locator: locatorSchema }).strict(),
   z.object({ kind: z.literal('scroll'), selector: text.optional() }).strict(),
   z.object({ kind: z.literal('wait'), condition: conditionSchema }).strict(),
 ]);
+
 export const sourceSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -88,12 +94,14 @@ export const sourceSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal(SourceKind.Response), path, association: text.optional() }).strict(),
 ]);
+
 const fieldProperties = {
   displayName: text.optional(),
   observedLabel: text.optional(),
   description: text,
   required: z.boolean(),
 };
+
 export const extractionIntentSchema = z
   .object({
     entity: text,
@@ -171,6 +179,7 @@ export const extractionIntentSchema = z
     triggerMatchMode: z.nativeEnum(TriggerMatchMode).default(TriggerMatchMode.All),
   })
   .strict();
+
 export const executionStrategySchema = z
   .object({
     transport: z.nativeEnum(Transport),
@@ -231,6 +240,218 @@ export const executionStrategySchema = z
   })
   .strict();
 
+function validateIntentAndScope(
+  intent: z.infer<typeof extractionIntentSchema>,
+  strategy: z.infer<typeof executionStrategySchema>,
+  issue: (message: string, path?: (string | number)[]) => void
+) {
+  if (strategy.pagination && intent.scope !== ExtractionScope.Collection) {
+    issue('Pagination requires collection scope.', ['intent', 'scope']);
+  }
+
+  if (
+    intent.mode === ExtractionMode.Single &&
+    (intent.scope !== ExtractionScope.Page ||
+      strategy.pagination ||
+      intent.identityFields.length)
+  ) {
+    issue('Single entities require page scope, no pagination, and empty identityFields.', [
+      'intent',
+    ]);
+  }
+
+  if (new Set(intent.identityFields).size !== intent.identityFields.length) {
+    issue('Identity fields must not repeat.', ['intent', 'identityFields']);
+  }
+
+  if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length) {
+    issue('Collections require stable identity fields.', ['intent', 'identityFields']);
+  }
+}
+
+function validateFieldMappings(
+  intent: z.infer<typeof extractionIntentSchema>,
+  strategy: z.infer<typeof executionStrategySchema>,
+  issue: (message: string, path?: (string | number)[]) => void
+) {
+  const intentKeys = Object.keys(intent.fields);
+  if (!intentKeys.length) {
+    issue('At least one field is required.', ['intent', 'fields']);
+  }
+
+  const sortedIntent = [...intentKeys].sort().join(',');
+  const sortedStrategy = Object.keys(strategy.fields).sort().join(',');
+  if (sortedIntent !== sortedStrategy) {
+    issue('Execution fields must exactly match intent fields.', ['strategy', 'fields']);
+  }
+
+  for (const [key, field] of Object.entries(intent.fields)) {
+    if (field.type === FieldType.Boolean) {
+      const keys = Object.keys(field.booleanValues ?? {});
+      if (!keys.length) {
+        issue(`Boolean field '${key}' requires an explicit value mapping.`, [
+          'intent',
+          'fields',
+          key,
+          'booleanValues',
+        ]);
+      }
+      const hasInvalidKey = keys.some(
+        (val) => val !== val.toLowerCase().replace(/\s+/g, ' ').trim() || !val
+      );
+      if (hasInvalidKey) {
+        issue(`Boolean mapping keys for '${key}' must be lowercase with normalized whitespace.`);
+      }
+    }
+
+    if ((field.type === FieldType.Number || field.type === FieldType.Date) && field.locale) {
+      try {
+        new Intl.NumberFormat(field.locale);
+      } catch {
+        issue(`Invalid locale for '${key}'.`, ['intent', 'fields', key, 'locale']);
+      }
+    }
+  }
+}
+
+function validateTriggerAndFilterRules(
+  intent: z.infer<typeof extractionIntentSchema>,
+  strategy: z.infer<typeof executionStrategySchema>,
+  issue: (message: string, path?: (string | number)[]) => void
+) {
+  const referencedKeys = [
+    ...intent.identityFields,
+    ...intent.triggerRules.map((rule) => rule.field),
+  ];
+  for (const key of referencedKeys) {
+    if (!intent.fields[key]?.required) {
+      issue(`Referenced field '${key}' must exist and be required.`, ['intent', 'fields', key]);
+    }
+  }
+
+  for (const filter of strategy.filters ?? []) {
+    if (!intent.fields[filter.field]?.required) {
+      issue('Record filters require a declared, required field.');
+    }
+  }
+
+  const allRules = [...intent.triggerRules, ...(strategy.filters ?? [])];
+  for (const rule of allRules) {
+    const field = intent.fields[rule.field];
+    if (!field) continue;
+
+    if (!triggerOperatorsForType(field.type).includes(rule.operator)) {
+      issue(`Operator '${rule.operator}' is incompatible with field '${rule.field}'.`);
+    }
+
+    const isNumericRelative =
+      rule.operator === TriggerOperator.Changes ||
+      rule.operator === TriggerOperator.Decreased ||
+      rule.operator === TriggerOperator.Increased;
+
+    if (
+      field.type === FieldType.Number &&
+      !isNumericRelative &&
+      (typeof rule.value !== 'number' || !Number.isFinite(rule.value))
+    ) {
+      issue(`Numeric rule '${rule.field}' requires a finite numeric threshold.`);
+    }
+
+    const isTextPattern =
+      rule.operator === TriggerOperator.Contains ||
+      rule.operator === TriggerOperator.NotContains;
+
+    if (isTextPattern && typeof rule.value !== 'string') {
+      issue(`Text rule '${rule.field}' requires a string threshold.`);
+    }
+
+    if (rule.operator === TriggerOperator.Equal || rule.operator === TriggerOperator.NotEqual) {
+      const expectedType =
+        field.type === FieldType.Number
+          ? 'number'
+          : field.type === FieldType.Boolean
+            ? 'boolean'
+            : 'string';
+
+      if (typeof rule.value !== expectedType) {
+        issue(`Rule '${rule.field}' has an incompatible threshold type.`);
+      }
+    }
+  }
+}
+
+function validateSourcesAndAssociations(
+  intent: z.infer<typeof extractionIntentSchema>,
+  strategy: z.infer<typeof executionStrategySchema>,
+  issue: (message: string, path?: (string | number)[]) => void
+) {
+  const sources = Object.values(strategy.fields).flat();
+
+  const invalidSourceKind = sources.some(
+    (item) => item.kind !== strategy.records.kind && !item.association
+  );
+  if (invalidSourceKind) {
+    issue(
+      'Field sources must belong to the selected record source or reference an explicit key association.'
+    );
+  }
+
+  for (const [name, assoc] of Object.entries(strategy.associations ?? {})) {
+    const localField = intent.fields[assoc.localField];
+    const hasAssocSource = strategy.fields[assoc.localField]?.some((s) => s.association);
+    if (!localField?.required || hasAssocSource) {
+      issue(`Association '${name}' requires a required, directly extracted local key.`);
+    }
+  }
+
+  for (const source of sources) {
+    if (
+      source.association &&
+      strategy.associations?.[source.association]?.records.kind !== source.kind
+    ) {
+      issue('Association source kind must match its referenced records.');
+    }
+  }
+}
+
+function validateConditionsAndTransport(
+  intent: z.infer<typeof extractionIntentSchema>,
+  strategy: z.infer<typeof executionStrategySchema>,
+  issue: (message: string, path?: (string | number)[]) => void
+) {
+  if (strategy.pagination && strategy.pagination.kind !== 'scroll' && !strategy.pagination.next) {
+    issue('Link and click pagination require a next locator.', [
+      'strategy',
+      'pagination',
+      'next',
+    ]);
+  }
+
+  if (strategy.setup?.some((a) => a.kind === 'wait' && a.condition.kind === 'field')) {
+    issue(
+      'Setup waits cannot reference fields before extraction; use a readiness field condition.'
+    );
+  }
+
+  const conditions = [
+    ...strategy.ready,
+    ...strategy.empty,
+    ...(strategy.pagination?.end ?? []),
+  ];
+  for (const item of conditions) {
+    if (item.kind === 'field' && !intent.fields[item.field]) {
+      issue(`Condition references missing field '${item.field}'.`);
+    }
+  }
+
+  if (strategy.transport === Transport.Http && requiresBrowser(strategy)) {
+    issue(
+      'The selected strategy requires browser capabilities (due to network responses, setup actions, or visibility conditions). Set "strategy.transport" to "browser".',
+      ['strategy', 'transport']
+    );
+  }
+}
+
 export const extractionPlanSchema = z
   .object({
     intent: extractionIntentSchema,
@@ -240,179 +461,89 @@ export const extractionPlanSchema = z
   .superRefine((plan, ctx) => {
     const issue = (message: string, path: (string | number)[] = []) =>
       ctx.addIssue({ code: 'custom', message, path });
-    const { intent, strategy: execution } = plan;
 
-    if (execution.pagination && intent.scope !== ExtractionScope.Collection)
-      issue('Pagination requires collection scope.', ['intent', 'scope']);
-    if (
-      intent.mode === ExtractionMode.Single &&
-      (intent.scope !== ExtractionScope.Page ||
-        execution.pagination ||
-        intent.identityFields.length)
-    )
-      issue('Single entities require page scope, no pagination, and empty identityFields.', [
-        'intent',
-      ]);
-    if (new Set(intent.identityFields).size !== intent.identityFields.length)
-      issue('Identity fields must not repeat.', ['intent', 'identityFields']);
-
-    if (!Object.keys(intent.fields).length)
-      issue('At least one field is required.', ['intent', 'fields']);
-    if (
-      JSON.stringify(Object.keys(intent.fields).sort()) !==
-      JSON.stringify(Object.keys(execution.fields).sort())
-    )
-      issue('Execution fields must exactly match intent fields.', ['strategy', 'fields']);
-
-    for (const key of [...intent.identityFields, ...intent.triggerRules.map((rule) => rule.field)])
-      if (!intent.fields[key]?.required)
-        issue(`Referenced field '${key}' must exist and be required.`, ['intent', 'fields', key]);
-    for (const rule of [...intent.triggerRules, ...(execution.filters ?? [])]) {
-      const field = intent.fields[rule.field];
-      if (!field) continue;
-      if (!triggerOperatorsForType(field.type).includes(rule.operator))
-        issue(`Operator '${rule.operator}' is incompatible with field '${rule.field}'.`);
-      if (
-        field.type === FieldType.Number &&
-        rule.operator !== TriggerOperator.Changes &&
-        rule.operator !== TriggerOperator.Decreased &&
-        rule.operator !== TriggerOperator.Increased &&
-        (typeof rule.value !== 'number' || !Number.isFinite(rule.value))
-      )
-        issue(`Numeric rule '${rule.field}' requires a finite numeric threshold.`);
-      if (
-        (rule.operator === TriggerOperator.Contains ||
-          rule.operator === TriggerOperator.NotContains) &&
-        typeof rule.value !== 'string'
-      )
-        issue(`Text rule '${rule.field}' requires a string threshold.`);
-      if (rule.operator === TriggerOperator.Equal || rule.operator === TriggerOperator.NotEqual) {
-        const expected =
-          field.type === FieldType.Number
-            ? 'number'
-            : field.type === FieldType.Boolean
-              ? 'boolean'
-              : 'string';
-        if (typeof rule.value !== expected)
-          issue(`Rule '${rule.field}' has an incompatible threshold type.`);
-      }
-    }
-    for (const [key, field] of Object.entries(intent.fields)) {
-      if (
-        field.type === FieldType.Boolean &&
-        Object.keys(field.booleanValues).some(
-          (value) => value !== value.toLowerCase().replace(/\s+/g, ' ').trim() || !value
-        )
-      )
-        issue(`Boolean mapping keys for '${key}' must be lowercase with normalized whitespace.`);
-      if ((field.type === FieldType.Number || field.type === FieldType.Date) && field.locale) {
-        try {
-          new Intl.NumberFormat(field.locale);
-        } catch {
-          issue(`Invalid locale for '${key}'.`, ['intent', 'fields', key, 'locale']);
-        }
-      }
-      if (field.type === FieldType.Boolean && !Object.keys(field.booleanValues ?? {}).length)
-        issue(`Boolean field '${key}' requires an explicit value mapping.`, [
-          'intent',
-          'fields',
-          key,
-          'booleanValues',
-        ]);
-    }
-    if (intent.mode === ExtractionMode.Collection && !intent.identityFields.length)
-      issue('Collections require stable identity fields.', ['intent', 'identityFields']);
-    if (
-      execution.pagination &&
-      execution.pagination.kind !== 'scroll' &&
-      !execution.pagination.next
-    )
-      issue('Link and click pagination require a next locator.', [
-        'strategy',
-        'pagination',
-        'next',
-      ]);
-    for (const filter of execution.filters ?? [])
-      if (!intent.fields[filter.field]?.required)
-        issue('Record filters require a declared, required field.');
-    const sources = Object.values(execution.fields).flat();
-    if (sources.some((item) => item.kind !== execution.records.kind && !item.association))
-      issue(
-        'Field sources must belong to the selected record source or reference an explicit key association.'
-      );
-    for (const [name, association] of Object.entries(execution.associations ?? {})) {
-      if (
-        !intent.fields[association.localField]?.required ||
-        execution.fields[association.localField]?.some((source) => source.association)
-      )
-        issue(`Association '${name}' requires a required, directly extracted local key.`);
-    }
-    for (const source of sources)
-      if (
-        source.association &&
-        execution.associations?.[source.association]?.records.kind !== source.kind
-      )
-        issue('Association source kind must match its referenced records.');
-    if (
-      execution.setup?.some((action) => action.kind === 'wait' && action.condition.kind === 'field')
-    )
-      issue(
-        'Setup waits cannot reference fields before extraction; use a readiness field condition.'
-      );
-    const conditions = [
-      ...execution.ready,
-      ...execution.empty,
-      ...(execution.pagination?.end ?? []),
-    ];
-    for (const item of conditions)
-      if (item.kind === 'field' && !intent.fields[item.field])
-        issue(`Condition references missing field '${item.field}'.`);
-    if (execution.transport === Transport.Http && requiresBrowser(execution))
-      issue(
-        'The selected strategy requires browser capabilities (due to network responses, setup actions, or visibility conditions). Set "strategy.transport" to "browser".',
-        ['strategy', 'transport']
-      );
+    validateIntentAndScope(plan.intent, plan.strategy, issue);
+    validateFieldMappings(plan.intent, plan.strategy, issue);
+    validateTriggerAndFilterRules(plan.intent, plan.strategy, issue);
+    validateSourcesAndAssociations(plan.intent, plan.strategy, issue);
+    validateConditionsAndTransport(plan.intent, plan.strategy, issue);
   });
 
-function normalizeCondition(cond: unknown): unknown {
+function normalizeLocatorValue(loc: unknown): unknown {
+  if (typeof loc === 'string') {
+    return { kind: 'css', selector: loc };
+  }
+  if (
+    loc &&
+    typeof loc === 'object' &&
+    !('kind' in loc) &&
+    'selector' in loc &&
+    typeof (loc as Record<string, unknown>).selector === 'string'
+  ) {
+    return { kind: 'css', ...(loc as Record<string, unknown>) };
+  }
+  return loc;
+}
+
+function normalizeConditionValue(cond: unknown): unknown {
   if (!cond || typeof cond !== 'object') return cond;
   const c = cond as Record<string, unknown>;
-  if (typeof c.locator === 'string') {
-    return { ...c, locator: { selector: c.locator } };
+  if ('locator' in c) {
+    return { ...c, locator: normalizeLocatorValue(c.locator) };
   }
   return cond;
 }
 
-/** Wrap a lone valid source in the canonical array shape and normalize string locators; leave all other input untouched. */
+/**
+ * Normalizes input objects before validation:
+ * wraps lone valid sources in arrays and normalizes string/selector locators.
+ */
 export function normalizeSingleFieldSources(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object' || !('strategy' in raw)) return raw;
   const plan = raw as { strategy?: unknown };
   if (!plan.strategy || typeof plan.strategy !== 'object') return raw;
+
   const strategy = { ...(plan.strategy as Record<string, unknown>) };
 
   if (strategy.fields && typeof strategy.fields === 'object' && !Array.isArray(strategy.fields)) {
     strategy.fields = Object.fromEntries(
       Object.entries(strategy.fields).map(([key, value]) =>
-        !Array.isArray(value) && sourceSchema.safeParse(value).success ? [key, [value]] : [key, value]
+        !Array.isArray(value) && sourceSchema.safeParse(value).success
+          ? [key, [value]]
+          : [key, value]
       )
     );
   }
 
+  if (Array.isArray(strategy.setup)) {
+    strategy.setup = strategy.setup.map((action: unknown) => {
+      if (!action || typeof action !== 'object') return action;
+      const a = action as Record<string, unknown>;
+      if (a.kind === 'click' && 'locator' in a) {
+        return { ...a, locator: normalizeLocatorValue(a.locator) };
+      }
+      if (a.kind === 'wait' && a.condition) {
+        return { ...a, condition: normalizeConditionValue(a.condition) };
+      }
+      return action;
+    });
+  }
+
   if (Array.isArray(strategy.ready)) {
-    strategy.ready = strategy.ready.map(normalizeCondition);
+    strategy.ready = strategy.ready.map(normalizeConditionValue);
   }
 
   if (Array.isArray(strategy.empty)) {
-    strategy.empty = strategy.empty.map(normalizeCondition);
+    strategy.empty = strategy.empty.map(normalizeConditionValue);
   }
 
   if (strategy.pagination && typeof strategy.pagination === 'object') {
     const pag = { ...(strategy.pagination as Record<string, unknown>) };
-    if (typeof pag.next === 'string') {
-      pag.next = { selector: pag.next };
+    if ('next' in pag) {
+      pag.next = normalizeLocatorValue(pag.next);
     }
     if (Array.isArray(pag.end)) {
-      pag.end = pag.end.map(normalizeCondition);
+      pag.end = pag.end.map(normalizeConditionValue);
     }
     strategy.pagination = pag;
   }

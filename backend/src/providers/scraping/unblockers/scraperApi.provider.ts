@@ -1,23 +1,18 @@
-import { normalizeUnblockerError } from './unblockerErrors.js';
 import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { fetchRemoteScreenshot } from '../../../utils/screenshotHelper.js';
-import { AntiBotBlockedError } from '../../../errors/domainErrors.js';
-import { logger } from '../../../utils/logger.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
-import {
-  UnblockerError,
-  UnblockerQuotaExhaustedError,
-  type IUnblockerProvider,
-} from './unblocker.interface.js';
+import { UnblockerError, UnblockerQuotaExhaustedError } from './unblocker.interface.js';
+import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
-export class ScraperApiUnblockerProvider implements IUnblockerProvider {
+export class ScraperApiUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'scraperapi';
   private readonly apiKey: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(options: { apiKey?: string; fetchFn?: typeof fetch } = {}) {
+    super();
     this.apiKey = options.apiKey ?? env.SCRAPERAPI_KEY;
     this.fetchFn = options.fetchFn ?? fetch;
   }
@@ -26,7 +21,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
-  private async executeAttempt(
+  protected async executeAttempt(
     targetUrl: string,
     usePremium: boolean,
     options: ScrapeOptions | undefined,
@@ -38,6 +33,7 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
     endpoint.searchParams.set('api_key', this.apiKey.trim());
     endpoint.searchParams.set('url', targetUrl);
     endpoint.searchParams.set('render', 'true');
+
     if (usePremium) {
       endpoint.searchParams.set('premium', 'true');
       const country = resolveTargetCountry(targetUrl);
@@ -105,44 +101,5 @@ export class ScraperApiUnblockerProvider implements IUnblockerProvider {
       durationMs: Date.now() - startTime,
       screenshot,
     };
-  }
-
-  async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
-    if (!this.isEnabled()) {
-      throw new UnblockerError(this.name, 'API key is not configured.');
-    }
-
-    const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-
-    try {
-      if (options?.premium !== undefined) {
-        return await this.executeAttempt(targetUrl, options.premium, options, signal, startTime);
-      }
-
-      try {
-        return await this.executeAttempt(targetUrl, false, options, signal, startTime);
-      } catch (err) {
-        const isChallenged = err instanceof AntiBotBlockedError;
-        const isProxyConfigIssue =
-          err instanceof UnblockerError &&
-          (err.httpStatus === 403 ||
-            err.httpStatus === 500 ||
-            (typeof err.message === 'string' &&
-              (err.message.includes('country_code') || err.message.includes('premium'))));
-
-        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged or requires premium residential proxy; retrying with premium residential proxy...`, {
-            targetUrl,
-          });
-          return await this.executeAttempt(targetUrl, true, options, signal, startTime);
-        }
-        throw err;
-      }
-    } catch (err) {
-      throw normalizeUnblockerError(this.name, err, timeoutMs);
-    }
   }
 }

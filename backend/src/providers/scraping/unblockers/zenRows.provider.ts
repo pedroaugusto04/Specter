@@ -1,23 +1,18 @@
-import { normalizeUnblockerError } from './unblockerErrors.js';
 import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
 import { decodeBase64Screenshot } from '../../../utils/screenshotHelper.js';
-import { AntiBotBlockedError } from '../../../errors/domainErrors.js';
-import { logger } from '../../../utils/logger.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
-import {
-  UnblockerError,
-  UnblockerQuotaExhaustedError,
-  type IUnblockerProvider,
-} from './unblocker.interface.js';
+import { UnblockerError, UnblockerQuotaExhaustedError } from './unblocker.interface.js';
+import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
-export class ZenRowsUnblockerProvider implements IUnblockerProvider {
+export class ZenRowsUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'zenrows';
   private readonly apiKey: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(options: { apiKey?: string; fetchFn?: typeof fetch } = {}) {
+    super();
     this.apiKey = options.apiKey ?? env.ZENROWS_API_KEY;
     this.fetchFn = options.fetchFn ?? fetch;
   }
@@ -26,7 +21,7 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
-  private async executeAttempt(
+  protected async executeAttempt(
     targetUrl: string,
     usePremium: boolean,
     options: ScrapeOptions | undefined,
@@ -38,6 +33,7 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
     endpoint.searchParams.set('apikey', this.apiKey.trim());
     endpoint.searchParams.set('url', targetUrl);
     endpoint.searchParams.set('js_render', 'true');
+
     if (usePremium) {
       endpoint.searchParams.set('premium_proxy', 'true');
       const country = resolveTargetCountry(targetUrl);
@@ -130,46 +126,5 @@ export class ZenRowsUnblockerProvider implements IUnblockerProvider {
       durationMs: Date.now() - startTime,
       screenshot,
     };
-  }
-
-  async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
-    if (!this.isEnabled()) {
-      throw new UnblockerError(this.name, 'API key is not configured.');
-    }
-
-    const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-
-    try {
-      if (options?.premium !== undefined) {
-        return await this.executeAttempt(targetUrl, options.premium, options, signal, startTime);
-      }
-
-      try {
-        return await this.executeAttempt(targetUrl, false, options, signal, startTime);
-      } catch (err) {
-        const isChallenged = err instanceof AntiBotBlockedError;
-        const isProxyConfigIssue =
-          err instanceof UnblockerError &&
-          (err.httpStatus === 422 ||
-            err.httpStatus === 400 ||
-            (typeof err.message === 'string' &&
-              (err.message.includes('proxy_country') ||
-                err.message.includes('premium') ||
-                err.message.includes('RESP001'))));
-
-        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
-          logger.info(`[${this.name}] Standard proxy challenged or requires premium proxy; retrying with premium proxy...`, {
-            targetUrl,
-          });
-          return await this.executeAttempt(targetUrl, true, options, signal, startTime);
-        }
-        throw err;
-      }
-    } catch (err) {
-      throw normalizeUnblockerError(this.name, err, timeoutMs);
-    }
   }
 }

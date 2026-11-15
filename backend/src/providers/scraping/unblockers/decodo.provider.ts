@@ -1,15 +1,9 @@
-import { normalizeUnblockerError } from './unblockerErrors.js';
 import { resolveTargetCountry } from '../../../utils/geoTarget.js';
 import { env } from '../../../config/env.js';
 import { detectAntiBotBlock } from '../../../utils/antiBotDetector.js';
-import { AntiBotBlockedError } from '../../../errors/domainErrors.js';
-import { logger } from '../../../utils/logger.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
-import {
-  UnblockerError,
-  UnblockerQuotaExhaustedError,
-  type IUnblockerProvider,
-} from './unblocker.interface.js';
+import { UnblockerError, UnblockerQuotaExhaustedError } from './unblocker.interface.js';
+import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
 interface DecodoScrapeResultItem {
   content?: string | null;
@@ -25,12 +19,13 @@ interface DecodoScrapeResponse {
   message?: string;
 }
 
-export class DecodoUnblockerProvider implements IUnblockerProvider {
+export class DecodoUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'decodo';
   private readonly apiKey: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(options: { apiKey?: string; fetchFn?: typeof fetch } = {}) {
+    super();
     this.apiKey = options.apiKey ?? env.DECODO_API_KEY;
     this.fetchFn = options.fetchFn ?? fetch;
   }
@@ -39,7 +34,7 @@ export class DecodoUnblockerProvider implements IUnblockerProvider {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
-  private async executeAttempt(
+  protected async executeAttempt(
     targetUrl: string,
     usePremium: boolean,
     _options: ScrapeOptions | undefined,
@@ -127,46 +122,5 @@ export class DecodoUnblockerProvider implements IUnblockerProvider {
       url: targetUrl,
       durationMs: Date.now() - startTime,
     };
-  }
-
-  async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
-    if (!this.isEnabled()) {
-      throw new UnblockerError(this.name, 'API key is not configured.');
-    }
-
-    const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = options?.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
-
-    try {
-      if (options?.premium !== undefined) {
-        return await this.executeAttempt(targetUrl, options.premium, options, signal, startTime);
-      }
-
-      try {
-        return await this.executeAttempt(targetUrl, false, options, signal, startTime);
-      } catch (err) {
-        const isChallenged = err instanceof AntiBotBlockedError;
-        const isProxyConfigIssue =
-          err instanceof UnblockerError &&
-          (err.httpStatus === 403 ||
-            err.httpStatus === 400 ||
-            err.httpStatus === 500 ||
-            (typeof err.message === 'string' &&
-              (err.message.includes('proxy_pool') || err.message.includes('premium'))));
-
-        if ((isChallenged || isProxyConfigIssue) && !signal.aborted) {
-          logger.info(
-            `[${this.name}] Standard pool challenged; retrying with premium residential pool...`,
-            { targetUrl }
-          );
-          return await this.executeAttempt(targetUrl, true, options, signal, startTime);
-        }
-        throw err;
-      }
-    } catch (err) {
-      throw normalizeUnblockerError(this.name, err, timeoutMs);
-    }
   }
 }

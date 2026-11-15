@@ -81,3 +81,13 @@ export function centralErrorHandler(
     message: 'We could not complete this request. Please try again later.',
   });
 }
+
+export function notFoundHandler(
+  request: FastifyRequest,
+  reply: FastifyReply
+): FastifyReply {
+  return reply.status(404).send({
+    error: 'NOT_FOUND',
+    message: `Route ${request.method} ${request.url} not found.`,
+  });
+}

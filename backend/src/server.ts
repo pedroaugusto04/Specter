@@ -212,6 +212,21 @@ async function bootstrap(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled Promise Rejection in Node process', {
+      errorMessage: reason instanceof Error ? reason.message : String(reason),
+      stack: reason instanceof Error ? reason.stack : undefined,
+    });
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception in Node process', {
+      errorMessage: error.message,
+      stack: error.stack,
+    });
+    process.exit(1);
+  });
+
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
     logger.info(`Specter Backend API is running on http://${env.HOST}:${env.PORT}`, {

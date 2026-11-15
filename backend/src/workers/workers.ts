@@ -92,9 +92,27 @@ export class WorkerManager {
       });
     });
 
+    this.compilationWorker.on('error', (err) => {
+      logger.error('Compilation worker Redis connection error', {
+        errorMessage: err.message,
+      });
+    });
+
     this.scrapeWorker.on('failed', (job, err) => {
       logger.error('Scrape worker job failed', {
         jobId: job?.data?.jobId,
+        errorMessage: err.message,
+      });
+    });
+
+    this.scrapeWorker.on('error', (err) => {
+      logger.error('Scrape worker Redis connection error', {
+        errorMessage: err.message,
+      });
+    });
+
+    this.maintenanceWorker.on('error', (err) => {
+      logger.error('Maintenance worker Redis connection error', {
         errorMessage: err.message,
       });
     });

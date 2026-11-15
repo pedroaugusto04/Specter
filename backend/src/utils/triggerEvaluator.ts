@@ -172,14 +172,16 @@ export function evaluateSingleRule(
     if (
       typeof actualValue !== typeof targetValue ||
       (typeof actualValue === 'number' &&
-        (numericValue(actualValue) === null || numericValue(targetValue) === null))
+        (!Number.isFinite(actualValue) || !Number.isFinite(targetValue as number)))
     ) {
       return { satisfied: false, reason: `Field '${field}' has incompatible comparison types.` };
     }
+
     const equal =
       typeof actualValue === 'string' && typeof targetValue === 'string'
         ? actualValue.toLowerCase() === targetValue.toLowerCase()
         : actualValue === targetValue;
+
     return {
       satisfied: operator === TriggerOperator.Equal ? equal : !equal,
       reason: `${field} compared with ${String(targetValue)}.`,
@@ -214,40 +216,60 @@ export function evaluateTriggerRules(
   previousPayload?: ExtractedPayload | null,
   identityFields: string[] = []
 ): TriggerEvaluationResult {
-  if (!rules?.length) return { triggered: true, hasRules: false, matchedRules: [], reasons: [] };
-  if (!payload)
+  if (!rules?.length) {
+    return { triggered: true, hasRules: false, matchedRules: [], reasons: [] };
+  }
+
+  if (!payload) {
     return { triggered: false, hasRules: true, matchedRules: [], reasons: ['No data available.'] };
+  }
+
   const records = payloadRecords(payload);
   const previous = previousPayload ? payloadRecords(previousPayload) : [];
   const previousByIdentity = new Map(
     previous.map((record) => [recordIdentity(record, identityFields), record])
   );
   const collection = 'items' in payload && Array.isArray(payload.items);
-  if (collection && !identityFields.length)
+
+  if (collection && !identityFields.length) {
     return {
       triggered: false,
       hasRules: true,
       matchedRules: [],
       reasons: ['Collection identity is required.'],
     };
+  }
+
   for (const record of records) {
     const old = collection
       ? previousByIdentity.get(recordIdentity(record, identityFields))
       : previous[0];
-    if (old && sameRecord(old, record)) continue;
+
+    if (old && sameRecord(old, record)) {
+      continue;
+    }
+
     const results = rules.map((rule) => ({
       rule,
       result: evaluateSingleRule(record[rule.field], rule, old?.[rule.field]),
     }));
+
     const matched = results.filter((entry) => entry.result.satisfied);
-    if (matchMode === TriggerMatchMode.All ? matched.length === rules.length : matched.length > 0)
+    const isTriggered =
+      matchMode === TriggerMatchMode.All
+        ? matched.length === rules.length
+        : matched.length > 0;
+
+    if (isTriggered) {
       return {
         triggered: true,
         hasRules: true,
         matchedRules: matched.map((entry) => entry.rule),
         reasons: matched.map((entry) => entry.result.reason),
       };
+    }
   }
+
   return {
     triggered: false,
     hasRules: true,

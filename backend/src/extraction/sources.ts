@@ -31,8 +31,8 @@ export class DomSourceReader implements ISourceReader {
     const scope = record.value as cheerio.Cheerio<AnyNode>;
     let target = source.selector === ':scope' ? scope : scope.find(source.selector);
     if (target.length === 0 && (source.selector.startsWith('meta') || source.selector.startsWith('head'))) {
-      const $ = cheerio.load(_snapshot.html);
-      target = $(source.selector);
+      const root = scope.parents().length ? scope.parents().last() : scope;
+      target = root.find(source.selector);
     }
     const readSingle = (el: cheerio.Cheerio<AnyNode>) =>
       source.attribute === 'text' ? el.text() : el.attr(source.attribute);

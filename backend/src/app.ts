@@ -2,7 +2,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
-import { centralErrorHandler } from './middlewares/errorHandler.js';
+import { centralErrorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { InMemoryRealtimeEventBus } from './providers/realtime/inMemoryRealtime.provider.js';
 import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
@@ -34,6 +34,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.decorateRequest('user', null);
   app.setErrorHandler(centralErrorHandler);
+  app.setNotFoundHandler(notFoundHandler);
 
   const sessionService =
     options.sessionService ?? new SessionService(new DrizzleSessionRepository());

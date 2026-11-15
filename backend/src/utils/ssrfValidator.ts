@@ -46,8 +46,7 @@ export function isPrivateIp(ip: string): boolean {
     const parts = ip.split('.').map((p) => Number(p));
     if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
 
-    const [a, b, c] = parts;
-    if (a === undefined || b === undefined || c === undefined) return true;
+    const [a, b, c] = parts as [number, number, number, number];
 
     // 0.0.0.0/8 (Current network)
     if (a === 0) return true;

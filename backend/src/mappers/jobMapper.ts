@@ -118,10 +118,12 @@ export const JobMapper = {
   extractScalarValues(
     payload: ExtractedPayload | null
   ): Record<string, string | number | boolean | null> {
-    if (!payload || typeof payload !== 'object') return {};
+    if (!payload) return {};
+
     if ('items' in payload && Array.isArray(payload.items)) {
       return { itemCount: payload.items.length };
     }
+
     const result: Record<string, string | number | boolean | null> = {};
     for (const [key, val] of Object.entries(payload)) {
       if (

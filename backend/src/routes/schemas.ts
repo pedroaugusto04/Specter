@@ -3,6 +3,10 @@ import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js'
 import { env } from '../config/env.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 
+// ============================================================================
+// Shared Primitive Schemas
+// ============================================================================
+
 export const cronExpressionSchema = z
   .string({ required_error: 'Cron expression is required' })
   .trim()
@@ -19,6 +23,60 @@ export const cronExpressionSchema = z
     }
   });
 
+export const targetUrlSchema = z
+  .string({ required_error: 'Target URL is required' })
+  .trim()
+  .min(1, 'Target URL is required')
+  .url('Target URL must be a valid URL format (e.g. https://example.com)')
+  .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+    message: 'Target URL must start with http:// or https://',
+  });
+
+export const webhookUrlStringSchema = z
+  .string({ required_error: 'Webhook URL is required' })
+  .trim()
+  .url('Webhook URL must be a valid HTTP or HTTPS URL')
+  .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+    message: 'Webhook URL must start with http:// or https://',
+  });
+
+export const optionalWebhookUrlSchema = webhookUrlStringSchema
+  .optional()
+  .or(z.literal(''))
+  .nullable();
+
+export const webhookSecretSchema = z
+  .string()
+  .trim()
+  .max(256, 'Webhook secret must not exceed 256 characters');
+
+export const monitorNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Monitor name is required')
+  .max(80, 'Monitor name must be 80 characters or fewer');
+
+export const userPromptSchema = z
+  .string({ required_error: 'Extraction instructions are required' })
+  .trim()
+  .min(1, 'Extraction instructions are required')
+  .min(5, 'Extraction instructions must contain at least 5 characters');
+
+export const emailAddressSchema = z
+  .string({ required_error: 'Email is required' })
+  .trim()
+  .min(1, 'Email is required')
+  .email('Please enter a valid email address');
+
+export const alertNotificationEmailSchema = z
+  .string()
+  .trim()
+  .email('Please enter a valid alert email address (e.g. alerts@company.com)');
+
+// ============================================================================
+// Trigger Rule Schemas
+// ============================================================================
+
 export const triggerRuleSchema = z.object({
   field: z.string().trim().min(1, 'Field is required'),
   operator: z.nativeEnum(TriggerOperator),
@@ -27,109 +85,33 @@ export const triggerRuleSchema = z.object({
 
 export const triggerMatchModeSchema = z.nativeEnum(TriggerMatchMode);
 
+// ============================================================================
+// Job Schemas
+// ============================================================================
+
 export const jobProbeSchema = z.object({
-  url: z
-    .string({ required_error: 'Target URL is required' })
-    .trim()
-    .min(1, 'Target URL is required')
-    .url('Target URL must be a valid URL format (e.g. https://example.com)')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Target URL must start with http:// or https://',
-    }),
+  url: targetUrlSchema,
 });
 
 export const jobInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, 'Monitor name is required')
-    .max(80, 'Monitor name must be 80 characters or fewer')
-    .optional(),
+  name: monitorNameSchema.optional(),
   userId: z.string().trim().min(1).optional(),
-  url: z
-    .string({ required_error: 'Target URL is required' })
-    .trim()
-    .min(1, 'Target URL is required')
-    .url('Target URL must be a valid URL format (e.g. https://example.com)')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Target URL must start with http:// or https://',
-    }),
-  userPrompt: z
-    .string({ required_error: 'Extraction instructions are required' })
-    .trim()
-    .min(1, 'Extraction instructions are required')
-    .min(5, 'Extraction instructions must contain at least 5 characters'),
-  notificationEmail: z
-    .string()
-    .trim()
-    .email('Please enter a valid alert email address (e.g. alerts@company.com)')
-    .optional()
-    .or(z.literal(''))
-    .default(''),
-  webhookUrl: z
-    .string()
-    .trim()
-    .url('Webhook URL must be a valid HTTP or HTTPS URL')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Webhook URL must start with http:// or https://',
-    })
-    .optional()
-    .or(z.literal(''))
-    .nullable(),
-  webhookSecret: z
-    .string()
-    .trim()
-    .max(256, 'Webhook secret must not exceed 256 characters')
-    .optional()
-    .nullable(),
+  url: targetUrlSchema,
+  userPrompt: userPromptSchema,
+  notificationEmail: alertNotificationEmailSchema.optional().or(z.literal('')).default(''),
+  webhookUrl: optionalWebhookUrlSchema,
+  webhookSecret: webhookSecretSchema.optional().nullable(),
   cronExpression: cronExpressionSchema.default('0 */6 * * *'),
   captureScreenshotOnChange: z.boolean().default(false),
 });
 
 export const jobUpdateSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, 'Monitor name is required')
-    .max(80, 'Monitor name must be 80 characters or fewer')
-    .optional(),
-  url: z
-    .string()
-    .trim()
-    .min(1, 'Target URL is required')
-    .url('Target URL must be a valid URL format (e.g. https://example.com)')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Target URL must start with http:// or https://',
-    })
-    .optional(),
-  userPrompt: z
-    .string()
-    .trim()
-    .min(1, 'Extraction instructions are required')
-    .min(5, 'Extraction instructions must contain at least 5 characters')
-    .optional(),
-  notificationEmail: z
-    .string()
-    .trim()
-    .email('Please enter a valid alert email address (e.g. alerts@company.com)')
-    .optional()
-    .or(z.literal('')),
-  webhookUrl: z
-    .string()
-    .trim()
-    .url('Webhook URL must be a valid HTTP or HTTPS URL')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Webhook URL must start with http:// or https://',
-    })
-    .optional()
-    .or(z.literal(''))
-    .nullable(),
-  webhookSecret: z
-    .string()
-    .trim()
-    .max(256, 'Webhook secret must not exceed 256 characters')
-    .optional()
-    .nullable(),
+  name: monitorNameSchema.optional(),
+  url: targetUrlSchema.optional(),
+  userPrompt: userPromptSchema.optional(),
+  notificationEmail: alertNotificationEmailSchema.optional().or(z.literal('')),
+  webhookUrl: optionalWebhookUrlSchema,
+  webhookSecret: webhookSecretSchema.optional().nullable(),
   cronExpression: cronExpressionSchema.optional(),
   captureScreenshotOnChange: z.boolean().optional(),
   triggerRules: z.array(triggerRuleSchema).optional(),
@@ -160,12 +142,12 @@ export const jobTimeseriesQuerySchema = z.object({
   range: z.enum(['24h', '7d', '30d', 'all']).default('all'),
 });
 
+// ============================================================================
+// Auth & Profile Schemas
+// ============================================================================
+
 export const authRegisterSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .trim()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailAddressSchema,
   password: z
     .string({ required_error: 'Password is required' })
     .min(8, 'Password must be at least 8 characters'),
@@ -173,11 +155,7 @@ export const authRegisterSchema = z.object({
 });
 
 export const authLoginSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .trim()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailAddressSchema,
   password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
 });
 
@@ -203,21 +181,16 @@ export const authProfileUpdateSchema = z.object({
     .optional(),
 });
 
+// ============================================================================
+// Integration Schemas
+// ============================================================================
+
 export const updateIntegrationsSchema = z.object({
   telegramEnabled: z.boolean().default(false),
   telegramChatId: z.string().trim().optional().nullable(),
   webhookEnabled: z.boolean().default(false),
-  webhookUrl: z
-    .string()
-    .trim()
-    .url('Webhook URL must be a valid HTTP or HTTPS URL')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Webhook URL must start with http:// or https://',
-    })
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  webhookSecret: z.string().trim().optional().nullable(),
+  webhookUrl: optionalWebhookUrlSchema,
+  webhookSecret: webhookSecretSchema.optional().nullable(),
 });
 
 export const testTelegramSchema = z.object({
@@ -225,15 +198,13 @@ export const testTelegramSchema = z.object({
 });
 
 export const testWebhookSchema = z.object({
-  webhookUrl: z
-    .string({ required_error: 'Webhook URL is required' })
-    .trim()
-    .url('Webhook URL must be a valid HTTP or HTTPS URL')
-    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-      message: 'Webhook URL must start with http:// or https://',
-    }),
-  secret: z.string().trim().optional().nullable(),
+  webhookUrl: webhookUrlStringSchema,
+  secret: webhookSecretSchema.optional().nullable(),
 });
+
+// ============================================================================
+// Session Sync Schemas
+// ============================================================================
 
 export const syncSessionSchema = z.object({
   domain: z.string().trim().min(1, 'Domain is required'),
