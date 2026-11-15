@@ -76,7 +76,7 @@ export const envSchema = z.object({
     .default('true')
     .transform((value) => value === 'true'),
   SEMANTIC_REVIEW_THRESHOLD: z.coerce.number().int().min(0).max(10).default(4),
-  EXTRACTION_ACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
+  EXTRACTION_ACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
   EXTRACTION_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(250),
   EXTRACTION_MAX_EVIDENCE: z.coerce.number().int().positive().default(200),
   EXTRACTION_EVIDENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
