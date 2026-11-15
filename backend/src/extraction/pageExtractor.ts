@@ -226,13 +226,19 @@ export class PageExtractor implements IPageExtractor {
 
       if (intent.mode === ExtractionMode.Collection) {
         if (contexts.length > 0 && result.validatedSourceRecords === 0) {
-          fail('No valid records could be extracted from candidate items.');
+          const containerDesc = strategy.records.kind === 'dom' ? `'${strategy.records.selector}'` : strategy.records.kind;
+          fail(`No valid records could be extracted from candidate items (${contexts.length} matched ${containerDesc}). Check field selectors.`);
         }
 
         const seen = new Set<string>();
         for (const record of result.records) {
           const identity = recordIdentity(record, intent.identityFields);
-          if (seen.has(identity)) fail('Duplicate collection identity.');
+          if (seen.has(identity)) {
+            const idPreview = identity ? `'${redactText(identity)}'` : '(empty)';
+            fail(
+              `Duplicate collection identity for ${idPreview}. Multiple records share the same identity fields [${intent.identityFields.join(', ')}]. Narrow the record container selector to target the primary content feed, or use composite identityFields.`
+            );
+          }
           seen.add(identity);
         }
       }
@@ -241,12 +247,18 @@ export class PageExtractor implements IPageExtractor {
         conditions.every((condition) =>
           evaluateCondition(condition, snapshot, candidates, observed)
         );
-      result.ready = all(strategy.ready);
+      const failedReady = strategy.ready.filter(
+        (condition) => !evaluateCondition(condition, snapshot, candidates, observed)
+      );
+      result.ready = failedReady.length === 0 && strategy.ready.length > 0;
       result.ended = !strategy.pagination || all(strategy.pagination.end);
       if (result.quality !== ExtractionQuality.Invalid) {
         if (!result.ready) {
           result.quality = ExtractionQuality.Inconclusive;
-          result.issues.push('Readiness conditions were not satisfied.');
+          const details = failedReady.map((c) => JSON.stringify(c)).join(', ');
+          result.issues.push(
+            `Readiness conditions were not satisfied: ${details}. Verify that the ready selector exists in the rendered DOM.`
+          );
         } else if (!result.records.length) {
           result.quality =
             all(strategy.empty) ||
