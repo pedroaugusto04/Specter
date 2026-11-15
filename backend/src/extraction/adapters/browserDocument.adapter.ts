@@ -372,7 +372,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           if (action.kind === 'inspect') {
             await rootLocator(action.selector)
               .first()
-              .waitFor({ state: 'attached', timeout: timeout() });
+              .waitFor({ state: 'attached', timeout: Math.min(timeout(), 30000) });
             const inspected = await snapshot();
             inspected.html = await rootLocator(action.selector).evaluateAll((elements) =>
               elements.map((element) => element.outerHTML).join('\n')

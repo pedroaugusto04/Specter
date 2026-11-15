@@ -1069,7 +1069,7 @@ export const liveBenchmarkSuite: LiveBenchmarkCase[] = [
       minRecords: 5,
       fields: {
         title: text('title', 'movie', 'film', 'name'),
-        gross: text('gross', 'weekend', 'revenue', 'money'),
+        gross: text('gross', 'weekend', 'revenue', 'money', 'faturamento', 'bilheteria'),
       },
     },
   },

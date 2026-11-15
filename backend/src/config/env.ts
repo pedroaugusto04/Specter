@@ -93,7 +93,7 @@ export const envSchema = z.object({
   ACCESS_BLOCK_THRESHOLD: z.coerce.number().int().positive().default(2),
   ACCESS_BLOCK_COOLDOWN_MINUTES: z.coerce.number().int().positive().default(60),
   EXTRACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
-  COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(420000),
+  COMPILATION_BUDGET_MS: z.coerce.number().int().positive().default(600000),
   COMPILATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   COMPILATION_QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   CONFIGURATION_MAX_INPUT_CHARS: z.coerce.number().int().positive().default(250000),

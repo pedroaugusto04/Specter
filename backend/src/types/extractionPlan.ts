@@ -24,11 +24,17 @@ export type {
 
 const text = z.string().trim().min(1);
 const path = z.array(z.union([z.string(), z.number().int().nonnegative()]));
-export const locatorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('css'), selector: text }).strict(),
+export const locatorSchema = z.union([
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('css'), selector: text }).strict(),
+    z
+      .object({ kind: z.literal('role'), role: text, name: text, exact: z.boolean().optional() })
+      .strict(),
+  ]),
   z
-    .object({ kind: z.literal('role'), role: text, name: text, exact: z.boolean().optional() })
-    .strict(),
+    .object({ selector: text })
+    .strict()
+    .transform((val) => ({ kind: 'css' as const, selector: val.selector })),
 ]);
 const match = z
   .object({
