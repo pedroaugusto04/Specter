@@ -3,7 +3,7 @@ import { emptyJobForm, formToCreateJob } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
 import { JobScheduleFields } from './JobScheduleFields';
 import { TriggerHelpCallout } from './TriggerRulesEditor';
-import { DEFAULT_TIMEZONE } from '@/lib/utils';
+import { getBrowserTimezone } from '@/lib/utils';
 
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Button } from '@/components/ui/button';
@@ -452,7 +452,7 @@ export function CreateJobForm({
           error={fieldErrors.cronExpression}
           prefix=""
           label="Monitoring Frequency"
-          timeZone={user?.timezone || DEFAULT_TIMEZONE}
+          timeZone={user?.timezone || getBrowserTimezone()}
         />
       </div>
 

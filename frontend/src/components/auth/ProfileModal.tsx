@@ -19,8 +19,9 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { useUpdateProfileMutation, useUserQuotasQuery } from '@/hooks/useDashboardQueries';
-import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from '@/lib/utils';
+import { getBrowserTimezone } from '@/lib/utils';
 import type { UserDto } from '@/lib/api';
 import { QuotaBar } from '@/components/dashboard/QuotaBar';
 
@@ -44,7 +45,7 @@ export function ProfileModal({
   const updateProfileMutation = useUpdateProfileMutation();
   const { data: quotas, isLoading: isLoadingQuotas } = useUserQuotasQuery(isOpen && Boolean(user));
   const [name, setName] = React.useState('');
-  const [timezone, setTimezone] = React.useState(DEFAULT_TIMEZONE);
+  const [timezone, setTimezone] = React.useState(getBrowserTimezone());
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -52,7 +53,7 @@ export function ProfileModal({
   React.useEffect(() => {
     if (user) {
       setName(user.name || '');
-      setTimezone(user.timezone || DEFAULT_TIMEZONE);
+      setTimezone(user.timezone || getBrowserTimezone());
       setErrorMessage(null);
       setSaveSuccess(false);
     }
@@ -88,7 +89,7 @@ export function ProfileModal({
       return new Intl.DateTimeFormat('en-US', {
         dateStyle: 'medium',
         timeStyle: 'short',
-        timeZone: user.timezone || DEFAULT_TIMEZONE,
+        timeZone: user.timezone || getBrowserTimezone(),
       }).format(d);
     } catch {
       return user.createdAt;
@@ -96,7 +97,7 @@ export function ProfileModal({
   })();
 
   const isDirty =
-    (user.name || '') !== name.trim() || (user.timezone || DEFAULT_TIMEZONE) !== timezone;
+    (user.name || '') !== name.trim() || (user.timezone || getBrowserTimezone()) !== timezone;
 
   return (
     <Dialog
@@ -164,19 +165,12 @@ export function ProfileModal({
             htmlFor="profile-timezone"
             hint="Scheduled times, dates, check timestamps, and change histories use this timezone. Changing it updates your schedules."
           >
-            <select
+            <TimezoneSelect
               id="profile-timezone"
               value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
+              onChange={(newTz) => setTimezone(newTz)}
               disabled={isSaving}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {COMMON_TIMEZONES.map((tz) => (
-                <option key={tz.value} value={tz.value} className="bg-background text-foreground">
-                  {tz.label}
-                </option>
-              ))}
-            </select>
+            />
           </FormField>
 
           <div className="flex justify-end pt-1">
@@ -273,7 +267,7 @@ export function ProfileModal({
                 <Globe className="h-3.5 w-3.5" />
                 <span>Active Timezone</span>
               </div>
-              <span className="font-mono text-foreground">{user.timezone || DEFAULT_TIMEZONE}</span>
+              <span className="font-mono text-foreground">{user.timezone || getBrowserTimezone()}</span>
             </div>
 
             {/* Monitors count */}

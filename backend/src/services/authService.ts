@@ -136,6 +136,7 @@ export class AuthService {
     email: string;
     password: string;
     name?: string;
+    timezone?: string;
   }): Promise<{ user: UserDto; tokens: AuthTokenPair }> {
     const normalizedEmail = input.email.trim().toLowerCase();
     const existing = await this.userRepository.findByEmail(normalizedEmail);
@@ -151,6 +152,7 @@ export class AuthService {
       email: normalizedEmail,
       name: input.name?.trim() || null,
       passwordHash,
+      ...(input.timezone?.trim() ? { timezone: input.timezone.trim() } : {}),
     });
 
     const userDto = UserMapper.entityToDto(created);

@@ -3,7 +3,7 @@ import * as React from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_JOB_CRON, type JobFormValues } from '@/forms/jobForm';
-import { cn, DEFAULT_TIMEZONE, getCronPresets } from '@/lib/utils';
+import { cn, getBrowserTimezone, getCronPresets } from '@/lib/utils';
 
 const CUSTOM_SCHEDULE = 'custom';
 type Schedule = Pick<JobFormValues, 'cronPreset' | 'customCron' | 'useCustomCron'>;
@@ -15,7 +15,7 @@ export function JobScheduleFields({
   error,
   prefix = '',
   label = 'Monitoring Frequency',
-  timeZone = DEFAULT_TIMEZONE,
+  timeZone,
 }: {
   value: Schedule;
   onChange(value: Schedule): void;
@@ -25,7 +25,7 @@ export function JobScheduleFields({
   label?: string;
   timeZone?: string;
 }) {
-  const effectiveTimeZone = timeZone || DEFAULT_TIMEZONE;
+  const effectiveTimeZone = timeZone || getBrowserTimezone();
   const presets = React.useMemo(() => getCronPresets(effectiveTimeZone), [effectiveTimeZone]);
   const presetId = `${prefix}cron-preset`;
   const customId = `${prefix}custom-cron`;

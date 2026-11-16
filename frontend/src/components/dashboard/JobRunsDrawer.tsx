@@ -24,13 +24,17 @@ import {
   ExternalLink,
   GitCompare,
   SlidersHorizontal,
+  Sparkles,
   TrendingUp,
   ZoomIn,
 } from 'lucide-react';
 import * as React from 'react';
 
 const MONITOR_STATUS = {
-  [JOB_STATUS.PendingCompilation]: { label: 'Setting up', variant: 'secondary' },
+  [JOB_STATUS.PendingCompilation]: {
+    label: 'Compiling selectors, usually ~30 s',
+    variant: 'secondary',
+  },
   [JOB_STATUS.Active]: { label: 'Ready to monitor', variant: 'success' },
   [JOB_STATUS.Healing]: { label: 'Checking monitor', variant: 'warning' },
   [JOB_STATUS.Paused]: { label: 'Paused', variant: 'secondary' },
@@ -66,11 +70,25 @@ export function JobRunsDrawer({
     setPage(1);
   }, [job?.id]);
 
-  const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
-  const { data: timeseriesData, isLoading: timeseriesLoading } = useJobTimeseriesQuery(
-    job?.id,
-    chartRange
-  );
+  const {
+    data,
+    isLoading: loading,
+    refetch: refetchRuns,
+  } = useJobRunsQuery(job?.id, page, pageSize);
+  const {
+    data: timeseriesData,
+    isLoading: timeseriesLoading,
+    refetch: refetchTimeseries,
+  } = useJobTimeseriesQuery(job?.id, chartRange);
+
+  const prevStatusRef = React.useRef(job?.status);
+  React.useEffect(() => {
+    if (prevStatusRef.current && prevStatusRef.current !== job?.status) {
+      void refetchRuns();
+      void refetchTimeseries();
+    }
+    prevStatusRef.current = job?.status;
+  }, [job?.status, refetchRuns, refetchTimeseries]);
 
   const runs: JobRunDto[] = data?.runs ?? [];
   const timeseriesPoints = timeseriesData?.points ?? [];
@@ -294,9 +312,25 @@ export function JobRunsDrawer({
                   Loading snapshot history...
                 </p>
               ) : runs.length === 0 ? (
-                <p className="rounded-lg border border-border bg-muted/20 p-4 text-xs sm:text-sm text-muted-foreground">
-                  No runs recorded for this monitor yet.
-                </p>
+                job.status === JOB_STATUS.PendingCompilation ? (
+                  <div className="rounded-xl border border-border bg-muted/30 p-6 text-center space-y-3">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary animate-pulse">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-sm text-foreground">
+                        Compiling selectors, usually ~30 s
+                      </h4>
+                      <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                        Analyzing the live page, detecting monitored fields, and running live verification. Results and snapshots will appear here automatically.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-border bg-muted/20 p-4 text-xs sm:text-sm text-muted-foreground">
+                    No runs recorded for this monitor yet.
+                  </p>
+                )
               ) : (
                 <div className="space-y-3">
                   {runs.map((run, index) => {

@@ -4,7 +4,7 @@ import { formToUpdateJob, jobToForm } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
 import { JobScheduleFields } from './JobScheduleFields';
 import { TriggerRulesEditor } from './TriggerRulesEditor';
-import { DEFAULT_TIMEZONE } from '@/lib/utils';
+import { getBrowserTimezone } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -291,7 +291,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
             error={fieldErrors.cronExpression}
             prefix="edit-"
             label="Check Frequency"
-            timeZone={user?.timezone || DEFAULT_TIMEZONE}
+            timeZone={user?.timezone || getBrowserTimezone()}
           />
         </div>
 

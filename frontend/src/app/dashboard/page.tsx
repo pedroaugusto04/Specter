@@ -24,6 +24,7 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { useRealtimeEvents, type RealtimeEventPayload } from '@/hooks/useRealtimeEvents';
 import { api, type UserDto } from '@/lib/api';
+import { getBrowserTimezone } from '@/lib/utils';
 import { Plus, Radio } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -48,6 +49,20 @@ export default function DashboardPage() {
   const logoutMutation = useLogoutMutation();
 
   const modals = useDashboardModals();
+
+  const effectiveTimeZone = user?.timezone || getBrowserTimezone();
+
+  const selectedJob = React.useMemo(() => {
+    const current = modals.selectedJob;
+    if (!current) return null;
+    return jobs.find((j) => j.id === current.id) ?? current;
+  }, [jobs, modals.selectedJob]);
+
+  const editingJob = React.useMemo(() => {
+    const current = modals.editingJob;
+    if (!current) return null;
+    return jobs.find((j) => j.id === current.id) ?? current;
+  }, [jobs, modals.editingJob]);
 
   const isRefreshing = isJobsLoading || isJobsFetching || isStatsFetching;
   const connectionError = jobsError || statsError;
@@ -79,7 +94,7 @@ export default function DashboardPage() {
                 next.delete(event.jobId);
                 return next;
               });
-              void invalidateJobsAndStats();
+              void invalidateJobsAndStats(event.jobId);
             }, 120_000)
           );
         } else if (event.jobId) {
@@ -92,7 +107,7 @@ export default function DashboardPage() {
             return next;
           });
         }
-        void invalidateJobsAndStats();
+        void invalidateJobsAndStats(event.jobId);
       },
       [invalidateJobsAndStats]
     ),
@@ -267,7 +282,7 @@ export default function DashboardPage() {
           onSelectJobForHistory={modals.openJobHistory}
           onEditJob={modals.openEditJob}
           onCreateClick={modals.openCreateModal}
-          timeZone={user?.timezone || 'America/Sao_Paulo'}
+          timeZone={effectiveTimeZone}
         />
       </main>
 
@@ -319,8 +334,8 @@ export default function DashboardPage() {
 
       {/* Edit Modal */}
       <EditJobModal
-        job={modals.editingJob}
-        isOpen={Boolean(modals.editingJob)}
+        job={editingJob}
+        isOpen={Boolean(editingJob)}
         user={user}
         onClose={modals.closeEditJob}
         onUpdated={() => void invalidateJobsAndStats()}
@@ -328,15 +343,15 @@ export default function DashboardPage() {
 
       {/* Snapshot and Diff Drawer */}
       <JobRunsDrawer
-        job={modals.selectedJob}
+        job={selectedJob}
         onClose={modals.closeJobHistory}
-        timeZone={user?.timezone || 'America/Sao_Paulo'}
+        timeZone={effectiveTimeZone}
       />
 
       <IntegrationsModal
         isOpen={modals.isIntegrationsModalOpen}
         onClose={modals.closeIntegrationsModal}
-        timeZone={user?.timezone || 'America/Sao_Paulo'}
+        timeZone={effectiveTimeZone}
       />
     </div>
   );

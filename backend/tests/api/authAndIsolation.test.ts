@@ -131,6 +131,23 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     expect(updateRes.json().data.name).toBe('Alice Smith');
   });
 
+  it('registers a user with a specific timezone and persists it', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'tzuser@example.com',
+        password: 'securePassword123',
+        name: 'Timezone User',
+        timezone: 'America/New_York',
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.data.timezone).toBe('America/New_York');
+  });
+
   it('rejects duplicate email registration and invalid login credentials', async () => {
     await app.inject({
       method: 'POST',

@@ -155,7 +155,11 @@ export function useInvalidateDashboard() {
       queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
     ];
     if (jobId) {
-      promises.push(queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) }));
+      promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns', jobId] }));
+      promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries', jobId] }));
+    } else {
+      promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns'] }));
+      promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries'] }));
     }
     await Promise.all(promises);
   };
@@ -198,8 +202,12 @@ export function useRegisterMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (credentials: { email: string; password: string; name?: string }) =>
-      api.register(credentials),
+    mutationFn: (credentials: {
+      email: string;
+      password: string;
+      name?: string;
+      timezone?: string;
+    }) => api.register(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(dashboardKeys.user, user);
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });

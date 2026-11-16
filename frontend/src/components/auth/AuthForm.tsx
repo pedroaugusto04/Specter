@@ -8,6 +8,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useLoginMutation, useRegisterMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, api, type UserDto } from '@/lib/api';
+import { getBrowserTimezone } from '@/lib/utils';
 
 export interface AuthFormProps {
   initialEmail?: string;
@@ -86,7 +87,11 @@ export function AuthForm({
     try {
       const user =
         mode === 'register'
-          ? await registerMutation.mutateAsync({ email: trimmedEmail, password })
+          ? await registerMutation.mutateAsync({
+              email: trimmedEmail,
+              password,
+              timezone: getBrowserTimezone(),
+            })
           : await loginMutation.mutateAsync({ email: trimmedEmail, password });
       await onSuccess(user);
     } catch (err) {

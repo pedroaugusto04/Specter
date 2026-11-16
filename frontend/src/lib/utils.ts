@@ -57,7 +57,23 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
   return { valid: true };
 }
 
-export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
+export const FALLBACK_TIMEZONE = 'America/Sao_Paulo';
+
+export function getBrowserTimezone(): string {
+  if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && typeof tz === 'string' && tz.trim().length > 0) {
+        return tz;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return FALLBACK_TIMEZONE;
+}
+
+export const DEFAULT_TIMEZONE = FALLBACK_TIMEZONE;
 
 export const COMMON_TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'America/Sao Paulo (BRT / UTC-3)' },
@@ -79,7 +95,58 @@ export const COMMON_TIMEZONES = [
   { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST/AEDT)' },
 ] as const;
 
-export function formatDateTime(isoString: string, timeZone: string = DEFAULT_TIMEZONE): string {
+export interface TimezoneOption {
+  value: string;
+  label: string;
+  offset: string;
+  city: string;
+}
+
+export function getAllIanaTimezones(): TimezoneOption[] {
+  let timezones: string[] = [];
+
+  if (typeof Intl !== 'undefined' && typeof (Intl as any).supportedValuesOf === 'function') {
+    try {
+      timezones = (Intl as any).supportedValuesOf('timeZone');
+    } catch {
+      timezones = [];
+    }
+  }
+
+  if (!timezones || timezones.length === 0) {
+    timezones = COMMON_TIMEZONES.map((t) => t.value);
+  }
+
+  if (!timezones.includes('UTC')) timezones.unshift('UTC');
+  if (!timezones.includes(FALLBACK_TIMEZONE)) timezones.unshift(FALLBACK_TIMEZONE);
+
+  const now = new Date();
+  const results: TimezoneOption[] = [];
+
+  for (const tz of timezones) {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'shortOffset',
+      });
+      const parts = formatter.formatToParts(now);
+      const tzPart = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+      const city = tz.split('/').pop()?.replace(/_/g, ' ') ?? tz;
+      results.push({
+        value: tz,
+        label: `${tz} (${tzPart})`,
+        offset: tzPart,
+        city,
+      });
+    } catch {
+      // unsupported timezone in host environment, skip
+    }
+  }
+
+  return results;
+}
+
+export function formatDateTime(isoString: string, timeZone: string = getBrowserTimezone()): string {
   try {
     const d = new Date(isoString);
     if (Number.isNaN(d.getTime())) return isoString;
@@ -100,7 +167,7 @@ export function formatDateTime(isoString: string, timeZone: string = DEFAULT_TIM
   }
 }
 
-export function formatCompactDate(isoString: string, timeZone: string = DEFAULT_TIMEZONE): string {
+export function formatCompactDate(isoString: string, timeZone: string = getBrowserTimezone()): string {
   try {
     const d = new Date(isoString);
     if (Number.isNaN(d.getTime())) return isoString;

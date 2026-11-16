@@ -142,7 +142,12 @@ export const api = {
     });
   },
 
-  register(input: { email: string; password: string; name?: string }): Promise<UserDto> {
+  register(input: {
+    email: string;
+    password: string;
+    name?: string;
+    timezone?: string;
+  }): Promise<UserDto> {
     return request<UserDto>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
