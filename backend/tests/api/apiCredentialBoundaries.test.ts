@@ -69,7 +69,12 @@ async function setup() {
     getBotUsername: async () => 'test_bot',
   };
   app = await buildApp({
-    jobService: new JobService(jobs, new MockJobScheduler(), new MockScraperEngine()),
+    jobService: new JobService({
+      jobRepository: jobs,
+      jobScheduler: new MockJobScheduler(),
+      compilationControl: { cancelCompilation: () => false },
+      scraperEngine: new MockScraperEngine(),
+    }),
     authService: auth,
     integrationService: new IntegrationService(integrations, telegram, webhook),
     sessionService: new SessionService(sessions),

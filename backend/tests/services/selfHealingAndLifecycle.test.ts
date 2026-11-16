@@ -250,16 +250,13 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
   });
 
   it('instantly cancels an active compilation when requested via jobService.cancelCompilation', async () => {
-    const jobService = new JobService(
-      repository,
-      scheduler,
-      scraper,
-      undefined,
-      undefined,
-      new JobPresenter(),
-      undefined,
-      compilationService
-    );
+    const jobService = new JobService({
+      jobRepository: repository,
+      jobScheduler: scheduler,
+      compilationControl: compilationService,
+      scraperEngine: scraper,
+      presenter: new JobPresenter(),
+    });
 
     const job = await repository.createJob({
       url: 'https://example.com/item',
@@ -308,16 +305,13 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
   });
 
   it('cancels ongoing compilation and pauses the monitor when setJobPauseState(true) is invoked', async () => {
-    const jobService = new JobService(
-      repository,
-      scheduler,
-      scraper,
-      undefined,
-      undefined,
-      new JobPresenter(),
-      undefined,
-      compilationService
-    );
+    const jobService = new JobService({
+      jobRepository: repository,
+      jobScheduler: scheduler,
+      compilationControl: compilationService,
+      scraperEngine: scraper,
+      presenter: new JobPresenter(),
+    });
 
     const job = await repository.createJob({
       url: 'https://example.com/item',
@@ -361,6 +355,53 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     const updated = await repository.findById(job.id);
     expect(updated?.status).toBe('PAUSED');
     expect(scheduler.compilationQueue).toHaveLength(0);
+    expect(repository.runs).toHaveLength(0);
+  });
+
+  it('does not start compilation when cancellation arrives while quota validation is pending', async () => {
+    const job = await repository.createJob({
+      userId: 'quota-race-user',
+      url: 'https://example.com/item',
+      userPrompt: 'Monitor price',
+      notificationEmail: 'alerts@example.com',
+      cronExpression: '*/30 * * * *',
+    });
+
+    let releaseQuotaCheck!: () => void;
+    let quotaCheckStarted!: () => void;
+    const quotaStarted = new Promise<void>((resolve) => {
+      quotaCheckStarted = resolve;
+    });
+    const quotaService = {
+      assertCanCompile: () => {
+        quotaCheckStarted();
+        return new Promise<void>((resolve) => {
+          releaseQuotaCheck = resolve;
+        });
+      },
+    } as unknown as import('../../src/services/quotaService.js').QuotaService;
+    const quotaAwareCompilationService = new CompilationService({
+      jobRepository: repository,
+      configurationPipeline: fixtureConfiguration(compiler, scraper),
+      alertRouter: notifier,
+      storageProvider: new NoopStorageProvider(),
+      jobScheduler: scheduler,
+      quotaService,
+    });
+    const jobService = new JobService({
+      jobRepository: repository,
+      jobScheduler: scheduler,
+      compilationControl: quotaAwareCompilationService,
+    });
+
+    const compilePromise = quotaAwareCompilationService.compileJob(job.id);
+    await quotaStarted;
+    await jobService.cancelCompilation(job.id);
+    releaseQuotaCheck();
+    await compilePromise;
+
+    expect(compiler.calls).toHaveLength(0);
+    expect((await repository.findById(job.id))?.status).toBe('PAUSED');
     expect(repository.runs).toHaveLength(0);
   });
 });

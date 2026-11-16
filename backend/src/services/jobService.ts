@@ -36,7 +36,18 @@ export type UpdateScrapingJobRequest = UpdateJobRequest;
 
 import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
-import type { CompilationService } from './compilationService.js';
+import type { ICompilationControl } from './compilationControl.interface.js';
+
+export interface JobServiceDeps {
+  jobRepository: IJobRepository;
+  jobScheduler: IJobScheduler;
+  compilationControl: ICompilationControl;
+  scraperEngine?: IScraperEngine;
+  sessionRepository?: ISessionRepository;
+  realtimeService?: RealtimeService;
+  presenter?: JobPresenter;
+  quotaService?: QuotaService;
+}
 
 export class JobService {
   private readonly jobRepository: IJobRepository;
@@ -45,25 +56,19 @@ export class JobService {
   private readonly sessionRepository?: ISessionRepository;
   private readonly realtimeService?: RealtimeService;
   private readonly quotaService?: QuotaService;
-  private readonly compilationService?: CompilationService;
+  private readonly compilationControl: ICompilationControl;
 
-  constructor(
-    jobRepository: IJobRepository,
-    jobScheduler: IJobScheduler,
-    scraperEngine?: IScraperEngine,
-    sessionRepository?: ISessionRepository,
-    realtimeService?: RealtimeService,
-    private readonly presenter: JobPresenter = new JobPresenter(),
-    quotaService?: QuotaService,
-    compilationService?: CompilationService
-  ) {
-    this.jobRepository = jobRepository;
-    this.jobScheduler = jobScheduler;
-    this.scraperEngine = scraperEngine;
-    this.sessionRepository = sessionRepository;
-    this.realtimeService = realtimeService;
-    this.quotaService = quotaService;
-    this.compilationService = compilationService;
+  private readonly presenter: JobPresenter;
+
+  constructor(deps: JobServiceDeps) {
+    this.jobRepository = deps.jobRepository;
+    this.jobScheduler = deps.jobScheduler;
+    this.compilationControl = deps.compilationControl;
+    this.scraperEngine = deps.scraperEngine;
+    this.sessionRepository = deps.sessionRepository;
+    this.realtimeService = deps.realtimeService;
+    this.presenter = deps.presenter ?? new JobPresenter();
+    this.quotaService = deps.quotaService;
   }
 
   async probeUrl(
@@ -313,7 +318,7 @@ export class JobService {
     const existing = await this.getOwnedJob(id, userId);
 
     if (paused) {
-      this.compilationService?.cancelCompilation(existing.id, 'Monitor paused by user');
+      this.compilationControl.cancelCompilation(existing.id, 'Monitor paused by user');
       await this.jobScheduler.removePendingCompilations(existing.id);
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       const updated = await this.jobRepository.updateJob(id, {
@@ -390,7 +395,14 @@ export class JobService {
   async cancelCompilation(id: string, userId?: string): Promise<ScrapingJobDto> {
     const existing = await this.getOwnedJob(id, userId);
 
-    this.compilationService?.cancelCompilation(existing.id, 'Compilation cancelled by user');
+    if (
+      existing.status !== JobStatus.PendingCompilation &&
+      existing.status !== JobStatus.Healing
+    ) {
+      throw new ValidationError('This monitor does not have a compilation in progress.');
+    }
+
+    this.compilationControl.cancelCompilation(existing.id, 'Compilation cancelled by user');
     await this.jobScheduler.removePendingCompilations(existing.id);
 
     // If job already had an extraction plan, revert to ACTIVE, otherwise set to PAUSED
@@ -410,7 +422,7 @@ export class JobService {
   async deleteJob(id: string, userId?: string): Promise<void> {
     const existing = await this.getOwnedJob(id, userId);
 
-    this.compilationService?.cancelCompilation(existing.id, 'Monitor deleted by user');
+    this.compilationControl.cancelCompilation(existing.id, 'Monitor deleted by user');
     await this.jobScheduler.removePendingCompilations(existing.id);
     await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
     await this.jobRepository.deleteJob(id);

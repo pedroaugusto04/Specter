@@ -378,7 +378,12 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
     const webhookProvider = new WebhookNotificationProvider();
 
-    const jobService = new JobService(jobRepo, jobScheduler, scraperEngine);
+    const jobService = new JobService({
+      jobRepository: jobRepo,
+      jobScheduler,
+      compilationControl: { cancelCompilation: () => false },
+      scraperEngine,
+    });
     const integrationService = new IntegrationService(
       integrationRepo,
       telegramProvider,

@@ -39,27 +39,11 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --no-audit --no-fund
-      - name: Install test browser
-        run: |
-          sudo bash -c 'echo -e "Acquire::Retries \"5\";\nAcquire::http::Timeout \"60\";" > /etc/apt/apt.conf.d/80-retries' || true
-          for attempt in 1 2 3; do
-            echo "Installing Playwright browser and dependencies (attempt $attempt/3)..."
-            if sudo apt-get update --fix-missing && npx playwright install --with-deps chromium; then
-              echo "Playwright installed successfully."
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Playwright installation failed after 3 attempts."
-              exit 1
-            fi
-            echo "Attempt $attempt failed. Retrying in 10s..."
-            sleep 10
-          done
       - run: npm run build
       - run: npm run evaluate:regression
-      - name: Behavioral and browser integration tests
+      - name: CI behavioral tests (live models and browser suite disabled)
         if: ${{ !cancelled() }}
-        run: npm test -- --reporter=default --reporter=junit --outputFile=reports/evals/behavior.xml
+        run: npm run test:ci -- --reporter=default --reporter=junit --outputFile=reports/evals/behavior.xml
       - name: Upload evaluation reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

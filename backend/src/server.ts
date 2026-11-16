@@ -124,16 +124,16 @@ async function bootstrap(): Promise<void> {
   });
 
   const retentionService = new RetentionService(jobRepository);
-  const jobService = new JobService(
+  const jobService = new JobService({
     jobRepository,
     jobScheduler,
+    compilationControl: compilationService,
     scraperEngine,
     sessionRepository,
     realtimeService,
-    new JobPresenter(accessCooldown),
+    presenter: new JobPresenter(accessCooldown),
     quotaService,
-    compilationService
-  );
+  });
   const authService = new AuthService(userRepository, {
     onTimezoneChanged: (userId) => schedules.refreshUserSchedules(userId, jobScheduler),
   });

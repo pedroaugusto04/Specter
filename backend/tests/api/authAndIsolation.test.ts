@@ -37,7 +37,12 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     scheduler = new MockJobScheduler();
     scraperEngine = new MockScraperEngine();
 
-    const jobService = new JobService(jobRepository, scheduler, scraperEngine);
+    const jobService = new JobService({
+      jobRepository,
+      jobScheduler: scheduler,
+      compilationControl: { cancelCompilation: () => false },
+      scraperEngine,
+    });
     authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
       accessExpiresSeconds: 900,
@@ -403,7 +408,12 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
       const userRepository = new InMemoryUserRepository();
       const scheduler = new MockJobScheduler();
       const scraperEngine = new MockScraperEngine();
-      const jobService = new JobService(jobRepository, scheduler, scraperEngine);
+      const jobService = new JobService({
+        jobRepository,
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        scraperEngine,
+      });
       const authService = new AuthService(userRepository, {
         jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
         accessExpiresSeconds: 900,

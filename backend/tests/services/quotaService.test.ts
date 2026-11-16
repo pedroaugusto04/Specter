@@ -61,15 +61,12 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
   describe('Trava A: Active Monitors Quota', () => {
     it('allows creating monitors within active limit', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService(
+      const jobService = new JobService({
         jobRepository,
-        scheduler,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        quotaService
-      );
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        quotaService,
+      });
 
       await jobService.createJob({
         userId,
@@ -91,15 +88,12 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
     it('blocks creating more monitors when active limit is reached', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService(
+      const jobService = new JobService({
         jobRepository,
-        scheduler,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        quotaService
-      );
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        quotaService,
+      });
 
       await jobService.createJob({
         userId,
@@ -126,15 +120,12 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
     it('does not count paused monitors towards the active quota', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService(
+      const jobService = new JobService({
         jobRepository,
-        scheduler,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        quotaService
-      );
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        quotaService,
+      });
 
       const job1 = await jobService.createJob({
         userId,
@@ -176,15 +167,12 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
       await usageRepository.incrementCompilations(userId);
 
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService(
+      const jobService = new JobService({
         jobRepository,
-        scheduler,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        quotaService
-      );
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        quotaService,
+      });
 
       await expect(
         jobService.createJob({
@@ -433,15 +421,12 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         new WebhookNotificationProvider()
       );
 
-      const jobService = new JobService(
+      const jobService = new JobService({
         jobRepository,
-        new MockJobScheduler(),
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        quotaService
-      );
+        jobScheduler: new MockJobScheduler(),
+        compilationControl: { cancelCompilation: () => false },
+        quotaService,
+      });
 
       app = await buildApp({
         jobService,

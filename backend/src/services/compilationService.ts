@@ -25,6 +25,7 @@ import { logger } from '../utils/logger.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
+import type { ICompilationControl } from './compilationControl.interface.js';
 
 function compilationFailureStatus(input: {
   reason?: CompilationReason;
@@ -51,17 +52,16 @@ export interface CompilationServiceDeps {
   quotaService?: QuotaService;
 }
 
-export class CompilationService {
+export class CompilationService implements ICompilationControl {
   private readonly activeCompilations = new Map<string, AbortController>();
 
   constructor(private readonly deps: CompilationServiceDeps) {}
 
   cancelCompilation(jobId: string, reason?: string): boolean {
     const controller = this.activeCompilations.get(jobId);
-    if (controller) {
+    if (controller && !controller.signal.aborted) {
       logger.info('Cancelling active compilation task', { jobId, reason });
       controller.abort(new Error(reason ?? 'Compilation cancelled by user'));
-      this.activeCompilations.delete(jobId);
       return true;
     }
     return false;
@@ -71,6 +71,30 @@ export class CompilationService {
     jobId: string,
     reason?: CompilationReason,
     willRetry = false
+  ): Promise<ScrapingJobEntity> {
+    const existingController = this.activeCompilations.get(jobId);
+    if (existingController && !existingController.signal.aborted) {
+      const current = await this.deps.jobRepository.findById(jobId);
+      if (!current) throw new NotFoundError(`Scraping job not found: ${jobId}`);
+      return current;
+    }
+
+    const abortController = new AbortController();
+    this.activeCompilations.set(jobId, abortController);
+    try {
+      return await this.runCompilation(jobId, reason, willRetry, abortController);
+    } finally {
+      if (this.activeCompilations.get(jobId) === abortController) {
+        this.activeCompilations.delete(jobId);
+      }
+    }
+  }
+
+  private async runCompilation(
+    jobId: string,
+    reason: CompilationReason | undefined,
+    willRetry: boolean,
+    abortController: AbortController
   ): Promise<ScrapingJobEntity> {
     const startTime = Date.now();
     const job = await this.deps.jobRepository.findById(jobId);
@@ -89,6 +113,9 @@ export class CompilationService {
       try {
         await this.deps.quotaService.assertCanCompile(job.userId);
       } catch (quotaErr) {
+        if (abortController.signal.aborted) {
+          return (await this.deps.jobRepository.findById(job.id)) ?? job;
+        }
         if (quotaErr instanceof QuotaExceededError) {
           logger.warn('Skipping compilation: monthly compilation quota reached', {
             jobId: job.id,
@@ -109,8 +136,15 @@ export class CompilationService {
       }
     }
 
-    const abortController = new AbortController();
-    this.activeCompilations.set(job.id, abortController);
+    const currentJob = await this.deps.jobRepository.findById(job.id);
+    if (!currentJob) throw new NotFoundError(`Scraping job not found: ${job.id}`);
+    if (
+      abortController.signal.aborted ||
+      currentJob.status === JobStatus.Paused ||
+      (reason !== undefined && currentJob.status === JobStatus.Active && currentJob.extractionPlan)
+    ) {
+      return currentJob;
+    }
 
     let httpStatus: number | null = null;
 
@@ -129,6 +163,7 @@ export class CompilationService {
           logAction: 'Using authenticated web session for AI compilation',
         }
       );
+      abortController.signal.throwIfAborted();
 
       const configured = await this.deps.configurationPipeline.configure({
         jobId: job.id,
@@ -139,6 +174,7 @@ export class CompilationService {
         captureScreenshot: job.captureScreenshotOnChange,
         signal: abortController.signal,
       });
+      abortController.signal.throwIfAborted();
       const compiledSchema = configured.plan;
       if (job.extractionPlan && !sameIntent(job.extractionPlan.intent, compiledSchema.intent))
         throw new CompilerValidationError(
@@ -295,8 +331,6 @@ export class CompilationService {
       await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, failureStatus);
 
       throw error;
-    } finally {
-      this.activeCompilations.delete(job.id);
     }
   }
 }

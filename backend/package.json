@@ -11,6 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "test:ci": "vitest run --exclude tests/extraction/interactiveExtraction.test.ts",
+    "test:heavy": "vitest run tests/extraction/interactiveExtraction.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint src tests",

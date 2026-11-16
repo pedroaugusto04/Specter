@@ -16,6 +16,7 @@ import type {
   ScrapeResult,
 } from '../../src/providers/scraping/scraper.interface.js';
 import type { IJobScheduler } from '../../src/queues/scheduler.interface.js';
+import type { ICompilationControl } from '../../src/services/compilationControl.interface.js';
 import type {
   CreateJobInput,
   CreateJobRunInput,
@@ -52,6 +53,11 @@ import type {
   MonthlyUsage,
 } from '../../src/repositories/usageRepository.js';
 import type { UserWebSessionEntity } from '../../src/types/domain.js';
+
+export const noopCompilationControl: ICompilationControl = {
+  cancelCompilation: () => false,
+};
+
 export class InMemoryUserRepository implements IUserRepository {
   public users = new Map<string, UserEntity>();
   async findById(id: string): Promise<UserEntity | null> {

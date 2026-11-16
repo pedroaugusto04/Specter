@@ -27,10 +27,12 @@ describe('Codex transport', () => {
       const schema=${JSON.stringify(JSON.stringify({ type: 'object', properties: { version: { type: 'number' } }, required: ['version'] }))};
       if(prompt.split(schema).length!==2)process.exit(14);
       if(!prompt.includes('untrusted data'))process.exit(15);
-      fs.writeFileSync(args[index+1],${JSON.stringify(JSON.stringify(output))});`
+      fs.writeFileSync(args[index+1],${JSON.stringify(JSON.stringify(output))});process.exit(0);`
     );
     const provider = new CodexCompilerProvider({
       tempBaseDir: path.join(root, 'work'),
+      model: '',
+      sandbox: 'read-only',
       spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
         spawn(process.execPath, [executable, ...args], options),
     });
@@ -60,7 +62,7 @@ describe('Codex transport', () => {
       executable,
       `const fs=require('node:fs');const args=process.argv.slice(2);
       const index=args.indexOf('--output-last-message');
-      fs.writeFileSync(args[index+1], ${JSON.stringify(fencedOutput)});`
+      fs.writeFileSync(args[index+1], ${JSON.stringify(fencedOutput)});process.exit(0);`
     );
     const provider = new CodexCompilerProvider({
       tempBaseDir: path.join(root, 'work'),

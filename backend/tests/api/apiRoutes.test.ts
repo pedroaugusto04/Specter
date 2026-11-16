@@ -14,6 +14,7 @@ import {
   InMemoryUserRepository,
   MockJobScheduler,
   MockScraperEngine,
+  noopCompilationControl,
 } from '../helpers/testDoubles.js';
 function extractCookieHeader(setCookieHeader: string | string[] | undefined): string {
   if (!setCookieHeader) return '';
@@ -35,7 +36,12 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     scraperEngine = new MockScraperEngine();
     const userRepository = new InMemoryUserRepository();
     const integrationRepository = new InMemoryIntegrationRepository();
-    const jobService = new JobService(repository, scheduler, scraperEngine);
+    const jobService = new JobService({
+      jobRepository: repository,
+      jobScheduler: scheduler,
+      compilationControl: noopCompilationControl,
+      scraperEngine,
+    });
     const authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
     });

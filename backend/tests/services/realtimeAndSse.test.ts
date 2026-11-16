@@ -93,7 +93,13 @@ describe('Realtime EventBus & SSE Streaming', () => {
       const scheduler = new MockJobScheduler();
       const scraper = new MockScraperEngine();
 
-      const jobService = new JobService(jobRepo, scheduler, scraper, undefined, realtimeService);
+      const jobService = new JobService({
+        jobRepository: jobRepo,
+        jobScheduler: scheduler,
+        compilationControl: { cancelCompilation: () => false },
+        scraperEngine: scraper,
+        realtimeService,
+      });
       const authService = new AuthService(userRepo);
       const authenticated = await authService.register({
         email: 'events@example.com',

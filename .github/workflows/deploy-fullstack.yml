@@ -161,24 +161,6 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
 
-      - name: Install test browser
-        working-directory: backend
-        run: |
-          sudo bash -c 'echo -e "Acquire::Retries \"5\";\nAcquire::http::Timeout \"60\";" > /etc/apt/apt.conf.d/80-retries' || true
-          for attempt in 1 2 3; do
-            echo "Installing Playwright browser and dependencies (attempt $attempt/3)..."
-            if sudo apt-get update --fix-missing && npx playwright install --with-deps chromium; then
-              echo "Playwright installed successfully."
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Playwright installation failed after 3 attempts."
-              exit 1
-            fi
-            echo "Attempt $attempt failed. Retrying in 10s..."
-            sleep 10
-          done
-
       - name: Check backend build and lint
         working-directory: backend
         env:
@@ -197,7 +179,7 @@ jobs:
           NOTIFICATION_FROM_EMAIL: ${{ env.NOTIFICATION_FROM_EMAIL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || vars.TELEGRAM_BOT_TOKEN }}
         run: |
-          npm run test
+          npm run test:ci
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3

@@ -191,7 +191,8 @@ export class CliCompilerProvider implements IModelProvider {
       try {
         fileWatcher = watch(tempDir, async (_eventType, filename) => {
           if (settled) return;
-          if (filename === 'extractor.json' || !filename) {
+          const changedFile = filename?.toString();
+          if (changedFile === 'extractor.json' || !changedFile) {
             try {
               await new Promise((r) => setTimeout(r, 100));
               if (settled) return;

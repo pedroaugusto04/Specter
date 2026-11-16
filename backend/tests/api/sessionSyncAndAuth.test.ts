@@ -38,10 +38,12 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
     userId = reg.user.id;
 
     const jobService = new JobService(
-      new InMemoryJobRepository(),
-      new MockJobScheduler(),
-      undefined,
-      sessionRepo
+      {
+        jobRepository: new InMemoryJobRepository(),
+        jobScheduler: new MockJobScheduler(),
+        compilationControl: { cancelCompilation: () => false },
+        sessionRepository: sessionRepo,
+      }
     );
     const integrationRepo = new InMemoryIntegrationRepository();
     const dummyTelegram = {
