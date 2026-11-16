@@ -14,9 +14,6 @@ export function registerRealtimeRoutes(
 
   app.get('/api/events', { preHandler: [withAuth] }, async (request, reply) => {
     const userId = requireUser(request).id;
-
-    reply.hijack();
-
     const raw = reply.raw;
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
     const allowedOrigin = origin && isAllowedCorsOrigin(origin) ? origin : null;
@@ -34,7 +31,27 @@ export function registerRealtimeRoutes(
       headers['Vary'] = 'Origin';
     }
 
+    let unsubscribe: (() => void) | undefined;
+    const pendingEvents: string[] = [];
+    let streamReady = false;
+    try {
+      // Wait for Redis SUBSCRIBE acknowledgement before confirming the SSE connection.
+      unsubscribe = await realtimeService.subscribeUser(userId, (event) => {
+        if (!raw.writableEnded && !raw.destroyed) {
+          const message = `event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`;
+          if (streamReady) raw.write(message);
+          else pendingEvents.push(message);
+        }
+      });
+    } catch {
+      return reply.code(503).send({ error: 'Realtime event stream is temporarily unavailable' });
+    }
+
+    reply.hijack();
     raw.writeHead(200, headers);
+    streamReady = true;
+    for (const event of pendingEvents) raw.write(event);
+    pendingEvents.length = 0;
 
     if (typeof raw.flushHeaders === 'function') {
       raw.flushHeaders();
@@ -55,17 +72,10 @@ export function registerRealtimeRoutes(
       }
     }, 20_000);
 
-    // Subscribe to domain events dispatched for this specific user
-    const unsubscribe = realtimeService.subscribeUser(userId, (event) => {
-      if (!raw.writableEnded && !raw.destroyed) {
-        raw.write(`event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`);
-      }
-    });
-
     // Teardown subscriber and timer on client disconnect
     request.raw.on('close', () => {
       clearInterval(heartbeatTimer);
-      unsubscribe();
+      unsubscribe?.();
     });
   });
 }

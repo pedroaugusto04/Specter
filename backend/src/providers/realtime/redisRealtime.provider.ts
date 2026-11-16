@@ -13,6 +13,7 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
   private readonly publisher: Redis;
   private readonly subscriber: Redis;
   private readonly listeners = new Map<string, Set<RealtimeEventHandler>>();
+  private readonly subscriptions = new Map<string, Promise<void>>();
   private isClosed = false;
 
   constructor(options: RedisOptions) {
@@ -78,22 +79,38 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
     }
   }
 
-  subscribe(userId: string, handler: RealtimeEventHandler): () => void {
+  async subscribe(userId: string, handler: RealtimeEventHandler): Promise<() => void> {
     if (this.isClosed) return () => {};
 
-    let userHandlers = this.listeners.get(userId);
-    if (!userHandlers) {
-      userHandlers = new Set();
-      this.listeners.set(userId, userHandlers);
-      void this.subscriber.subscribe(`${CHANNEL_PREFIX}${userId}`).catch((err) => {
-        logger.warn('Failed to subscribe to Redis realtime channel', {
-          userId,
-          errorMessage: err instanceof Error ? err.message : String(err),
-        });
-      });
+    let handlers = this.listeners.get(userId);
+    if (!handlers) {
+      handlers = new Set();
+      this.listeners.set(userId, handlers);
     }
-    userHandlers.add(handler);
+    handlers.add(handler);
 
+    let subscription = this.subscriptions.get(userId);
+    if (!subscription) {
+      subscription = this.subscriber.subscribe(`${CHANNEL_PREFIX}${userId}`).then(() => undefined);
+      this.subscriptions.set(userId, subscription);
+    }
+
+    try {
+      await subscription;
+      return this.createUnsubscribe(userId, handler);
+    } catch (err) {
+      handlers.delete(handler);
+      if (handlers.size === 0) this.listeners.delete(userId);
+      if (this.subscriptions.get(userId) === subscription) this.subscriptions.delete(userId);
+      logger.warn('Failed to subscribe to Redis realtime channel', {
+        userId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  private createUnsubscribe(userId: string, handler: RealtimeEventHandler): () => void {
     return () => {
       const current = this.listeners.get(userId);
       if (current) {
@@ -111,6 +128,7 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
   async close(): Promise<void> {
     this.isClosed = true;
     this.listeners.clear();
+    this.subscriptions.clear();
     await Promise.allSettled([this.subscriber.quit(), this.publisher.quit()]);
   }
 }

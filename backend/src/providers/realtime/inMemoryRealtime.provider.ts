@@ -17,7 +17,7 @@ export class InMemoryRealtimeEventBus implements IRealtimeEventBus {
     this.emitter.emit(`user:${event.userId}`, event);
   }
 
-  subscribe(userId: string, handler: RealtimeEventHandler): () => void {
+  async subscribe(userId: string, handler: RealtimeEventHandler): Promise<() => void> {
     const channel = `user:${userId}`;
     this.emitter.on(channel, handler);
     return () => {

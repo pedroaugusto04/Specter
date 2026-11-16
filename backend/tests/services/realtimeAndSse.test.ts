@@ -19,7 +19,7 @@ describe('Realtime EventBus & SSE Streaming', () => {
       const bus = new InMemoryRealtimeEventBus();
       const receivedEvents: RealtimeEvent[] = [];
 
-      const unsubscribe = bus.subscribe('user-123', (evt) => {
+      const unsubscribe = await bus.subscribe('user-123', (evt) => {
         receivedEvents.push(evt);
       });
 
@@ -64,7 +64,7 @@ describe('Realtime EventBus & SSE Streaming', () => {
       const realtimeService = new RealtimeService(bus);
       const captured: RealtimeEvent[] = [];
 
-      realtimeService.subscribeUser('user-999', (evt) => captured.push(evt));
+      await realtimeService.subscribeUser('user-999', (evt) => captured.push(evt));
 
       await realtimeService.notifyJobCreated('user-999', 'job-abc', 'PENDING_COMPILATION');
       await realtimeService.notifyJobUpdated('user-999', 'job-abc', 'ACTIVE');
