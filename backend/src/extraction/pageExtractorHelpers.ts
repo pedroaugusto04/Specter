@@ -1,15 +1,13 @@
-import * as cheerio from 'cheerio';
-import { ExtractionFailureReason, ExtractionMode, ExtractionQuality } from './constants.js';
+import { ExtractionQuality } from './constants.js';
 import type {
   DocumentSnapshot,
   ExtractionPlan,
   IntentField,
   PageExtraction,
-  RecordFilter,
   Scalar,
   Source,
 } from './contracts.js';
-import { evaluateCondition, readPath } from './conditions.js';
+import { evaluateCondition, getCheerioRoot, readPath } from './conditions.js';
 import { convertFieldValue, recordIdentity } from './values.js';
 import { evidenceValue, redactObject, redactText } from './evidence.js';
 import { matchesRecord } from './recordFilter.js';
@@ -428,7 +426,7 @@ export function extractNextPageUrl(
   pagination?: ExtractionPlan['strategy']['pagination']
 ): string | undefined {
   if (pagination?.next?.kind === 'css') {
-    const href = cheerio.load(snapshot.html)(pagination.next.selector).first().attr('href');
+    const href = getCheerioRoot(snapshot)(pagination.next.selector).first().attr('href');
     if (href) {
       try {
         return new URL(href, snapshot.url).href;

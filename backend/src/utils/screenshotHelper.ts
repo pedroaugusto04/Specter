@@ -17,13 +17,8 @@ export function decodeBase64Screenshot(input?: string | null): Buffer | undefine
     return undefined;
   }
   const base64Data = trimmed.includes(';base64,') ? trimmed.split(';base64,').pop()! : trimmed;
-
-  try {
-    const buffer = Buffer.from(base64Data, 'base64');
-    return buffer.length > 0 ? buffer : undefined;
-  } catch {
-    return undefined;
-  }
+  const buffer = Buffer.from(base64Data, 'base64');
+  return buffer.length > 0 ? buffer : undefined;
 }
 
 /**

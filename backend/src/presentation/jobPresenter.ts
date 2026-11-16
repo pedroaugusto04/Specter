@@ -18,4 +18,25 @@ export class JobPresenter {
       currentRun: latest?.status === 'RUNNING' ? JobMapper.runEntityToDto(latest) : null,
     };
   }
+
+  async presentMany(jobs: ScrapingJobEntity[]): Promise<ScrapingJobDto[]> {
+    if (jobs.length === 0) return [];
+    if (jobs.length === 1) return [await this.present(jobs[0]!)];
+
+    // Single indexed query to find all running runs across monitors instead of N separate queries
+    const runningRuns = (await this.repository?.findRunningRuns()) ?? [];
+    const runningByJobId = new Map(runningRuns.map((run) => [run.jobId, run]));
+
+    return Promise.all(
+      jobs.map(async (job) => {
+        const running = runningByJobId.get(job.id);
+        return {
+          ...JobMapper.entityToDto(job, {
+            accessState: (await this.cooldown?.state(job)) ?? null,
+          }),
+          currentRun: running ? JobMapper.runEntityToDto(running) : null,
+        };
+      })
+    );
+  }
 }

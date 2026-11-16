@@ -2,7 +2,7 @@ import { SourceKind } from './constants.js';
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type { DocumentSnapshot, ExecutionStrategy, Source } from './contracts.js';
-import { matchingResponses, readPath } from './conditions.js';
+import { getCheerioRoot, matchingResponses, readPath } from './conditions.js';
 import { extractJsonLdBlocks } from '../utils/htmlSanitizer.js';
 type RecordSelector = ExecutionStrategy['records'];
 
@@ -20,7 +20,7 @@ export class DomSourceReader implements ISourceReader {
   select(snapshot: DocumentSnapshot, selector: RecordSelector): SourceRecord[] {
     if (selector.kind !== SourceKind.Dom)
       throw new Error('DOM reader requires a DOM record selector.');
-    const $ = cheerio.load(snapshot.html);
+    const $ = getCheerioRoot(snapshot);
     return $(selector.selector)
       .toArray()
       .map((element) => ({ kind: SourceKind.Dom, value: $(element) }));

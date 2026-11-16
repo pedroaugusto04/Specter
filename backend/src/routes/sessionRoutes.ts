@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { SessionService } from '../services/sessionService.js';
-import { syncSessionSchema } from './schemas.js';
+import { sessionCheckQuerySchema, syncSessionSchema } from './schemas.js';
 
 export function registerSessionRoutes(
   app: FastifyInstance,
@@ -19,29 +19,18 @@ export function registerSessionRoutes(
   });
 
   // Check if a specific domain or URL has a saved session
-  app.get<{ Querystring: { domain?: string; url?: string } }>(
-    '/api/sessions/check',
-    { preHandler: [withAuth] },
-    async (request, reply) => {
-      const user = requireUser(request);
-      const target = request.query.domain || request.query.url;
-
-      if (!target) {
-        return reply.status(400).send({
-          error: 'VALIDATION_ERROR',
-          message: 'Query parameter "domain" or "url" is required.',
-        });
-      }
-
-      const session = await sessionService.checkSession(user.id, target);
-      return reply.status(200).send({
-        data: {
-          hasSession: Boolean(session),
-          session: session ?? null,
-        },
-      });
-    }
-  );
+  app.get('/api/sessions/check', { preHandler: [withAuth] }, async (request, reply) => {
+    const user = requireUser(request);
+    const query = sessionCheckQuerySchema.parse(request.query);
+    const target = (query.domain || query.url)!;
+    const session = await sessionService.checkSession(user.id, target);
+    return reply.status(200).send({
+      data: {
+        hasSession: Boolean(session),
+        session: session ?? null,
+      },
+    });
+  });
 
   // Sync / Upload cookies from the browser extension
   app.post('/api/sessions/sync', { preHandler: [withAuth] }, async (request, reply) => {

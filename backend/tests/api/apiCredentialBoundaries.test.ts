@@ -7,6 +7,8 @@ import { SessionService } from '../../src/services/sessionService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import type { ISessionRepository } from '../../src/repositories/sessionRepository.js';
 import {
+  createTestQuotaService,
+  createTestRealtimeService,
   InMemoryJobRepository,
   InMemoryUserRepository,
   InMemoryIntegrationRepository,
@@ -68,16 +70,23 @@ async function setup() {
     sendTestMessage: async () => ({ ok: true }),
     getBotUsername: async () => 'test_bot',
   };
+  const realtimeService = createTestRealtimeService();
+  const quotaService = createTestQuotaService(jobs);
   app = await buildApp({
     jobService: new JobService({
       jobRepository: jobs,
       jobScheduler: new MockJobScheduler(),
       compilationControl: { cancelCompilation: () => false },
       scraperEngine: new MockScraperEngine(),
+      sessionRepository: sessions,
+      realtimeService,
+      quotaService,
     }),
     authService: auth,
     integrationService: new IntegrationService(integrations, telegram, webhook),
     sessionService: new SessionService(sessions),
+    realtimeService,
+    quotaService,
     enableLogger: false,
   });
   const registration = await app.inject({

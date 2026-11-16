@@ -1,5 +1,5 @@
 import type { ScrapingJobDto } from '@/lib/api';
-import { JOB_STATUS } from '@/lib/domainValues';
+import { JobStatus } from '@specter/contracts';
 import { formatDateTime } from '@/lib/utils';
 
 export type JobRowActionType = 'run' | 'recompile' | 'cancel-compilation' | 'pause' | 'delete';
@@ -32,12 +32,12 @@ export function getJobActionPermissions({
 }: ResolveJobActionPermissionsInput): JobActionPermissions {
   const isJobBusy = Boolean(currentAction);
   const isCompiling =
-    job.status === JOB_STATUS.PendingCompilation ||
-    job.status === JOB_STATUS.Recovering ||
+    job.status === JobStatus.PendingCompilation ||
+    job.status === JobStatus.Recovering ||
     currentAction === 'recompile';
   const isRunning = isExecutingExtraction || currentAction === 'run';
-  const isPaused = job.status === JOB_STATUS.Paused;
-  const isFailed = job.status === JOB_STATUS.Failed;
+  const isPaused = job.status === JobStatus.Paused;
+  const isFailed = job.status === JobStatus.Failed;
   const isAccessBlocked = Boolean(
     job.accessState?.retryAt && new Date(job.accessState.retryAt).getTime() > Date.now()
   );

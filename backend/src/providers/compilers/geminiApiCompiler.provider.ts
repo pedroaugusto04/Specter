@@ -138,13 +138,13 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     retryAfter?: string | null,
     signal?: AbortSignal
   ): Promise<void> {
-    const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN;
+    const retryAfterMs = parseRetryAfter(retryAfter ?? null);
     const exponential = Math.min(
       env.COMPILER_API_RETRY_BASE_DELAY_MS * 2 ** attempt,
       env.COMPILER_API_RETRY_MAX_DELAY_MS
     );
     const delay =
-      Number.isFinite(retryAfterMs) && retryAfterMs >= 0
+      retryAfterMs !== undefined
         ? Math.min(retryAfterMs, env.COMPILER_API_RETRY_MAX_DELAY_MS)
         : exponential;
     const jittered = Math.floor(delay * (0.8 + Math.random() * 0.4));

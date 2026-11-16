@@ -6,9 +6,14 @@ import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
 import { TelegramNotificationProvider } from '../../src/providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from '../../src/providers/notifications/webhookNotification.provider.js';
+import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestJobService,
+  createTestQuotaService,
+  createTestRealtimeService,
   InMemoryIntegrationRepository,
   InMemoryJobRepository,
+  InMemorySessionRepository,
   InMemoryUserRepository,
   MockJobScheduler,
   MockScraperEngine,
@@ -37,11 +42,18 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     scheduler = new MockJobScheduler();
     scraperEngine = new MockScraperEngine();
 
-    const jobService = new JobService({
+    const sessionRepository = new InMemorySessionRepository();
+    const realtimeService = createTestRealtimeService();
+    const quotaService = createTestQuotaService(jobRepository);
+    const sessionService = new SessionService(sessionRepository);
+
+    const jobService = createTestJobService({
       jobRepository,
       jobScheduler: scheduler,
-      compilationControl: { cancelCompilation: () => false },
       scraperEngine,
+      sessionRepository,
+      realtimeService,
+      quotaService,
     });
     authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
@@ -62,6 +74,9 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       jobService,
       authService,
       integrationService,
+      sessionService,
+      realtimeService,
+      quotaService,
       enableLogger: false,
     });
   });
@@ -413,9 +428,14 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
       await import('../../src/providers/notifications/telegramNotification.provider.js');
     const { WebhookNotificationProvider } =
       await import('../../src/providers/notifications/webhookNotification.provider.js');
+    const { SessionService } = await import('../../src/services/sessionService.js');
     const {
+      createTestJobService,
+      createTestQuotaService,
+      createTestRealtimeService,
       InMemoryIntegrationRepository,
       InMemoryJobRepository,
+      InMemorySessionRepository,
       InMemoryUserRepository,
       MockJobScheduler,
       MockScraperEngine,
@@ -426,11 +446,18 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
       const userRepository = new InMemoryUserRepository();
       const scheduler = new MockJobScheduler();
       const scraperEngine = new MockScraperEngine();
-      const jobService = new JobService({
+      const sessionRepository = new InMemorySessionRepository();
+      const realtimeService = createTestRealtimeService();
+      const quotaService = createTestQuotaService(jobRepository);
+      const sessionService = new SessionService(sessionRepository);
+
+      const jobService = createTestJobService({
         jobRepository,
         jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
         scraperEngine,
+        sessionRepository,
+        realtimeService,
+        quotaService,
       });
       const authService = new AuthService(userRepository, {
         jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
@@ -446,7 +473,14 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
         telegramProvider,
         webhookProvider
       );
-      return { jobService, authService, integrationService };
+      return {
+        jobService,
+        authService,
+        integrationService,
+        sessionService,
+        realtimeService,
+        quotaService,
+      };
     }
 
     // Development build (NODE_ENV=test, CHROME_EXTENSION_ID unset) → all extensions allowed

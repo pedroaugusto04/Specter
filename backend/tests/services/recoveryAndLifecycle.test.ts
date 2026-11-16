@@ -18,6 +18,9 @@ import { CompilationReason } from '../../src/queues/scheduler.interface.js';
 import { JobService } from '../../src/services/jobService.js';
 import { JobPresenter } from '../../src/presentation/jobPresenter.js';
 import {
+  createTestCompilationService,
+  createTestJobService,
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockCompilerProvider,
   MockJobScheduler,
@@ -38,14 +41,14 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
     compiler = new MockCompilerProvider();
     notifier = new MockNotificationProvider();
     scheduler = new MockJobScheduler();
-    compilationService = new CompilationService({
+    compilationService = createTestCompilationService({
       jobRepository: repository,
       configurationPipeline: fixtureConfiguration(compiler, scraper),
       alertRouter: notifier,
       storageProvider: new NoopStorageProvider(),
       jobScheduler: scheduler,
     });
-    scrapeService = new ScrapeExecutionService({
+    scrapeService = createTestScrapeExecutionService({
       jobRepository: repository,
       planExecutor: fixtureExecutor(scraper),
       alertRouter: notifier,
@@ -66,7 +69,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
     const events: RealtimeEvent[] = [];
     await bus.subscribe(job.userId, (event) => events.push(event));
     const executor = fixtureExecutor(scraper);
-    const service = new ScrapeExecutionService({
+    const service = createTestScrapeExecutionService({
       jobRepository: repository,
       planExecutor: {
         execute: async (...args) => {
@@ -279,7 +282,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
   });
 
   it('instantly cancels an active compilation when requested via jobService.cancelCompilation', async () => {
-    const jobService = new JobService({
+    const jobService = createTestJobService({
       jobRepository: repository,
       jobScheduler: scheduler,
       compilationControl: compilationService,
@@ -334,7 +337,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
   });
 
   it('cancels ongoing compilation and pauses the monitor when setJobPauseState(true) is invoked', async () => {
-    const jobService = new JobService({
+    const jobService = createTestJobService({
       jobRepository: repository,
       jobScheduler: scheduler,
       compilationControl: compilationService,
@@ -409,7 +412,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
         });
       },
     } as unknown as import('../../src/services/quotaService.js').QuotaService;
-    const quotaAwareCompilationService = new CompilationService({
+    const quotaAwareCompilationService = createTestCompilationService({
       jobRepository: repository,
       configurationPipeline: fixtureConfiguration(compiler, scraper),
       alertRouter: notifier,
@@ -417,7 +420,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
       jobScheduler: scheduler,
       quotaService,
     });
-    const jobService = new JobService({
+    const jobService = createTestJobService({
       jobRepository: repository,
       jobScheduler: scheduler,
       compilationControl: quotaAwareCompilationService,

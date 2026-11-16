@@ -59,7 +59,6 @@ export const monitorNameSchema = z
 export const userPromptSchema = z
   .string({ required_error: 'Extraction instructions are required' })
   .trim()
-  .min(1, 'Extraction instructions are required')
   .min(5, 'Extraction instructions must contain at least 5 characters');
 
 export const emailAddressSchema = z
@@ -146,30 +145,31 @@ export const jobTimeseriesQuerySchema = z.object({
 // Auth & Profile Schemas
 // ============================================================================
 
+export const ianaTimezoneSchema = z
+  .string()
+  .trim()
+  .refine(
+    (tz) => {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    {
+      message:
+        'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
+    }
+  );
+
 export const authRegisterSchema = z.object({
   email: emailAddressSchema,
   password: z
     .string({ required_error: 'Password is required' })
     .min(8, 'Password must be at least 8 characters'),
   name: z.string().trim().max(100).optional(),
-  timezone: z
-    .string()
-    .trim()
-    .refine(
-      (tz) => {
-        try {
-          Intl.DateTimeFormat(undefined, { timeZone: tz });
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      {
-        message:
-          'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
-      }
-    )
-    .optional(),
+  timezone: ianaTimezoneSchema.optional(),
 });
 
 export const authLoginSchema = z.object({
@@ -179,24 +179,7 @@ export const authLoginSchema = z.object({
 
 export const authProfileUpdateSchema = z.object({
   name: z.string().trim().nullable().optional(),
-  timezone: z
-    .string()
-    .trim()
-    .refine(
-      (tz) => {
-        try {
-          Intl.DateTimeFormat(undefined, { timeZone: tz });
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      {
-        message:
-          'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
-      }
-    )
-    .optional(),
+  timezone: ianaTimezoneSchema.optional(),
 });
 
 // ============================================================================
@@ -255,3 +238,13 @@ export const syncSessionSchema = z.object({
     )
     .optional(),
 });
+
+export const sessionCheckQuerySchema = z
+  .object({
+    domain: z.string().trim().optional(),
+    url: z.string().trim().optional(),
+  })
+  .refine((data) => Boolean(data.domain || data.url), {
+    message: 'Query parameter "domain" or "url" is required.',
+    path: ['domain'],
+  });

@@ -1,5 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createTestCompilationService,
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   InMemoryUsageRepository,
   MockJobScheduler,
@@ -44,8 +46,8 @@ describe('One persisted result per execution cycle', () => {
       alertRouter: new MockNotificationProvider(),
       storageProvider: new NoopStorageProvider(),
     };
-    execute = new ScrapeExecutionService({ ...shared, planExecutor: fixtureExecutor(scraper) });
-    compile = new CompilationService({
+    execute = createTestScrapeExecutionService({ ...shared, planExecutor: fixtureExecutor(scraper) });
+    compile = createTestCompilationService({
       ...shared,
       configurationPipeline: fixtureConfiguration(compiler, scraper),
     });

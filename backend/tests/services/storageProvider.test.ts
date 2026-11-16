@@ -8,6 +8,7 @@ import {
 } from '../../src/providers/storage/index.js';
 import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import {
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockJobScheduler,
   MockNotificationProvider,
@@ -145,7 +146,7 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
           screenshot: Buffer.from('screenshot-bytes'),
         };
       });
-      const service = new ScrapeExecutionService({
+      const service = createTestScrapeExecutionService({
         jobRepository: repository,
         planExecutor: fixtureExecutor(scraper),
         alertRouter: notifier,
@@ -219,7 +220,7 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
           screenshot: Buffer.from('screenshot-bytes-of-change'),
         };
       });
-      const service = new ScrapeExecutionService({
+      const service = createTestScrapeExecutionService({
         jobRepository: repository,
         planExecutor: fixtureExecutor(scraper),
         alertRouter: notifier,
@@ -277,7 +278,7 @@ describe('Storage Providers & Supabase Object Storage Integration', () => {
         durationMs: 20,
         screenshot: Buffer.from('screenshot-bytes'),
       }));
-      const service = new ScrapeExecutionService({
+      const service = createTestScrapeExecutionService({
         jobRepository: repository,
         planExecutor: fixtureExecutor(scraper),
         alertRouter: notifier,

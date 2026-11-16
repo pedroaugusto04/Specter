@@ -9,11 +9,17 @@ import { EnvPlanLimitResolver } from '../../src/services/quotas/envPlanLimitReso
 import { JobService } from '../../src/services/jobService.js';
 import { CompilationService } from '../../src/services/compilationService.js';
 import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
+import { SessionService } from '../../src/services/sessionService.js';
 import {
-  InMemoryJobRepository,
-  InMemoryUserRepository,
+  createTestCompilationService,
+  createTestJobService,
+  createTestRealtimeService,
+  createTestScrapeExecutionService,
   InMemoryIntegrationRepository,
+  InMemoryJobRepository,
+  InMemorySessionRepository,
   InMemoryUsageRepository,
+  InMemoryUserRepository,
   MockJobScheduler,
 } from '../helpers/testDoubles.js';
 import { JobStatus } from '../../src/types/enums.js';
@@ -61,10 +67,9 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
   describe('Trava A: Active Monitors Quota', () => {
     it('allows creating monitors within active limit', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService({
+      const jobService = createTestJobService({
         jobRepository,
         jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
         quotaService,
       });
 
@@ -88,10 +93,9 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
     it('blocks creating more monitors when active limit is reached', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService({
+      const jobService = createTestJobService({
         jobRepository,
         jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
         quotaService,
       });
 
@@ -120,10 +124,9 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
     it('does not count paused monitors towards the active quota', async () => {
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService({
+      const jobService = createTestJobService({
         jobRepository,
         jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
         quotaService,
       });
 
@@ -167,10 +170,9 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
       await usageRepository.incrementCompilations(userId);
 
       const scheduler = new MockJobScheduler();
-      const jobService = new JobService({
+      const jobService = createTestJobService({
         jobRepository,
         jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
         quotaService,
       });
 
@@ -231,7 +233,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         }),
       };
 
-      const compilationService = new CompilationService({
+      const compilationService = createTestCompilationService({
         jobRepository,
         configurationPipeline: fakePipeline as any,
         alertRouter: { dispatch: async () => {} } as any,
@@ -280,7 +282,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         },
       };
 
-      const compilationService = new CompilationService({
+      const compilationService = createTestCompilationService({
         jobRepository,
         configurationPipeline: fakePipeline as any,
         alertRouter: { dispatch: async () => {} } as any,
@@ -334,7 +336,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         },
       };
 
-      const scrapeService = new ScrapeExecutionService({
+      const scrapeService = createTestScrapeExecutionService({
         jobRepository,
         planExecutor: fakePlanExecutor as any,
         alertRouter: { dispatch: async () => {} } as any,
@@ -434,17 +436,23 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         new WebhookNotificationProvider()
       );
 
-      const jobService = new JobService({
+      const sessionRepository = new InMemorySessionRepository();
+      const realtimeService = createTestRealtimeService();
+      const sessionService = new SessionService(sessionRepository);
+
+      const jobService = createTestJobService({
         jobRepository,
-        jobScheduler: new MockJobScheduler(),
-        compilationControl: { cancelCompilation: () => false },
         quotaService,
+        sessionRepository,
+        realtimeService,
       });
 
       app = await buildApp({
         jobService,
         authService,
         integrationService,
+        sessionService,
+        realtimeService,
         quotaService,
         enableLogger: false,
       });

@@ -14,7 +14,7 @@ export interface NotificationDispatcherDeps {
   telegramProvider: ITelegramNotificationProvider;
   webhookProvider: IWebhookNotificationProvider;
   integrationRepository: IIntegrationRepository;
-  userRepository?: IUserRepository;
+  userRepository: IUserRepository;
 }
 
 export class NotificationDispatcher implements IAlertRouter, IAlertSender {
@@ -25,7 +25,7 @@ export class NotificationDispatcher implements IAlertRouter, IAlertSender {
     if (payload.timezone?.trim()) {
       return resolveTimezone(payload.timezone);
     }
-    if (payload.userId && this.deps.userRepository) {
+    if (payload.userId) {
       try {
         const user = await this.deps.userRepository.findById(payload.userId);
         if (user?.timezone) {
@@ -70,7 +70,9 @@ export class NotificationDispatcher implements IAlertRouter, IAlertSender {
   }
 
   async deliver(delivery: AlertDelivery, deliveryId: string): Promise<void> {
-    const timezone = await this.resolvePayloadTimezone(delivery.payload);
+    const timezone = delivery.payload.timezone?.trim()
+      ? delivery.payload.timezone
+      : await this.resolvePayloadTimezone(delivery.payload);
     const payload: AlertPayload = {
       ...delivery.payload,
       detectedAt: delivery.payload.detectedAt ? new Date(delivery.payload.detectedAt) : undefined,

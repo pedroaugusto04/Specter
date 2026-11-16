@@ -1,8 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { FieldType, triggerOperatorsForType, type TriggerRule, type TriggerMatchMode, type TriggerOperator } from '@specter/contracts';
-import { TRIGGER_MATCH_MODE, TRIGGER_OPERATOR } from '@/lib/extractionPlan';
+import {
+  FieldType,
+  TriggerMatchMode,
+  TriggerOperator,
+  triggerOperatorsForType,
+  type TriggerRule,
+} from '@specter/contracts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HelpCircle, Plus, Trash2 } from 'lucide-react';
@@ -93,7 +98,7 @@ export function TriggerRulesEditor({
     const defaultField = availableFields[0] || '';
     onChange([
       ...triggerRules,
-      { field: defaultField, operator: TRIGGER_OPERATOR.Changes, value: '' },
+      { field: defaultField, operator: TriggerOperator.Changes, value: '' },
     ]);
   };
 
@@ -109,7 +114,7 @@ export function TriggerRulesEditor({
     updated[index] = {
       ...current,
       field: newField,
-      operator: TRIGGER_OPERATOR.Changes,
+      operator: TriggerOperator.Changes,
       value: '',
     };
     onChange(updated);
@@ -168,14 +173,14 @@ export function TriggerRulesEditor({
               type="button"
               onClick={() =>
                 onMatchModeChange(
-                  triggerMatchMode === TRIGGER_MATCH_MODE.All
-                    ? TRIGGER_MATCH_MODE.Any
-                    : TRIGGER_MATCH_MODE.All
+                  triggerMatchMode === TriggerMatchMode.All
+                    ? TriggerMatchMode.Any
+                    : TriggerMatchMode.All
                 )
               }
               className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
             >
-              {triggerMatchMode === TRIGGER_MATCH_MODE.All ? 'ALL conditions' : 'ANY condition'}
+              {triggerMatchMode === TriggerMatchMode.All ? 'ALL conditions' : 'ANY condition'}
             </button>
           </div>
         )}
@@ -243,82 +248,82 @@ export function TriggerRulesEditor({
                   >
                     <optgroup label="Relative Changes (vs Previous Check)">
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.PercentageDrop)}
-                        value={TRIGGER_OPERATOR.PercentageDrop}
+                        disabled={!allowedOperators.includes(TriggerOperator.PercentageDrop)}
+                        value={TriggerOperator.PercentageDrop}
                       >
                         Drops by % or more
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.PercentageIncrease)}
-                        value={TRIGGER_OPERATOR.PercentageIncrease}
+                        disabled={!allowedOperators.includes(TriggerOperator.PercentageIncrease)}
+                        value={TriggerOperator.PercentageIncrease}
                       >
                         Increases by % or more
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Decreased)}
-                        value={TRIGGER_OPERATOR.Decreased}
+                        disabled={!allowedOperators.includes(TriggerOperator.Decreased)}
+                        value={TriggerOperator.Decreased}
                       >
                         Decreased (any drop)
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Increased)}
-                        value={TRIGGER_OPERATOR.Increased}
+                        disabled={!allowedOperators.includes(TriggerOperator.Increased)}
+                        value={TriggerOperator.Increased}
                       >
                         Increased (any rise)
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Changes)}
-                        value={TRIGGER_OPERATOR.Changes}
+                        disabled={!allowedOperators.includes(TriggerOperator.Changes)}
+                        value={TriggerOperator.Changes}
                       >
                         Changed (any text or value)
                       </option>
                     </optgroup>
                     <optgroup label="Fixed Thresholds & Matches">
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.LessThan)}
-                        value={TRIGGER_OPERATOR.LessThan}
+                        disabled={!allowedOperators.includes(TriggerOperator.LessThan)}
+                        value={TriggerOperator.LessThan}
                       >
                         &lt; Less than
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.LessThanOrEqual)}
-                        value={TRIGGER_OPERATOR.LessThanOrEqual}
+                        disabled={!allowedOperators.includes(TriggerOperator.LessThanOrEqual)}
+                        value={TriggerOperator.LessThanOrEqual}
                       >
                         &le; Less or equal
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.GreaterThan)}
-                        value={TRIGGER_OPERATOR.GreaterThan}
+                        disabled={!allowedOperators.includes(TriggerOperator.GreaterThan)}
+                        value={TriggerOperator.GreaterThan}
                       >
                         &gt; Greater than
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.GreaterThanOrEqual)}
-                        value={TRIGGER_OPERATOR.GreaterThanOrEqual}
+                        disabled={!allowedOperators.includes(TriggerOperator.GreaterThanOrEqual)}
+                        value={TriggerOperator.GreaterThanOrEqual}
                       >
                         &ge; Greater or equal
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Equal)}
-                        value={TRIGGER_OPERATOR.Equal}
+                        disabled={!allowedOperators.includes(TriggerOperator.Equal)}
+                        value={TriggerOperator.Equal}
                       >
                         == Equals
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.NotEqual)}
-                        value={TRIGGER_OPERATOR.NotEqual}
+                        disabled={!allowedOperators.includes(TriggerOperator.NotEqual)}
+                        value={TriggerOperator.NotEqual}
                       >
                         != Not equals
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.Contains)}
-                        value={TRIGGER_OPERATOR.Contains}
+                        disabled={!allowedOperators.includes(TriggerOperator.Contains)}
+                        value={TriggerOperator.Contains}
                       >
                         Contains text
                       </option>
                       <option
-                        disabled={!allowedOperators.includes(TRIGGER_OPERATOR.NotContains)}
-                        value={TRIGGER_OPERATOR.NotContains}
+                        disabled={!allowedOperators.includes(TriggerOperator.NotContains)}
+                        value={TriggerOperator.NotContains}
                       >
                         Does not contain
                       </option>
@@ -330,9 +335,9 @@ export function TriggerRulesEditor({
                 <div className="w-full sm:w-1/3">
                   {(
                     [
-                      TRIGGER_OPERATOR.Decreased,
-                      TRIGGER_OPERATOR.Increased,
-                      TRIGGER_OPERATOR.Changes,
+                      TriggerOperator.Decreased,
+                      TriggerOperator.Increased,
+                      TriggerOperator.Changes,
                     ] as TriggerOperator[]
                   ).includes(rule.operator) ? (
                     <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
@@ -352,20 +357,20 @@ export function TriggerRulesEditor({
                       type={
                         (
                           [
-                            TRIGGER_OPERATOR.LessThan,
-                            TRIGGER_OPERATOR.LessThanOrEqual,
-                            TRIGGER_OPERATOR.GreaterThan,
-                            TRIGGER_OPERATOR.GreaterThanOrEqual,
-                            TRIGGER_OPERATOR.PercentageDrop,
-                            TRIGGER_OPERATOR.PercentageIncrease,
+                            TriggerOperator.LessThan,
+                            TriggerOperator.LessThanOrEqual,
+                            TriggerOperator.GreaterThan,
+                            TriggerOperator.GreaterThanOrEqual,
+                            TriggerOperator.PercentageDrop,
+                            TriggerOperator.PercentageIncrease,
                           ] as TriggerOperator[]
                         ).includes(rule.operator)
                           ? 'number'
                           : 'text'
                       }
                       placeholder={
-                        rule.operator === TRIGGER_OPERATOR.PercentageDrop ||
-                        rule.operator === TRIGGER_OPERATOR.PercentageIncrease
+                        rule.operator === TriggerOperator.PercentageDrop ||
+                        rule.operator === TriggerOperator.PercentageIncrease
                           ? 'e.g. 10 (for 10%)'
                           : 'target value'
                       }
@@ -374,12 +379,12 @@ export function TriggerRulesEditor({
                       onChange={(e) => {
                         const isNum = (
                           [
-                            TRIGGER_OPERATOR.LessThan,
-                            TRIGGER_OPERATOR.LessThanOrEqual,
-                            TRIGGER_OPERATOR.GreaterThan,
-                            TRIGGER_OPERATOR.GreaterThanOrEqual,
-                            TRIGGER_OPERATOR.PercentageDrop,
-                            TRIGGER_OPERATOR.PercentageIncrease,
+                            TriggerOperator.LessThan,
+                            TriggerOperator.LessThanOrEqual,
+                            TriggerOperator.GreaterThan,
+                            TriggerOperator.GreaterThanOrEqual,
+                            TriggerOperator.PercentageDrop,
+                            TriggerOperator.PercentageIncrease,
                           ] as TriggerOperator[]
                         ).includes(rule.operator);
 

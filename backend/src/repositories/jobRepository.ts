@@ -524,45 +524,50 @@ export class DrizzleJobRepository implements IJobRepository {
   }
 
   async getStats(userId?: string): Promise<DashboardStats> {
-    const allJobs = userId
-      ? await this.db
-          .select({ status: scrapingJobs.status })
-          .from(scrapingJobs)
-          .where(eq(scrapingJobs.userId, userId))
-      : await this.db.select({ status: scrapingJobs.status }).from(scrapingJobs);
+    const [jobStatsRows, runCountsRows] = await Promise.all([
+      userId
+        ? this.db
+            .select({
+              totalJobs: sql<number>`count(*)::int`,
+              activeJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} = ${JobStatus.Active})::int`,
+              recoveringOrCompilingJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} in (${JobStatus.Recovering}, ${JobStatus.PendingCompilation}))::int`,
+              failedOrPausedJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} in (${JobStatus.Failed}, ${JobStatus.Paused}))::int`,
+            })
+            .from(scrapingJobs)
+            .where(eq(scrapingJobs.userId, userId))
+        : this.db
+            .select({
+              totalJobs: sql<number>`count(*)::int`,
+              activeJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} = ${JobStatus.Active})::int`,
+              recoveringOrCompilingJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} in (${JobStatus.Recovering}, ${JobStatus.PendingCompilation}))::int`,
+              failedOrPausedJobs: sql<number>`count(*) filter (where ${scrapingJobs.status} in (${JobStatus.Failed}, ${JobStatus.Paused}))::int`,
+            })
+            .from(scrapingJobs),
+      userId
+        ? this.db
+            .select({
+              totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
+              changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
+            })
+            .from(jobRuns)
+            .innerJoin(scrapingJobs, eq(jobRuns.jobId, scrapingJobs.id))
+            .where(eq(scrapingJobs.userId, userId))
+        : this.db
+            .select({
+              totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
+              changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
+            })
+            .from(jobRuns),
+    ]);
 
-    const [runCounts] = userId
-      ? await this.db
-          .select({
-            totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
-            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
-          })
-          .from(jobRuns)
-          .innerJoin(scrapingJobs, eq(jobRuns.jobId, scrapingJobs.id))
-          .where(eq(scrapingJobs.userId, userId))
-      : await this.db
-          .select({
-            totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
-            changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
-          })
-          .from(jobRuns);
-
-    let activeJobs = 0;
-    let recoveringOrCompilingJobs = 0;
-    let failedOrPausedJobs = 0;
-
-    for (const j of allJobs) {
-      if (j.status === JobStatus.Active) activeJobs++;
-      else if (j.status === JobStatus.Recovering || j.status === JobStatus.PendingCompilation)
-        recoveringOrCompilingJobs++;
-      else failedOrPausedJobs++;
-    }
+    const jobCounts = jobStatsRows[0];
+    const runCounts = runCountsRows[0];
 
     return {
-      totalJobs: allJobs.length,
-      activeJobs,
-      recoveringOrCompilingJobs,
-      failedOrPausedJobs,
+      totalJobs: jobCounts?.totalJobs ?? 0,
+      activeJobs: jobCounts?.activeJobs ?? 0,
+      recoveringOrCompilingJobs: jobCounts?.recoveringOrCompilingJobs ?? 0,
+      failedOrPausedJobs: jobCounts?.failedOrPausedJobs ?? 0,
       totalRuns: runCounts?.totalRuns ?? 0,
       DetectedChangesCount: runCounts?.changesCount ?? 0,
     };

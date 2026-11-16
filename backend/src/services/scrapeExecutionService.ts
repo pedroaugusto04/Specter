@@ -31,15 +31,15 @@ import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
 
 export interface ScrapeExecutionServiceDeps {
-  accessCooldown?: AccessCooldownService;
+  accessCooldown: AccessCooldownService;
   jobRepository: IJobRepository;
   planExecutor: IPlanExecutor;
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
   storageProvider: IStorageProvider;
-  sessionRepository?: ISessionRepository;
-  realtimeService?: RealtimeService;
-  quotaService?: QuotaService;
+  sessionRepository: ISessionRepository;
+  realtimeService: RealtimeService;
+  quotaService: QuotaService;
   maxRecoveryAttempts?: number;
 }
 
@@ -85,13 +85,13 @@ export class ScrapeExecutionService {
       undefined,
       job.updatedAt
     );
-    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+    await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id);
     let report: ExtractionReport | undefined;
     let error: unknown;
     let access: Awaited<ReturnType<AccessCooldownService['forMonitor']>> | undefined;
     try {
-      access = await this.deps.accessCooldown?.forMonitor(job);
-      if (await access?.state())
+      access = await this.deps.accessCooldown.forMonitor(job);
+      if (await access.state())
         return this.finish(
           job,
           run,
@@ -99,7 +99,9 @@ export class ScrapeExecutionService {
           new AntiBotBlockedError('Website access is temporarily blocked.')
         );
       if (!metadata.executionCharged) {
-        await this.deps.quotaService?.assertCanExecuteScrape(job.userId);
+        if (job.userId) {
+          await this.deps.quotaService.assertCanExecuteScrape(job.userId);
+        }
         metadata.executionCharged = true;
         await repo.commitRun(
           { ...run, metadata, chargeUsage: 'execution' },
@@ -182,7 +184,7 @@ export class ScrapeExecutionService {
       if (attempts >= (this.deps.maxRecoveryAttempts ?? env.MAX_RECOVERY_ATTEMPTS))
         return this.finish(job, run, true);
       try {
-        await this.deps.quotaService?.assertCanCompile(job.userId);
+        await this.deps.quotaService.assertCanCompile(job.userId);
       } catch (error) {
         if (!(error instanceof QuotaExceededError)) throw error;
         return this.finish(job, run, false, error);
@@ -198,7 +200,7 @@ export class ScrapeExecutionService {
         },
         job.updatedAt
       );
-      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+      await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id);
       await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Recovery, run.id);
       return null;
     }
@@ -227,7 +229,7 @@ export class ScrapeExecutionService {
         undefined,
         job.updatedAt
       );
-      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+      await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id);
       await this.deps.jobScheduler.enqueueRunAttempt(
         job.id,
         run.id,
@@ -268,13 +270,13 @@ export class ScrapeExecutionService {
     return result;
   }
   private async completed(job: ScrapingJobEntity, run: JobRunEntity) {
-    await this.deps.realtimeService?.notifyJobRunCompleted(
+    await this.deps.realtimeService.notifyJobRunCompleted(
       job.userId,
       job.id,
       run.id,
       run.hasChanges
     );
-    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+    await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id);
   }
 }
 

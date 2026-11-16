@@ -6,6 +6,7 @@ import { ScrapeExecutionService } from '../../src/services/scrapeExecutionServic
 import type { ExtractionPlan, TriggerRule } from '../../src/types/extractionPlan.js';
 import { evaluateSingleRule, evaluateTriggerRules } from '../../src/utils/triggerEvaluator.js';
 import {
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockJobScheduler,
   MockNotificationProvider,
@@ -145,7 +146,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       scraper = new MockScraperEngine();
       notifier = new MockNotificationProvider();
       scheduler = new MockJobScheduler();
-      scrapeService = new ScrapeExecutionService({
+      scrapeService = createTestScrapeExecutionService({
         jobRepository: repository,
         planExecutor: fixtureExecutor(scraper),
         alertRouter: notifier,

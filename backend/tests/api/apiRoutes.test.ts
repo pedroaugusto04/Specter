@@ -8,9 +8,13 @@ import { WebhookNotificationProvider } from '../../src/providers/notifications/w
 import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
+import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestQuotaService,
+  createTestRealtimeService,
   InMemoryIntegrationRepository,
   InMemoryJobRepository,
+  InMemorySessionRepository,
   InMemoryUserRepository,
   MockJobScheduler,
   MockScraperEngine,
@@ -36,11 +40,18 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     scraperEngine = new MockScraperEngine();
     const userRepository = new InMemoryUserRepository();
     const integrationRepository = new InMemoryIntegrationRepository();
+    const sessionRepository = new InMemorySessionRepository();
+    const realtimeService = createTestRealtimeService();
+    const quotaService = createTestQuotaService(repository);
+    const sessionService = new SessionService(sessionRepository);
     const jobService = new JobService({
       jobRepository: repository,
       jobScheduler: scheduler,
       compilationControl: noopCompilationControl,
       scraperEngine,
+      sessionRepository,
+      realtimeService,
+      quotaService,
     });
     const authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
@@ -56,6 +67,9 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       jobService,
       authService,
       integrationService,
+      sessionService,
+      realtimeService,
+      quotaService,
       enableLogger: false,
     });
     const regRes = await app.inject({

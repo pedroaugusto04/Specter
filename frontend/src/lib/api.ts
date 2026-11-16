@@ -4,7 +4,6 @@ import type {
   JobRunsDto,
   JobTimeseriesDto,
   JobStatus,
-  MetricQuotaSummary,
   ProbeUrlDto,
   ScrapingJobDto,
   SessionDto,
@@ -15,28 +14,29 @@ import type {
   UserIntegrationsDto,
   UserQuotaSummary,
 } from '@specter/contracts';
-export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from './domainValues';
 export type {
-  JobRunsDto,
-  JobTimeseriesDto,
-  JobTimeseriesPointDto,
-  TimeseriesRange,
-} from '@specter/contracts';
-export type {
+  ChangeStatus,
+  ExtractionQuality,
   ExtractionPlan,
+  JobStatus,
+  RunStatus,
   TriggerMatchMode,
   TriggerOperator,
   TriggerRule,
-} from './extractionPlan';
+} from '@specter/contracts';
 
 export type {
   DashboardStatsDto as DashboardStats,
   DiffChangeEntry,
   DiffSummary,
   JobRunDto,
+  JobRunsDto,
+  JobTimeseriesDto,
+  JobTimeseriesPointDto,
   MetricQuotaSummary,
   ScrapingJobDto,
   SessionDto,
+  TimeseriesRange,
   UserDto,
   UserIntegrationsDto,
   UserQuotaSummary,

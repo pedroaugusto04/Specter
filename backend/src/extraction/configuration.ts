@@ -4,7 +4,6 @@ import { ExtractionQuality, TraceStatus, isAcceptedExtractionQuality } from './c
 import { DomainError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
-  DocumentSnapshot,
   ExtractionIntent,
   ExtractionPlan,
   SemanticReview,

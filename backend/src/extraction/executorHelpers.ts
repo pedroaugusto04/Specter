@@ -1,4 +1,4 @@
-import { ExtractionMode, ExtractionQuality, FailureCode } from './constants.js';
+import { ExtractionMode, ExtractionQuality } from './constants.js';
 import { UpstreamHttpError } from '../errors/domainErrors.js';
 import type {
   DiscoveryAction,

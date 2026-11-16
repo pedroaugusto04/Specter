@@ -13,7 +13,7 @@ import { Input, Textarea } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, type ScrapingJobDto, type UserDto } from '@/lib/api';
-import { TRIGGER_MATCH_MODE } from '@/lib/extractionPlan';
+import { TriggerMatchMode } from '@specter/contracts';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react';
 import * as React from 'react';
@@ -82,7 +82,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
 
   const rulesChanged = React.useMemo(() => {
     const origRules = job?.extractionPlan?.intent.triggerRules || [];
-    const origMode = job?.extractionPlan?.intent.triggerMatchMode ?? TRIGGER_MATCH_MODE.All;
+    const origMode = job?.extractionPlan?.intent.triggerMatchMode ?? TriggerMatchMode.All;
     if (triggerMatchMode !== origMode) return true;
     if (triggerRules.length !== origRules.length) return true;
     return JSON.stringify(triggerRules) !== JSON.stringify(origRules);

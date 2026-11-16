@@ -1,14 +1,9 @@
 import * as cheerio from 'cheerio';
-import { canonicalJson } from '../utils/diffHasher.js';
 import type { DocumentSnapshot, ExtractionPlan } from './contracts.js';
 import type { ExecutionResult } from './executor.js';
 import { redactObject, redactText } from './evidence.js';
 import { observationPacket } from './configurationTools.js';
-import {
-  ConfigurationToolKind,
-  ConfigurationErrorCode,
-} from './configurationConstants.js';
-import type { ConfigurationTool } from './configurationSchemas.js';
+import { ConfigurationToolKind } from './configurationConstants.js';
 
 export function isToolHistoryEntry(h: unknown): boolean {
   return Boolean(h && typeof h === 'object' && 'tool' in h);

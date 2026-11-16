@@ -8,9 +8,14 @@ import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
 import { AuthService } from '../../src/services/authService.js';
 import type { AlertPayload } from '../../src/providers/notifications/notification.interface.js';
+import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestJobService,
+  createTestQuotaService,
+  createTestRealtimeService,
   InMemoryIntegrationRepository,
   InMemoryJobRepository,
+  InMemorySessionRepository,
   InMemoryUserRepository,
   MockJobScheduler,
   MockNotificationProvider,
@@ -206,6 +211,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo,
+      userRepository: new InMemoryUserRepository(),
     });
 
     for (const delivery of await dispatcher.prepare(sampleAlert))
@@ -277,6 +283,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo,
+      userRepository: new InMemoryUserRepository(),
     });
 
     const deliveries = await dispatcher.prepare({
@@ -313,6 +320,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo,
+      userRepository: new InMemoryUserRepository(),
     });
 
     const deliveries = await dispatcher.prepare({
@@ -349,6 +357,7 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       telegramProvider: new TelegramNotificationProvider('server-bot-token-env'),
       webhookProvider: new WebhookNotificationProvider(),
       integrationRepository: integrationRepo,
+      userRepository: new InMemoryUserRepository(),
     });
 
     const jobSecret = 'job-specific-secret-123';
@@ -378,11 +387,18 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     const telegramProvider = new TelegramNotificationProvider('server-bot-token-env');
     const webhookProvider = new WebhookNotificationProvider();
 
-    const jobService = new JobService({
+    const sessionRepository = new InMemorySessionRepository();
+    const realtimeService = createTestRealtimeService();
+    const quotaService = createTestQuotaService(jobRepo);
+    const sessionService = new SessionService(sessionRepository);
+
+    const jobService = createTestJobService({
       jobRepository: jobRepo,
       jobScheduler,
-      compilationControl: { cancelCompilation: () => false },
       scraperEngine,
+      sessionRepository,
+      realtimeService,
+      quotaService,
     });
     const integrationService = new IntegrationService(
       integrationRepo,
@@ -394,6 +410,9 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       jobService,
       authService,
       integrationService,
+      sessionService,
+      realtimeService,
+      quotaService,
       enableLogger: false,
     });
 

@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { VisualDiffSlider } from '@/components/dashboard/VisualDiffSlider';
 import type { JobRunDto } from '@/lib/api';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { ChangeStatus, RunStatus } from '@specter/contracts';
 import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { localizeExtractedPayload, type ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
 import { USER_FAILURES } from '@specter/contracts';
@@ -33,12 +33,12 @@ export function JobRunCard({
 }: JobRunCardProps) {
   const parsedError = run.errorMessage
     ? parseErrorMessage(run.errorMessage)
-    : run.status === RUN_STATUS.Failed
+    : run.status === RunStatus.Failed
       ? USER_FAILURES.requestFailed
       : null;
 
   const isChangeWithDiff =
-    run.hasChanges === CHANGE_STATUS.Changed &&
+    run.hasChanges === ChangeStatus.Changed &&
     Boolean(run.screenshotUrl) &&
     Boolean(previousScreenshot);
 
@@ -53,14 +53,14 @@ export function JobRunCard({
         <div className="flex items-center gap-2">
           <Badge
             variant={
-              run.status === RUN_STATUS.Success
+              run.status === RunStatus.Success
                 ? 'success'
-                : run.status === RUN_STATUS.Failed
+                : run.status === RunStatus.Failed
                   ? 'destructive'
                   : 'secondary'
             }
           >
-            {run.status === RUN_STATUS.Running ? (
+            {run.status === RunStatus.Running ? (
               <span className="inline-flex items-center gap-1.5">
                 <span>{runProgressPill(run)}</span>
                 <LoadingSpinner size="xs" />
@@ -71,9 +71,9 @@ export function JobRunCard({
           </Badge>
           <Badge
             variant={
-              run.hasChanges === CHANGE_STATUS.Changed
+              run.hasChanges === ChangeStatus.Changed
                 ? 'warning'
-                : run.hasChanges === CHANGE_STATUS.Initial
+                : run.hasChanges === ChangeStatus.Initial
                   ? 'default'
                   : 'secondary'
             }

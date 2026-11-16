@@ -28,6 +28,15 @@ import type {
 } from '../../src/repositories/jobRepository.js';
 import type { TimeseriesRowEntity } from '../../src/types/domain.js';
 import type { TimeseriesRange } from '@specter/contracts';
+import { RealtimeService } from '../../src/services/realtimeService.js';
+import { InMemoryRealtimeEventBus } from '../../src/providers/realtime/inMemoryRealtime.provider.js';
+import { QuotaService } from '../../src/services/quotaService.js';
+import { EnvPlanLimitResolver } from '../../src/services/quotas/envPlanLimitResolver.js';
+import { JobService, type JobServiceDeps } from '../../src/services/jobService.js';
+import { ScrapeExecutionService, type ScrapeExecutionServiceDeps } from '../../src/services/scrapeExecutionService.js';
+import { CompilationService, type CompilationServiceDeps } from '../../src/services/compilationService.js';
+import { NotificationDispatcher, type NotificationDispatcherDeps } from '../../src/providers/notifications/notificationDispatcher.js';
+import { AccessCooldownService, type IAccessCooldownStore } from '../../src/acquisition/cooldown.js';
 import type {
   CreateUserInput,
   IUserRepository,
@@ -608,4 +617,109 @@ export class InMemoryUsageRepository implements IUsageRepository {
     this.usage.set(k, { ...current });
     return current.executionsCount;
   }
+}
+
+export class InMemoryAccessCooldownStore implements IAccessCooldownStore {
+  private counts = new Map<string, number>();
+  private until = new Map<string, number>();
+
+  async get(key: string): Promise<number | null> {
+    return this.until.get(key) ?? null;
+  }
+  async blocked(key: string, threshold: number, durationMs: number, now: number): Promise<number | null> {
+    const count = (this.counts.get(key) ?? 0) + 1;
+    this.counts.set(key, count);
+    if (count >= threshold) {
+      const expires = now + durationMs;
+      this.until.set(key, expires);
+      return expires;
+    }
+    return null;
+  }
+  async clear(key: string): Promise<void> {
+    this.counts.delete(key);
+    this.until.delete(key);
+  }
+}
+
+export class NoopAccessCooldownStore implements IAccessCooldownStore {
+  async get(_key: string): Promise<number | null> {
+    return null;
+  }
+  async blocked(_key: string, _threshold: number, _durationMs: number, _now: number): Promise<number | null> {
+    return null;
+  }
+  async clear(_key: string): Promise<void> {}
+}
+
+export function createDummyScraperEngine(name = 'dummy-scraper'): IScraperEngine {
+  return {
+    name,
+    fetchHtml: async (url: string) => ({
+      rawHtml: '<html><body>Mock</body></html>',
+      httpStatus: 200,
+      url,
+      durationMs: 10,
+    }),
+  };
+}
+
+export function createTestRealtimeService(): RealtimeService {
+  return new RealtimeService(new InMemoryRealtimeEventBus());
+}
+
+export function createTestQuotaService(
+  jobRepository: IJobRepository = new InMemoryJobRepository(),
+  usageRepository: IUsageRepository = new InMemoryUsageRepository()
+): QuotaService {
+  return new QuotaService({
+    jobRepository,
+    usageRepository,
+    planLimitResolver: new EnvPlanLimitResolver(),
+  });
+}
+
+export function createTestJobService(overrides: Partial<JobServiceDeps> = {}): JobService {
+  const jobRepo = overrides.jobRepository ?? new InMemoryJobRepository();
+  return new JobService({
+    jobRepository: jobRepo,
+    jobScheduler: overrides.jobScheduler ?? new MockJobScheduler(),
+    compilationControl: overrides.compilationControl ?? noopCompilationControl,
+    scraperEngine: overrides.scraperEngine ?? createDummyScraperEngine(),
+    sessionRepository: overrides.sessionRepository ?? new InMemorySessionRepository(),
+    realtimeService: overrides.realtimeService ?? createTestRealtimeService(),
+    quotaService: overrides.quotaService ?? createTestQuotaService(jobRepo),
+    ...overrides,
+  });
+}
+
+export function createTestCompilationService(overrides: Partial<CompilationServiceDeps> & { jobRepository: IJobRepository; configurationPipeline: any; alertRouter: any; jobScheduler: any; storageProvider: any }): CompilationService {
+  return new CompilationService({
+    sessionRepository: new InMemorySessionRepository(),
+    realtimeService: createTestRealtimeService(),
+    quotaService: createTestQuotaService(overrides.jobRepository),
+    ...overrides,
+  });
+}
+
+export function createTestScrapeExecutionService(overrides: Partial<ScrapeExecutionServiceDeps> & { jobRepository: IJobRepository; planExecutor: any; alertRouter: any; jobScheduler: any; storageProvider: any }): ScrapeExecutionService {
+  const sessionRepo = overrides.sessionRepository ?? new InMemorySessionRepository();
+  return new ScrapeExecutionService({
+    accessCooldown: new AccessCooldownService(new NoopAccessCooldownStore(), sessionRepo),
+    sessionRepository: sessionRepo,
+    realtimeService: createTestRealtimeService(),
+    quotaService: createTestQuotaService(overrides.jobRepository),
+    ...overrides,
+  });
+}
+
+export function createTestNotificationDispatcher(overrides: Partial<NotificationDispatcherDeps> = {}): NotificationDispatcher {
+  return new NotificationDispatcher({
+    emailProvider: { name: 'mock-email', sendAlert: async () => {} },
+    telegramProvider: { name: 'mock-telegram', sendAlert: async () => {}, sendTestMessage: async () => ({ ok: true }) },
+    webhookProvider: { name: 'mock-webhook', sendAlert: async () => {}, sendTestEvent: async () => ({ ok: true }) },
+    integrationRepository: new InMemoryIntegrationRepository(),
+    userRepository: new InMemoryUserRepository(),
+    ...overrides,
+  });
 }

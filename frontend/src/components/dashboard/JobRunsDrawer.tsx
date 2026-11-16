@@ -11,8 +11,7 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useJobRunsQuery, useJobTimeseriesQuery } from '@/hooks/useDashboardQueries';
 import type { JobRunDto, ScrapingJobDto, TimeseriesRange } from '@/lib/api';
 import { USER_FAILURES, type IntentField } from '@specter/contracts';
-import { CHANGE_STATUS, JOB_STATUS, RUN_STATUS } from '@/lib/domainValues';
-import { EXTRACTION_SCOPE } from '@/lib/extractionPlan';
+import { ExtractionScope, JobStatus } from '@specter/contracts';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels } from '@/lib/extractionDisplay';
 import { formatObservedNumber } from '@/lib/numberFormatting';
@@ -31,14 +30,14 @@ import {
 import * as React from 'react';
 
 const MONITOR_STATUS = {
-  [JOB_STATUS.PendingCompilation]: {
+  [JobStatus.PendingCompilation]: {
     label: 'Compiling selectors — this may take a few minutes',
     variant: 'secondary',
   },
-  [JOB_STATUS.Active]: { label: 'Ready to monitor', variant: 'success' },
-  [JOB_STATUS.Recovering]: { label: 'Recovering monitor', variant: 'warning' },
-  [JOB_STATUS.Paused]: { label: 'Paused', variant: 'secondary' },
-  [JOB_STATUS.Failed]: { label: 'Needs attention', variant: 'destructive' },
+  [JobStatus.Active]: { label: 'Ready to monitor', variant: 'success' },
+  [JobStatus.Recovering]: { label: 'Recovering monitor', variant: 'warning' },
+  [JobStatus.Paused]: { label: 'Paused', variant: 'secondary' },
+  [JobStatus.Failed]: { label: 'Needs attention', variant: 'destructive' },
 } as const;
 
 function displayValue(
@@ -91,7 +90,7 @@ export function JobRunsDrawer({
   const latestReading = data?.latestSuccessfulRun;
   const latestData = latestReading?.extractedData;
   const latestRecord = latestData && !('items' in latestData) ? latestData : null;
-  const monitorStatus = MONITOR_STATUS[job?.status ?? JOB_STATUS.PendingCompilation];
+  const monitorStatus = MONITOR_STATUS[job?.status ?? JobStatus.PendingCompilation];
   const jobFailure = parseErrorMessage(job?.lastError);
 
   const runsWithScreenshot = React.useMemo(
@@ -122,12 +121,12 @@ export function JobRunsDrawer({
   return (
     <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
       <div className="space-y-6">
-        {job.status === JOB_STATUS.Failed && (
+        {job.status === JobStatus.Failed && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
             <FailureDetails failure={jobFailure ?? USER_FAILURES.requestFailed} />
           </div>
         )}
-        {job.status === JOB_STATUS.Active && jobFailure && (
+        {job.status === JobStatus.Active && jobFailure && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-foreground">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -312,14 +311,14 @@ export function JobRunsDrawer({
                   Loading snapshot history...
                 </p>
               ) : runs.length === 0 ? (
-                job.status === JOB_STATUS.PendingCompilation ? (
+                job.status === JobStatus.PendingCompilation ? (
                   <div className="rounded-xl border border-border bg-muted/30 p-6 text-center space-y-3">
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary animate-pulse">
                       <Sparkles className="h-5 w-5" />
                     </div>
                     <div>
                       <h4 className="font-medium text-sm text-foreground">
-                        {MONITOR_STATUS[JOB_STATUS.PendingCompilation].label}
+                        {MONITOR_STATUS[JobStatus.PendingCompilation].label}
                       </h4>
                       <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
                         Analyzing the live page, detecting monitored fields, and running live
@@ -415,7 +414,7 @@ export function JobRunsDrawer({
                     ))}
                   </ul>
                   <p className="mt-4 text-xs text-muted-foreground">
-                    {job.extractionPlan.intent.scope === EXTRACTION_SCOPE.Collection
+                    {job.extractionPlan.intent.scope === ExtractionScope.Collection
                       ? 'Covers all pages in the list.'
                       : 'Covers this page.'}
                   </p>
@@ -469,7 +468,7 @@ export function JobRunsDrawer({
                 setup is complete.
               </p>
             )}
-            {(job.status === JOB_STATUS.Failed || job.status === JOB_STATUS.Recovering) &&
+            {(job.status === JobStatus.Failed || job.status === JobStatus.Recovering) &&
               jobFailure && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                   <FailureDetails failure={jobFailure} />

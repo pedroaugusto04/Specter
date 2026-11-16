@@ -12,8 +12,8 @@ import {
   useTogglePauseMutation,
   useTriggerJobMutation,
 } from '@/hooks/useDashboardQueries';
-import type { JobStatus, ScrapingJobDto } from '@/lib/api';
-import { JOB_STATUS, JOB_STATUS_FILTER } from '@/lib/domainValues';
+import { JobStatus } from '@specter/contracts';
+import type { ScrapingJobDto } from '@/lib/api';
 import { getJobActionPermissions, type JobRowActionType } from '@/lib/jobActionPermissions';
 import { DEFAULT_TIMEZONE, formatCompactDate, formatDateTime } from '@/lib/utils';
 import {
@@ -33,6 +33,13 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 
+const JOB_STATUS_FILTER = {
+  All: 'ALL',
+  Active: JobStatus.Active,
+  Recovering: JobStatus.Recovering,
+  Paused: JobStatus.Paused,
+} as const;
+
 type StatusFilter = (typeof JOB_STATUS_FILTER)[keyof typeof JOB_STATUS_FILTER];
 
 function formatDisplayUrl(rawUrl: string): string {
@@ -48,14 +55,14 @@ function formatDisplayUrl(rawUrl: string): string {
 
 function renderStatusPill(status: JobStatus) {
   switch (status) {
-    case JOB_STATUS.Active:
+    case JobStatus.Active:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-900 bg-zinc-900 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           ACTIVE
         </span>
       );
-    case JOB_STATUS.PendingCompilation:
+    case JobStatus.PendingCompilation:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-ping" />
@@ -63,7 +70,7 @@ function renderStatusPill(status: JobStatus) {
           <LoadingSpinner size="xs" />
         </span>
       );
-    case JOB_STATUS.Recovering:
+    case JobStatus.Recovering:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
@@ -71,14 +78,14 @@ function renderStatusPill(status: JobStatus) {
           <LoadingSpinner size="xs" />
         </span>
       );
-    case JOB_STATUS.Failed:
+    case JobStatus.Failed:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           FAILED
         </span>
       );
-    case JOB_STATUS.Paused:
+    case JobStatus.Paused:
     default:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-muted-foreground">
@@ -143,37 +150,37 @@ export function JobsTable({
 
   // Counts for filter tabs
   const activeCount = React.useMemo(
-    () => jobs.filter((j) => j.status === JOB_STATUS.Active).length,
+    () => jobs.filter((j) => j.status === JobStatus.Active).length,
     [jobs]
   );
   const recoveringCount = React.useMemo(
     () =>
       jobs.filter(
-        (j) => j.status === JOB_STATUS.Recovering || j.status === JOB_STATUS.PendingCompilation
+        (j) => j.status === JobStatus.Recovering || j.status === JobStatus.PendingCompilation
       ).length,
     [jobs]
   );
   const pausedOrFailedCount = React.useMemo(
     () =>
-      jobs.filter((j) => j.status === JOB_STATUS.Paused || j.status === JOB_STATUS.Failed).length,
+      jobs.filter((j) => j.status === JobStatus.Paused || j.status === JobStatus.Failed).length,
     [jobs]
   );
 
   // Filtered jobs
   const filteredJobs = React.useMemo(() => {
     return jobs.filter((job) => {
-      if (filter === JOB_STATUS_FILTER.Active && job.status !== JOB_STATUS.Active) return false;
+      if (filter === JOB_STATUS_FILTER.Active && job.status !== JobStatus.Active) return false;
       if (
         filter === JOB_STATUS_FILTER.Recovering &&
-        job.status !== JOB_STATUS.Recovering &&
-        job.status !== JOB_STATUS.PendingCompilation
+        job.status !== JobStatus.Recovering &&
+        job.status !== JobStatus.PendingCompilation
       ) {
         return false;
       }
       if (
         filter === JOB_STATUS_FILTER.Paused &&
-        job.status !== JOB_STATUS.Paused &&
-        job.status !== JOB_STATUS.Failed
+        job.status !== JobStatus.Paused &&
+        job.status !== JobStatus.Failed
       ) {
         return false;
       }
@@ -323,13 +330,13 @@ export function JobsTable({
                 const isRunningExtraction = runningJobIds.has(job.id);
                 const isRunning = currentAction === 'run';
                 const isCompilingState =
-                  job.status === JOB_STATUS.PendingCompilation ||
-                  job.status === JOB_STATUS.Recovering;
+                  job.status === JobStatus.PendingCompilation ||
+                  job.status === JobStatus.Recovering;
                 const isCompiling = isCompilingState || currentAction === 'recompile';
                 const isCancelling = currentAction === 'cancel-compilation';
                 const isPausing = currentAction === 'pause';
                 const isDeleting = currentAction === 'delete';
-                const isPaused = job.status === JOB_STATUS.Paused;
+                const isPaused = job.status === JobStatus.Paused;
 
                 const permissions = getJobActionPermissions({
                   job,

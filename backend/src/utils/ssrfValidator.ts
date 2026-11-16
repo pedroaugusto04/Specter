@@ -142,6 +142,13 @@ export function isInternalHostname(hostname: string): boolean {
  * to private IP ranges, loopback, cloud metadata endpoints, or internal hostnames.
  * Performs DNS resolution to prevent DNS rebinding attacks.
  */
+const dnsSafeCache = new Map<string, number>();
+const DNS_CACHE_TTL_MS = 60_000;
+
+export function clearDnsSafeCache(): void {
+  dnsSafeCache.clear();
+}
+
 export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<string> {
   let parsed: URL;
   try {
@@ -182,6 +189,12 @@ export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<
   }
 
   // Resolve hostname via DNS to prevent DNS rebinding to internal IPs
+  const cachedExpires = dnsSafeCache.get(hostname);
+  if (cachedExpires && cachedExpires > Date.now()) {
+    parsed.hash = '';
+    return parsed.toString();
+  }
+
   try {
     const lookupResults = await dns.lookup(hostname, { all: true });
     for (const record of lookupResults) {
@@ -197,6 +210,7 @@ export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<
         );
       }
     }
+    dnsSafeCache.set(hostname, Date.now() + DNS_CACHE_TTL_MS);
   } catch (err) {
     if (err instanceof ValidationError) {
       throw err;

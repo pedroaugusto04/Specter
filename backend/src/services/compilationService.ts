@@ -52,9 +52,9 @@ export interface CompilationServiceDeps {
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
   storageProvider: IStorageProvider;
-  sessionRepository?: ISessionRepository;
-  realtimeService?: RealtimeService;
-  quotaService?: QuotaService;
+  sessionRepository: ISessionRepository;
+  realtimeService: RealtimeService;
+  quotaService: QuotaService;
 }
 
 export class CompilationService implements ICompilationControl {
@@ -146,7 +146,7 @@ export class CompilationService implements ICompilationControl {
     )
       return job;
 
-    if (this.deps.quotaService && job.userId) {
+    if (job.userId) {
       try {
         await this.deps.quotaService.assertCanCompile(job.userId);
       } catch (quotaErr) {
@@ -279,7 +279,7 @@ export class CompilationService implements ICompilationControl {
       );
       const updatedJob = await this.deps.jobRepository.findById(job.id);
 
-      await this.deps.realtimeService?.notifyJobRunCompleted(
+      await this.deps.realtimeService.notifyJobRunCompleted(
         job.userId,
         job.id,
         completedRun.id,
@@ -292,7 +292,7 @@ export class CompilationService implements ICompilationControl {
         provider: 'configuration-pipeline',
       });
 
-      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
+      await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
 
       return updatedJob ?? job;
     } catch (error) {
@@ -371,7 +371,7 @@ export class CompilationService implements ICompilationControl {
             undefined,
             job.updatedAt
           );
-          await this.deps.realtimeService?.notifyJobUpdated(
+          await this.deps.realtimeService.notifyJobUpdated(
             job.userId,
             job.id,
             JobStatus.Recovering
@@ -387,7 +387,7 @@ export class CompilationService implements ICompilationControl {
           status: failureStatus,
           lastError: userMessage,
         });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, failureStatus);
+        await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, failureStatus);
       }
 
       throw error;
@@ -407,12 +407,12 @@ export class CompilationService implements ICompilationControl {
       job.updatedAt
     );
     await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
-    await this.deps.realtimeService?.notifyJobRunCompleted(
+    await this.deps.realtimeService.notifyJobRunCompleted(
       job.userId,
       job.id,
       completed.id,
       completed.hasChanges
     );
-    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+    await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id);
   }
 }

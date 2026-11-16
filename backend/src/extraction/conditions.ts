@@ -25,6 +25,17 @@ export function matchingResponses(
   );
 }
 
+const cheerioSnapshotCache = new WeakMap<DocumentSnapshot, cheerio.CheerioAPI>();
+
+export function getCheerioRoot(snapshot: DocumentSnapshot): cheerio.CheerioAPI {
+  let $ = cheerioSnapshotCache.get(snapshot);
+  if (!$) {
+    $ = cheerio.load(snapshot.html);
+    cheerioSnapshotCache.set(snapshot, $);
+  }
+  return $;
+}
+
 export function evaluateCondition(
   condition: Condition,
   snapshot: DocumentSnapshot,
@@ -48,7 +59,7 @@ export function evaluateCondition(
         : value === condition.equals;
     });
   if (condition.kind === 'visible' || condition.locator.kind !== 'css') return false;
-  const $ = cheerio.load(snapshot.html);
+  const $ = getCheerioRoot(snapshot);
   const elements = $(condition.locator.selector);
   if (condition.kind === 'exists') return elements.length > 0;
   if (condition.kind === 'absent') return elements.length === 0;

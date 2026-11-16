@@ -6,6 +6,9 @@ import { JobService } from '../../src/services/jobService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestJobService,
+  createTestQuotaService,
+  createTestRealtimeService,
   InMemoryUserRepository,
   InMemorySessionRepository,
   InMemoryJobRepository,
@@ -37,14 +40,10 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
     token = reg.tokens.accessToken;
     userId = reg.user.id;
 
-    const jobService = new JobService(
-      {
-        jobRepository: new InMemoryJobRepository(),
-        jobScheduler: new MockJobScheduler(),
-        compilationControl: { cancelCompilation: () => false },
-        sessionRepository: sessionRepo,
-      }
-    );
+    const jobService = createTestJobService({
+      jobRepository: new InMemoryJobRepository(),
+      sessionRepository: sessionRepo,
+    });
     const integrationRepo = new InMemoryIntegrationRepository();
     const dummyTelegram = {
       name: 'dummy-telegram',
@@ -67,6 +66,8 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
       authService,
       integrationService,
       sessionService,
+      realtimeService: createTestRealtimeService(),
+      quotaService: createTestQuotaService(),
       enableLogger: false,
     });
     await app.ready();

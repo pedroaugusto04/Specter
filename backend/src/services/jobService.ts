@@ -42,20 +42,20 @@ export interface JobServiceDeps {
   jobRepository: IJobRepository;
   jobScheduler: IJobScheduler;
   compilationControl: ICompilationControl;
-  scraperEngine?: IScraperEngine;
-  sessionRepository?: ISessionRepository;
-  realtimeService?: RealtimeService;
+  scraperEngine: IScraperEngine;
+  sessionRepository: ISessionRepository;
+  realtimeService: RealtimeService;
+  quotaService: QuotaService;
   presenter?: JobPresenter;
-  quotaService?: QuotaService;
 }
 
 export class JobService {
   private readonly jobRepository: IJobRepository;
   private readonly jobScheduler: IJobScheduler;
-  private readonly scraperEngine?: IScraperEngine;
-  private readonly sessionRepository?: ISessionRepository;
-  private readonly realtimeService?: RealtimeService;
-  private readonly quotaService?: QuotaService;
+  private readonly scraperEngine: IScraperEngine;
+  private readonly sessionRepository: ISessionRepository;
+  private readonly realtimeService: RealtimeService;
+  private readonly quotaService: QuotaService;
   private readonly compilationControl: ICompilationControl;
 
   private readonly presenter: JobPresenter;
@@ -84,13 +84,6 @@ export class JobService {
           ? ssrfErr.message
           : 'Access to private, loopback, or internal network addresses is forbidden.';
       return { accessible: false, reason };
-    }
-
-    if (!this.scraperEngine) {
-      return {
-        accessible: false,
-        reason: formatUserErrorMessage(new Error('Acquisition adapter unavailable.')),
-      };
     }
 
     const storageState = await resolveSessionStorageState(
@@ -131,7 +124,7 @@ export class JobService {
       existingJobs.map((job) => job.name)
     );
 
-    if (this.quotaService && request.userId) {
+    if (request.userId) {
       await this.quotaService.assertCanActivateMonitor(request.userId);
       await this.quotaService.assertCanCompile(request.userId);
     }
@@ -150,7 +143,7 @@ export class JobService {
 
     await this.jobScheduler.enqueueCompilation(createdEntity.id, CompilationReason.Initial);
 
-    await this.realtimeService?.notifyJobCreated(
+    await this.realtimeService.notifyJobCreated(
       createdEntity.userId,
       createdEntity.id,
       createdEntity.status
@@ -167,7 +160,7 @@ export class JobService {
 
   async listJobs(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobDto[]> {
     const entities = await this.jobRepository.findAll(statusFilter, userId);
-    return Promise.all(entities.map((entity) => this.presenter.present(entity)));
+    return this.presenter.presentMany(entities);
   }
 
   async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
@@ -271,7 +264,7 @@ export class JobService {
     }
 
     const resultDto = await this.presenter.present(updated);
-    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -325,7 +318,7 @@ export class JobService {
         bullmqRepeatableKey: null,
       });
       const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+      await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
       return resultDto;
     }
 
@@ -342,7 +335,7 @@ export class JobService {
       });
       await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
       const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+      await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
       return resultDto;
     }
 
@@ -355,7 +348,7 @@ export class JobService {
       bullmqRepeatableKey: repeatableKey,
     });
     const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -367,12 +360,12 @@ export class JobService {
 
     if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
       await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
-      await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
+      await this.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
       return { queued: true, mode: 'compile' };
     }
 
     await this.jobScheduler.enqueueImmediateScrape(existing.id);
-    await this.realtimeService?.notifyJobUpdated(existing.userId, existing.id, existing.status);
+    await this.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
     return { queued: true, mode: 'scrape' };
   }
 
@@ -386,7 +379,7 @@ export class JobService {
 
     await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
     const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -412,7 +405,7 @@ export class JobService {
     });
 
     const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;
   }
 
@@ -423,7 +416,7 @@ export class JobService {
     await this.jobScheduler.removePendingCompilations(existing.id);
     await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
     await this.jobRepository.deleteJob(id);
-    await this.realtimeService?.notifyJobDeleted(existing.userId, existing.id);
+    await this.realtimeService.notifyJobDeleted(existing.userId, existing.id);
   }
 
   async getJobRuns(jobId: string, page = 1, pageSize = 20, userId?: string): Promise<JobRunsDto> {

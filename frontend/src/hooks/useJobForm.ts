@@ -33,8 +33,11 @@ export function useJobForm() {
         setField('triggerRules', value),
       setTriggerMatchMode: (value: SetStateAction<JobFormValues['triggerMatchMode']>) =>
         setField('triggerMatchMode', value),
+      setCronPreset: (value: SetStateAction<string>) => setField('cronPreset', value),
+      setCustomCron: (value: SetStateAction<string>) => setField('customCron', value),
+      setUseCustomCron: (value: SetStateAction<boolean>) => setField('useCustomCron', value),
     }),
     [setField]
   );
-  return { values, reset, ...setters };
+  return { values, reset, setField, ...setters };
 }

@@ -12,6 +12,7 @@ import { PageExtractor } from '../../src/extraction/pageExtractor.js';
 import { standardSourceReaders } from '../../src/extraction/sources.js';
 import { fixturePlan, fixturePolicy } from '../helpers/extractionFixtures.js';
 import {
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockJobScheduler,
   MockNotificationProvider,
@@ -245,7 +246,7 @@ describe('Per-monitor access cooldown', () => {
     });
     const notifications = new MockNotificationProvider();
     const scheduler = new MockJobScheduler();
-    const service = new ScrapeExecutionService({
+    const service = createTestScrapeExecutionService({
       jobRepository: repository,
       planExecutor: { execute },
       accessCooldown: cooldown,
@@ -267,7 +268,7 @@ describe('Per-monitor access cooldown', () => {
     const remote = candidate('remote', true, '<body>missing data</body>');
     const notifications = new MockNotificationProvider();
     const prepare = vi.spyOn(notifications, 'prepare');
-    const service = new ScrapeExecutionService({
+    const service = createTestScrapeExecutionService({
       jobRepository: repository,
       planExecutor: new PlanExecutionService(executor([local, remote])),
       alertRouter: notifications,

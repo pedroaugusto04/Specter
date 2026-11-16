@@ -4,8 +4,6 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
 import { isAllowedCorsOrigin } from './utils/corsHelper.js';
 import { centralErrorHandler, notFoundHandler } from './middlewares/errorHandler.js';
-import { InMemoryRealtimeEventBus } from './providers/realtime/inMemoryRealtime.provider.js';
-import { DrizzleSessionRepository } from './repositories/sessionRepository.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
 import { registerIntegrationRoutes } from './routes/integrationRoutes.js';
 import { registerJobRoutes } from './routes/jobRoutes.js';
@@ -22,9 +20,9 @@ export interface BuildAppOptions {
   jobService: JobService;
   authService: AuthService;
   integrationService: IntegrationService;
-  sessionService?: SessionService;
-  realtimeService?: RealtimeService;
-  quotaService?: QuotaService;
+  sessionService: SessionService;
+  realtimeService: RealtimeService;
+  quotaService: QuotaService;
   enableLogger?: boolean;
 }
 
@@ -37,10 +35,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.setErrorHandler(centralErrorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
-  const sessionService =
-    options.sessionService ?? new SessionService(new DrizzleSessionRepository());
-  const realtimeService =
-    options.realtimeService ?? new RealtimeService(new InMemoryRealtimeEventBus());
+  const sessionService = options.sessionService;
+  const realtimeService = options.realtimeService;
 
   await app.register(rateLimit, {
     global: true,

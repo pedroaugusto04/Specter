@@ -61,16 +61,6 @@ export function formatEmailDateTime(
       }).format(d) + ` (${tz})`
     );
   } catch {
-    try {
-      return (
-        new Intl.DateTimeFormat('en-US', {
-          dateStyle: 'long',
-          timeStyle: 'medium',
-          timeZone: DEFAULT_TIMEZONE,
-        }).format(d) + ` (${DEFAULT_TIMEZONE})`
-      );
-    } catch {
-      return d.toISOString();
-    }
+    return d.toISOString();
   }
 }

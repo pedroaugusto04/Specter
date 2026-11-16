@@ -17,7 +17,7 @@ export function registerJobRoutes(
   app: FastifyInstance,
   jobService: JobService,
   authService: AuthService,
-  quotaService?: QuotaService
+  quotaService: QuotaService
 ): void {
   const withAuth = requireAuth(authService);
   const withOptionalAuth = optionalAuth(authService);
@@ -29,9 +29,6 @@ export function registerJobRoutes(
 
   app.get('/api/quotas', { preHandler: [withAuth] }, async (request) => {
     const user = requireUser(request);
-    if (!quotaService) {
-      return { data: null };
-    }
     const summary = await quotaService.getQuotaSummary(user.id);
     return { data: summary };
   });

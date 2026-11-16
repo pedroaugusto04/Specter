@@ -14,12 +14,12 @@ export interface ResolveSessionStorageOptions {
  * Centralizes the session lookup previously duplicated across jobService, compilationService, and scrapeExecutionService.
  */
 export async function resolveSessionStorageState(
-  sessionRepository?: ISessionRepository,
+  sessionRepository: ISessionRepository,
   userId?: string,
   targetUrl?: string,
   options?: ResolveSessionStorageOptions
 ): Promise<PlaywrightStorageState | undefined> {
-  if (!sessionRepository || !userId || !targetUrl) {
+  if (!userId || !targetUrl) {
     return undefined;
   }
 

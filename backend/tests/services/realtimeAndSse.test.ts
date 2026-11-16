@@ -9,7 +9,11 @@ import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
 import { RealtimeService } from '../../src/services/realtimeService.js';
+import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestJobService,
+  createTestQuotaService,
+  InMemorySessionRepository,
   MockJobScheduler,
   MockScraperEngine,
   InMemoryJobRepository,
@@ -107,11 +111,12 @@ describe('Realtime EventBus & SSE Streaming', () => {
         const scheduler = new MockJobScheduler();
         const scraper = new MockScraperEngine();
 
-        const jobService = new JobService({
+        const sessionRepository = new InMemorySessionRepository();
+        const jobService = createTestJobService({
           jobRepository: jobRepo,
           jobScheduler: scheduler,
-          compilationControl: { cancelCompilation: () => false },
           scraperEngine: scraper,
+          sessionRepository,
           realtimeService,
         });
         const authService = new AuthService(userRepo);
@@ -131,7 +136,9 @@ describe('Realtime EventBus & SSE Streaming', () => {
           jobService,
           authService,
           integrationService,
+          sessionService: new SessionService(sessionRepository),
           realtimeService,
+          quotaService: createTestQuotaService(jobRepo),
           enableLogger: false,
         });
 

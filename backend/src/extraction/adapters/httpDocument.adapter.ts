@@ -1,5 +1,4 @@
 import { passiveCapabilities } from '../capabilities.js';
-import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import { env } from '../../config/env.js';
 import { UnsupportedCapabilityError } from '../../errors/domainErrors.js';
 import { Transport } from '../constants.js';
@@ -31,7 +30,6 @@ export class HttpDocumentAdapter implements DocumentAdapter {
       storageState: (this.external ? undefined : options.storageState) as
         import('../../types/session.js').PlaywrightStorageState | undefined,
     });
-    detectAntiBotBlock(result.url, result.rawHtml, result.httpStatus);
     const snapshot = {
       transport: Transport.Http,
       html: result.rawHtml,

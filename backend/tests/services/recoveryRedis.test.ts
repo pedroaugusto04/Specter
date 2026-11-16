@@ -7,6 +7,8 @@ import {
 } from '../../src/queues/queues.js';
 import { reconcileRuns } from '../../src/queues/runReconciler.js';
 import {
+  createTestCompilationService,
+  createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockNotificationProvider,
   MockScraperEngine,
@@ -51,11 +53,11 @@ describe.skipIf(!process.env.RECOVERY_TEST_REDIS_PORT)(
         alertRouter: new MockNotificationProvider(),
         storageProvider: new NoopStorageProvider(),
       };
-      const execute = new ScrapeExecutionService({
+      const execute = createTestScrapeExecutionService({
         ...shared,
         planExecutor: fixtureExecutor(scraper),
       });
-      const compile = new CompilationService({
+      const compile = createTestCompilationService({
         ...shared,
         configurationPipeline: fixtureConfiguration(compiler, scraper),
       });

@@ -5,7 +5,7 @@ import {
   type TimelineStripPoint,
 } from '@/components/dashboard/ExecutionTimelineStrip';
 import { Badge } from '@/components/ui/badge';
-import { CHANGE_STATUS, RUN_STATUS } from '@/lib/domainValues';
+import { ChangeStatus, RunStatus } from '@specter/contracts';
 import { ArrowRight, Bell, Globe } from 'lucide-react';
 import * as React from 'react';
 
@@ -50,13 +50,13 @@ function buildPreviewRuns(count: number): TimelineStripPoint[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `preview-run-${index}`,
     executedAt: new Date(PREVIEW_START_MS + index * PREVIEW_INTERVAL_MS).toISOString(),
-    status: RUN_STATUS.Success,
+    status: RunStatus.Success,
     hasChanges:
       index === 0
-        ? CHANGE_STATUS.Initial
+        ? ChangeStatus.Initial
         : PREVIEW_CHANGE_INDEXES.has(index)
-          ? CHANGE_STATUS.Changed
-          : CHANGE_STATUS.Unchanged,
+          ? ChangeStatus.Changed
+          : ChangeStatus.Unchanged,
     durationMs: 1800 + ((index * 137) % 900),
     contractRevision: null,
     errorMessage: null,
