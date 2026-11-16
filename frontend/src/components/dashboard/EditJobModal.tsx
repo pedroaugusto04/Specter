@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, type ScrapingJobDto, type UserDto } from '@/lib/api';
 import { TRIGGER_MATCH_MODE } from '@/lib/extractionPlan';
@@ -349,9 +350,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                 htmlFor="edit-job-webhook-secret"
                 hint="When configured, payloads are signed with header X-Specter-Signature-256 for integrity verification."
               >
-                <Input
+                <PasswordInput
                   id="edit-job-webhook-secret"
-                  type="password"
                   placeholder={
                     job?.hasWebhookSecret
                       ? 'Secret configured; leave blank to keep it'
@@ -363,6 +363,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
                     setClearWebhookSecret(false);
                   }}
                   className="font-mono text-xs sm:text-sm"
+                  toggleAriaLabel="Toggle webhook signing secret visibility"
                 />
               </FormField>
 

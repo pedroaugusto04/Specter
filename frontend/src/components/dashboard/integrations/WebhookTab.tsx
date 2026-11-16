@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { cn } from '@/lib/utils';
 import { AlertCircle, Check, Loader2, Webhook } from 'lucide-react';
 
@@ -79,19 +80,17 @@ export function WebhookTab({
         label="Signing Secret (Optional HMAC-SHA256)"
         hint="When configured, payloads are signed with header X-Specter-Signature-256 for integrity verification."
       >
-        <div className="relative">
-          <Input
-            type="password"
-            placeholder={
-              hasConfiguredSecret
-                ? 'Secret configured; leave blank to keep it'
-                : 'whsec_xxxxxxxxxxxxxxxx'
-            }
-            value={webhookSecret}
-            onChange={(e) => onWebhookSecretChange(e.target.value)}
-            className="font-mono text-xs sm:text-sm"
-          />
-        </div>
+        <PasswordInput
+          placeholder={
+            hasConfiguredSecret
+              ? 'Secret configured; leave blank to keep it'
+              : 'whsec_xxxxxxxxxxxxxxxx'
+          }
+          value={webhookSecret}
+          onChange={(e) => onWebhookSecretChange(e.target.value)}
+          className="font-mono text-xs sm:text-sm"
+          toggleAriaLabel="Toggle webhook signing secret visibility"
+        />
       </FormField>
 
       {hasConfiguredSecret && (

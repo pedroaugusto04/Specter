@@ -11,8 +11,10 @@ import {
   CompilerValidationError,
   DomainError,
   NavigationTimeoutError,
+  NotFoundError,
   QuotaExceededError,
   SelectorMismatchError,
+  UnauthorizedError,
 } from '../errors/domainErrors.js';
 
 const USER_ERROR_MESSAGES = Object.fromEntries(
@@ -23,6 +25,8 @@ const USER_ERROR_MESSAGES = Object.fromEntries(
 export function formatUserErrorMessage(error: unknown): string {
   if (error instanceof BrowserCapacityError) return USER_ERROR_MESSAGES.resourceUnavailable;
   if (error instanceof QuotaExceededError) return error.message;
+  if (error instanceof UnauthorizedError) return error.message;
+  if (error instanceof NotFoundError) return 'The requested resource was not found.';
   // Setup deadlines must not be mistaken for website navigation timeouts.
   if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
   if (error instanceof CompilerApiRequestError)

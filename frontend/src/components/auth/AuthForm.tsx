@@ -2,16 +2,18 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useLoginMutation, useRegisterMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, api, type UserDto } from '@/lib/api';
 import { getBrowserTimezone } from '@/lib/utils';
 
 export interface AuthFormProps {
   initialEmail?: string;
+  initialError?: string;
   defaultMode?: 'login' | 'register';
   onSuccess: (user: UserDto) => void | Promise<void>;
   onGoogleBeforeRedirect?: () => void;
@@ -20,6 +22,7 @@ export interface AuthFormProps {
 
 export function AuthForm({
   initialEmail = '',
+  initialError,
   defaultMode = 'login',
   onSuccess,
   onGoogleBeforeRedirect,
@@ -37,7 +40,7 @@ export function AuthForm({
     password?: string;
     terms?: string;
   }>({});
-  const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const [globalError, setGlobalError] = React.useState<string | null>(initialError ?? null);
 
   React.useEffect(() => {
     if (initialEmail && !email) {
@@ -208,9 +211,8 @@ export function AuthForm({
         </FormField>
 
         <FormField label="Password" htmlFor="auth-password" required error={fieldErrors.password}>
-          <Input
+          <PasswordInput
             id="auth-password"
-            type="password"
             autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
             placeholder={mode === 'register' ? 'Min. 8 characters' : '••••••••'}
             value={password}
@@ -271,9 +273,10 @@ export function AuthForm({
         {globalError && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+            className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 p-3 text-xs sm:text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
           >
-            {globalError}
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1 leading-relaxed">{globalError}</div>
           </div>
         )}
 

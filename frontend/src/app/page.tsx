@@ -27,16 +27,25 @@ export default function HomePage() {
   const logoutMutation = useLogoutMutation();
   const modals = useDashboardModals();
   const router = useRouter();
+  const [authError, setAuthError] = React.useState<string | undefined>(undefined);
 
   // If URL has ?jobId=... from email alert, redirect to /dashboard?jobId=...
+  // If URL has ?auth_error=google_failed, open auth modal with error
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const targetJobId = params.get('jobId');
     if (targetJobId) {
       router.push(`/dashboard?jobId=${encodeURIComponent(targetJobId)}`);
+      return;
     }
-  }, [router]);
+    const errorParam = params.get('auth_error');
+    if (errorParam) {
+      setAuthError('Google sign-in could not be completed. Please try again or use your password.');
+      modals.openAuthModal();
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [router, modals]);
 
   const handleLogout = async () => {
     try {
@@ -152,7 +161,11 @@ export default function HomePage() {
       {/* Auth Modal */}
       <AuthModal
         isOpen={modals.isAuthModalOpen}
-        onClose={modals.closeAuthModal}
+        onClose={() => {
+          setAuthError(undefined);
+          modals.closeAuthModal();
+        }}
+        initialError={authError}
         onAuthenticated={handleUserAuthenticated}
       />
 

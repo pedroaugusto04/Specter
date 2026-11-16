@@ -178,6 +178,7 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       },
     });
     expect(badLogin.statusCode).toBe(401);
+    expect(badLogin.json().message).toBe('Invalid email or password.');
 
     const goodLogin = await app.inject({
       method: 'POST',

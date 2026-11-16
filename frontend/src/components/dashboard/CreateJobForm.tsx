@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import {
   useCheckSessionMutation,
   useCreateJobMutation,
@@ -551,13 +552,13 @@ export function CreateJobForm({
               htmlFor="job-webhook-secret"
               hint="When configured, payloads are signed with header X-Specter-Signature-256 for integrity verification."
             >
-              <Input
+              <PasswordInput
                 id="job-webhook-secret"
-                type="password"
                 placeholder="whsec_xxxxxxxxxxxxxxxx (optional)"
                 value={webhookSecret}
                 onChange={(e) => setWebhookSecret(e.target.value)}
                 className="font-mono text-xs sm:text-sm"
+                toggleAriaLabel="Toggle webhook signing secret visibility"
               />
             </FormField>
           </div>

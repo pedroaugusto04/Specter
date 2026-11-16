@@ -71,14 +71,14 @@ describe('Centralized Error Handler Middleware', () => {
     expect(res404.statusCode).toBe(404);
     expect(res404.json()).toEqual({
       error: 'NOT_FOUND',
-      message: 'We could not complete this request. Please try again later.',
+      message: 'The requested resource was not found.',
     });
 
     const res401 = await app.inject({ method: 'GET', url: '/test-401' });
     expect(res401.statusCode).toBe(401);
     expect(res401.json()).toEqual({
       error: 'UNAUTHORIZED',
-      message: 'We could not complete this request. Please try again later.',
+      message: 'Unauthorized access',
     });
   });
 
