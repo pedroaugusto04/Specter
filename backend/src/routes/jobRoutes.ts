@@ -43,7 +43,7 @@ export function registerJobRoutes(
         data: {
           totalJobs: 0,
           activeJobs: 0,
-          healingOrCompilingJobs: 0,
+          recoveringOrCompilingJobs: 0,
           failedOrPausedJobs: 0,
           totalRuns: 0,
           DetectedChangesCount: 0,
@@ -165,11 +165,7 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobTimeseriesQuerySchema.parse(request.query);
-      const result = await jobService.getJobTimeseries(
-        request.params.id,
-        query.range,
-        user.id
-      );
+      const result = await jobService.getJobTimeseries(request.params.id, query.range, user.id);
       return { data: result };
     }
   );

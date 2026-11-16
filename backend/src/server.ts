@@ -1,3 +1,4 @@
+import { reconcileRuns } from './queues/runReconciler.js';
 import { ScheduleCoordinator } from './queues/scheduleCoordinator.js';
 import { JobPresenter } from './presentation/jobPresenter.js';
 import { BrowserCapacity } from './resources/browserCapacity.js';
@@ -131,7 +132,7 @@ async function bootstrap(): Promise<void> {
     scraperEngine,
     sessionRepository,
     realtimeService,
-    presenter: new JobPresenter(accessCooldown),
+    presenter: new JobPresenter(accessCooldown, jobRepository),
     quotaService,
   });
   const authService = new AuthService(userRepository, {
@@ -165,6 +166,7 @@ async function bootstrap(): Promise<void> {
       (await jobRepository.findAll(JobStatus.PendingCompilation)).map((job) => job.id),
       (jobId) => jobScheduler.enqueueCompilation(jobId, CompilationReason.Initial)
     );
+    await reconcileRuns(jobRepository, jobScheduler, realtimeService);
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {
     logger.warn(
@@ -176,6 +178,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const workerManager = new WorkerManager({
+    reconcileRuns: () => reconcileRuns(jobRepository, jobScheduler, realtimeService),
     compilationService,
     scrapeExecutionService,
     retentionService,

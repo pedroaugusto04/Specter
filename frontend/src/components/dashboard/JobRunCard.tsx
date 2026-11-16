@@ -1,4 +1,5 @@
 'use client';
+import { runProgressLabel } from '@/lib/runProgress';
 
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -44,17 +45,23 @@ export function JobRunCard({
     <div
       id={`run-card-${run.id}`}
       className={`rounded-lg border bg-card p-4 sm:p-5 transition-all ${
-        isSelected
-          ? 'border-primary ring-1 ring-primary/40 bg-muted/10'
-          : 'border-border'
+        isSelected ? 'border-primary ring-1 ring-primary/40 bg-muted/10' : 'border-border'
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex items-center gap-2">
           <Badge
-            variant={run.status === RUN_STATUS.Success ? 'success' : 'destructive'}
+            variant={
+              run.status === RUN_STATUS.Success
+                ? 'success'
+                : run.status === RUN_STATUS.Failed
+                  ? 'destructive'
+                  : 'secondary'
+            }
           >
-            {run.extractionReport?.quality ?? run.status}
+            {run.status === RUN_STATUS.Running
+              ? runProgressLabel(run)
+              : (run.extractionReport?.quality ?? run.status)}
           </Badge>
           <Badge
             variant={
@@ -67,15 +74,14 @@ export function JobRunCard({
           >
             Change: {run.hasChanges}
           </Badge>
+          {run.recoveredAutomatically && (
+            <Badge variant="secondary">Recovered automatically</Badge>
+          )}
           {run.httpStatus && (
-            <span className="font-mono text-xs text-muted-foreground">
-              HTTP {run.httpStatus}
-            </span>
+            <span className="font-mono text-xs text-muted-foreground">HTTP {run.httpStatus}</span>
           )}
           {run.durationMs !== null && (
-            <span className="font-mono text-xs text-muted-foreground">
-              {run.durationMs}ms
-            </span>
+            <span className="font-mono text-xs text-muted-foreground">{run.durationMs}ms</span>
           )}
         </div>
         <span className="font-mono text-xs text-muted-foreground">
@@ -157,11 +163,7 @@ export function JobRunCard({
 
       {run.extractedData && (
         <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
-          {JSON.stringify(
-            localizeExtractedPayload(run.extractedData, extractionFields),
-            null,
-            2
-          )}
+          {JSON.stringify(localizeExtractedPayload(run.extractedData, extractionFields), null, 2)}
         </pre>
       )}
     </div>

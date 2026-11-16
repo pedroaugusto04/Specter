@@ -1,4 +1,4 @@
-import { ExtractionMode, ExtractionQuality } from './constants.js';
+import { ExtractionFailureReason, ExtractionMode, ExtractionQuality } from './constants.js';
 import { matchesRecord } from './recordFilter.js';
 import * as cheerio from 'cheerio';
 import type { DocumentSnapshot, ExtractionPlan, PageExtraction, Scalar } from './contracts.js';
@@ -43,14 +43,20 @@ export class PageExtractor implements IPageExtractor {
             : ExtractionQuality.Inconclusive,
         issues: ['An HTTP error response cannot establish valid data.'],
       };
-    const fail = (message: string) => {
+    const fail = (message: string, reason: PageExtraction['failureReason'] = 'REQUIRED_FIELD') => {
+      result.failureReason = reason;
       result.quality = ExtractionQuality.Invalid;
       if (!result.issues.includes(message)) result.issues.push(message);
     };
     try {
       const contexts = this.readers[strategy.records.kind].select(snapshot, strategy.records);
       if (intent.mode === ExtractionMode.Single && contexts.length !== 1)
-        fail('A single entity must be selected unambiguously.');
+        fail(
+          'A single entity must be selected unambiguously.',
+          contexts.length
+            ? ExtractionFailureReason.AmbiguousSelection
+            : ExtractionFailureReason.MissingRecords
+        );
       const associations = Object.fromEntries(
         Object.entries(strategy.associations ?? {}).map(([key, association]) => [
           key,
@@ -159,7 +165,7 @@ export class PageExtractor implements IPageExtractor {
             result.validatedSourceRecords++;
 
           if (identityFields.some((key) => record[key] === null || record[key] === undefined))
-            fail('Source record has no stable identity.');
+            fail('Source record has no stable identity.', 'IDENTITY');
           result.observedIdentities.push(recordIdentity(record, identityFields));
 
           const filters = strategy.filters ?? [];
@@ -226,8 +232,13 @@ export class PageExtractor implements IPageExtractor {
 
       if (intent.mode === ExtractionMode.Collection) {
         if (contexts.length > 0 && result.validatedSourceRecords === 0) {
-          const containerDesc = strategy.records.kind === 'dom' ? `'${strategy.records.selector}'` : strategy.records.kind;
-          fail(`No valid records could be extracted from candidate items (${contexts.length} matched ${containerDesc}). Check field selectors.`);
+          const containerDesc =
+            strategy.records.kind === 'dom'
+              ? `'${strategy.records.selector}'`
+              : strategy.records.kind;
+          fail(
+            `No valid records could be extracted from candidate items (${contexts.length} matched ${containerDesc}). Check field selectors.`
+          );
         }
 
         const seen = new Set<string>();
@@ -254,6 +265,7 @@ export class PageExtractor implements IPageExtractor {
       result.ended = !strategy.pagination || all(strategy.pagination.end);
       if (result.quality !== ExtractionQuality.Invalid) {
         if (!result.ready) {
+          result.failureReason = 'READINESS';
           result.quality = ExtractionQuality.Inconclusive;
           const details = failedReady.map((c) => JSON.stringify(c)).join(', ');
           result.issues.push(
@@ -277,7 +289,7 @@ export class PageExtractor implements IPageExtractor {
         if (href) result.nextUrl = new URL(href, snapshot.url).href;
       }
     } catch (error) {
-      fail(error instanceof Error ? error.message : 'Page extraction failed.');
+      fail(error instanceof Error ? error.message : 'Page extraction failed.', 'INTERNAL');
     }
     return result;
   }

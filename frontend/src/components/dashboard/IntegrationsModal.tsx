@@ -15,7 +15,15 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { type SessionDto, type UserIntegrationsDto } from '@/lib/api';
 import { cn, DEFAULT_TIMEZONE } from '@/lib/utils';
-import { AlertCircle, CheckCircle2, Loader2, Radio, Send, ShieldCheck, Webhook } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Radio,
+  Send,
+  ShieldCheck,
+  Webhook,
+} from 'lucide-react';
 import { TelegramTab } from './integrations/TelegramTab';
 import { WebhookTab } from './integrations/WebhookTab';
 import { WebSessionsTab } from './integrations/WebSessionsTab';
@@ -44,7 +52,8 @@ export function IntegrationsModal({
     process.env.NEXT_PUBLIC_EXTENSION_URL ||
     `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/specter-companion.zip`;
   const isExternalExtensionUrl = Boolean(
-    process.env.NEXT_PUBLIC_EXTENSION_URL && /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
+    process.env.NEXT_PUBLIC_EXTENSION_URL &&
+    /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
   );
   const [sessions, setSessions] = React.useState<SessionDto[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = React.useState(false);
@@ -137,7 +146,7 @@ export function IntegrationsModal({
       await deleteSessionMutation.mutateAsync(session.id);
       setSessions((prev) => prev.filter((s) => s.id !== session.id));
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Falha ao revogar sessão.');
+      setGlobalError(err instanceof Error ? err.message : 'Failed to revoke session.');
     } finally {
       setDeletingSessionId(null);
     }
@@ -264,7 +273,7 @@ export function IntegrationsModal({
           </div>
         </div>
       }
-      description="Configure real-time delivery channels for scraping change alerts and self-healing events."
+      description="Configure real-time delivery channels for scraping change alerts and automatic recovery."
       confirmTitle="Discard Unsaved Changes?"
       confirmMessage="You have modified integration settings that have not been saved. Close without saving?"
     >

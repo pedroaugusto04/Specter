@@ -24,7 +24,6 @@ export interface BuildChangeAlertOptions {
   triggerRules?: TriggerRule[];
   triggerMatchMode?: TriggerMatchMode;
   screenshotUrl?: string | null;
-  subjectSuffix?: string; // e.g. ' (Self-healing)'
   timezone?: string;
 }
 
@@ -33,15 +32,7 @@ export interface BuildChangeAlertOptions {
  * Removes duplication across CompilationService and ScrapeExecutionService.
  */
 export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload | null {
-  const {
-    job,
-    currentData,
-    previousData,
-    triggerRules,
-    triggerMatchMode,
-    screenshotUrl,
-    subjectSuffix = '',
-  } = options;
+  const { job, currentData, previousData, triggerRules, triggerMatchMode, screenshotUrl } = options;
 
   if (!previousData) return null;
 
@@ -68,7 +59,7 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
       : `${diffSummary.totalChanges} changes detected`;
 
   const monitorName = job.name?.trim() || job.url;
-  const subject = `[Specter] ${changeNoun}${subjectSuffix}: ${monitorName}`;
+  const subject = `[Specter] ${changeNoun}: ${monitorName}`;
 
   return {
     to: job.notificationEmail?.trim() || undefined,

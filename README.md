@@ -1,6 +1,6 @@
 # Specter — Scraper & Monitor Autônomo com IA
 
-Plataforma autônoma de extração e monitoramento web que combina **configuração adaptativa com ferramentas tipadas via IA** (`IModelProvider`: AGY CLI / Codex / API) com **execução determinística contínua** (BullMQ + Playwright + Cheerio + Fastify + Drizzle ORM + Next.js), operando com **0 consumo de tokens de LLM** nas checagens rotineiras e **Auto-Cura (_Self-Healing_)** em caso de alterações de layout.
+Plataforma autônoma de extração e monitoramento web que combina **configuração adaptativa com ferramentas tipadas via IA** (`IModelProvider`: AGY CLI / Codex / API) com **execução determinística contínua** (BullMQ + Playwright + Cheerio + Fastify + Drizzle ORM + Next.js), operando com **0 consumo de tokens de LLM** nas checagens rotineiras e **recuperação automática** em caso de alterações de layout.
 
 ---
 
@@ -186,7 +186,7 @@ parte dos DTOs. O segredo de webhook é somente de escrita: a leitura retorna
 O frontend oferece essas operações sem receber o segredo existente.
 
 A preparação comum de snapshots, comparação com baseline e alertas fica em
-`SuccessfulRunService`. Compilação, coleta e healing mantêm suas próprias decisões
+`SuccessfulRunService`. Compilação, coleta e recuperação mantêm suas próprias decisões
 de ciclo de vida e persistem snapshots e entregas na transação existente.
 
 Os builds Docker usam o contexto da raiz, copiando apenas o projeto correspondente

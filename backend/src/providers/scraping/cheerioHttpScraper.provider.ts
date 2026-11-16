@@ -1,3 +1,4 @@
+import { parseRetryAfter } from '../../utils/retryAfter.js';
 import { isTimeoutError } from '../../utils/networkErrors.js';
 import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
@@ -76,6 +77,7 @@ export class CheerioScraperEngine implements IScraperEngine {
 
       return {
         rawHtml,
+        retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
         httpStatus,
         url: finalUrl,
         durationMs: Date.now() - startTime,

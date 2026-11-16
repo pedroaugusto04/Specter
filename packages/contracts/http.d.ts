@@ -1,5 +1,5 @@
 import type { ExtractionIntent, ExtractionReport, IntentField } from './extraction.js';
-import type { JobStatus, RunStatus, ChangeStatus, AccessFailure } from './vocabulary.js';
+import type { JobStatus, RunStatus, RunPhase, ChangeStatus, AccessFailure } from './vocabulary.js';
 import type { ExtractedPayload } from './payload.js';
 import type { DiffSummary } from './diff.js';
 export interface AccessState {
@@ -37,6 +37,7 @@ export interface UserIntegrationsDto {
 }
 
 export interface ScrapingJobDto {
+  currentRun?: JobRunDto | null;
   id: string;
   name: string;
   url: string;
@@ -57,13 +58,17 @@ export interface ScrapingJobDto {
   status: JobStatus;
   accessState?: AccessState | null;
   lastError: string | null;
-  failureCount: number;
   captureScreenshotOnChange: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface JobRunDto {
+  phase?: RunPhase | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  nextAttemptAt?: string | null;
+  recoveredAutomatically?: boolean;
   id: string;
   jobId: string;
   contractRevision: string | null;
@@ -81,7 +86,7 @@ export interface JobRunDto {
 export interface DashboardStatsDto {
   totalJobs: number;
   activeJobs: number;
-  healingOrCompilingJobs: number;
+  recoveringOrCompilingJobs: number;
   failedOrPausedJobs: number;
   totalRuns: number;
   DetectedChangesCount: number;
@@ -144,6 +149,7 @@ export interface JobRunsSummaryDto {
   averageDurationMs: number | null;
 }
 export interface JobRunsDto {
+  latestSuccessfulRun?: JobRunDto | null;
   runs: JobRunDto[];
   latestDiff: DiffSummary | null;
   pagination: PaginationMeta;

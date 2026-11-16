@@ -26,7 +26,6 @@ import { TelegramNotificationProvider } from '../../src/providers/notifications/
 import { WebhookNotificationProvider } from '../../src/providers/notifications/webhookNotification.provider.js';
 import type { FastifyInstance } from 'fastify';
 
-
 function extractCookieHeader(setCookieHeader: string | string[] | undefined): string {
   if (!setCookieHeader) return '';
   const list = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
@@ -46,6 +45,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
   beforeEach(() => {
     jobRepository = new InMemoryJobRepository();
     usageRepository = new InMemoryUsageRepository();
+    jobRepository.usageRepository = usageRepository;
     planLimitResolver = new EnvPlanLimitResolver({
       maxActiveMonitors: 2,
       maxMonthlyCompilations: 3,
@@ -211,7 +211,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
           semanticReview: { status: 'OPTIMAL', score: 5 },
           execution: {
             report: {
-              quality: 'OPTIMAL' as const,
+              quality: 'COMPLETE' as const,
               issues: [],
               validatedSourceRecords: 1,
               scope: 'TARGET_MATCH',
@@ -246,7 +246,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
       expect(usage.compilationsCount).toBe(1);
     });
 
-    it('fails self-healing gracefully if compilation quota is exhausted', async () => {
+    it('fails recovery cleanly if compilation quota is exhausted', async () => {
       // Exhaust compilation quota
       await usageRepository.incrementCompilations(userId);
       await usageRepository.incrementCompilations(userId);
@@ -254,11 +254,23 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
       const job = await jobRepository.createJob({
         userId,
-        name: 'Monitor Healing',
+        name: 'Monitor Recovery',
         url: 'https://example.com',
         userPrompt: 'Extract',
         cronExpression: '0 */6 * * *',
       });
+
+      const active = (await jobRepository.updateJob(job.id, {
+        status: JobStatus.Active,
+        extractionPlan: fixturePlan(),
+      }))!;
+      const run = (await jobRepository.beginRun(active, 'recovery-quota-test'))!;
+      const recoveringRun = await jobRepository.commitRun(
+        { ...run, phase: 'RECOVERING' },
+        [],
+        { status: JobStatus.Recovering },
+        active.updatedAt
+      );
 
       let configureCalled = false;
       const fakePipeline = {
@@ -277,12 +289,13 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
         quotaService,
       });
 
-      await compilationService.compileJob(job.id, CompilationReason.Healing);
+      await compilationService.compileJob(job.id, CompilationReason.Recovery, false, run.id);
 
       expect(configureCalled).toBe(false);
       const updated = await jobRepository.findById(job.id);
       expect(updated?.status).toBe(JobStatus.Failed);
-      expect(updated?.lastError).toContain('Monthly compilation limit reached');
+      expect(updated?.lastError).toContain('could not be verified');
+      expect((await jobRepository.findRun(recoveringRun.id))?.status).toBe('FAILED');
     });
   });
 
@@ -307,7 +320,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
           executionCount++;
           return {
             report: {
-              quality: 'OPTIMAL' as const,
+              quality: 'COMPLETE' as const,
               issues: [],
               validatedSourceRecords: 1,
               scope: 'TARGET_MATCH',
@@ -341,7 +354,7 @@ describe('Quota Enforcement (Trava A, Trava B, Trava D)', () => {
 
       // 6th run should be skipped due to quota reached
       const result = await scrapeService.executeScrape(job.id);
-      expect(result).toBeNull();
+      expect(result?.status).toBe('FAILED');
       expect(executionCount).toBe(5); // Not invoked!
     });
   });

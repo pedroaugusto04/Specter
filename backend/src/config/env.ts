@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+export const MINIMUM_CRON_INTERVAL_MINUTES = 15;
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
@@ -104,12 +106,20 @@ export const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   COMPILATION_DIAGNOSTICS_MAX_CHARS: z.coerce.number().int().min(1000).max(100000).default(30000),
-  HEALING_WINDOW_MS: z.coerce.number().int().positive().default(86400000),
+  RECOVERY_WINDOW_MS: z.coerce.number().int().positive().default(86400000),
 
-  // Guardrails & Self-Healing
-  MIN_CRON_INTERVAL_MINUTES: z.coerce.number().int().min(1).default(15),
-  CONSECUTIVE_FAILURES_FOR_HEALING: z.coerce.number().int().min(1).default(2),
-  MAX_HEALING_RETRIES: z.coerce.number().int().min(1).default(3),
+  // Recovery guardrails
+  MIN_CRON_INTERVAL_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(MINIMUM_CRON_INTERVAL_MINUTES)
+    .default(MINIMUM_CRON_INTERVAL_MINUTES),
+  SCRAPE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  SCRAPE_RETRY_DELAY_MS: z.coerce.number().int().positive().default(5000),
+  EXTRACTION_CONFIRMATION_DELAY_MS: z.coerce.number().int().positive().default(900000),
+  RUN_RECONCILE_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+  RUN_MAX_DURATION_MS: z.coerce.number().int().positive().default(3600000),
+  MAX_RECOVERY_ATTEMPTS: z.coerce.number().int().min(1).default(3),
   RETENTION_DAYS_UNCHANGED: z.coerce.number().int().min(1).default(14),
 
   // Quotas & Usage Limits

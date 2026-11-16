@@ -74,6 +74,17 @@ export const FailureCode = Object.freeze(
   })
 );
 
+export const ExtractionFailureReason = Object.freeze(
+  /** @type {const} */ ({
+    RequiredField: 'REQUIRED_FIELD',
+    AmbiguousSelection: 'AMBIGUOUS_SELECTION',
+    Identity: 'IDENTITY',
+    MissingRecords: 'MISSING_RECORDS',
+    Readiness: 'READINESS',
+    Internal: 'INTERNAL',
+  })
+);
+
 export const TraceStatus = Object.freeze(
   /** @type {const} */ ({ Success: 'SUCCESS', Failed: 'FAILED', Skipped: 'SKIPPED' })
 );
@@ -91,13 +102,27 @@ export const JobStatus = Object.freeze(
     PendingCompilation: 'PENDING_COMPILATION',
     Active: 'ACTIVE',
     Failed: 'FAILED',
-    Healing: 'HEALING',
+    Recovering: 'RECOVERING',
     Paused: 'PAUSED',
   })
 );
 
 export const RunStatus = Object.freeze(
-  /** @type {const} */ ({ Success: 'SUCCESS', Failed: 'FAILED' })
+  /** @type {const} */ ({
+    Running: 'RUNNING',
+    Cancelled: 'CANCELLED',
+    Success: 'SUCCESS',
+    Failed: 'FAILED',
+  })
+);
+
+export const RunPhase = Object.freeze(
+  /** @type {const} */ ({
+    Checking: 'CHECKING',
+    Retrying: 'RETRYING',
+    Confirming: 'CONFIRMING',
+    Recovering: 'RECOVERING',
+  })
 );
 
 export const ChangeStatus = Object.freeze(

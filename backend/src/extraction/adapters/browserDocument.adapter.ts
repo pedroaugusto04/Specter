@@ -1,3 +1,4 @@
+import { parseRetryAfter } from '../../utils/retryAfter.js';
 import { isTimeoutError } from '../../utils/networkErrors.js';
 import type { IBrowserCapacity } from '../../resources/browserCapacity.js';
 import { browserCapabilities } from '../capabilities.js';
@@ -44,7 +45,8 @@ export class BrowserDocumentSession implements DocumentSession {
     private readonly responses: NetworkResponse[],
     private readonly responseTasks: Set<Promise<void>>,
     private readonly getHttpStatus: () => number,
-    private readonly cleanup: () => Promise<void>
+    private readonly cleanup: () => Promise<void>,
+    private readonly getRetryAfter: () => number | undefined = () => undefined
   ) {}
 
   private timeout(): number {
@@ -107,7 +109,9 @@ export class BrowserDocumentSession implements DocumentSession {
 
     await target.first().click({ timeout: this.timeout() });
     const postClickTimeout = Math.max(1, Math.min(this.execution.remaining(), 15000));
-    await this.page.waitForLoadState?.('networkidle', { timeout: postClickTimeout })?.catch(() => {});
+    await this.page
+      .waitForLoadState?.('networkidle', { timeout: postClickTimeout })
+      ?.catch(() => {});
   }
 
   private async scroll(selector?: string): Promise<void> {
@@ -164,6 +168,7 @@ export class BrowserDocumentSession implements DocumentSession {
       html,
       url: currentUrl,
       httpStatus,
+      retryAfterMs: this.getRetryAfter(),
       responses: [...this.responses],
     };
   }
@@ -176,7 +181,12 @@ export class BrowserDocumentSession implements DocumentSession {
       await Promise.allSettled([...this.responseTasks]);
       return evaluateCondition(
         condition,
-        { html: '', url: this.page.url(), httpStatus: this.getHttpStatus(), responses: this.responses },
+        {
+          html: '',
+          url: this.page.url(),
+          httpStatus: this.getHttpStatus(),
+          responses: this.responses,
+        },
         []
       );
     }
@@ -192,8 +202,8 @@ export class BrowserDocumentSession implements DocumentSession {
           const style = element.ownerDocument.defaultView?.getComputedStyle(element);
           return Boolean(
             element.getClientRects().length &&
-              style?.visibility !== 'hidden' &&
-              style?.display !== 'none'
+            style?.visibility !== 'hidden' &&
+            style?.display !== 'none'
           );
         })
       );
@@ -433,13 +443,20 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         }
       });
 
-      const actionTimeout = Math.max(1, Math.min(execution.remaining(), this.policy.actionTimeoutMs));
-      const navTimeout = Math.max(1, Math.min(execution.remaining(), this.policy.navigationTimeoutMs));
+      const actionTimeout = Math.max(
+        1,
+        Math.min(execution.remaining(), this.policy.actionTimeoutMs)
+      );
+      const navTimeout = Math.max(
+        1,
+        Math.min(execution.remaining(), this.policy.navigationTimeoutMs)
+      );
       page.setDefaultTimeout(actionTimeout);
       page.setDefaultNavigationTimeout(navTimeout);
 
       const responses: NetworkResponse[] = [];
       let httpStatus = 0;
+      let retryAfterMs: number | undefined;
       let pendingBytes = 0;
       const responseTasks = new Set<Promise<void>>();
 
@@ -449,6 +466,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
           response.request().frame() === page.mainFrame()
         ) {
           httpStatus = response.status();
+          retryAfterMs = parseRetryAfter(response.headers()['retry-after'] ?? null);
         }
 
         if (!(response.headers()['content-type'] ?? '').includes('json')) {
@@ -482,6 +500,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         timeout: navTimeout,
       });
       httpStatus = response?.status() ?? 200;
+      retryAfterMs = parseRetryAfter(response?.headers()['retry-after'] ?? null);
 
       const cleanup = async () => {
         execution.signal.removeEventListener('abort', abort);
@@ -496,7 +515,8 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         responses,
         responseTasks,
         () => httpStatus,
-        cleanup
+        cleanup,
+        () => retryAfterMs
       );
     } catch (error) {
       execution.signal.removeEventListener('abort', abort);

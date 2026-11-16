@@ -1,4 +1,3 @@
-import { extractionPlanSchema } from '../types/extractionPlan.js';
 import type { ScrapeOptions, ScrapeResult } from '../providers/scraping/scraper.interface.js';
 import type { ExtractionPlan, ExtractionReport } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';

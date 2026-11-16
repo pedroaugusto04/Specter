@@ -109,8 +109,8 @@ describe('public failure details', () => {
   });
 
   it('maps stored retry-limit errors to approved public copy', () => {
-    expect(presentStoredError('Self-healing retry limit exceeded (3): internal details')).toBe(
-      USER_FAILURES.configurationRejected.description
+    expect(presentStoredError('Internal failure: provider details')).toBe(
+      USER_FAILURES.requestFailed.description
     );
   });
 });

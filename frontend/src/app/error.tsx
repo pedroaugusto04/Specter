@@ -24,12 +24,12 @@ export default function GlobalError({
           <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-3 text-destructive">
             <AlertTriangle className="w-6 h-6" />
           </div>
-          <CardTitle className="text-xl font-semibold">Algo deu errado</CardTitle>
+          <CardTitle className="text-xl font-semibold">Something went wrong</CardTitle>
         </CardHeader>
         <CardContent className="text-center text-sm text-muted-foreground pb-4">
           <p>
-            Ocorreu um erro inesperado na interface. Você pode tentar recarregar a seção ou voltar ao
-            início.
+            An unexpected error occurred. You can try reloading this section or return to the home
+            page.
           </p>
           {process.env.NODE_ENV !== 'production' && error.message && (
             <p className="mt-3 p-2 bg-muted rounded text-xs font-mono text-left break-words">
@@ -39,11 +39,11 @@ export default function GlobalError({
         </CardContent>
         <CardFooter className="flex justify-center gap-3 pt-2">
           <Button variant="outline" onClick={() => (window.location.href = '/')}>
-            Ir para Início
+            Go to Home
           </Button>
           <Button onClick={() => reset()} className="gap-2">
             <RefreshCw className="w-4 h-4" />
-            Tentar novamente
+            Try Again
           </Button>
         </CardFooter>
       </Card>

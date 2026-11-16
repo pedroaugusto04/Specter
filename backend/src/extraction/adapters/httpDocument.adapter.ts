@@ -37,6 +37,7 @@ export class HttpDocumentAdapter implements DocumentAdapter {
       html: result.rawHtml,
       url: result.url,
       httpStatus: result.httpStatus,
+      retryAfterMs: result.retryAfterMs,
       responses: [],
       screenshot: result.screenshot,
     };

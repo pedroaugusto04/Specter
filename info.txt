@@ -15,7 +15,7 @@ O FLUXO ATUAL
 4. Validacao: verifica campos obrigatorios, identidade, ambiguidades, duplicatas, prontidao e conclusao. Somente COMPLETE/EMPTY substitui a baseline valida.
 5. Comparacao e alerta: calcula mudancas e registra snapshot e entregas numa transacao. O outbox tenta enviar notificacoes com retries limitados.
 
-A arquitetura protege a baseline contra resultados incompletos, limita paginas, acoes, itens e tempo, e separa healing de seletores de erros de acesso. Essas partes devem ser mantidas.
+A arquitetura protege a baseline contra resultados incompletos, limita paginas, acoes, itens e tempo, e separa a recuperacao de seletores dos erros de acesso. Essas partes devem ser mantidas.
 
 LACUNAS ATUAIS CONFIRMADAS
 
@@ -23,7 +23,7 @@ LACUNAS ATUAIS CONFIRMADAS
 - O Cascade tenta primeiro todos os providers habilitados em ordem e retorna o primeiro que nao lanca excecao. Essa resposta ainda pode ser uma pagina de bloqueio ou ser inutil para a extracao; nesse caso, os providers seguintes nao sao tentados.
 - O caminho browser agendado nao usa o Cascade. Pode usar o proxy unico configurado em HTTP_PROXY.
 - No setup, browser bloqueado pode cair para HTML passivo pelo HTTP/Cascade. Esse fallback nao preserva clique, scroll ou observacao de respostas de rede.
-- Bloqueios reconhecidos nao ativam healing de seletores, corretamente, mas podem reaparecer a cada agendamento. Nao ha cooldown especifico para acesso bloqueado.
+- Bloqueios reconhecidos nao ativam recuperacao de seletores, corretamente, mas podem reaparecer a cada agendamento. Nao ha cooldown especifico para acesso bloqueado.
 - O corpus deterministico existente e pequeno e nao comprova a cobertura de sites reais.
 
 AJUSTES QUE VALEM A PENA MANTER
@@ -62,7 +62,7 @@ COMPORTAMENTO ESPERADO DEPOIS DOS AJUSTES
 - Bloqueio no caminho HTTP: escalonamento limitado; cada resposta candidata precisa passar pela mesma validacao de extracao.
 - Bloqueio num plano browser: tentar apenas alternativas compativeis. Se o plano exige interacao que o provider nao fornece, informar bloqueio/falha de acesso de forma clara.
 - Nenhuma alternativa produz dados validos: preservar baseline, registrar a categoria da falha e respeitar o cooldown.
-- Healing continua reservado para estrategia/seletor que deixou de funcionar, nao para bloqueio ou timeout.
+- Recuperacao continua reservada para estrategia/seletor que deixou de funcionar, nao para bloqueio ou timeout.
 
 O QUE ADIAR
 
@@ -79,7 +79,7 @@ CRITERIOS DE ACEITACAO
 2. Providers so sao chamados conforme a politica de escalonamento e dentro de limites de tentativas/tempo.
 3. Um fallback passivo nao e aceito quando faltar uma capacidade exigida pelo plano.
 4. Falhas repetidas de acesso nao entram em loop caro a cada agendamento; cooldown e observavel.
-5. Falha de aquisicao nao aciona healing de seletores; healing nao altera a intencao do usuario.
+5. Falha de aquisicao nao aciona recuperacao de seletores; a recuperacao nao altera a intencao do usuario.
 6. Mensagens ao usuario nao expoem detalhes tecnicos nem credenciais.
 7. A melhoria e avaliada com casos representativos, incluindo falsos sucessos e falsos alertas.
 

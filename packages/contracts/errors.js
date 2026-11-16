@@ -73,9 +73,6 @@ export const USER_FAILURES = Object.freeze({
 });
 
 export function getUserFailure(message) {
-  if (/^Self-healing retry limit exceeded \(\d+\): /.test(message)) {
-    return USER_FAILURES.configurationRejected;
-  }
   return (
     Object.values(USER_FAILURES).find((failure) => failure.description === message) ??
     USER_FAILURES.requestFailed

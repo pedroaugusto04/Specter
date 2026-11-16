@@ -114,8 +114,18 @@ describe('Shared acquisition policy', () => {
     expect(plan.strategy.transport).toBe('browser');
   });
   it('falls back from proxied browser to direct browser on proxy failure in discovery', async () => {
-    const proxiedBrowser = candidate('browser-proxied', false, new Error('page.goto: net::ERR_TUNNEL_CONNECTION_FAILED'), 'browser');
-    const directBrowser = candidate('browser-direct', false, '<h1>rendered by direct browser</h1>', 'browser');
+    const proxiedBrowser = candidate(
+      'browser-proxied',
+      false,
+      new Error('page.goto: net::ERR_TUNNEL_CONNECTION_FAILED'),
+      'browser'
+    );
+    const directBrowser = candidate(
+      'browser-direct',
+      false,
+      '<h1>rendered by direct browser</h1>',
+      'browser'
+    );
     const passive = candidate('passive', true, '<h1>passive</h1>', 'http');
 
     const session = await new DiscoveryDocumentAdapter(
@@ -247,7 +257,7 @@ describe('Per-monitor access cooldown', () => {
     await service.executeScrape(job.id);
     await service.executeScrape(job.id);
     expect(execute).toHaveBeenCalledTimes(2);
-    expect(await repository.findById(job.id)).toMatchObject({ status: 'ACTIVE', failureCount: 0 });
+    expect(await repository.findById(job.id)).toMatchObject({ status: 'ACTIVE' });
     expect(await repository.findLatestSuccessfulRun(job.id)).toBeNull();
     expect(scheduler.compilationQueue).toHaveLength(0);
   });

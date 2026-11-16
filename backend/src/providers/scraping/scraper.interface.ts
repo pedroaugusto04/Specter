@@ -10,6 +10,7 @@ export interface ScrapeOptions {
 }
 
 export interface ScrapeResult {
+  retryAfterMs?: number;
   rawHtml: string;
   httpStatus: number;
   url: string;

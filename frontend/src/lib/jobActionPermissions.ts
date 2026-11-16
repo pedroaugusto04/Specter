@@ -33,7 +33,7 @@ export function getJobActionPermissions({
   const isJobBusy = Boolean(currentAction);
   const isCompiling =
     job.status === JOB_STATUS.PendingCompilation ||
-    job.status === JOB_STATUS.Healing ||
+    job.status === JOB_STATUS.Recovering ||
     currentAction === 'recompile';
   const isRunning = isExecutingExtraction || currentAction === 'run';
   const isPaused = job.status === JOB_STATUS.Paused;
@@ -61,7 +61,8 @@ export function getJobActionPermissions({
   } else if (isRunning) {
     runTitle = 'Executing extraction...';
   } else if (isFailed) {
-    runTitle = 'Cannot run extraction on a failed monitor. Please recompile selectors or edit the monitor.';
+    runTitle =
+      'Cannot run extraction on a failed monitor. Please recompile selectors or edit the monitor.';
   } else if (isAccessBlocked && job.accessState?.retryAt) {
     runTitle = `Target access is currently blocked. Next attempt allowed after ${formatDateTime(
       job.accessState.retryAt,
@@ -84,7 +85,8 @@ export function getJobActionPermissions({
   let pauseDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning || isFailed;
   let pauseTitle = isPaused ? 'Resume schedule' : 'Pause schedule';
   if (isFailed) {
-    pauseTitle = 'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.';
+    pauseTitle =
+      'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.';
   } else if (isCompiling) {
     pauseTitle = 'Stop compilation and pause monitor';
   } else if (isRunning) {

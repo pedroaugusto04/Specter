@@ -24,7 +24,7 @@ import {
   MockNotificationProvider,
   MockScraperEngine,
 } from '../helpers/testDoubles.js';
-describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () => {
+describe('Monitor compilation, recovery, and lifecycle', () => {
   let repository: InMemoryJobRepository;
   let scraper: MockScraperEngine;
   let compiler: MockCompilerProvider;
@@ -51,11 +51,10 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       alertRouter: notifier,
       storageProvider: new NoopStorageProvider(),
       jobScheduler: scheduler,
-      consecutiveFailuresForHealing: 2,
-      maxHealingRetries: 3,
+      maxRecoveryAttempts: 3,
     });
   });
-  it('notifies subscribers after an inconclusive run updates the error and failure counter', async () => {
+  it('persists confirmation progress and notifies subscribers for an inconclusive run', async () => {
     const bus = new InMemoryRealtimeEventBus();
     const realtimeService = new RealtimeService(bus);
     const job = await repository.createJob({
@@ -87,14 +86,13 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       storageProvider: new NoopStorageProvider(),
       jobScheduler: scheduler,
       realtimeService,
-      consecutiveFailuresForHealing: 2,
-      maxHealingRetries: 3,
+      maxRecoveryAttempts: 3,
     });
     await service.executeScrape(job.id);
-    expect((await repository.findById(job.id))?.failureCount).toBe(1);
+    expect(scheduler.runAttempts).toHaveLength(1);
     expect(events.at(-1)).toMatchObject({ type: 'JOB_UPDATED', jobId: job.id });
     expect(events.at(-1)?.status).not.toBe('RUNNING');
-    expect((await repository.findRunsByJobId(job.id)).some((run) => run.status === 'FAILED')).toBe(
+    expect((await repository.findRunsByJobId(job.id)).some((run) => run.status === 'RUNNING')).toBe(
       true
     );
     await realtimeService.close();
@@ -126,7 +124,6 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     expect(compiler.calls).toHaveLength(1);
     expect(compiler.calls[0]?.sanitizedHtml).not.toContain('<script>');
     expect(compiledJob.status).toBe('ACTIVE');
-    expect(compiledJob.failureCount).toBe(0);
     expect(compiledJob.extractionPlan).toBeDefined();
     expect(scheduler.scheduledRepeatables.has(job.id)).toBe(true);
     const runs = await repository.findRunsByJobId(job.id);
@@ -225,50 +222,35 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
         ?.field
     ).toBe('price');
   });
-  it('transitions to HEALING only after 2 consecutive SelectorMismatchErrors, and caps retries at maxHealingRetries', async () => {
+  it('recovers a structural break in a daily monitor immediately and caps the monitor budget', async () => {
     const job = await repository.createJob({
       url: 'https://store.example.com/item',
       userPrompt: 'Monitor product',
-      notificationEmail: 'alerts@example.com',
-      cronExpression: '*/30 * * * *',
+      cronExpression: '0 0 * * *',
     });
     await compilationService.compileJob(job.id);
-    // Website changes layout (HTTP 200 OK, but selectors return empty)
     scraper.setHandler(async (url) => ({
-      rawHtml: `<html><body><div class="new-v2-title">Notebook Pro</div><div class="new-v2-price">$ 1,100.00</div></body></html>`,
+      rawHtml: '<html><body><div>Changed layout</div></body></html>',
       httpStatus: 200,
       url,
       durationMs: 30,
     }));
-    // 1st consecutive failure -> remains ACTIVE, failureCount = 1, no healing compilation yet
     await scrapeService.executeScrape(job.id);
-    let currentJob = await repository.findById(job.id);
-    expect(currentJob?.status).toBe('ACTIVE');
-    expect(currentJob?.failureCount).toBe(1);
-    expect(scheduler.compilationQueue).toHaveLength(0);
-    // 2nd consecutive failure -> transitions to HEALING, failureCount = 2, enqueues healing compilation
-    await scrapeService.executeScrape(job.id);
-    currentJob = await repository.findById(job.id);
-    expect(currentJob?.status).toBe('HEALING');
-    expect(currentJob?.failureCount).toBe(2);
+    expect((await repository.findById(job.id))?.status).toBe('RECOVERING');
     expect(scheduler.compilationQueue).toHaveLength(1);
-    expect(scheduler.compilationQueue[0]).toEqual({ jobId: job.id, reason: 'healing' });
-    // Scheduled scraping must not run during recovery.
+    expect(repository.runs.filter((run) => run.status === 'RUNNING')).toHaveLength(1);
     await scrapeService.executeScrape(job.id);
-    expect((await repository.findById(job.id))?.failureCount).toBe(2);
-    // A new cycle after the window budget is exhausted must stop scheduling.
+    expect(scheduler.compilationQueue).toHaveLength(1);
     await repository.updateJob(job.id, {
       status: 'ACTIVE',
-      failureCount: 1,
-      healingAttempts: 3,
-      healingWindowStartedAt: new Date(),
+      recoveryAttempts: 3,
+      recoveryWindowStartedAt: new Date(),
     });
-    const queued = scheduler.compilationQueue.length;
     await scrapeService.executeScrape(job.id);
     expect((await repository.findById(job.id))?.status).toBe('FAILED');
-    expect(scheduler.compilationQueue.length).toBe(queued);
+    expect(scheduler.compilationQueue).toHaveLength(1);
   });
-  it('does NOT trigger self-healing on AntiBotBlockedError (HTTP 403/429) or NavigationTimeoutError', async () => {
+  it('does NOT trigger automatic recovery for access blocks or transient navigation errors', async () => {
     const job = await repository.createJob({
       url: 'https://protected.example.com/item',
       userPrompt: 'Monitor item',
@@ -284,16 +266,15 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     await scrapeService.executeScrape(job.id);
     let currentJob = await repository.findById(job.id);
     expect(currentJob?.status).toBe('ACTIVE');
-    expect(currentJob?.failureCount).toBe(0);
     expect(scheduler.compilationQueue).toHaveLength(0);
-    // Simulate NavigationTimeoutError -> should rethrow for BullMQ backoff without triggering healing
+    // Navigation timeouts retry within the current execution without recompiling.
     scraper.setHandler(async () => {
       throw new NavigationTimeoutError('Navigation timeout after 30000ms');
     });
-    await expect(scrapeService.executeScrape(job.id)).rejects.toThrow(NavigationTimeoutError);
+    await scrapeService.executeScrape(job.id);
+    expect(scheduler.runAttempts).toHaveLength(1);
     currentJob = await repository.findById(job.id);
     expect(currentJob?.status).toBe('ACTIVE');
-    expect(currentJob?.failureCount).toBe(0);
     expect(scheduler.compilationQueue).toHaveLength(0);
   });
 

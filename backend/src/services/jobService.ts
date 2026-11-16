@@ -67,7 +67,7 @@ export class JobService {
     this.scraperEngine = deps.scraperEngine;
     this.sessionRepository = deps.sessionRepository;
     this.realtimeService = deps.realtimeService;
-    this.presenter = deps.presenter ?? new JobPresenter();
+    this.presenter = deps.presenter ?? new JobPresenter(undefined, deps.jobRepository);
     this.quotaService = deps.quotaService;
   }
 
@@ -252,7 +252,6 @@ export class JobService {
       patch.bullmqRepeatableKey = null;
       patch.status = JobStatus.PendingCompilation;
       patch.extractionPlan = null;
-      patch.failureCount = 0;
       patch.lastError = null;
     } else if (patch.cronExpression !== undefined && existing.status === JobStatus.Active) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
@@ -381,8 +380,7 @@ export class JobService {
     const existing = await this.getOwnedJob(id, userId);
 
     const updated = await this.jobRepository.updateJob(id, {
-      status: JobStatus.Healing,
-      failureCount: 0,
+      status: JobStatus.Recovering,
       lastError: null,
     });
 
@@ -397,7 +395,7 @@ export class JobService {
 
     if (
       existing.status !== JobStatus.PendingCompilation &&
-      existing.status !== JobStatus.Healing
+      existing.status !== JobStatus.Recovering
     ) {
       throw new ValidationError('This monitor does not have a compilation in progress.');
     }
@@ -410,7 +408,6 @@ export class JobService {
 
     const updated = await this.jobRepository.updateJob(id, {
       status: targetStatus,
-      failureCount: 0,
       lastError: null,
     });
 
@@ -469,6 +466,9 @@ export class JobService {
 
     return {
       runs,
+      latestSuccessfulRun: await this.jobRepository
+        .findLatestSuccessfulRun(jobId)
+        .then((run) => (run ? JobMapper.runEntityToDto(run) : null)),
       latestDiff,
       pagination: {
         page,

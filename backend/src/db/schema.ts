@@ -1,3 +1,4 @@
+import type { RunMetadata, RunPhase } from '../types/run.js';
 import type { EncryptedJsonEnvelope } from '../types/crypto.js';
 import type { AlertPayload } from '../providers/notifications/notification.interface.js';
 import type { DeliveryChannel } from '../notifications/contracts.js';
@@ -87,10 +88,9 @@ export const scrapingJobs = pgTable(
       .notNull(),
 
     lastError: text('last_error'),
-    failureCount: integer('failure_count').default(0).notNull(),
 
-    healingAttempts: integer('healing_attempts').default(0).notNull(),
-    healingWindowStartedAt: timestamp('healing_window_started_at', { withTimezone: true }),
+    recoveryAttempts: integer('recovery_attempts').default(0).notNull(),
+    recoveryWindowStartedAt: timestamp('recovery_window_started_at', { withTimezone: true }),
 
     // Visual Diff Screenshot Option (Defaults to false)
     captureScreenshotOnChange: boolean('capture_screenshot_on_change').default(false).notNull(),
@@ -127,10 +127,22 @@ export const jobRuns = pgTable(
     durationMs: integer('duration_ms'),
     screenshotUrl: text('screenshot_url'),
 
+    originQueueId: text('origin_queue_id'),
+    phase: text('phase').$type<RunPhase>(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    monitorUpdatedAt: timestamp('monitor_updated_at', { withTimezone: true }),
+    recoveredAutomatically: boolean('recovered_automatically').notNull().default(false),
+    metadata: jsonb('metadata').$type<RunMetadata>(),
     executedAt: timestamp('executed_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_job_runs_job_id_executed_at').on(table.jobId, table.executedAt),
+    uniqueIndex('uq_job_runs_origin').on(table.originQueueId),
+    uniqueIndex('uq_job_runs_running')
+      .on(table.jobId)
+      .where(sql`${table.status} = 'RUNNING'`),
     index('idx_job_runs_retention').on(table.hasChanges, table.executedAt),
   ]
 );

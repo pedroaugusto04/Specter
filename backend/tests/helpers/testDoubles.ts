@@ -48,10 +48,7 @@ import type {
   ISessionRepository,
   UpsertSessionInput,
 } from '../../src/repositories/sessionRepository.js';
-import type {
-  IUsageRepository,
-  MonthlyUsage,
-} from '../../src/repositories/usageRepository.js';
+import type { IUsageRepository, MonthlyUsage } from '../../src/repositories/usageRepository.js';
 import type { UserWebSessionEntity } from '../../src/types/domain.js';
 
 export const noopCompilationControl: ICompilationControl = {
@@ -112,6 +109,7 @@ export class InMemoryJobRepository implements IJobRepository {
   public jobs = new Map<string, ScrapingJobEntity>();
   public runs: JobRunEntity[] = [];
   public pendingDeliveries: AlertDelivery[] = [];
+  public usageRepository?: IUsageRepository;
   async commitRun(
     input: CreateJobRunInput,
     deliveries: AlertDelivery[],
@@ -125,10 +123,62 @@ export class InMemoryJobRepository implements IJobRepository {
       (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime())
     )
       throw new Error('Stale snapshot');
-    const run = await this.createRun(input);
+    const existing = input.id ? this.runs.find((run) => run.id === input.id) : undefined;
+    if (existing && existing.status !== 'RUNNING') return { ...existing };
+    const { chargeUsage: _charge, ...values } = input;
+    const run = existing ? Object.assign(existing, values) : await this.createRun(values);
+    if (run.status !== 'RUNNING') {
+      run.completedAt = new Date();
+      run.phase = null;
+      run.nextAttemptAt = null;
+    }
     this.pendingDeliveries.push(...deliveries);
-    if (patch) await this.updateJob(input.jobId, patch);
+    if (input.chargeUsage === 'execution')
+      await this.usageRepository?.incrementExecutions(current.userId);
+    if (input.chargeUsage === 'compilation')
+      await this.usageRepository?.incrementCompilations(current.userId);
+    if (patch) {
+      const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
+      this.jobs.set(input.jobId, { ...current, ...patch, updatedAt });
+      run.monitorUpdatedAt = updatedAt;
+    }
     return run;
+  }
+  async findRun(id: string) {
+    return this.runs.find((run) => run.id === id) ?? null;
+  }
+  async findRunningRuns() {
+    return this.runs.filter((run) => run.status === 'RUNNING');
+  }
+  async cancelRuns(jobId: string) {
+    for (const run of this.runs)
+      if (run.jobId === jobId && run.status === 'RUNNING') {
+        run.status = 'CANCELLED';
+        run.completedAt = new Date();
+        run.phase = null;
+        run.nextAttemptAt = null;
+      }
+  }
+  async beginRun(job: ScrapingJobEntity, originQueueId: string) {
+    const existing = this.runs.find((run) => run.originQueueId === originQueueId);
+    if (existing) return existing;
+    if (this.runs.some((run) => run.jobId === job.id && run.status === 'RUNNING')) return null;
+    return this.createRun({
+      jobId: job.id,
+      originQueueId,
+      status: 'RUNNING',
+      hasChanges: 'NO',
+      phase: 'CHECKING',
+      startedAt: new Date(),
+      monitorUpdatedAt: job.updatedAt,
+      metadata: {
+        accessAttempts: 0,
+        confirmations: 0,
+        recoveryAttempts: 0,
+        compilationAttempts: 0,
+        reasons: [],
+      },
+    });
   }
   async purgeEvidence(_cutoff: Date) {}
   async createJob(input: CreateJobInput): Promise<ScrapingJobEntity> {
@@ -147,7 +197,6 @@ export class InMemoryJobRepository implements IJobRepository {
       extractionPlan: null,
       status: 'PENDING_COMPILATION',
       lastError: null,
-      failureCount: 0,
       captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
       createdAt: now,
       updatedAt: now,
@@ -174,6 +223,7 @@ export class InMemoryJobRepository implements IJobRepository {
   async updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null> {
     const existing = this.jobs.get(id);
     if (!existing) return null;
+    await this.cancelRuns(id);
     const updated: ScrapingJobEntity = {
       ...existing,
       ...patch,
@@ -185,7 +235,7 @@ export class InMemoryJobRepository implements IJobRepository {
         patch.webhookSecret !== undefined
           ? (patch.webhookSecret ?? null)
           : (existing.webhookSecret ?? null),
-      updatedAt: new Date(),
+      updatedAt: new Date(Math.max(Date.now(), existing.updatedAt.getTime() + 1)),
     };
     this.jobs.set(id, updated);
     return { ...updated };
@@ -199,6 +249,7 @@ export class InMemoryJobRepository implements IJobRepository {
   }
   async createRun(input: CreateJobRunInput): Promise<JobRunEntity> {
     const entity: JobRunEntity = {
+      ...input,
       id: crypto.randomUUID(),
       jobId: input.jobId,
       extractionReport: input.extractionReport,
@@ -302,8 +353,8 @@ export class InMemoryJobRepository implements IJobRepository {
     return {
       totalJobs: allJobs.length,
       activeJobs: allJobs.filter((j) => j.status === 'ACTIVE').length,
-      healingOrCompilingJobs: allJobs.filter(
-        (j) => j.status === 'HEALING' || j.status === 'PENDING_COMPILATION'
+      recoveringOrCompilingJobs: allJobs.filter(
+        (j) => j.status === 'RECOVERING' || j.status === 'PENDING_COMPILATION'
       ).length,
       failedOrPausedJobs: allJobs.filter((j) => j.status === 'FAILED' || j.status === 'PAUSED')
         .length,
@@ -398,11 +449,19 @@ export class MockNotificationProvider implements INotificationProvider {
 export class MockJobScheduler implements IJobScheduler {
   public compilationQueue: Array<{
     jobId: string;
-    reason: 'initial' | 'healing' | 'manual';
+    reason: 'initial' | 'recovery' | 'manual';
   }> = [];
   public immediateScrapeQueue: string[] = [];
   public scheduledRepeatables = new Map<string, string>();
-  async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
+  public runAttempts: { jobId: string; runId: string; attempt: number; at: Date }[] = [];
+  async enqueueRunAttempt(jobId: string, runId: string, attempt: number, at: Date) {
+    if (!this.runAttempts.some((item) => item.runId === runId && item.attempt === attempt))
+      this.runAttempts.push({ jobId, runId, attempt, at });
+  }
+  async enqueueCompilation(
+    jobId: string,
+    reason: 'initial' | 'recovery' | 'manual'
+  ): Promise<void> {
     this.compilationQueue.push({ jobId, reason });
   }
   async removePendingCompilations(jobId: string): Promise<void> {

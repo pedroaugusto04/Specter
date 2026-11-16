@@ -38,7 +38,7 @@ export class BullMqJobScheduler implements IJobScheduler {
         attempts: env.COMPILATION_QUEUE_MAX_ATTEMPTS,
         backoff: {
           type: COMPILATION_BACKOFF_TYPE,
-          delay: 5000,
+          delay: env.SCRAPE_RETRY_DELAY_MS,
         },
         removeOnComplete: 100,
         removeOnFail: 200,
@@ -48,10 +48,10 @@ export class BullMqJobScheduler implements IJobScheduler {
     this.scrapeQueue = new Queue(SCRAPE_EXECUTION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: 3,
+        attempts: env.SCRAPE_MAX_ATTEMPTS,
         backoff: {
           type: 'exponential',
-          delay: 5000,
+          delay: env.SCRAPE_RETRY_DELAY_MS,
         },
         removeOnComplete: 200,
         removeOnFail: 500,
@@ -67,19 +67,39 @@ export class BullMqJobScheduler implements IJobScheduler {
     });
   }
 
-  async enqueueCompilation(jobId: string, reason: CompilationReason): Promise<void> {
+  async enqueueCompilation(
+    jobId: string,
+    reason: CompilationReason,
+    runId?: string
+  ): Promise<void> {
     await this.compilationQueue.add(
       'compile-job',
-      { jobId, reason },
+      { jobId, reason, runId },
       {
-        jobId: `compile-${jobId}-${Date.now()}`,
+        jobId: runId ? `recover-${runId}` : `compile-${jobId}-${Date.now()}`,
       }
     );
     logger.info('Enqueued job compilation task', { jobId, reason });
   }
 
+  async enqueueRunAttempt(jobId: string, runId: string, attempt: number, at: Date): Promise<void> {
+    await this.scrapeQueue.add(
+      'scrape-job',
+      { jobId, runId },
+      {
+        jobId: `run-${runId}-${attempt}`,
+        delay: Math.max(0, at.getTime() - Date.now()),
+      }
+    );
+  }
+
   async removePendingCompilations(jobId: string): Promise<void> {
-    const jobs = await this.compilationQueue.getJobs(['waiting', 'delayed', 'prioritized', 'active']);
+    const jobs = await this.compilationQueue.getJobs([
+      'waiting',
+      'delayed',
+      'prioritized',
+      'active',
+    ]);
     for (const job of jobs) {
       if (job.data?.jobId === jobId) {
         try {
@@ -158,7 +178,7 @@ export class BullMqJobScheduler implements IJobScheduler {
       {
         jobId: 'daily-retention-pruning',
         repeat: {
-          pattern: '0 3 * * *', // Daily at 03:00 AM
+          every: env.RUN_RECONCILE_INTERVAL_MS,
         },
       }
     );

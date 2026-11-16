@@ -19,8 +19,8 @@ export function StatsCards({ stats }: { stats: DashboardStats | null }) {
     },
     {
       label: 'Schema Sync',
-      value: stats?.healingOrCompilingJobs ?? 0,
-      sub: 'Compiling or adapting selectors',
+      value: stats?.recoveringOrCompilingJobs ?? 0,
+      sub: 'Compiling or recovering selectors',
       icon: Terminal,
     },
     {

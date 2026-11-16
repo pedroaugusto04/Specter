@@ -1,4 +1,5 @@
 'use client';
+import { runProgressLabel } from '@/lib/runProgress';
 
 import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
@@ -60,11 +61,11 @@ function renderStatusPill(status: JobStatus) {
           COMPILING
         </span>
       );
-    case JOB_STATUS.Healing:
+    case JOB_STATUS.Recovering:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-          ADAPTING
+          RECOVERING
         </span>
       );
     case JOB_STATUS.Failed:
@@ -142,10 +143,10 @@ export function JobsTable({
     () => jobs.filter((j) => j.status === JOB_STATUS.Active).length,
     [jobs]
   );
-  const healingCount = React.useMemo(
+  const recoveringCount = React.useMemo(
     () =>
       jobs.filter(
-        (j) => j.status === JOB_STATUS.Healing || j.status === JOB_STATUS.PendingCompilation
+        (j) => j.status === JOB_STATUS.Recovering || j.status === JOB_STATUS.PendingCompilation
       ).length,
     [jobs]
   );
@@ -160,8 +161,8 @@ export function JobsTable({
     return jobs.filter((job) => {
       if (filter === JOB_STATUS_FILTER.Active && job.status !== JOB_STATUS.Active) return false;
       if (
-        filter === JOB_STATUS_FILTER.Healing &&
-        job.status !== JOB_STATUS.Healing &&
+        filter === JOB_STATUS_FILTER.Recovering &&
+        job.status !== JOB_STATUS.Recovering &&
         job.status !== JOB_STATUS.PendingCompilation
       ) {
         return false;
@@ -227,14 +228,15 @@ export function JobsTable({
           </button>
           <button
             type="button"
-            onClick={() => setFilter(JOB_STATUS_FILTER.Healing)}
+            onClick={() => setFilter(JOB_STATUS_FILTER.Recovering)}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-              filter === JOB_STATUS_FILTER.Healing
+              filter === JOB_STATUS_FILTER.Recovering
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Syncing <span className="ml-1.5 font-mono text-xs opacity-60">{healingCount}</span>
+            Recovering / Compiling{' '}
+            <span className="ml-1.5 font-mono text-xs opacity-60">{recoveringCount}</span>
           </button>
           <button
             type="button"
@@ -308,12 +310,6 @@ export function JobsTable({
                 <th className="py-3 px-3 sm:px-4">Target</th>
                 <th className="w-[125px] px-2.5 py-3">Status</th>
                 <th className="w-[110px] px-2.5 py-3">Schedule</th>
-                <th
-                  className="w-[80px] px-2.5 py-3"
-                  title="Consecutive extraction failures used for automatic recovery; compilation failures are recorded in run history."
-                >
-                  Extraction failures
-                </th>
                 <th className="w-[130px] px-2.5 py-3">Last Checked</th>
                 <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
@@ -324,7 +320,8 @@ export function JobsTable({
                 const isRunningExtraction = runningJobIds.has(job.id);
                 const isRunning = currentAction === 'run';
                 const isCompilingState =
-                  job.status === JOB_STATUS.PendingCompilation || job.status === JOB_STATUS.Healing;
+                  job.status === JOB_STATUS.PendingCompilation ||
+                  job.status === JOB_STATUS.Recovering;
                 const isCompiling = isCompilingState || currentAction === 'recompile';
                 const isCancelling = currentAction === 'cancel-compilation';
                 const isPausing = currentAction === 'pause';
@@ -364,10 +361,10 @@ export function JobsTable({
 
                     {/* Status Pill */}
                     <td className="whitespace-nowrap px-2.5 py-3">
-                      {isRunningExtraction && job.status === JOB_STATUS.Active ? (
+                      {job.currentRun ? (
                         <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-primary">
                           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />{' '}
-                          RUNNING
+                          {runProgressLabel(job.currentRun!)}
                         </span>
                       ) : (
                         renderStatusPill(job.status)
@@ -385,19 +382,6 @@ export function JobsTable({
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3 text-muted-foreground/70" />
                         <span className="truncate">{job.cronExpression}</span>
-                      </span>
-                    </td>
-
-                    {/* Failures */}
-                    <td className="whitespace-nowrap px-2.5 py-3 text-xs">
-                      <span
-                        className={
-                          job.failureCount > 0
-                            ? 'font-mono font-semibold text-foreground underline decoration-red-500/60 underline-offset-4'
-                            : 'font-mono text-muted-foreground'
-                        }
-                      >
-                        {job.failureCount}
                       </span>
                     </td>
 

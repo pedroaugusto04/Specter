@@ -1,3 +1,4 @@
+import type { RunProgress } from './run.js';
 import type { ExtractionPlan, ExtractionReport } from './extractionPlan.js';
 import type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 import type { ExtractedPayload } from './extractor.js';
@@ -56,15 +57,14 @@ export interface ScrapingJobEntity {
   extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;
-  healingAttempts?: number;
-  healingWindowStartedAt?: Date | null;
-  failureCount: number;
+  recoveryAttempts?: number;
+  recoveryWindowStartedAt?: Date | null;
   captureScreenshotOnChange: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface JobRunEntity {
+export interface JobRunEntity extends RunProgress {
   id: string;
   jobId: string;
   contractRevision?: string | null;

@@ -66,6 +66,14 @@ export const FailureCode: Readonly<{
   readonly Navigation: 'NAVIGATION';
   readonly Timeout: 'TIMEOUT';
 }>;
+export const ExtractionFailureReason: Readonly<{
+  readonly RequiredField: 'REQUIRED_FIELD';
+  readonly AmbiguousSelection: 'AMBIGUOUS_SELECTION';
+  readonly Identity: 'IDENTITY';
+  readonly MissingRecords: 'MISSING_RECORDS';
+  readonly Readiness: 'READINESS';
+  readonly Internal: 'INTERNAL';
+}>;
 export const TraceStatus: Readonly<{
   readonly Success: 'SUCCESS';
   readonly Failed: 'FAILED';
@@ -80,12 +88,20 @@ export const JobStatus: Readonly<{
   readonly PendingCompilation: 'PENDING_COMPILATION';
   readonly Active: 'ACTIVE';
   readonly Failed: 'FAILED';
-  readonly Healing: 'HEALING';
+  readonly Recovering: 'RECOVERING';
   readonly Paused: 'PAUSED';
 }>;
 export const RunStatus: Readonly<{
-  readonly Success: 'SUCCESS';
+  readonly Running: 'RUNNING';
+  Cancelled: 'CANCELLED';
+  Success: 'SUCCESS';
   readonly Failed: 'FAILED';
+}>;
+export const RunPhase: Readonly<{
+  readonly Checking: 'CHECKING';
+  readonly Retrying: 'RETRYING';
+  readonly Confirming: 'CONFIRMING';
+  readonly Recovering: 'RECOVERING';
 }>;
 export const ChangeStatus: Readonly<{
   readonly Changed: 'YES';
@@ -113,10 +129,13 @@ export type Transport = (typeof Transport)[keyof typeof Transport];
 export type FieldType = (typeof FieldType)[keyof typeof FieldType];
 export type SemanticReviewStatus = (typeof SemanticReviewStatus)[keyof typeof SemanticReviewStatus];
 export type FailureCode = (typeof FailureCode)[keyof typeof FailureCode];
+export type ExtractionFailureReason =
+  (typeof ExtractionFailureReason)[keyof typeof ExtractionFailureReason];
 export type TraceStatus = (typeof TraceStatus)[keyof typeof TraceStatus];
 export type EntityChangeKind = (typeof EntityChangeKind)[keyof typeof EntityChangeKind];
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
+export type RunPhase = (typeof RunPhase)[keyof typeof RunPhase];
 export type ChangeStatus = (typeof ChangeStatus)[keyof typeof ChangeStatus];
 export type AccessFailure = (typeof AccessFailure)[keyof typeof AccessFailure];
 export type AcquisitionOutcome = (typeof AcquisitionOutcome)[keyof typeof AcquisitionOutcome];

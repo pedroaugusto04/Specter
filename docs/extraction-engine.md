@@ -97,8 +97,9 @@ records; live browser checks precede snapshot capture.
 Only COMPLETE and EMPTY results can become baselines. PARTIAL, INVALID, BLOCKED
 and INCONCLUSIVE results preserve the previous accepted baseline. Access blocks
 and transient navigation failures are distinct from selector/readiness failures;
-only applicable consecutive extraction failures enter bounded self-healing.
-Recovery failure does not replace the approved plan or baseline.
+transient failures stay inside one bounded run, and only ready pages with
+structural extraction evidence can start automatic recovery. Recovery failure
+does not replace the approved plan or baseline.
 
 ## Semantic acceptance and delivery
 
@@ -148,7 +149,7 @@ protection must separately require the PR check if merges should be blocked.
 The snapshot adapter changes state only on matching recorded actions, and every
 execution starts from the initial document. Chromium tests cover rendering,
 pagination, frames, Shadow DOM and virtualized scrolling. Service/transaction
-tests cover actual baseline persistence, healing, queues, acquisition and delivery.
+tests cover actual baseline persistence, recovery, queues, acquisition and delivery.
 
 `evaluate:configuration` may explicitly use real models when
 `EVALS_LIVE_MODELS_ENABLED=true`; `evaluate:regression` is always offline. Automated

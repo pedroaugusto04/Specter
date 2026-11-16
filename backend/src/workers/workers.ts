@@ -16,6 +16,7 @@ import { logger } from '../utils/logger.js';
 import type { CompilationReason } from '../queues/scheduler.interface.js';
 
 export interface WorkerManagerDeps {
+  reconcileRuns?: () => Promise<void>;
   compilationService: CompilationService;
   scrapeExecutionService: ScrapeExecutionService;
   retentionService: RetentionService;
@@ -37,13 +38,14 @@ export class WorkerManager {
 
     this.compilationWorker = new Worker(
       COMPILATION_QUEUE_NAME,
-      async (job: Job<{ jobId: string; reason?: CompilationReason }>) => {
+      async (job: Job<{ jobId: string; reason?: CompilationReason; runId?: string }>) => {
         const { jobId, reason } = job.data;
         await this.runMonitor(jobId, () =>
           this.deps.compilationService.compileJob(
             jobId,
             reason,
-            job.attemptsMade + 1 < (job.opts.attempts ?? 1)
+            job.attemptsMade + 1 < (job.opts.attempts ?? 1),
+            job.data.runId
           )
         );
       },
@@ -60,11 +62,10 @@ export class WorkerManager {
 
     this.scrapeWorker = new Worker(
       SCRAPE_EXECUTION_QUEUE_NAME,
-      async (job: Job<{ jobId: string }>) => {
+      async (job: Job<{ jobId: string; runId?: string }>) => {
         const { jobId } = job.data;
-        if (await this.deps.scrapeExecutionService.isAccessSuspended(jobId)) return;
         await this.runMonitor(jobId, () =>
-          this.deps.scrapeExecutionService.executeScrape(jobId)
+          this.deps.scrapeExecutionService.executeScrape(jobId, job.id, job.data.runId)
         );
       },
       {
@@ -77,6 +78,7 @@ export class WorkerManager {
     this.maintenanceWorker = new Worker(
       MAINTENANCE_QUEUE_NAME,
       async () => {
+        await this.deps.reconcileRuns?.();
         await this.deps.retentionService.pruneUnchangedSnapshots();
       },
       {

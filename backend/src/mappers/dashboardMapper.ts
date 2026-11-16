@@ -4,7 +4,7 @@ export const DashboardMapper = {
     return {
       totalJobs: stats.totalJobs,
       activeJobs: stats.activeJobs,
-      healingOrCompilingJobs: stats.healingOrCompilingJobs,
+      recoveringOrCompilingJobs: stats.recoveringOrCompilingJobs,
       failedOrPausedJobs: stats.failedOrPausedJobs,
       totalRuns: stats.totalRuns,
       DetectedChangesCount: stats.DetectedChangesCount,

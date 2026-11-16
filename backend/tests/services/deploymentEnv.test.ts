@@ -15,6 +15,8 @@ const tuning = {
   COMPILER_MAX_OUTPUT_TOKENS: '6000',
   ACCESS_BLOCK_THRESHOLD: '3',
   ACCESS_BLOCK_COOLDOWN_MINUTES: '30',
+  RECOVERY_WINDOW_MS: '172800000',
+  MAX_RECOVERY_ATTEMPTS: '4',
   EVALS_LIVE_MODELS_ENABLED: 'true',
 };
 describe('Environment configuration', () => {
@@ -38,6 +40,15 @@ describe('Environment configuration', () => {
           parseEnv({ ENCRYPTION_KEY: 'a'.repeat(64), NODE_ENV: 'test', [key]: invalid })
         ).toThrow(key);
     }
+  });
+  it('enforces the 15-minute cron floor in runtime configuration', () => {
+    const base = { ENCRYPTION_KEY: 'a'.repeat(64), NODE_ENV: 'test' };
+    expect(parseEnv({ ...base, MIN_CRON_INTERVAL_MINUTES: '15' }).MIN_CRON_INTERVAL_MINUTES).toBe(
+      15
+    );
+    expect(() => parseEnv({ ...base, MIN_CRON_INTERVAL_MINUTES: '14' })).toThrow(
+      'MIN_CRON_INTERVAL_MINUTES'
+    );
   });
   it('requires a valid encryption key in every environment', () => {
     expect(() =>

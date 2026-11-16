@@ -22,7 +22,6 @@ interface SuccessfulRunInput {
   contractRevision: string | null | undefined;
   startedAt: number;
   logContext: string;
-  subjectSuffix?: string;
   timezone?: string;
 }
 /** Common preparation; callers retain lifecycle decisions and the atomic commit. */
@@ -55,7 +54,6 @@ export class SuccessfulRunService {
             triggerRules: plan.intent.triggerRules,
             triggerMatchMode: plan.intent.triggerMatchMode,
             screenshotUrl,
-            subjectSuffix: input.subjectSuffix,
             timezone: input.timezone,
           })
         : null;

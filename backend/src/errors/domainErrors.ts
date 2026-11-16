@@ -18,7 +18,7 @@ export class DomainError extends Error {
 
 /**
  * Thrown when target website responds with HTTP 403/429 or WAF/CAPTCHA page.
- * System action: Record failure, DO NOT trigger self-healing recompilation.
+ * System action: Record failure without triggering automatic recovery.
  */
 export class AntiBotBlockedError extends DomainError {
   public readonly httpStatus: number;
@@ -51,7 +51,7 @@ export class NavigationTimeoutError extends DomainError {
 
 /**
  * Thrown when HTTP 200 OK is returned, but the current compiled selectors extract no valid fields.
- * System action: Increment failureCount; on 2nd consecutive failure, transition to HEALING.
+ * System action: Recovery requires structured evidence that target content is ready and sources broke.
  */
 export class SelectorMismatchError extends DomainError {
   constructor(message: string, cause?: unknown) {
@@ -172,7 +172,10 @@ export class UnauthorizedError extends DomainError {
 }
 
 export class UpstreamHttpError extends DomainError {
-  constructor(public readonly httpStatus: number) {
+  constructor(
+    public readonly httpStatus: number,
+    public readonly retryAfterMs?: number
+  ) {
     super(`Target returned HTTP ${httpStatus}; response cannot establish an extraction baseline.`, {
       code: 'UPSTREAM_HTTP_ERROR',
       statusCode: 502,

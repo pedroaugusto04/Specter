@@ -11,16 +11,16 @@ export default function NotFound() {
           <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3 text-muted-foreground">
             <FileQuestion className="w-6 h-6" />
           </div>
-          <CardTitle className="text-xl font-semibold">Página não encontrada</CardTitle>
+          <CardTitle className="text-xl font-semibold">Page Not Found</CardTitle>
         </CardHeader>
         <CardContent className="text-center text-sm text-muted-foreground pb-4">
-          <p>A página que você está procurando não existe ou foi movida.</p>
+          <p>The page you are looking for does not exist or has been moved.</p>
         </CardContent>
         <CardFooter className="flex justify-center pt-2">
           <Link href="/">
             <Button className="gap-2">
               <Home className="w-4 h-4" />
-              Voltar ao Início
+              Back to Home
             </Button>
           </Link>
         </CardFooter>

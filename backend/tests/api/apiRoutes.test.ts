@@ -88,7 +88,6 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       notificationEmail: 'editor@example.com',
       cronExpression: '*/30 * * * *',
       status: 'PENDING_COMPILATION',
-      failureCount: 0,
     });
     expect(scheduler.compilationQueue).toHaveLength(1);
     expect(scheduler.compilationQueue[0]?.reason).toBe('initial');

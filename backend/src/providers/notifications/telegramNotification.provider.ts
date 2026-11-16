@@ -154,7 +154,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
         '✅ <b>Specter Telegram Integration Test</b>',
         '',
         'Your Telegram notification channel is successfully connected to <b>Specter</b>!',
-        'Future monitor alerts and self-healing updates will be delivered here in real time.',
+        'Future monitor alerts and automatic recovery updates will be delivered here in real time.',
         '',
         `<i>Sent at: ${sentAt}</i>`,
       ].join('\n');

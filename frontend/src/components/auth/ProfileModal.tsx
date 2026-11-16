@@ -210,7 +210,7 @@ export function ProfileModal({
                 label="Active Monitors"
                 used={quotas.activeMonitors.used}
                 limit={quotas.activeMonitors.limit}
-                helper="Running, healing, or pending monitors"
+                helper="Running, recovering, or pending monitors"
               />
 
               {/* Compilations */}
@@ -220,7 +220,7 @@ export function ProfileModal({
                 subLabel="(This Month)"
                 used={quotas.monthlyCompilations.used}
                 limit={quotas.monthlyCompilations.limit}
-                helper="Initial monitor configurations & self-healing runs"
+                helper="Initial monitor configurations and automatic recovery runs"
               />
 
               {/* Scrape Executions */}
@@ -267,7 +267,9 @@ export function ProfileModal({
                 <Globe className="h-3.5 w-3.5" />
                 <span>Active Timezone</span>
               </div>
-              <span className="font-mono text-foreground">{user.timezone || getBrowserTimezone()}</span>
+              <span className="font-mono text-foreground">
+                {user.timezone || getBrowserTimezone()}
+              </span>
             </div>
 
             {/* Monitors count */}

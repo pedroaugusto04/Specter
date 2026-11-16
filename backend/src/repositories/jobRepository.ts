@@ -1,8 +1,10 @@
+import type { RunProgress } from '../types/run.js';
+import { RunPhase } from '@specter/contracts';
 import type { AlertDelivery } from '../notifications/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import { and, asc, desc, eq, gte, lt, sql, ne } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
-import { jobRuns, scrapingJobs, alertDeliveries } from '../db/schema.js';
+import { jobRuns, scrapingJobs, alertDeliveries, userMonthlyUsage } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
@@ -37,13 +39,14 @@ export interface UpdateJobPatch {
   extractionPlan?: ExtractionPlan | null;
   status?: JobStatus;
   lastError?: string | null;
-  healingAttempts?: number;
-  healingWindowStartedAt?: Date | null;
-  failureCount?: number;
+  recoveryAttempts?: number;
+  recoveryWindowStartedAt?: Date | null;
   captureScreenshotOnChange?: boolean;
 }
 
-export interface CreateJobRunInput {
+export interface CreateJobRunInput extends RunProgress {
+  id?: string;
+  chargeUsage?: 'execution' | 'compilation';
   jobId: string;
   contractRevision?: string | null;
   extractionReport?: ExtractionReport | null;
@@ -61,7 +64,7 @@ export interface CreateJobRunInput {
 export interface DashboardStats {
   totalJobs: number;
   activeJobs: number;
-  healingOrCompilingJobs: number;
+  recoveringOrCompilingJobs: number;
   failedOrPausedJobs: number;
   totalRuns: number;
   DetectedChangesCount: number;
@@ -80,6 +83,10 @@ export interface PaginatedRunsResult {
 }
 
 export interface IJobRepository {
+  beginRun(job: ScrapingJobEntity, originQueueId: string): Promise<JobRunEntity | null>;
+  findRun(id: string): Promise<JobRunEntity | null>;
+  findRunningRuns(): Promise<JobRunEntity[]>;
+  cancelRuns(jobId: string): Promise<void>;
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
   findById(id: string): Promise<ScrapingJobEntity | null>;
   findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]>;
@@ -115,6 +122,67 @@ export class DrizzleJobRepository implements IJobRepository {
     this.db = db ?? getDb();
   }
 
+  async findRun(id: string): Promise<JobRunEntity | null> {
+    const [row] = await this.db.select().from(jobRuns).where(eq(jobRuns.id, id));
+    return row ? JobMapper.runRowToEntity(row) : null;
+  }
+  async findRunningRuns(): Promise<JobRunEntity[]> {
+    return (await this.db.select().from(jobRuns).where(eq(jobRuns.status, RunStatus.Running))).map(
+      JobMapper.runRowToEntity
+    );
+  }
+  async cancelRuns(jobId: string): Promise<void> {
+    await this.db
+      .update(jobRuns)
+      .set({
+        status: RunStatus.Cancelled,
+        completedAt: new Date(),
+        nextAttemptAt: null,
+        phase: null,
+      })
+      .where(and(eq(jobRuns.jobId, jobId), eq(jobRuns.status, RunStatus.Running)));
+  }
+  async beginRun(job: ScrapingJobEntity, originQueueId: string): Promise<JobRunEntity | null> {
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(scrapingJobs)
+        .where(eq(scrapingJobs.id, job.id))
+        .for('update');
+      if (
+        !current ||
+        current.status !== JobStatus.Active ||
+        current.updatedAt.getTime() !== job.updatedAt.getTime()
+      )
+        return null;
+      const [existing] = await tx
+        .select()
+        .from(jobRuns)
+        .where(eq(jobRuns.originQueueId, originQueueId));
+      if (existing) return JobMapper.runRowToEntity(existing);
+      const [row] = await tx
+        .insert(jobRuns)
+        .values({
+          jobId: job.id,
+          originQueueId,
+          status: RunStatus.Running,
+          hasChanges: ChangeStatus.Unchanged,
+          phase: RunPhase.Checking,
+          startedAt: new Date(),
+          monitorUpdatedAt: job.updatedAt,
+          metadata: {
+            accessAttempts: 0,
+            confirmations: 0,
+            recoveryAttempts: 0,
+            compilationAttempts: 0,
+            reasons: [],
+          },
+        })
+        .onConflictDoNothing()
+        .returning();
+      return row ? JobMapper.runRowToEntity(row) : null;
+    });
+  }
   async createJob(input: CreateJobInput): Promise<ScrapingJobEntity> {
     const [row] = await this.db
       .insert(scrapingJobs)
@@ -129,7 +197,6 @@ export class DrizzleJobRepository implements IJobRepository {
         cronExpression: input.cronExpression,
         captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
         status: JobStatus.PendingCompilation,
-        failureCount: 0,
       })
       .returning();
 
@@ -186,16 +253,32 @@ export class DrizzleJobRepository implements IJobRepository {
         : {}),
     };
 
-    const [row] = await this.db
-      .update(scrapingJobs)
-      .set({
-        ...encryptedPatch,
-        updatedAt: new Date(),
-      })
-      .where(eq(scrapingJobs.id, id))
-      .returning();
-
-    return row ? JobMapper.rowToEntity(row) : null;
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ updatedAt: scrapingJobs.updatedAt })
+        .from(scrapingJobs)
+        .where(eq(scrapingJobs.id, id))
+        .for('update');
+      if (!current) return null;
+      await tx
+        .update(jobRuns)
+        .set({
+          status: RunStatus.Cancelled,
+          completedAt: new Date(),
+          nextAttemptAt: null,
+          phase: null,
+        })
+        .where(and(eq(jobRuns.jobId, id), eq(jobRuns.status, RunStatus.Running)));
+      const [row] = await tx
+        .update(scrapingJobs)
+        .set({
+          ...encryptedPatch,
+          updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)),
+        })
+        .where(eq(scrapingJobs.id, id))
+        .returning();
+      return row ? JobMapper.rowToEntity(row) : null;
+    });
   }
 
   async deleteJob(id: string): Promise<boolean> {
@@ -241,7 +324,11 @@ export class DrizzleJobRepository implements IJobRepository {
   ): Promise<JobRunEntity> {
     return this.db.transaction(async (tx) => {
       const [current] = await tx
-        .select({ updatedAt: scrapingJobs.updatedAt, status: scrapingJobs.status })
+        .select({
+          updatedAt: scrapingJobs.updatedAt,
+          status: scrapingJobs.status,
+          userId: scrapingJobs.userId,
+        })
         .from(scrapingJobs)
         .where(eq(scrapingJobs.id, input.jobId))
         .for('update');
@@ -251,16 +338,48 @@ export class DrizzleJobRepository implements IJobRepository {
         (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime())
       )
         throw new Error('Monitor changed during execution; stale snapshot discarded.');
-      const [row] = await tx
-        .insert(jobRuns)
-        .values({ ...input, extractionReport: input.extractionReport ?? null })
-        .returning();
+      const { chargeUsage, ...values } = input;
+      if (input.id) {
+        const [existing] = await tx
+          .select()
+          .from(jobRuns)
+          .where(eq(jobRuns.id, input.id))
+          .for('update');
+        if (!existing || existing.jobId !== input.jobId) throw new Error('Run not found.');
+        if (existing.status !== RunStatus.Running) return JobMapper.runRowToEntity(existing);
+      }
+      const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
+      const persisted = {
+        ...values,
+        ...(patch ? { monitorUpdatedAt: updatedAt } : {}),
+        ...(input.status !== RunStatus.Running
+          ? { completedAt: updatedAt, nextAttemptAt: null, phase: null }
+          : {}),
+      };
+      const [row] = input.id
+        ? await tx.update(jobRuns).set(persisted).where(eq(jobRuns.id, input.id)).returning()
+        : await tx.insert(jobRuns).values(persisted).returning();
       if (!row) throw new Error('Failed to persist snapshot.');
       if (patch)
         await tx
           .update(scrapingJobs)
-          .set({ ...patch, updatedAt: new Date() })
+          .set({ ...patch, updatedAt })
           .where(eq(scrapingJobs.id, input.jobId));
+      if (chargeUsage) {
+        const period = updatedAt.toISOString().slice(0, 7);
+        const column =
+          chargeUsage === 'compilation'
+            ? userMonthlyUsage.compilationsCount
+            : userMonthlyUsage.executionsCount;
+        const key = chargeUsage === 'compilation' ? 'compilationsCount' : 'executionsCount';
+        await tx
+          .insert(userMonthlyUsage)
+          .values({ userId: current.userId, period, [key]: 1 })
+          .onConflictDoUpdate({
+            target: [userMonthlyUsage.userId, userMonthlyUsage.period],
+            set: { [key]: sql`${column} + 1`, updatedAt },
+          });
+      }
       if (deliveries.length)
         await tx
           .insert(alertDeliveries)
@@ -324,7 +443,7 @@ export class DrizzleJobRepository implements IJobRepository {
     const hours = range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
     const cutoffDate = hours ? new Date(Date.now() - hours * 3600 * 1000) : null;
 
-    const conditions = [eq(jobRuns.jobId, jobId)];
+    const conditions = [eq(jobRuns.jobId, jobId), eq(jobRuns.status, RunStatus.Success)];
     if (cutoffDate) {
       conditions.push(gte(jobRuns.executedAt, cutoffDate));
     }
@@ -360,7 +479,7 @@ export class DrizzleJobRepository implements IJobRepository {
   async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {
     const [stats] = await this.db
       .select({
-        totalRuns: sql<number>`count(*)::int`,
+        totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
         changedRuns: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
         lastChange: sql<Date | null>`max(case when ${jobRuns.hasChanges} = ${ChangeStatus.Changed} then ${jobRuns.executedAt} else null end)`,
         averageDurationMs: sql<
@@ -393,7 +512,11 @@ export class DrizzleJobRepository implements IJobRepository {
     const deleted = await this.db
       .delete(jobRuns)
       .where(
-        and(eq(jobRuns.hasChanges, ChangeStatus.Unchanged), lt(jobRuns.executedAt, cutoffDate))
+        and(
+          ne(jobRuns.status, RunStatus.Running),
+          eq(jobRuns.hasChanges, ChangeStatus.Unchanged),
+          lt(jobRuns.executedAt, cutoffDate)
+        )
       )
       .returning({ id: jobRuns.id });
 
@@ -411,7 +534,7 @@ export class DrizzleJobRepository implements IJobRepository {
     const [runCounts] = userId
       ? await this.db
           .select({
-            totalRuns: sql<number>`count(*)::int`,
+            totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
             changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
           })
           .from(jobRuns)
@@ -419,26 +542,26 @@ export class DrizzleJobRepository implements IJobRepository {
           .where(eq(scrapingJobs.userId, userId))
       : await this.db
           .select({
-            totalRuns: sql<number>`count(*)::int`,
+            totalRuns: sql<number>`count(*) filter (where ${jobRuns.status} not in ('RUNNING', 'CANCELLED'))::int`,
             changesCount: sql<number>`count(*) filter (where ${jobRuns.hasChanges} = ${ChangeStatus.Changed})::int`,
           })
           .from(jobRuns);
 
     let activeJobs = 0;
-    let healingOrCompilingJobs = 0;
+    let recoveringOrCompilingJobs = 0;
     let failedOrPausedJobs = 0;
 
     for (const j of allJobs) {
       if (j.status === JobStatus.Active) activeJobs++;
-      else if (j.status === JobStatus.Healing || j.status === JobStatus.PendingCompilation)
-        healingOrCompilingJobs++;
+      else if (j.status === JobStatus.Recovering || j.status === JobStatus.PendingCompilation)
+        recoveringOrCompilingJobs++;
       else failedOrPausedJobs++;
     }
 
     return {
       totalJobs: allJobs.length,
       activeJobs,
-      healingOrCompilingJobs,
+      recoveringOrCompilingJobs,
       failedOrPausedJobs,
       totalRuns: runCounts?.totalRuns ?? 0,
       DetectedChangesCount: runCounts?.changesCount ?? 0,
@@ -451,12 +574,7 @@ export class DrizzleJobRepository implements IJobRepository {
         count: sql<number>`count(*)::int`,
       })
       .from(scrapingJobs)
-      .where(
-        and(
-          eq(scrapingJobs.userId, userId),
-          ne(scrapingJobs.status, JobStatus.Paused)
-        )
-      );
+      .where(and(eq(scrapingJobs.userId, userId), ne(scrapingJobs.status, JobStatus.Paused)));
 
     return row?.count ?? 0;
   }

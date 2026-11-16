@@ -1,4 +1,5 @@
 'use client';
+import { runProgressLabel } from '@/lib/runProgress';
 
 import { ExecutionTimelineChart } from '@/components/dashboard/ExecutionTimelineChart';
 import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimelineStrip';
@@ -36,7 +37,7 @@ const MONITOR_STATUS = {
     variant: 'secondary',
   },
   [JOB_STATUS.Active]: { label: 'Ready to monitor', variant: 'success' },
-  [JOB_STATUS.Healing]: { label: 'Checking monitor', variant: 'warning' },
+  [JOB_STATUS.Recovering]: { label: 'Recovering monitor', variant: 'warning' },
   [JOB_STATUS.Paused]: { label: 'Paused', variant: 'secondary' },
   [JOB_STATUS.Failed]: { label: 'Needs attention', variant: 'destructive' },
 } as const;
@@ -88,9 +89,7 @@ export function JobRunsDrawer({
   };
   const extractionFields = job?.extractionPlan?.intent.fields ?? {};
   const fieldLabels = getExtractionFieldLabels(extractionFields);
-  const latestReading = runs.find(
-    (run) => run.status === RUN_STATUS.Success && run.extractedData !== null
-  );
+  const latestReading = data?.latestSuccessfulRun;
   const latestData = latestReading?.extractedData;
   const latestRecord = latestData && !('items' in latestData) ? latestData : null;
   const monitorStatus = MONITOR_STATUS[job?.status ?? JOB_STATUS.PendingCompilation];
@@ -124,6 +123,7 @@ export function JobRunsDrawer({
   return (
     <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
       <div className="space-y-6">
+        {job.currentRun && <p role="status">{runProgressLabel(job.currentRun)}</p>}
         {job.status === JOB_STATUS.Failed && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
             <FailureDetails failure={jobFailure ?? USER_FAILURES.requestFailed} />
@@ -172,6 +172,7 @@ export function JobRunsDrawer({
         {/* TAB 1: RUNS LIST */}
         {activeTab === 'runs' && (
           <div className="space-y-6">
+            {job.currentRun && <p role="status">{runProgressLabel(job.currentRun)}</p>}
             {/* Timeline Strip (Status bar over time) */}
             {(timeseriesPoints.length > 0 || runs.length > 0) && (
               <ExecutionTimelineStrip
@@ -455,7 +456,7 @@ export function JobRunsDrawer({
                 setup is complete.
               </p>
             )}
-            {(job.status === JOB_STATUS.Failed || job.status === JOB_STATUS.Healing) &&
+            {(job.status === JOB_STATUS.Failed || job.status === JOB_STATUS.Recovering) &&
               jobFailure && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                   <FailureDetails failure={jobFailure} />

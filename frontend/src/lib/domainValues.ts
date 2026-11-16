@@ -9,6 +9,6 @@ export type { ChangeStatus, ExtractionQuality, JobStatus, RunStatus } from '@spe
 export const JOB_STATUS_FILTER = {
   All: 'ALL',
   Active: JOB_STATUS.Active,
-  Healing: JOB_STATUS.Healing,
+  Recovering: JOB_STATUS.Recovering,
   Paused: JOB_STATUS.Paused,
 } as const;

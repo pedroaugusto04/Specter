@@ -114,7 +114,8 @@ export class ExtractionExecutor implements IExtractionExecutor {
       }
       // Capture after live checks so terminal evidence cannot precede the final records.
       snapshot = await session!.snapshot();
-      if (snapshot.httpStatus >= 400) throw new UpstreamHttpError(snapshot.httpStatus);
+      if (snapshot.httpStatus >= 400)
+        throw new UpstreamHttpError(snapshot.httpStatus, snapshot.retryAfterMs);
       if (new URL(snapshot.url).origin !== origin)
         throw new Error('Navigation escaped the original origin.');
       return this.extractor.extract(snapshot, plan, observed);
@@ -168,6 +169,12 @@ export class ExtractionExecutor implements IExtractionExecutor {
         report.evidence!.push(
           ...page.evidence.slice(0, Math.max(0, this.policy.maxEvidence - report.evidence!.length))
         );
+        report.targetReady = page.ready;
+        report.failureReason = page.failureReason;
+        report.structuralFailure =
+          page.ready &&
+          page.quality === ExtractionQuality.Invalid &&
+          ['REQUIRED_FIELD', 'AMBIGUOUS_SELECTION', 'IDENTITY'].includes(page.failureReason ?? '');
         report.quality = page.quality;
         report.issues.push(...page.issues);
         if (!isAcceptedExtractionQuality(page.quality)) {
@@ -181,6 +188,8 @@ export class ExtractionExecutor implements IExtractionExecutor {
           if (records.has(key) && JSON.stringify(records.get(key)) !== JSON.stringify(record)) {
             report.quality = ExtractionQuality.Invalid;
             report.integrity = ExtractionQuality.Invalid;
+            report.structuralFailure = true;
+            report.failureReason = 'IDENTITY';
             report.issues.push('Conflicting values for the same collection identity.');
             return output();
           }

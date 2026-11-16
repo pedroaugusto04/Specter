@@ -17,6 +17,7 @@ let repository: DrizzleJobRepository;
 let outbox: DrizzleOutboxRepository;
 let owner: string;
 const migratedJobs: string[] = [];
+let legacyHealingJob: string;
 let historicalRun: string;
 beforeAll(async () => {
   pg = new PGlite();
@@ -38,6 +39,14 @@ beforeAll(async () => {
       historicalRun = randomUUID();
       await pg.exec(
         `INSERT INTO job_runs (id,job_id,has_changes,status,extracted_data) VALUES ('${historicalRun}','${migratedJobs[0]}','INITIAL','SUCCESS','{"title":"Historical"}'::jsonb)`
+      );
+    }
+    if (file.startsWith('0016')) {
+      const legacyOwner = randomUUID();
+      legacyHealingJob = randomUUID();
+      await pg.exec(`INSERT INTO users (id,email) VALUES ('${legacyOwner}','healing@example.com')`);
+      await pg.exec(
+        `INSERT INTO scraping_jobs (id,user_id,url,name,user_prompt,notification_email,status) VALUES ('${legacyHealingJob}','${legacyOwner}','https://example.com','Old monitor','Old recovery','','HEALING')`
       );
     }
     await pg.exec(await readFile('drizzle/migrations/' + file, 'utf8'));
@@ -100,6 +109,9 @@ describe('PostgreSQL migrations and transactional outbox', () => {
     const history = await repository.findRunsByJobId(migratedJobs[0]!);
     expect(history[0]?.id).toBe(historicalRun);
     expect(history[0]?.extractedData).toEqual({ title: 'Historical' });
+  });
+  it('renames the persisted healing state to recovering', async () => {
+    expect((await repository.findById(legacyHealingJob))?.status).toBe('RECOVERING');
   });
   it('rolls back snapshot and job update if an outbox insert fails', async () => {
     const job = await monitor();
@@ -219,5 +231,54 @@ describe('PostgreSQL migrations and transactional outbox', () => {
     const rows = await repository.findRunsByJobId(job.id);
     expect(rows[0]?.extractionReport?.evidence).toBeUndefined();
     expect(rows[0]?.extractionReport?.semanticReview?.status).toBe('SKIPPED');
+  });
+});
+
+describe('Persisted execution cycles', () => {
+  it('deduplicates delivery, prevents overlap, and atomically finalizes usage and alerts', async () => {
+    const job = await monitor();
+    const origin = randomUUID();
+    const run = (await repository.beginRun(job, origin))!;
+    expect((await repository.beginRun(job, origin))!.id).toBe(run.id);
+    expect(await repository.beginRun(job, randomUUID())).toBeNull();
+    const result = {
+      jobId: job.id,
+      id: run.id,
+      status: 'SUCCESS' as const,
+      hasChanges: 'YES' as const,
+      chargeUsage: 'compilation' as const,
+      recoveredAutomatically: true,
+    };
+    await repository.commitRun(result, [delivery(job.id)], undefined, job.updatedAt);
+    await repository.commitRun(result, [delivery(job.id)], undefined, job.updatedAt);
+    expect(await repository.findRunsByJobId(job.id)).toHaveLength(1);
+    const rows = await db.select().from(alertDeliveries).where(eq(alertDeliveries.runId, run.id));
+    expect(rows).toHaveLength(1);
+    const { DrizzleUsageRepository } = await import('../../src/repositories/usageRepository.js');
+    const usage = await new DrizzleUsageRepository(db as unknown as Database).getUsage(job.userId);
+    expect(usage.compilationsCount).toBe(1);
+    expect((await repository.findRun(run.id))?.completedAt).toBeInstanceOf(Date);
+  });
+  it('cancels a run atomically on edit and rejects a late commit', async () => {
+    const job = await monitor();
+    const run = (await repository.beginRun(job, randomUUID()))!;
+    await repository.updateJob(job.id, { userPrompt: 'Changed request' });
+    expect((await repository.findRun(run.id))?.status).toBe('CANCELLED');
+    await expect(
+      repository.commitRun(
+        { ...run, status: 'SUCCESS' },
+        [delivery(job.id)],
+        { status: 'ACTIVE' },
+        job.updatedAt
+      )
+    ).rejects.toThrow();
+    expect((await repository.findById(job.id))?.userPrompt).toBe('Changed request');
+  });
+  it('retention preserves ongoing cycles and excludes them from completed statistics', async () => {
+    const job = await monitor();
+    const run = (await repository.beginRun(job, randomUUID()))!;
+    await repository.deleteUnchangedRunsOlderThan(new Date(Date.now() + 86400000));
+    expect(await repository.findRun(run.id)).not.toBeNull();
+    expect((await repository.getJobRunsSummary(job.id)).totalRuns).toBe(0);
   });
 });

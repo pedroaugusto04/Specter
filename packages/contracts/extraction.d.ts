@@ -153,6 +153,7 @@ export interface NetworkResponse {
 }
 
 export interface DocumentSnapshot {
+  retryAfterMs?: number;
   transport?: Transport;
   html: string;
   url: string;
@@ -161,7 +162,10 @@ export interface DocumentSnapshot {
   screenshot?: Uint8Array;
 }
 
+export type { ExtractionFailureReason } from './vocabulary.js';
+
 export interface PageExtraction {
+  failureReason?: ExtractionFailureReason;
   records: Record<string, Scalar>[];
   observedIdentities: string[];
   validatedSourceRecords: number;
@@ -181,6 +185,9 @@ export type DiscoveryAction =
   | { kind: 'wait'; condition: Condition };
 
 export interface ExtractionReport {
+  failureReason?: ExtractionFailureReason;
+  targetReady?: boolean;
+  structuralFailure?: boolean;
   validatedSourceRecords?: number;
   quality: PageExtraction['quality'];
   scope: ExtractionScope;

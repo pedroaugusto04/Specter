@@ -15,7 +15,7 @@ function browserFixture() {
   const element = { first: () => element, evaluate: async () => '<html><body>Page</body></html>' };
   const page = {
     on: vi.fn(),
-    goto: async () => ({ status: () => 200 }),
+    goto: async () => ({ headers: () => ({}), status: () => 200 }),
     setDefaultTimeout: vi.fn(),
     setDefaultNavigationTimeout: vi.fn(),
     locator: () => element,

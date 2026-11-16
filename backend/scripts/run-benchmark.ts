@@ -22,7 +22,7 @@ interface SyntheticCase {
   description: string;
   url: string;
   prompt: string;
-  /** Page versions; more than one exercises self-healing (compile on v1, heal on the last). */
+  /** Page versions; more than one exercises automatic recovery with the original intent. */
   versions: string[];
   responses?: DocumentSnapshot['responses'];
   tags: EvalTags;
@@ -36,7 +36,14 @@ const scenarios: SyntheticCase[] = [
     description: 'Vários preços no DOM; o pipeline deve capturar o valor à vista no PIX.',
     url: 'https://ecommerce.example.com/smart-tv-55',
     prompt: 'Extraia o nome da TV e o preço à vista no PIX',
-    tags: { siteType: 'ecommerce', render: 'ssr', dataSource: 'dom', mode: 'single', locale: 'pt-BR', challenges: ['ambiguous-price'] },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'single',
+      locale: 'pt-BR',
+      challenges: ['ambiguous-price'],
+    },
     versions: [
       `<!DOCTYPE html><html><head><title>Smart TV 55 4K UHD</title></head><body>
         <main class="product-wrapper">
@@ -67,7 +74,13 @@ const scenarios: SyntheticCase[] = [
     description: 'DOM é apenas um shell; os dados estão na resposta /api/v2/products.',
     url: 'https://spa.example.com/products/headphone-pro',
     prompt: 'Extraia o título do fone, o preço atual e o status de disponibilidade em estoque',
-    tags: { siteType: 'ecommerce', render: 'csr-spa', dataSource: 'network-json', mode: 'single', locale: 'pt-BR' },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'csr-spa',
+      dataSource: 'network-json',
+      mode: 'single',
+      locale: 'pt-BR',
+    },
     versions: [
       `<!DOCTYPE html><html><head><title>Loja Virtual SPA</title></head><body>
         <div id="app-root"><div class="skeleton-loader">Carregando catálogo...</div></div></body></html>`,
@@ -103,7 +116,14 @@ const scenarios: SyntheticCase[] = [
     url: 'https://finance.example.com/rates',
     prompt:
       'Extraia a tabela com todas as moedas, incluindo o código da moeda, a cotação de venda e a variação diária. Quero alerta se a variação for maior que 1%',
-    tags: { siteType: 'finance', render: 'ssr', dataSource: 'dom', mode: 'collection', locale: 'pt-BR', challenges: ['trigger-rule'] },
+    tags: {
+      siteType: 'finance',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'collection',
+      locale: 'pt-BR',
+      challenges: ['trigger-rule'],
+    },
     versions: [
       `<!DOCTYPE html><html><head><title>Cotações do Mercado</title></head><body><main>
         <h1>Painel de Moedas</h1>
@@ -134,7 +154,14 @@ const scenarios: SyntheticCase[] = [
     url: 'https://store.example.com/catalog',
     prompt:
       'Liste apenas os produtos da categoria Eletrônicos com preço menor que 500 reais, com nome, categoria e preço',
-    tags: { siteType: 'ecommerce', render: 'ssr', dataSource: 'dom', mode: 'collection', locale: 'pt-BR', challenges: ['filter'] },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'collection',
+      locale: 'pt-BR',
+      challenges: ['filter'],
+    },
     versions: [
       `<!DOCTYPE html><html><head><title>Catálogo Geral de Produtos</title></head><body>
         <div class="product-grid">
@@ -155,16 +182,26 @@ const scenarios: SyntheticCase[] = [
       });
       return records.length === 2 && valid
         ? CORRECT
-        : wrong(`Esperava apenas Mouse e Teclado. Obtido ${records.length}: ${JSON.stringify(records)}`);
+        : wrong(
+            `Esperava apenas Mouse e Teclado. Obtido ${records.length}: ${JSON.stringify(records)}`
+          );
     },
   },
   {
-    id: 'advanced-self-healing',
-    name: 'Self-healing: mudança drástica de layout + queda de preço',
-    description: 'Compila na v1; o site migra para CSS Modules e o preço cai. Recupera com intent travado?',
+    id: 'advanced-automatic-recovery',
+    name: 'Recuperação automática: mudança de layout + queda de preço',
+    description:
+      'Compila na v1; o site migra para CSS Modules e o preço cai. Recupera com intent travado?',
     url: 'https://store.example.com/console',
     prompt: 'Extraia o nome do console e o preço',
-    tags: { siteType: 'ecommerce', render: 'ssr', dataSource: 'dom', mode: 'single', locale: 'pt-BR', challenges: ['layout-drift', 'css-modules-hash'] },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'single',
+      locale: 'pt-BR',
+      challenges: ['layout-drift', 'css-modules-hash'],
+    },
     versions: [
       `<html><body><div id="legacy-container">
         <h1 class="legacy-title">Console NextGen 1TB</h1><p class="legacy-price">R$ 4.499,00</p>
@@ -175,16 +212,24 @@ const scenarios: SyntheticCase[] = [
     ],
     judge: ([record]) => {
       const price = Number(pickField(record, 'price', 'preco'));
-      return price === 3999 ? CORRECT : wrong(`Após healing, preço ${price}; esperado 3999.`);
+      return price === 3999 ? CORRECT : wrong(`Após recuperação, preço ${price}; esperado 3999.`);
     },
   },
   {
     id: 'bilingual-currency',
     name: 'Formatação Monetária Europeia (€ 1.299,50)',
-    description: 'Página em idioma estrangeiro com símbolo de Euro e formatação com ponto e vírgula invertidos.',
+    description:
+      'Página em idioma estrangeiro com símbolo de Euro e formatação com ponto e vírgula invertidos.',
     url: 'https://store.example.de/laptop',
     prompt: 'Extraia o modelo do notebook e o preço em euros',
-    tags: { siteType: 'ecommerce', render: 'ssr', dataSource: 'dom', mode: 'single', locale: 'de-DE', challenges: ['currency-format'] },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'single',
+      locale: 'de-DE',
+      challenges: ['currency-format'],
+    },
     versions: [
       `<!DOCTYPE html><html><head><title>Gaming Laptop Pro 16</title></head><body>
         <main class="product-page">
@@ -201,19 +246,35 @@ const scenarios: SyntheticCase[] = [
       const normalizedPrice =
         typeof rawPrice === 'number'
           ? rawPrice
-          : parseFloat(String(rawPrice ?? '').replace(/[^\d,.]/g, '').replace('.', '').replace(',', '.'));
-      return typeof title === 'string' && (normalizedPrice === 1299.5 || String(rawPrice).includes('1.299,50'))
+          : parseFloat(
+              String(rawPrice ?? '')
+                .replace(/[^\d,.]/g, '')
+                .replace('.', '')
+                .replace(',', '.')
+            );
+      return typeof title === 'string' &&
+        (normalizedPrice === 1299.5 || String(rawPrice).includes('1.299,50'))
         ? CORRECT
-        : wrong(`Esperava 1299.5 ou string contendo 1.299,50. Obtido: raw=${rawPrice}, parsed=${normalizedPrice}, title=${title}`);
+        : wrong(
+            `Esperava 1299.5 ou string contendo 1.299,50. Obtido: raw=${rawPrice}, parsed=${normalizedPrice}, title=${title}`
+          );
     },
   },
   {
     id: 'complex-data-attributes',
     name: 'Atributos Estruturados data-* no DOM',
-    description: 'Catálogo onde metadados confiáveis de preço e SKU estão em atributos data-* das tags HTML.',
+    description:
+      'Catálogo onde metadados confiáveis de preço e SKU estão em atributos data-* das tags HTML.',
     url: 'https://tech.example.com/gpus',
     prompt: 'Extraia os produtos com o nome da placa, o código SKU e o preço numérico',
-    tags: { siteType: 'ecommerce', render: 'ssr', dataSource: 'dom', mode: 'collection', locale: 'pt-BR', challenges: ['data-attributes'] },
+    tags: {
+      siteType: 'ecommerce',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'collection',
+      locale: 'pt-BR',
+      challenges: ['data-attributes'],
+    },
     versions: [
       `<!DOCTYPE html><html><body>
         <div class="catalog-grid">
@@ -234,9 +295,13 @@ const scenarios: SyntheticCase[] = [
       const valid = records.every((r) => {
         const sku = String(pickField(r, 'sku', 'code') ?? '');
         const price = Number(String(pickField(r, 'price', 'preco') ?? '').replace(/[^\d.]/g, ''));
-        return (sku.includes('4070') || sku.includes('7800') || sku.startsWith('GPU-')) && price > 3000;
+        return (
+          (sku.includes('4070') || sku.includes('7800') || sku.startsWith('GPU-')) && price > 3000
+        );
       });
-      return valid ? CORRECT : wrong(`Registros não capturaram SKU ou Preço numérico: ${JSON.stringify(records)}`);
+      return valid
+        ? CORRECT
+        : wrong(`Registros não capturaram SKU ou Preço numérico: ${JSON.stringify(records)}`);
     },
   },
   {
@@ -245,7 +310,13 @@ const scenarios: SyntheticCase[] = [
     description: 'Tabela densa de vagas corporativas com múltiplas colunas e tags de modalidade.',
     url: 'https://careers.example.com/openings',
     prompt: 'Extraia a tabela com todas as vagas, incluindo o cargo, o departamento e a modalidade',
-    tags: { siteType: 'jobs', render: 'ssr', dataSource: 'dom', mode: 'collection', locale: 'pt-BR' },
+    tags: {
+      siteType: 'jobs',
+      render: 'ssr',
+      dataSource: 'dom',
+      mode: 'collection',
+      locale: 'pt-BR',
+    },
     versions: [
       `<!DOCTYPE html><html><body>
         <table class="careers-table">
@@ -346,28 +417,37 @@ async function main() {
         new PageExtractor(standardSourceReaders()),
         executionPolicy()
       );
-      const pipeline = new ConfigurationPipeline(createConfigurationModel(counted), adapter, executor, {
-        budgetMs: 90000,
-        maxAttempts: 3,
-        maxDecisions: 6,
-        reviewReserveMs: 5000,
-        evidenceLimit: 25000,
-        semanticEnabled: true,
-        semanticThreshold: 4,
-      });
-      const request = { jobId: `bench-${scenario.id}-${run}`, url: scenario.url, prompt: scenario.prompt };
+      const pipeline = new ConfigurationPipeline(
+        createConfigurationModel(counted),
+        adapter,
+        executor,
+        {
+          budgetMs: 90000,
+          maxAttempts: 3,
+          maxDecisions: 6,
+          reviewReserveMs: 5000,
+          evidenceLimit: 25000,
+          semanticEnabled: true,
+          semanticThreshold: 4,
+        }
+      );
+      const request = {
+        jobId: `bench-${scenario.id}-${run}`,
+        url: scenario.url,
+        prompt: scenario.prompt,
+      };
 
       try {
         let result = await pipeline.configure(request);
         for (const version of scenario.versions.slice(1)) {
-          // Layout drift: heal with the original intent locked, as production does.
+          // Layout drift: recover with the original intent locked, as production does.
           html = version;
           const intent = result.plan.intent;
           result = await pipeline.configure({ ...request, intent });
           if (!sameIntent(intent, result.plan.intent))
             return {
               outcome: 'WRONG_VALUE',
-              reason: 'Self-healing alterou o intent travado.',
+              reason: 'A recuperação alterou a intenção travada.',
               records: 0,
               modelCalls: counted.totalCalls,
             };

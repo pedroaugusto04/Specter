@@ -1,35 +1,31 @@
+import { randomUUID } from 'crypto';
+import { decideRecovery, RecoveryDecision } from './recoveryPolicy.js';
+import type { ScrapingJobEntity } from '../types/domain.js';
 import { SuccessfulRunService } from './successfulRunService.js';
 import { AccessFailure } from '../types/access.js';
-import { FailureCode } from '../extraction/constants.js';
-import { classifyAccessFailure, AcquisitionFailureError } from '../acquisition/failure.js';
+import { classifyAccessFailure } from '../acquisition/failure.js';
 import type { AccessCooldownService } from '../acquisition/cooldown.js';
 import type { IAlertRouter } from '../notifications/contracts.js';
 import type { IPlanExecutor } from './planExecutionService.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
-import { env } from '../config/env.js';
+import { env, MINIMUM_CRON_INTERVAL_MINUTES } from '../config/env.js';
 import {
   AntiBotBlockedError,
   DomainError,
   NavigationTimeoutError,
-  NotFoundError,
   QuotaExceededError,
   SelectorMismatchError,
 } from '../errors/domainErrors.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
 import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
+import { RunPhase } from '@specter/contracts';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { JobRunEntity } from '../types/domain.js';
-import { presentExtractionReport, formatUserErrorMessage } from '../utils/errorSanitizer.js';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { logger } from '../utils/logger.js';
-import {
-  ChangeStatus,
-  ExtractionQuality,
-  isAcceptedExtractionQuality,
-  JobStatus,
-  RunStatus,
-} from '../types/enums.js';
+import { JobStatus, RunStatus } from '../types/enums.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
@@ -44,300 +40,246 @@ export interface ScrapeExecutionServiceDeps {
   sessionRepository?: ISessionRepository;
   realtimeService?: RealtimeService;
   quotaService?: QuotaService;
-  consecutiveFailuresForHealing?: number;
-  maxHealingRetries?: number;
+  maxRecoveryAttempts?: number;
 }
 
 export class ScrapeExecutionService {
-  private readonly consecutiveFailuresForHealing: number;
-  private readonly maxHealingRetries: number;
-  constructor(private readonly deps: ScrapeExecutionServiceDeps) {
-    this.consecutiveFailuresForHealing =
-      deps.consecutiveFailuresForHealing ?? env.CONSECUTIVE_FAILURES_FOR_HEALING;
-    this.maxHealingRetries = deps.maxHealingRetries ?? env.MAX_HEALING_RETRIES;
-  }
+  constructor(private readonly deps: ScrapeExecutionServiceDeps) {}
 
-  async isAccessSuspended(jobId: string): Promise<boolean> {
-    if (!this.deps.accessCooldown) return false;
-    const job = await this.deps.jobRepository.findById(jobId);
-    const state = job ? await this.deps.accessCooldown.state(job) : null;
-    if (state)
-      logger.info('Skipping scrape during access cooldown', { jobId, retryAt: state.retryAt });
-    return Boolean(state);
-  }
-
-  async executeScrape(jobId: string): Promise<JobRunEntity | null> {
-    const startTime = Date.now();
-    const job = await this.deps.jobRepository.findById(jobId);
-
-    if (!job) {
-      throw new NotFoundError(`Scraping job not found: ${jobId}`);
-    }
-
-    if (job.status !== JobStatus.Active) {
-      logger.info('Skipping scrape execution for PAUSED job', { jobId: job.id });
+  async executeScrape(
+    jobId: string,
+    originQueueId: string = randomUUID(),
+    runId?: string
+  ): Promise<JobRunEntity | null> {
+    const repo = this.deps.jobRepository;
+    const job = await repo.findById(jobId);
+    if (!job || job.status !== JobStatus.Active) return null;
+    const run = runId ? await repo.findRun(runId) : await repo.beginRun(job, originQueueId);
+    if (!run || run.jobId !== job.id || run.status !== RunStatus.Running) return null;
+    if (run.monitorUpdatedAt?.getTime() !== job.updatedAt.getTime()) {
+      await repo.cancelRuns(job.id);
       return null;
     }
-
-    if (this.deps.quotaService && job.userId) {
-      try {
-        await this.deps.quotaService.assertCanExecuteScrape(job.userId);
-      } catch (quotaErr) {
-        if (quotaErr instanceof QuotaExceededError) {
-          logger.warn('Skipping scrape execution: monthly execution quota reached', {
-            jobId: job.id,
-            userId: job.userId,
-            quotaLimit: quotaErr.limit,
-            current: quotaErr.current,
-          });
-          return null;
-        }
-        throw quotaErr;
-      }
-    }
-
-    const access = await this.deps.accessCooldown?.forMonitor(job);
-    if (await access?.state()) return null;
-
-    if (!job.extractionPlan) {
-      logger.info('Job has no extractionPlan; enqueueing compilation', { jobId: job.id });
-      await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Initial);
-      return null;
-    }
-
-    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, 'RUNNING');
-
-    let httpStatus: number | null = null;
-    let extractionReport: ExtractionReport | undefined;
-
+    if (run.nextAttemptAt && run.nextAttemptAt.getTime() > Date.now()) return null;
+    if (!job.extractionPlan) return this.finish(job, run, true);
+    const metadata = run.metadata!;
+    if (
+      Date.now() - run.startedAt!.getTime() > env.RUN_MAX_DURATION_MS ||
+      metadata.accessAttempts >= env.SCRAPE_MAX_ATTEMPTS + 1
+    )
+      return this.finish(
+        job,
+        run,
+        false,
+        new NavigationTimeoutError('Execution exceeded its allowed duration.')
+      );
+    metadata.accessAttempts++;
+    await repo.commitRun(
+      {
+        ...run,
+        phase: metadata.confirmations ? RunPhase.Confirming : RunPhase.Checking,
+        nextAttemptAt: null,
+        metadata,
+      },
+      [],
+      undefined,
+      job.updatedAt
+    );
+    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+    let report: ExtractionReport | undefined;
+    let error: unknown;
+    let access: Awaited<ReturnType<AccessCooldownService['forMonitor']>> | undefined;
     try {
+      access = await this.deps.accessCooldown?.forMonitor(job);
+      if (await access?.state())
+        return this.finish(
+          job,
+          run,
+          false,
+          new AntiBotBlockedError('Website access is temporarily blocked.')
+        );
+      if (!metadata.executionCharged) {
+        await this.deps.quotaService?.assertCanExecuteScrape(job.userId);
+        metadata.executionCharged = true;
+        await repo.commitRun(
+          { ...run, metadata, chargeUsage: 'execution' },
+          [],
+          undefined,
+          job.updatedAt
+        );
+      }
       const storageState = await resolveSessionStorageState(
         this.deps.sessionRepository,
         job.userId,
         job.url,
-        {
-          jobId: job.id,
-          logAction: 'Injecting authenticated web session into Playwright scraper',
-        }
+        { jobId: job.id, logAction: 'Executing monitor' }
       );
-
       const execution = await this.deps.planExecutor.execute(job.url, job.extractionPlan, {
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
       });
-
-      if (this.deps.quotaService && job.userId) {
-        await this.deps.quotaService.recordExecution(job.userId);
-      }
-      extractionReport = execution.report;
-      const scrapeResult = execution.scrape;
-      const extractedData = execution.data;
-      httpStatus = scrapeResult.httpStatus;
+      report = execution.report;
       await assertExecutionLease();
-      const latest = await this.deps.jobRepository.findById(job.id);
-      if (
-        !latest ||
-        latest.status !== job.status ||
-        latest.updatedAt.getTime() !== job.updatedAt.getTime()
-      )
-        return null;
-
       await access?.record(false);
-      if (!isAcceptedExtractionQuality(execution.report.quality)) {
-        logger.warn('Extraction rejected', {
-          jobId: job.id,
-          quality: execution.report.quality,
-          failureCode: execution.report.failureCode,
-          issues: execution.report.issues,
+      if (
+        decideRecovery({ report, metadata, maxAccessAttempts: env.SCRAPE_MAX_ATTEMPTS }) ===
+        RecoveryDecision.Accept
+      ) {
+        const prepared = await new SuccessfulRunService(this.deps).prepare({
+          job,
+          plan: job.extractionPlan,
+          execution,
+          contractRevision: job.contractRevision,
+          startedAt: run.startedAt!.getTime(),
+          logContext: 'routine scraping',
         });
-        if (
-          (execution.report.quality === ExtractionQuality.Invalid &&
-            (execution.report.failureCode === FailureCode.Source ||
-              execution.report.failureCode === FailureCode.Readiness)) ||
-          ((execution.report.quality === ExtractionQuality.Inconclusive ||
-            execution.report.failureCode === FailureCode.NoProgress) &&
-            job.failureCount + 1 >= this.consecutiveFailuresForHealing)
-        )
-          throw new SelectorMismatchError(execution.report.issues.join(' '));
-        const invalidExtractionMessage = formatUserErrorMessage(
-          new SelectorMismatchError('Extraction could not be validated.')
+        const result = await repo.commitRun(
+          { ...prepared.run, id: run.id },
+          prepared.deliveries,
+          { lastError: null },
+          job.updatedAt
         );
-        await this.deps.jobRepository.createRun({
-          jobId: job.id,
-          extractedData,
-          hasChanges: ChangeStatus.Unchanged,
-          status: RunStatus.Failed,
-          extractionReport: presentExtractionReport(execution.report),
-          errorMessage: invalidExtractionMessage,
-          httpStatus,
-        });
-        const selectorFailure =
-          execution.report.failureCode === FailureCode.Source ||
-          execution.report.failureCode === FailureCode.Readiness ||
-          execution.report.failureCode === FailureCode.NoProgress;
-        await this.deps.jobRepository.updateJob(job.id, {
-          lastError: invalidExtractionMessage,
-          ...(selectorFailure ? { failureCount: job.failureCount + 1 } : { failureCount: 0 }),
-        });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
-        return null;
+        await this.completed(job, result);
+        return result;
       }
-      const prepared = await new SuccessfulRunService(this.deps).prepare({
-        job,
-        plan: job.extractionPlan,
-        execution,
-        contractRevision: job.contractRevision,
-        startedAt: startTime,
-        logContext: 'routine scraping',
+    } catch (caught) {
+      error = caught;
+      await assertExecutionLease();
+      logger.error('Monitor attempt failed', {
+        jobId,
+        runId: run.id,
+        errorStack: caught instanceof Error ? caught.stack : String(caught),
       });
-      const runRecord = await this.deps.jobRepository.commitRun(
-        prepared.run,
-        prepared.deliveries,
-        { status: JobStatus.Active, failureCount: 0, lastError: null },
+      if (classifyAccessFailure(caught) === AccessFailure.Blocked) {
+        await access?.record(true);
+      }
+    }
+    const current = await repo.findById(jobId);
+    if (
+      !current ||
+      current.status !== job.status ||
+      current.updatedAt.getTime() !== job.updatedAt.getTime() ||
+      (await repo.findRun(run.id))?.status !== RunStatus.Running
+    )
+      return null;
+    const decision = decideRecovery({
+      report,
+      error,
+      metadata,
+      maxAccessAttempts: env.SCRAPE_MAX_ATTEMPTS,
+    });
+    metadata.reasons.push(
+      error instanceof DomainError
+        ? error.code
+        : (report?.failureReason ?? report?.failureCode ?? decision)
+    );
+    run.extractionReport = report ?? null;
+    if (decision === RecoveryDecision.Recompile) {
+      const inWindow =
+        job.recoveryWindowStartedAt &&
+        Date.now() - job.recoveryWindowStartedAt.getTime() < env.RECOVERY_WINDOW_MS;
+      const attempts = inWindow ? (job.recoveryAttempts ?? 0) : 0;
+      if (attempts >= (this.deps.maxRecoveryAttempts ?? env.MAX_RECOVERY_ATTEMPTS))
+        return this.finish(job, run, true);
+      try {
+        await this.deps.quotaService?.assertCanCompile(job.userId);
+      } catch (error) {
+        if (!(error instanceof QuotaExceededError)) throw error;
+        return this.finish(job, run, false, error);
+      }
+      metadata.recoveryAttempts++;
+      await repo.commitRun(
+        { ...run, metadata, phase: RunPhase.Recovering, nextAttemptAt: null },
+        [],
+        {
+          status: JobStatus.Recovering,
+          recoveryAttempts: attempts + 1,
+          recoveryWindowStartedAt: inWindow ? job.recoveryWindowStartedAt : new Date(),
+        },
         job.updatedAt
       );
-      const durationMs = prepared.run.durationMs ?? 0;
-      const hasChanges = prepared.run.hasChanges;
-      logger.info('Deterministic scrape execution completed', {
-        jobId: job.id,
-        durationMs,
-        httpStatus,
-        hasChanges,
-      });
-
-      await this.deps.realtimeService?.notifyJobRunCompleted(
-        job.userId,
-        job.id,
-        runRecord.id,
-        hasChanges
-      );
-      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
-
-      return runRecord;
-    } catch (error) {
-      const durationMs = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? (error.stack ?? errorMessage) : errorMessage;
-      const errorCode = error instanceof DomainError ? error.code : 'SCRAPE_EXECUTION_ERROR';
-
-      if (error instanceof AntiBotBlockedError) {
-        httpStatus = error.httpStatus;
-      }
-
-      logger.error('Scrape execution failed', {
-        jobId: job.id,
-        durationMs,
-        errorCode,
-        httpStatus: httpStatus ?? undefined,
-        errorStack,
-      });
-
-      await assertExecutionLease();
-      const current = await this.deps.jobRepository.findById(job.id);
-      if (
-        !current ||
-        current.status !== job.status ||
-        current.updatedAt.getTime() !== job.updatedAt.getTime()
-      )
-        return null;
-      const accessFailure = classifyAccessFailure(error);
-      if (!extractionReport) await access?.record(accessFailure === AccessFailure.Blocked);
-      const userMessage = formatUserErrorMessage(error);
-
-      await this.deps.jobRepository.createRun({
-        jobId: job.id,
-        extractedData: null,
-        normalizedHash: null,
-        hasChanges: ChangeStatus.Unchanged,
-        status: RunStatus.Failed,
-        extractionReport: extractionReport
-          ? presentExtractionReport(extractionReport)
-          : {
-              quality:
-                accessFailure === AccessFailure.Blocked
-                  ? ExtractionQuality.Blocked
-                  : ExtractionQuality.Inconclusive,
-              scope: job.extractionPlan.intent.scope,
-              pagesVisited: 0,
-              issues: [userMessage],
-              sourcesUsed: {},
-            },
-        errorMessage: userMessage,
-        httpStatus,
-        durationMs,
-      });
-
-      // 1. Selector Mismatch (HTTP 200 OK, but layout changed): Self-Healing state machine
-      if (error instanceof SelectorMismatchError) {
-        const inHealingWindow = Boolean(
-          job.healingWindowStartedAt &&
-          Date.now() - job.healingWindowStartedAt.getTime() < env.HEALING_WINDOW_MS
-        );
-        const currentHealingAttempts = inHealingWindow ? (job.healingAttempts ?? 0) : 0;
-        const newFailureCount = job.failureCount + 1;
-
-        if (
-          newFailureCount >= this.consecutiveFailuresForHealing &&
-          currentHealingAttempts >= this.maxHealingRetries
-        ) {
-          // Cap maximum self-healing retries to prevent infinite recompilation loops
-          await this.deps.jobRepository.updateJob(job.id, {
-            status: JobStatus.Failed,
-            failureCount: newFailureCount,
-            lastError: `Self-healing retry limit exceeded (${this.maxHealingRetries}): ${userMessage}`,
-          });
-          await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
-          logger.warn('Job exceeded max self-healing retries and transitioned to FAILED', {
-            jobId: job.id,
-            failureCount: newFailureCount,
-          });
-          await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Failed);
-          return null;
-        }
-
-        if (newFailureCount >= this.consecutiveFailuresForHealing) {
-          await this.deps.jobRepository.updateJob(job.id, {
-            status: JobStatus.Healing,
-            healingAttempts: currentHealingAttempts + 1,
-            healingWindowStartedAt: inHealingWindow ? job.healingWindowStartedAt : new Date(),
-            failureCount: newFailureCount,
-            lastError: userMessage,
-          });
-          logger.info(
-            'Consecutive selector mismatches reached threshold; transitioning to HEALING',
-            {
-              jobId: job.id,
-              failureCount: newFailureCount,
-            }
-          );
-          await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Healing);
-          await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Healing);
-          return null;
-        }
-
-        // First selector failure: keep ACTIVE, increment failureCount
-        await this.deps.jobRepository.updateJob(job.id, {
-          status: JobStatus.Active,
-          failureCount: newFailureCount,
-          lastError: userMessage,
-        });
-        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
-        return null;
-      }
-
-      // 2. All other failures (Anti-bot block, acquisition failures, timeouts, domain/network errors):
-      // Record failure for audit, reset failureCount, and rethrow (or return null if blocked)
-      await this.deps.jobRepository.updateJob(job.id, {
-        lastError: userMessage,
-        failureCount: 0,
-      });
       await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
-
-      if (accessFailure === AccessFailure.Blocked) {
-        return null;
-      }
-
-      throw error;
+      await this.deps.jobScheduler.enqueueCompilation(job.id, CompilationReason.Recovery, run.id);
+      return null;
     }
+    if (decision === RecoveryDecision.Retry || decision === RecoveryDecision.Confirm) {
+      const delay =
+        decision === RecoveryDecision.Confirm
+          ? Math.max(
+              MINIMUM_CRON_INTERVAL_MINUTES * 60000,
+              env.EXTRACTION_CONFIRMATION_DELAY_MS,
+              env.MIN_CRON_INTERVAL_MINUTES * 60000
+            )
+          : Math.max(
+              env.SCRAPE_RETRY_DELAY_MS * 2 ** (metadata.accessAttempts - 1),
+              retryAfter(error)
+            );
+      if (decision === RecoveryDecision.Confirm) metadata.confirmations++;
+      const nextAttemptAt = new Date(Date.now() + delay);
+      await repo.commitRun(
+        {
+          ...run,
+          metadata,
+          phase: decision === RecoveryDecision.Confirm ? RunPhase.Confirming : RunPhase.Retrying,
+          nextAttemptAt,
+        },
+        [],
+        undefined,
+        job.updatedAt
+      );
+      await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+      await this.deps.jobScheduler.enqueueRunAttempt(
+        job.id,
+        run.id,
+        metadata.accessAttempts,
+        nextAttemptAt
+      );
+      return null;
+    }
+    return this.finish(job, run, Boolean(report?.structuralFailure), error);
   }
+
+  private async finish(
+    job: ScrapingJobEntity,
+    run: JobRunEntity,
+    structural: boolean,
+    error?: unknown
+  ) {
+    const userMessage = formatUserErrorMessage(
+      error ?? new SelectorMismatchError('Execution could not be validated.')
+    );
+    const result = await this.deps.jobRepository.commitRun(
+      {
+        ...run,
+        status: RunStatus.Failed,
+        errorMessage: userMessage,
+        durationMs: Date.now() - (run.startedAt?.getTime() ?? Date.now()),
+      },
+      [],
+      {
+        status: structural ? JobStatus.Failed : JobStatus.Active,
+        lastError: userMessage,
+      },
+      job.updatedAt
+    );
+    if (structural)
+      await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
+    await this.completed(job, result);
+    return result;
+  }
+  private async completed(job: ScrapingJobEntity, run: JobRunEntity) {
+    await this.deps.realtimeService?.notifyJobRunCompleted(
+      job.userId,
+      job.id,
+      run.id,
+      run.hasChanges
+    );
+    await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
+  }
+}
+
+function retryAfter(error: unknown): number {
+  if (!error || typeof error !== 'object') return 0;
+  if ('retryAfterMs' in error && typeof error.retryAfterMs === 'number') return error.retryAfterMs;
+  return 'cause' in error ? retryAfter(error.cause) : 0;
 }

@@ -153,6 +153,7 @@ export function useInvalidateDashboard() {
   const invalidateJobsAndStats = useCallback(
     async (jobId?: string) => {
       const promises: Promise<unknown>[] = [
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas }),
         queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs }),
         queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
       ];
