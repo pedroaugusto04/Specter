@@ -32,7 +32,7 @@ import * as React from 'react';
 
 const MONITOR_STATUS = {
   [JOB_STATUS.PendingCompilation]: {
-    label: 'Compiling selectors, usually ~30 s',
+    label: 'Compiling selectors — this may take a few minutes',
     variant: 'secondary',
   },
   [JOB_STATUS.Active]: { label: 'Ready to monitor', variant: 'success' },
@@ -70,25 +70,11 @@ export function JobRunsDrawer({
     setPage(1);
   }, [job?.id]);
 
-  const {
-    data,
-    isLoading: loading,
-    refetch: refetchRuns,
-  } = useJobRunsQuery(job?.id, page, pageSize);
-  const {
-    data: timeseriesData,
-    isLoading: timeseriesLoading,
-    refetch: refetchTimeseries,
-  } = useJobTimeseriesQuery(job?.id, chartRange);
-
-  const prevStatusRef = React.useRef(job?.status);
-  React.useEffect(() => {
-    if (prevStatusRef.current && prevStatusRef.current !== job?.status) {
-      void refetchRuns();
-      void refetchTimeseries();
-    }
-    prevStatusRef.current = job?.status;
-  }, [job?.status, refetchRuns, refetchTimeseries]);
+  const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
+  const { data: timeseriesData, isLoading: timeseriesLoading } = useJobTimeseriesQuery(
+    job?.id,
+    chartRange
+  );
 
   const runs: JobRunDto[] = data?.runs ?? [];
   const timeseriesPoints = timeseriesData?.points ?? [];
@@ -319,10 +305,11 @@ export function JobRunsDrawer({
                     </div>
                     <div>
                       <h4 className="font-medium text-sm text-foreground">
-                        Compiling selectors, usually ~30 s
+                        {MONITOR_STATUS[JOB_STATUS.PendingCompilation].label}
                       </h4>
                       <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                        Analyzing the live page, detecting monitored fields, and running live verification. Results and snapshots will appear here automatically.
+                        Analyzing the live page, detecting monitored fields, and running live
+                        verification. Results and snapshots will appear here automatically.
                       </p>
                     </div>
                   </div>

@@ -80,7 +80,7 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
   }
 
   async subscribe(userId: string, handler: RealtimeEventHandler): Promise<() => void> {
-    if (this.isClosed) return () => {};
+    if (this.isClosed) throw new Error('Realtime event bus is closed');
 
     let handlers = this.listeners.get(userId);
     if (!handlers) {
@@ -117,6 +117,7 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
         current.delete(handler);
         if (current.size === 0) {
           this.listeners.delete(userId);
+          this.subscriptions.delete(userId);
           if (!this.isClosed) {
             void this.subscriber.unsubscribe(`${CHANNEL_PREFIX}${userId}`).catch(() => {});
           }

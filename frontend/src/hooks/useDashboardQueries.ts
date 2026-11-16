@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   api,
@@ -149,20 +150,23 @@ export function useSessionsQuery(enabled = true) {
 export function useInvalidateDashboard() {
   const queryClient = useQueryClient();
 
-  const invalidateJobsAndStats = async (jobId?: string) => {
-    const promises: Promise<unknown>[] = [
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs }),
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
-    ];
-    if (jobId) {
-      promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns', jobId] }));
-      promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries', jobId] }));
-    } else {
-      promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns'] }));
-      promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries'] }));
-    }
-    await Promise.all(promises);
-  };
+  const invalidateJobsAndStats = useCallback(
+    async (jobId?: string) => {
+      const promises: Promise<unknown>[] = [
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs }),
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
+      ];
+      if (jobId) {
+        promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns', jobId] }));
+        promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries', jobId] }));
+      } else {
+        promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns'] }));
+        promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries'] }));
+      }
+      await Promise.all(promises);
+    },
+    [queryClient]
+  );
 
   const invalidateAll = async () => {
     await Promise.all([

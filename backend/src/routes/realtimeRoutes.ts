@@ -32,7 +32,12 @@ export function registerRealtimeRoutes(
     }
 
     let unsubscribe: (() => void) | undefined;
-    const pendingEvents: string[] = [];
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+    const cleanup = () => {
+      clearInterval(heartbeatTimer);
+      unsubscribe?.();
+    };
+    raw.once('close', cleanup);
     let streamReady = false;
     try {
       // Wait for Redis SUBSCRIBE acknowledgement before confirming the SSE connection.
@@ -40,18 +45,20 @@ export function registerRealtimeRoutes(
         if (!raw.writableEnded && !raw.destroyed) {
           const message = `event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`;
           if (streamReady) raw.write(message);
-          else pendingEvents.push(message);
         }
       });
     } catch {
       return reply.code(503).send({ error: 'Realtime event stream is temporarily unavailable' });
     }
 
+    if (raw.destroyed) {
+      cleanup();
+      return;
+    }
+
     reply.hijack();
     raw.writeHead(200, headers);
     streamReady = true;
-    for (const event of pendingEvents) raw.write(event);
-    pendingEvents.length = 0;
 
     if (typeof raw.flushHeaders === 'function') {
       raw.flushHeaders();
@@ -66,16 +73,10 @@ export function registerRealtimeRoutes(
     raw.write(`event: connected\ndata: ${connectedPayload}\n\n`);
 
     // Heartbeat interval to prevent intermediate reverse proxies (Nginx, Traefik, Cloudflare) from timing out
-    const heartbeatTimer = setInterval(() => {
+    heartbeatTimer = setInterval(() => {
       if (!raw.writableEnded && !raw.destroyed) {
         raw.write(': keepalive\n\n');
       }
     }, 20_000);
-
-    // Teardown subscriber and timer on client disconnect
-    request.raw.on('close', () => {
-      clearInterval(heartbeatTimer);
-      unsubscribe?.();
-    });
   });
 }

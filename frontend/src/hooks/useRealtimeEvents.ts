@@ -51,18 +51,12 @@ export function useRealtimeEvents({
       return;
     }
 
-    // Check if browser supports EventSource
-    if (typeof EventSource === 'undefined') {
-      setConnectionMode('polling');
-      return;
-    }
-
     let eventSource: EventSource | null = null;
     let fallbackTimer: NodeJS.Timeout | null = null;
     let isDisposed = false;
 
     const startFallbackPolling = () => {
-      if (fallbackTimer) clearInterval(fallbackTimer);
+      if (fallbackTimer) return;
       fallbackTimer = setInterval(() => {
         // Only poll if window/tab is visible
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
@@ -100,14 +94,9 @@ export function useRealtimeEvents({
           if (isDisposed) return;
           setConnectionMode('realtime');
           stopFallbackPolling();
-          setReconnectCount((prev) => {
-            const next = prev + 1;
-            // On successful reconnection after a drop, refetch state
-            if (next > 1) {
-              onReconnectRef.current?.();
-            }
-            return next;
-          });
+          setReconnectCount((prev) => prev + 1);
+          // Resync on every connection, including changes made before the first subscription.
+          onReconnectRef.current?.();
         };
 
         // Listen for specific domain event types
@@ -129,7 +118,12 @@ export function useRealtimeEvents({
       }
     };
 
-    connectSse();
+    if (typeof EventSource === 'undefined') {
+      setConnectionMode('polling');
+      startFallbackPolling();
+    } else {
+      connectSse();
+    }
 
     // Page Visibility API handler: when user returns to tab, refresh data
     const handleVisibilityChange = () => {

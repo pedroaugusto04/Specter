@@ -12,15 +12,8 @@ import {
 } from '@/hooks/useDashboardQueries';
 import type { JobStatus, ScrapingJobDto } from '@/lib/api';
 import { JOB_STATUS, JOB_STATUS_FILTER } from '@/lib/domainValues';
-import {
-  getJobActionPermissions,
-  type JobRowActionType,
-} from '@/lib/jobActionPermissions';
-import {
-  DEFAULT_TIMEZONE,
-  formatCompactDate,
-  formatDateTime,
-} from '@/lib/utils';
+import { getJobActionPermissions, type JobRowActionType } from '@/lib/jobActionPermissions';
+import { DEFAULT_TIMEZONE, formatCompactDate, formatDateTime } from '@/lib/utils';
 import {
   Clock,
   ExternalLink,
@@ -121,7 +114,11 @@ export function JobsTable({
   const togglePauseMutation = useTogglePauseMutation();
   const deleteJobMutation = useDeleteJobMutation();
 
-  const handleAction = async (jobId: string, action: JobRowActionType, fn: () => Promise<unknown>) => {
+  const handleAction = async (
+    jobId: string,
+    action: JobRowActionType,
+    fn: () => Promise<unknown>
+  ) => {
     setActiveActions((prev) => ({ ...prev, [jobId]: action }));
     try {
       await fn();
@@ -311,7 +308,12 @@ export function JobsTable({
                 <th className="py-3 px-3 sm:px-4">Target</th>
                 <th className="w-[125px] px-2.5 py-3">Status</th>
                 <th className="w-[110px] px-2.5 py-3">Schedule</th>
-                <th className="w-[80px] px-2.5 py-3">Failures</th>
+                <th
+                  className="w-[80px] px-2.5 py-3"
+                  title="Consecutive extraction failures used for automatic recovery; compilation failures are recorded in run history."
+                >
+                  Extraction failures
+                </th>
                 <th className="w-[130px] px-2.5 py-3">Last Checked</th>
                 <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
@@ -340,7 +342,10 @@ export function JobsTable({
                   <tr key={job.id} className="group hover:bg-muted/30 transition-colors">
                     {/* Monitor name and target */}
                     <td className="py-3 px-3 sm:px-4 min-w-0">
-                      <div className="truncate font-medium text-foreground min-w-0" title={job.name}>
+                      <div
+                        className="truncate font-medium text-foreground min-w-0"
+                        title={job.name}
+                      >
                         {job.name}
                       </div>
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -361,9 +366,12 @@ export function JobsTable({
                     <td className="whitespace-nowrap px-2.5 py-3">
                       {isRunningExtraction && job.status === JOB_STATUS.Active ? (
                         <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-primary">
-                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> RUNNING
+                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />{' '}
+                          RUNNING
                         </span>
-                      ) : renderStatusPill(job.status)}
+                      ) : (
+                        renderStatusPill(job.status)
+                      )}
                       {job.accessState && (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Access blocked. New attempts allowed after{' '}
