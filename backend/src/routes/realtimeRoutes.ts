@@ -1,25 +1,9 @@
-import { env } from '../config/env.js';
 import { toRealtimeDto } from '../mappers/realtimeMapper.js';
 import type { FastifyInstance } from 'fastify';
 import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { RealtimeService } from '../services/realtimeService.js';
-
-function resolveCorsOriginHeader(origin: string | undefined): string | null {
-  if (!origin) return null;
-  if (origin.startsWith('chrome-extension://')) {
-    const allowedExtId = env.CHROME_EXTENSION_ID;
-    if (!allowedExtId || env.NODE_ENV !== 'production' || origin === `chrome-extension://${allowedExtId}`) {
-      return origin;
-    }
-    return null;
-  }
-  const allowed = env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',').map((s) => s.trim());
-  if (allowed === true || allowed.includes(origin)) {
-    return origin;
-  }
-  return null;
-}
+import { isAllowedCorsOrigin } from '../utils/corsHelper.js';
 
 export function registerRealtimeRoutes(
   app: FastifyInstance,
@@ -35,7 +19,7 @@ export function registerRealtimeRoutes(
 
     const raw = reply.raw;
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
-    const allowedOrigin = resolveCorsOriginHeader(origin);
+    const allowedOrigin = origin && isAllowedCorsOrigin(origin) ? origin : null;
 
     const headers: Record<string, string> = {
       'Content-Type': 'text/event-stream',

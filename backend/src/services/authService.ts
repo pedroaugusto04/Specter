@@ -12,6 +12,7 @@ import {
 } from '../utils/cookies.js';
 import { signJwt, verifyJwt, type JwtPayload } from '../utils/jwt.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
+import { resolveTimezone } from '../utils/dateFormatter.js';
 
 export interface AuthTokenPair {
   accessToken: string;
@@ -152,7 +153,7 @@ export class AuthService {
       email: normalizedEmail,
       name: input.name?.trim() || null,
       passwordHash,
-      ...(input.timezone?.trim() ? { timezone: input.timezone.trim() } : {}),
+      ...(input.timezone ? { timezone: resolveTimezone(input.timezone) } : {}),
     });
 
     const userDto = UserMapper.entityToDto(created);
@@ -206,7 +207,7 @@ export class AuthService {
       patch.name = input.name?.trim() || null;
     }
     if (input.timezone !== undefined) {
-      patch.timezone = input.timezone.trim() || 'America/Sao_Paulo';
+      patch.timezone = resolveTimezone(input.timezone);
     }
     const updated = await this.userRepository.updateUser(userId, patch);
     if (!updated) {

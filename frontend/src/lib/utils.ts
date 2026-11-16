@@ -102,7 +102,11 @@ export interface TimezoneOption {
   city: string;
 }
 
+let cachedTimezones: TimezoneOption[] | null = null;
+
 export function getAllIanaTimezones(): TimezoneOption[] {
+  if (cachedTimezones) return cachedTimezones;
+
   let timezones: string[] = [];
 
   if (typeof Intl !== 'undefined' && typeof (Intl as any).supportedValuesOf === 'function') {
@@ -143,6 +147,7 @@ export function getAllIanaTimezones(): TimezoneOption[] {
     }
   }
 
+  cachedTimezones = results;
   return results;
 }
 
