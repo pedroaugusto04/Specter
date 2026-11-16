@@ -30,9 +30,20 @@ const PLAYWRIGHT_NETWORK_ERRORS = [
   'ERR_ADDRESS_UNREACHABLE',
 ];
 
+export function isLocatorTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'TimeoutError' &&
+    (error.message.includes('locator.') ||
+      error.message.includes('waiting for locator') ||
+      error.message.includes('waiting for getByRole'))
+  );
+}
+
 export function classifyAccessFailure(error: unknown): AccessFailure | undefined {
   if (error instanceof AcquisitionFailureError) return error.category;
   if (error instanceof AntiBotBlockedError) return AccessFailure.Blocked;
+  if (isLocatorTimeoutError(error)) return undefined;
   if (error instanceof NavigationTimeoutError || isTimeoutError(error))
     return AccessFailure.Timeout;
   if (error instanceof UpstreamHttpError && error.isRetryable) return AccessFailure.Transient;

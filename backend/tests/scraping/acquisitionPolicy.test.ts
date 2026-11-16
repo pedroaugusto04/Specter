@@ -289,6 +289,20 @@ describe('Per-monitor access cooldown', () => {
     await cooldown.record(job, true);
     expect(await cooldown.state(job)).toBeNull();
   });
+  it('distinguishes locator timeouts from real navigation access timeouts', () => {
+    const locatorTimeout = new Error(
+      "locator.waitFor: Timeout 120000ms exceeded.\nCall log:\n  - waiting for locator('div.release-entry').first()"
+    );
+    locatorTimeout.name = 'TimeoutError';
+    expect(classifyAccessFailure(locatorTimeout)).toBeUndefined();
+
+    const roleTimeout = new Error("waiting for getByRole('button')");
+    roleTimeout.name = 'TimeoutError';
+    expect(classifyAccessFailure(roleTimeout)).toBeUndefined();
+
+    const navTimeout = new NavigationTimeoutError('Browser navigation exceeded its budget.');
+    expect(classifyAccessFailure(navTimeout)).toBe('TIMEOUT');
+  });
 });
 
 it('presents safe diagnostics for current and historical errors', () => {

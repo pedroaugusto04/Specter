@@ -4,6 +4,7 @@ import { ExtractionQuality, TraceStatus, isAcceptedExtractionQuality } from './c
 import { DomainError } from '../errors/domainErrors.js';
 import type {
   DocumentAdapter,
+  DocumentSnapshot,
   ExtractionIntent,
   ExtractionPlan,
   SemanticReview,
@@ -13,7 +14,7 @@ import type { ConfigurationModel, StageInput } from './model.js';
 import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
 import { extractionPlanSchema, normalizeSingleFieldSources } from '../types/extractionPlan.js';
-import { redactObject, redactText } from './evidence.js';
+import { redactText } from './evidence.js';
 import { observationPacket } from './configurationTools.js';
 import { logger } from '../utils/logger.js';
 import { ConfigurationSession } from './configurationSession.js';
@@ -22,10 +23,17 @@ import { ConfigurationFailure } from './configurationFailure.js';
 import { reviewConfiguration } from './configurationReview.js';
 import {
   ConfigurationDecisionKind,
-  ConfigurationToolKind,
   ConfigurationStage,
   ConfigurationErrorCode,
 } from './configurationConstants.js';
+import type { ConfigurationTool } from './configurationSchemas.js';
+import {
+  buildObservationEvidence,
+  buildValidationHistoryEntry,
+  countToolHistory,
+  isScopedOrInteractiveTool,
+  precheckCandidatePlanInSnapshot,
+} from './configurationHelpers.js';
 
 export interface ConfigurationRequest {
   jobId: string;
@@ -36,15 +44,18 @@ export interface ConfigurationRequest {
   captureScreenshot?: boolean;
   signal?: AbortSignal;
 }
+
 export interface ConfigurationResult {
   plan: ExtractionPlan;
   execution: ExecutionResult;
   semanticReview: SemanticReview;
   trace: StageTrace[];
 }
+
 export interface IConfigurationPipeline {
   configure(request: ConfigurationRequest): Promise<ConfigurationResult>;
 }
+
 export interface ConfigurationOptions {
   budgetMs: number;
   maxAttempts: number;
@@ -54,9 +65,6 @@ export interface ConfigurationOptions {
   semanticEnabled: boolean;
   semanticThreshold: number;
 }
-
-const isToolHistory = (h: unknown): boolean =>
-  Boolean(h && typeof h === 'object' && 'tool' in h);
 
 export class ConfigurationPipeline implements IConfigurationPipeline {
   constructor(
@@ -69,24 +77,29 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
   async configure(request: ConfigurationRequest): Promise<ConfigurationResult> {
     const context = createExecutionContext(this.options.budgetMs, request.signal);
     const reserve = this.options.semanticEnabled ? this.options.reviewReserveMs : 0;
-    if (reserve >= this.options.budgetMs)
+    if (reserve >= this.options.budgetMs) {
       throw new ConfigurationFailure(
         'Review reserve must be smaller than the configuration budget.',
         []
       );
+    }
+
     const work = createExecutionContext(
       Math.max(1, this.options.budgetMs - reserve),
       context.signal
     );
     const trace: StageTrace[] = [];
     const history: unknown[] = [];
+    const rejected = new Set<string>();
+    const progress = new ConfigurationProgress();
+
     let attempts = 0;
     let feedback = '';
-    const progress = new ConfigurationProgress();
-    const rejected = new Set<string>();
+
     const fail = (message: string, review?: SemanticReview): never => {
       throw new ConfigurationFailure(message, trace, review);
     };
+
     const run = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
       const started = Date.now();
       const stageContext = stage === ConfigurationStage.Semantic ? context : work;
@@ -114,8 +127,9 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
         throw error;
       }
     };
+
     const session = new ConfigurationSession(this.browser, request, work, run);
-    const input = (evidence: string, review = false): StageInput => ({
+    const buildStageInput = (evidence: string, review = false): StageInput => ({
       jobId: request.jobId,
       url: request.url,
       prompt: request.prompt,
@@ -123,98 +137,68 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       timeoutMs: review ? context.remaining() : work.remaining(),
       signal: review ? context.signal : work.signal,
     });
+
     try {
       let snapshot = await session.snapshot();
+
       for (let decisionIndex = 0; decisionIndex < this.options.maxDecisions; decisionIndex++) {
         work.check();
-        // The model adapter packs the exact input budget and preserves authoritative inputs.
         const available = this.options.evidenceLimit;
-        const observationBudget = history.length
-          ? Math.max(1000, Math.floor(available * 0.65))
-          : available;
-
-        let activeFeedback = feedback;
-        const toolDecisionsCount = history.filter(isToolHistory).length;
-        if (!feedback && toolDecisionsCount >= 3) {
-          activeFeedback = `Decision budget notice: You have completed ${toolDecisionsCount} tool observations and have sufficient structural evidence. Do not call additional tools. In this turn, you MUST emit kind 'candidate' with your best extraction plan derived from observed evidence.`;
-        }
-
-        const evidence = JSON.stringify({
-          feedback: redactText(activeFeedback),
-          observation: observationPacket(snapshot, observationBudget),
-          history: redactObject([...history].reverse()),
+        const evidence = buildObservationEvidence({
+          snapshot,
+          history,
+          feedback,
+          availableLimit: available,
         });
+
         try {
           const decision = await run(ConfigurationStage.Configure, () =>
-            this.model.decide(input(evidence), request.intent)
+            this.model.decide(buildStageInput(evidence), request.intent)
           );
+
           if (decision.kind === ConfigurationDecisionKind.Tool) {
-            const currentToolCount = history.filter(isToolHistory).length;
-            if (currentToolCount >= 5) {
-              feedback = `Observation budget limit reached (${currentToolCount} tools executed). Do not make further tool calls; emit kind 'candidate' with your best extraction plan now.`;
-              history.push({
-                id: decisionIndex,
-                rejection: feedback,
-              });
-              continue;
-            }
-            try {
-              const result = await run('tool:' + decision.tool.kind, () =>
-                session.execute(decision.tool)
-              );
-              const isScopedOrInteractive =
-                decision.tool.kind === ConfigurationToolKind.Inspect ||
-                decision.tool.kind === ConfigurationToolKind.Interact;
-              const state = isScopedOrInteractive
-                ? [result.result, result.snapshot.html, result.snapshot.responses]
-                : result.result;
-              if (!progress.observe(decision.tool, state))
-                fail('Repeated operation without progress.');
-              // Inspection is a scoped observation, not a replacement of the browser state.
-              snapshot = await session.snapshot();
-              history.push({
-                id: decisionIndex,
-                tool: decision.tool,
-                result: redactObject(result.result),
-                ...(isScopedOrInteractive
-                  ? {
-                      evidence: observationPacket(
-                        result.snapshot,
-                        Math.max(500, Math.floor(available * 0.2))
-                      ),
-                    }
-                  : {}),
-              });
-              feedback = '';
-            } catch (error) {
-              if (
-                error instanceof ConfigurationFailure ||
-                classifyAccessFailure(error) ||
-                work.signal.aborted
-              )
-                throw error;
-              if (!progress.observe(decision.tool, String(error)))
-                fail('Repeated operation without progress.');
-              history.push({
-                id: decisionIndex,
-                tool: decision.tool,
-                error: redactText(String(error)),
-              });
-              feedback = 'Tool failed: ' + redactText(String(error));
-            }
+            feedback = await this.handleToolDecision({
+              tool: decision.tool,
+              session,
+              progress,
+              history,
+              decisionIndex,
+              availableLimit: available,
+              run,
+              work,
+              fail,
+            });
+            snapshot = await session.snapshot();
             continue;
           }
+
+          // Candidate branch
           progress.reset();
           attempts++;
+
           const plan = extractionPlanSchema.parse(normalizeSingleFieldSources(decision.plan));
-          if (request.intent && !sameIntent(request.intent, plan.intent))
+          if (request.intent && !sameIntent(request.intent, plan.intent)) {
             fail('Recovery cannot change extraction intent.');
-          const key = canonicalJson(plan);
-          if (rejected.has(key))
+          }
+
+          const planKey = canonicalJson(plan);
+          if (rejected.has(planKey)) {
             fail('Repeated rejected extraction strategy. Previous failure: ' + feedback);
-          rejected.add(key);
-          // Release browser capacity before fresh validation; reopen/replay only if repair needs it.
+          }
+          rejected.add(planKey);
+
+          // Fast in-memory sanity check: verify DOM record container exists in observed snapshot
+          const precheck = precheckCandidatePlanInSnapshot(plan, snapshot);
+          if (!precheck.valid) {
+            history.push({ id: decisionIndex, rejection: precheck.rejection });
+            feedback = precheck.rejection!;
+            if (attempts >= this.options.maxAttempts) fail(feedback);
+            continue;
+          }
+
+          // Release browser capacity before fresh validation
           await session.close();
+
           const execution = await run(ConfigurationStage.Validation, () =>
             this.executor.execute(request.url, plan, {
               timeoutMs: work.remaining(),
@@ -223,39 +207,35 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               captureScreenshot: request.captureScreenshot,
             })
           );
+
           if (!isAcceptedExtractionQuality(execution.report.quality)) {
-            history.push({
-              id: decisionIndex,
-              validation: redactObject({
-                records: plan.strategy.records,
-                identityFields: plan.intent.identityFields,
-                quality: execution.report.quality,
-                issues: execution.report.issues.slice(0, 8),
-                sourcesUsed: execution.report.sourcesUsed,
-                evidence: execution.report.evidence?.slice(0, 8),
-              }),
-            });
+            history.push(buildValidationHistoryEntry(decisionIndex, plan, execution));
             throw new Error(execution.report.issues.join(' '));
           }
+
           if (
             !request.intent &&
             execution.report.quality === ExtractionQuality.Empty &&
             !execution.report.validatedSourceRecords
-          )
+          ) {
             throw new Error('An initially empty collection cannot validate field sources.');
+          }
+
           const semanticReview = await reviewConfiguration({
             model: this.model,
             enabled: this.options.semanticEnabled,
             threshold: this.options.semanticThreshold,
             intent: plan.intent,
             execution,
-            stageInput: input('', true),
+            stageInput: buildStageInput('', true),
             evidenceLimit: available,
             trace,
             run,
           });
+
           execution.report.semanticReview = semanticReview;
           execution.report.trace = [...trace, ...(execution.report.trace ?? [])];
+
           return { plan, execution, semanticReview, trace };
         } catch (error) {
           if (
@@ -263,8 +243,10 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
             classifyAccessFailure(error) ||
             (error instanceof DomainError && error.isRetryable) ||
             work.signal.aborted
-          )
+          ) {
             throw error;
+          }
+
           feedback = redactText(
             error instanceof Error ? error.message : String(error),
             this.options.evidenceLimit / 4
@@ -274,12 +256,85 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           snapshot = await session.snapshot();
         }
       }
+
       return fail(feedback || 'Configuration decision budget exhausted.');
     } catch (error) {
-      if (work.signal.aborted || context.signal.aborted) fail('Configuration deadline exhausted.');
+      if (work.signal.aborted || context.signal.aborted) {
+        fail('Configuration deadline exhausted.');
+      }
       throw error;
     } finally {
       await session.close();
+    }
+  }
+
+  private async handleToolDecision(params: {
+    tool: ConfigurationTool;
+    session: ConfigurationSession;
+    progress: ConfigurationProgress;
+    history: unknown[];
+    decisionIndex: number;
+    availableLimit: number;
+    run: <T>(stage: string, action: () => Promise<T>) => Promise<T>;
+    work: ReturnType<typeof createExecutionContext>;
+    fail: (message: string) => never;
+  }): Promise<string> {
+    const { tool, session, progress, history, decisionIndex, availableLimit, run, work, fail } =
+      params;
+    const currentToolCount = countToolHistory(history);
+
+    if (currentToolCount >= 5) {
+      const limitNotice = `Observation budget limit reached (${currentToolCount} tools executed). Do not make further tool calls; emit kind 'candidate' with your best extraction plan now.`;
+      history.push({ id: decisionIndex, rejection: limitNotice });
+      return limitNotice;
+    }
+
+    try {
+      const result = await run('tool:' + tool.kind, () => session.execute(tool));
+      const isScoped = isScopedOrInteractiveTool(tool.kind);
+      const state = isScoped
+        ? [result.result, result.snapshot.html, result.snapshot.responses]
+        : result.result;
+
+      if (!progress.observe(tool, state)) {
+        fail('Repeated operation without progress.');
+      }
+
+      history.push({
+        id: decisionIndex,
+        tool,
+        result: result.result,
+        ...(isScoped
+          ? {
+              evidence: observationPacket(
+                result.snapshot,
+                Math.max(500, Math.floor(availableLimit * 0.2))
+              ),
+            }
+          : {}),
+      });
+
+      return '';
+    } catch (error) {
+      if (
+        error instanceof ConfigurationFailure ||
+        classifyAccessFailure(error) ||
+        work.signal.aborted
+      ) {
+        throw error;
+      }
+
+      if (!progress.observe(tool, String(error))) {
+        fail('Repeated operation without progress.');
+      }
+
+      history.push({
+        id: decisionIndex,
+        tool,
+        error: redactText(String(error)),
+      });
+
+      return 'Tool failed: ' + redactText(String(error));
     }
   }
 }

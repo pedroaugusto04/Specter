@@ -273,4 +273,35 @@ describe('Bounded configuration with tools', () => {
     expect(reviewPacket.context.result.data.items).toHaveLength(25);
     expect(reviewPacket.context.result.provenance).toHaveLength(40);
   });
+
+  it('rejects candidates in-memory without validation when record selector has 0 matches in observed DOM', async () => {
+    const invalidSelectorPlan = {
+      ...plan,
+      strategy: {
+        ...plan.strategy,
+        records: { kind: 'dom' as const, selector: 'div.non-existent-container' },
+      },
+    };
+    const validPlan = {
+      ...plan,
+      strategy: {
+        ...plan.strategy,
+        records: { kind: 'dom' as const, selector: 'h1' },
+      },
+    };
+    const fixture = setup({
+      decisions: [
+        { kind: 'candidate', plan: invalidSelectorPlan },
+        { kind: 'candidate', plan: validPlan },
+      ],
+    });
+    // Executor should only be called once, for the valid plan!
+    await expect(fixture.pipeline.configure(request)).resolves.toMatchObject({
+      plan: validPlan,
+    });
+    expect(fixture.execute).toHaveBeenCalledTimes(1);
+    expect(fixture.inputs[1]).toContain(
+      "Candidate record selector 'div.non-existent-container' matched 0 elements in observed DOM"
+    );
+  });
 });
