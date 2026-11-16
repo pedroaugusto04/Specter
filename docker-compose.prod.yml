@@ -69,7 +69,7 @@ services:
       AGY_MODEL: ${AGY_MODEL:-}
       CODEX_CLI_PATH: /usr/local/bin/codex
       COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
-      CODEX_SANDBOX: ${CODEX_SANDBOX:-read-only}
+      CODEX_SANDBOX: ${CODEX_SANDBOX:-danger-full-access}
       CODEX_HOME: /root/.codex
     ports:
       - '${PORT:-3001}:3001'
