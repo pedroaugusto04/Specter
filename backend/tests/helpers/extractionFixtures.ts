@@ -24,6 +24,7 @@ export interface FixtureCompilerInput {
   jobId: string;
   sanitizedHtml: string;
   userPrompt: string;
+  signal?: AbortSignal;
 }
 export interface FixtureCompiler {
   compile(input: FixtureCompilerInput): Promise<ExtractionPlan>;
@@ -163,15 +164,20 @@ export function fixtureConfiguration(
 ): IConfigurationPipeline {
   return {
     configure: async (request: ConfigurationRequest) => {
+      request.signal?.throwIfAborted();
       const fetched = await scraper.fetchHtml(request.url);
+      request.signal?.throwIfAborted();
       const plan = await compiler.compile({
         jobId: request.jobId,
         userPrompt: request.prompt,
         sanitizedHtml: buildCompilerEvidence(fetched.rawHtml, 200000),
+        signal: request.signal,
       });
+      request.signal?.throwIfAborted();
       const result = await fixtureExecutor(scraper).execute(request.url, plan, {
         captureScreenshot: request.captureScreenshot,
       });
+      request.signal?.throwIfAborted();
       if (!['COMPLETE', 'EMPTY'].includes(result.report.quality))
         throw new CompilerValidationError(result.report.issues.join(' '));
       return {

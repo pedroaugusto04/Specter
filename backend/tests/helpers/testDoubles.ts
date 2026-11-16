@@ -399,6 +399,9 @@ export class MockJobScheduler implements IJobScheduler {
   async enqueueCompilation(jobId: string, reason: 'initial' | 'healing' | 'manual'): Promise<void> {
     this.compilationQueue.push({ jobId, reason });
   }
+  async removePendingCompilations(jobId: string): Promise<void> {
+    this.compilationQueue = this.compilationQueue.filter((item) => item.jobId !== jobId);
+  }
   async enqueueImmediateScrape(jobId: string): Promise<void> {
     this.immediateScrapeQueue.push(jobId);
   }

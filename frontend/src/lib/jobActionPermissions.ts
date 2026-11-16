@@ -2,7 +2,7 @@ import type { ScrapingJobDto } from '@/lib/api';
 import { JOB_STATUS } from '@/lib/domainValues';
 import { formatDateTime } from '@/lib/utils';
 
-export type JobRowActionType = 'run' | 'recompile' | 'pause' | 'delete';
+export type JobRowActionType = 'run' | 'recompile' | 'cancel-compilation' | 'pause' | 'delete';
 
 export interface ActionPermissionItem {
   disabled: boolean;
@@ -71,24 +71,22 @@ export function getJobActionPermissions({
     runTitle = 'Action in progress...';
   }
 
-  // Recompile Action
-  let recompileDisabled = isJobBusy || isCompiling || isRunning;
-  let recompileTitle = 'Recompile selectors';
-  if (isCompiling) {
-    recompileTitle = 'Compilation is already in progress';
-  } else if (isRunning) {
+  // Recompile / Stop Compilation Action
+  let recompileDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning;
+  let recompileTitle = isCompiling ? 'Stop compilation' : 'Recompile selectors';
+  if (isRunning) {
     recompileTitle = 'Cannot recompile while extraction is running';
-  } else if (isJobBusy) {
+  } else if (isJobBusy && currentAction !== 'recompile') {
     recompileTitle = 'Action in progress...';
   }
 
   // Pause / Resume Action
-  let pauseDisabled = isJobBusy || isCompiling || isRunning || isFailed;
+  let pauseDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning || isFailed;
   let pauseTitle = isPaused ? 'Resume schedule' : 'Pause schedule';
   if (isFailed) {
     pauseTitle = 'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.';
   } else if (isCompiling) {
-    pauseTitle = 'Schedule is suspended during compilation';
+    pauseTitle = 'Stop compilation and pause monitor';
   } else if (isRunning) {
     pauseTitle = 'Cannot change schedule state while extraction is running';
   } else if (isJobBusy) {
@@ -97,11 +95,9 @@ export function getJobActionPermissions({
 
   // Delete Action
   let deleteDisabled = isJobBusy || isRunning;
-  let deleteTitle = 'Delete monitor';
+  let deleteTitle = isCompiling ? 'Stop compilation and delete monitor' : 'Delete monitor';
   if (isRunning) {
     deleteTitle = 'Cannot delete while extraction is in progress';
-  } else if (currentAction === 'recompile') {
-    deleteTitle = 'Cannot delete while recompile request is running';
   } else if (isJobBusy) {
     deleteTitle = 'Action in progress...';
   }

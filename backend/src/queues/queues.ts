@@ -78,6 +78,23 @@ export class BullMqJobScheduler implements IJobScheduler {
     logger.info('Enqueued job compilation task', { jobId, reason });
   }
 
+  async removePendingCompilations(jobId: string): Promise<void> {
+    const jobs = await this.compilationQueue.getJobs(['waiting', 'delayed', 'prioritized', 'active']);
+    for (const job of jobs) {
+      if (job.data?.jobId === jobId) {
+        try {
+          await job.remove();
+          logger.info('Removed pending compilation job from Redis queue', {
+            jobId,
+            queueJobId: job.id,
+          });
+        } catch {
+          // Job might be currently being processed or already completed
+        }
+      }
+    }
+  }
+
   async enqueueImmediateScrape(jobId: string): Promise<void> {
     await this.scrapeQueue.add(
       'scrape-job',

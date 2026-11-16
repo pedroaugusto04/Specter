@@ -133,6 +133,16 @@ export function registerJobRoutes(
     }
   );
 
+  app.post<{ Params: { id: string } }>(
+    '/api/jobs/:id/cancel-compilation',
+    { preHandler: [withAuth] },
+    async (request) => {
+      const user = requireUser(request);
+      const updated = await jobService.cancelCompilation(request.params.id, user.id);
+      return { data: updated };
+    }
+  );
+
   app.get<{ Params: { id: string } }>(
     '/api/jobs/:id/runs',
     { preHandler: [withAuth] },

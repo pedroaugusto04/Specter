@@ -131,7 +131,8 @@ async function bootstrap(): Promise<void> {
     sessionRepository,
     realtimeService,
     new JobPresenter(accessCooldown),
-    quotaService
+    quotaService,
+    compilationService
   );
   const authService = new AuthService(userRepository, {
     onTimezoneChanged: (userId) => schedules.refreshUserSchedules(userId, jobScheduler),

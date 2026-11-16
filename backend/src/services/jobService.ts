@@ -36,6 +36,7 @@ export type UpdateScrapingJobRequest = UpdateJobRequest;
 
 import type { RealtimeService } from './realtimeService.js';
 import type { QuotaService } from './quotaService.js';
+import type { CompilationService } from './compilationService.js';
 
 export class JobService {
   private readonly jobRepository: IJobRepository;
@@ -44,6 +45,7 @@ export class JobService {
   private readonly sessionRepository?: ISessionRepository;
   private readonly realtimeService?: RealtimeService;
   private readonly quotaService?: QuotaService;
+  private readonly compilationService?: CompilationService;
 
   constructor(
     jobRepository: IJobRepository,
@@ -52,7 +54,8 @@ export class JobService {
     sessionRepository?: ISessionRepository,
     realtimeService?: RealtimeService,
     private readonly presenter: JobPresenter = new JobPresenter(),
-    quotaService?: QuotaService
+    quotaService?: QuotaService,
+    compilationService?: CompilationService
   ) {
     this.jobRepository = jobRepository;
     this.jobScheduler = jobScheduler;
@@ -60,6 +63,7 @@ export class JobService {
     this.sessionRepository = sessionRepository;
     this.realtimeService = realtimeService;
     this.quotaService = quotaService;
+    this.compilationService = compilationService;
   }
 
   async probeUrl(
@@ -309,6 +313,8 @@ export class JobService {
     const existing = await this.getOwnedJob(id, userId);
 
     if (paused) {
+      this.compilationService?.cancelCompilation(existing.id, 'Monitor paused by user');
+      await this.jobScheduler.removePendingCompilations(existing.id);
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       const updated = await this.jobRepository.updateJob(id, {
         status: JobStatus.Paused,
@@ -381,9 +387,31 @@ export class JobService {
     return resultDto;
   }
 
+  async cancelCompilation(id: string, userId?: string): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(id, userId);
+
+    this.compilationService?.cancelCompilation(existing.id, 'Compilation cancelled by user');
+    await this.jobScheduler.removePendingCompilations(existing.id);
+
+    // If job already had an extraction plan, revert to ACTIVE, otherwise set to PAUSED
+    const targetStatus = existing.extractionPlan ? JobStatus.Active : JobStatus.Paused;
+
+    const updated = await this.jobRepository.updateJob(id, {
+      status: targetStatus,
+      failureCount: 0,
+      lastError: null,
+    });
+
+    const resultDto = await this.presenter.present(updated ?? existing);
+    await this.realtimeService?.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    return resultDto;
+  }
+
   async deleteJob(id: string, userId?: string): Promise<void> {
     const existing = await this.getOwnedJob(id, userId);
 
+    this.compilationService?.cancelCompilation(existing.id, 'Monitor deleted by user');
+    await this.jobScheduler.removePendingCompilations(existing.id);
     await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
     await this.jobRepository.deleteJob(id);
     await this.realtimeService?.notifyJobDeleted(existing.userId, existing.id);

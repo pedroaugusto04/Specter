@@ -11,6 +11,8 @@ import {
 import { CompilationService } from '../../src/services/compilationService.js';
 import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import { CompilationReason } from '../../src/queues/scheduler.interface.js';
+import { JobService } from '../../src/services/jobService.js';
+import { JobPresenter } from '../../src/presentation/jobPresenter.js';
 import {
   InMemoryJobRepository,
   MockCompilerProvider,
@@ -245,5 +247,120 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
     expect(currentJob?.status).toBe('ACTIVE');
     expect(currentJob?.failureCount).toBe(0);
     expect(scheduler.compilationQueue).toHaveLength(0);
+  });
+
+  it('instantly cancels an active compilation when requested via jobService.cancelCompilation', async () => {
+    const jobService = new JobService(
+      repository,
+      scheduler,
+      scraper,
+      undefined,
+      undefined,
+      new JobPresenter(),
+      undefined,
+      compilationService
+    );
+
+    const job = await repository.createJob({
+      url: 'https://example.com/item',
+      userPrompt: 'Monitor price',
+      notificationEmail: 'alerts@example.com',
+      cronExpression: '*/30 * * * *',
+    });
+
+    let compilationStarted = false;
+    compiler.setHandler(async (input) => {
+      compilationStarted = true;
+      await new Promise<void>((_, reject) => {
+        if (input.signal?.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'));
+          return;
+        }
+        input.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      });
+      return fixturePlan({
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+        fields: {},
+      });
+    });
+
+    const compilePromise = compilationService.compileJob(job.id);
+
+    while (!compilationStarted) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    const resultDto = await jobService.cancelCompilation(job.id);
+    await compilePromise;
+
+    expect(resultDto.status).toBe('PAUSED');
+    const updated = await repository.findById(job.id);
+    expect(updated?.status).toBe('PAUSED');
+    expect(scheduler.compilationQueue).toHaveLength(0);
+    expect(repository.runs).toHaveLength(0);
+  });
+
+  it('cancels ongoing compilation and pauses the monitor when setJobPauseState(true) is invoked', async () => {
+    const jobService = new JobService(
+      repository,
+      scheduler,
+      scraper,
+      undefined,
+      undefined,
+      new JobPresenter(),
+      undefined,
+      compilationService
+    );
+
+    const job = await repository.createJob({
+      url: 'https://example.com/item',
+      userPrompt: 'Monitor price',
+      notificationEmail: 'alerts@example.com',
+      cronExpression: '*/30 * * * *',
+    });
+
+    let compilationStarted = false;
+    compiler.setHandler(async (input) => {
+      compilationStarted = true;
+      await new Promise<void>((_, reject) => {
+        if (input.signal?.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'));
+          return;
+        }
+        input.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      });
+      return fixturePlan({
+        mode: 'single',
+        readySelector: 'body',
+        scope: 'page',
+        identityFields: [],
+        triggerRules: [],
+        triggerMatchMode: 'all',
+        fields: {},
+      });
+    });
+
+    const compilePromise = compilationService.compileJob(job.id);
+
+    while (!compilationStarted) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    await jobService.setJobPauseState(job.id, true);
+    await compilePromise;
+
+    const updated = await repository.findById(job.id);
+    expect(updated?.status).toBe('PAUSED');
+    expect(scheduler.compilationQueue).toHaveLength(0);
+    expect(repository.runs).toHaveLength(0);
   });
 });

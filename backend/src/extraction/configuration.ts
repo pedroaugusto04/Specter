@@ -34,6 +34,7 @@ export interface ConfigurationRequest {
   intent?: ExtractionIntent;
   storageState?: unknown;
   captureScreenshot?: boolean;
+  signal?: AbortSignal;
 }
 export interface ConfigurationResult {
   plan: ExtractionPlan;
@@ -66,7 +67,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
   ) {}
 
   async configure(request: ConfigurationRequest): Promise<ConfigurationResult> {
-    const context = createExecutionContext(this.options.budgetMs);
+    const context = createExecutionContext(this.options.budgetMs, request.signal);
     const reserve = this.options.semanticEnabled ? this.options.reviewReserveMs : 0;
     if (reserve >= this.options.budgetMs)
       throw new ConfigurationFailure(

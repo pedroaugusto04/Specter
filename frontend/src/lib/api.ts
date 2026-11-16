@@ -217,6 +217,13 @@ export const api = {
     });
   },
 
+  cancelCompilation(id: string): Promise<ScrapingJobDto> {
+    return request<ScrapingJobDto>(`/api/jobs/${id}/cancel-compilation`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
   deleteJob(id: string): Promise<void> {
     return request<void>(`/api/jobs/${id}`, {
       method: 'DELETE',

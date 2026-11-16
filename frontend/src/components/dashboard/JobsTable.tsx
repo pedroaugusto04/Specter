@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import {
+  useCancelCompilationMutation,
   useDeleteJobMutation,
   useRecompileJobMutation,
   useTogglePauseMutation,
@@ -31,6 +32,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Square,
   Trash2,
   Zap,
 } from 'lucide-react';
@@ -115,6 +117,7 @@ export function JobsTable({
   const modal = useModal();
   const triggerJobMutation = useTriggerJobMutation();
   const recompileJobMutation = useRecompileJobMutation();
+  const cancelCompilationMutation = useCancelCompilationMutation();
   const togglePauseMutation = useTogglePauseMutation();
   const deleteJobMutation = useDeleteJobMutation();
 
@@ -321,6 +324,7 @@ export function JobsTable({
                 const isCompilingState =
                   job.status === JOB_STATUS.PendingCompilation || job.status === JOB_STATUS.Healing;
                 const isCompiling = isCompilingState || currentAction === 'recompile';
+                const isCancelling = currentAction === 'cancel-compilation';
                 const isPausing = currentAction === 'pause';
                 const isDeleting = currentAction === 'delete';
                 const isPaused = job.status === JOB_STATUS.Paused;
@@ -456,15 +460,35 @@ export function JobsTable({
                           <History className="h-3.5 w-3.5" />
                         </Button>
 
-                        {/* Recompile */}
+                        {/* Recompile / Stop Compilation */}
                         <Button
                           variant="ghost"
                           size="icon"
                           disabled={permissions.recompile.disabled}
                           title={permissions.recompile.title}
-                          aria-label="Recompile selectors"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          aria-label={isCompiling ? 'Stop compilation' : 'Recompile selectors'}
+                          className={`h-7 w-7 ${
+                            isCompiling
+                              ? 'text-red-500 hover:text-red-600 hover:bg-red-500/10'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
                           onClick={async () => {
+                            if (isCompiling) {
+                              const confirmed = await modal.confirm({
+                                title: 'Stop Compilation',
+                                message: `Are you sure you want to stop compilation for "${job.name}"?`,
+                                confirmLabel: 'Stop Compilation',
+                                cancelLabel: 'Cancel',
+                                variant: 'destructive',
+                              });
+                              if (confirmed) {
+                                void handleAction(job.id, 'cancel-compilation', () =>
+                                  cancelCompilationMutation.mutateAsync(job.id)
+                                );
+                              }
+                              return;
+                            }
+
                             const confirmed = await modal.confirm({
                               title: 'Recompile Selectors',
                               message: `Are you sure you want to recompile the AI extraction selectors for "${job.name}"?`,
@@ -479,8 +503,10 @@ export function JobsTable({
                             }
                           }}
                         >
-                          {isCompiling ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
+                          {isCancelling ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                          ) : isCompiling ? (
+                            <Square className="h-3.5 w-3.5 fill-current text-red-500" />
                           ) : (
                             <RefreshCw className="h-3.5 w-3.5" />
                           )}
@@ -495,6 +521,25 @@ export function JobsTable({
                           aria-label={isPaused ? 'Resume schedule' : 'Pause schedule'}
                           className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
                           onClick={async () => {
+                            if (isCompiling) {
+                              const confirmed = await modal.confirm({
+                                title: 'Pause Monitor & Stop Compilation',
+                                message: `Compilation is currently running for "${job.name}". Pausing will stop compilation and suspend the monitor. Continue?`,
+                                confirmLabel: 'Stop & Pause',
+                                cancelLabel: 'Cancel',
+                                variant: 'default',
+                              });
+                              if (confirmed) {
+                                void handleAction(job.id, 'pause', () =>
+                                  togglePauseMutation.mutateAsync({
+                                    jobId: job.id,
+                                    paused: true,
+                                  })
+                                );
+                              }
+                              return;
+                            }
+
                             const actionTitle = isPaused ? 'Resume Schedule' : 'Pause Schedule';
                             const actionVerb = isPaused ? 'resume' : 'pause';
                             const confirmed = await modal.confirm({
@@ -532,9 +577,12 @@ export function JobsTable({
                           aria-label="Delete monitor"
                           className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted"
                           onClick={async () => {
+                            const deleteMessage = isCompiling
+                              ? `Compilation is currently running for "${job.name}". Deleting will cancel compilation and remove the monitor permanently. Continue?`
+                              : `Are you sure you want to permanently delete "${job.name}"?`;
                             const confirmed = await modal.confirm({
                               title: 'Delete Monitor',
-                              message: `Are you sure you want to permanently delete "${job.name}"?`,
+                              message: deleteMessage,
                               confirmLabel: 'Delete',
                               cancelLabel: 'Cancel',
                               variant: 'destructive',

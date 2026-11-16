@@ -52,7 +52,20 @@ export interface CompilationServiceDeps {
 }
 
 export class CompilationService {
+  private readonly activeCompilations = new Map<string, AbortController>();
+
   constructor(private readonly deps: CompilationServiceDeps) {}
+
+  cancelCompilation(jobId: string, reason?: string): boolean {
+    const controller = this.activeCompilations.get(jobId);
+    if (controller) {
+      logger.info('Cancelling active compilation task', { jobId, reason });
+      controller.abort(new Error(reason ?? 'Compilation cancelled by user'));
+      this.activeCompilations.delete(jobId);
+      return true;
+    }
+    return false;
+  }
 
   async compileJob(
     jobId: string,
@@ -96,6 +109,9 @@ export class CompilationService {
       }
     }
 
+    const abortController = new AbortController();
+    this.activeCompilations.set(job.id, abortController);
+
     let httpStatus: number | null = null;
 
     try {
@@ -121,6 +137,7 @@ export class CompilationService {
         intent: job.extractionPlan?.intent,
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
+        signal: abortController.signal,
       });
       const compiledSchema = configured.plan;
       if (job.extractionPlan && !sameIntent(job.extractionPlan.intent, compiledSchema.intent))
@@ -198,6 +215,19 @@ export class CompilationService {
 
       return updatedJob ?? job;
     } catch (error) {
+      if (
+        abortController.signal.aborted ||
+        (error instanceof Error && (error.name === 'AbortError' || error.message.includes('cancelled')))
+      ) {
+        logger.info('Job compilation cancelled by signal', {
+          jobId: job.id,
+          durationMs: Date.now() - startTime,
+        });
+        await assertExecutionLease().catch(() => {});
+        const current = await this.deps.jobRepository.findById(job.id);
+        return current ?? job;
+      }
+
       const durationMs = Date.now() - startTime;
       const errorMessage =
         error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -265,6 +295,8 @@ export class CompilationService {
       await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id, failureStatus);
 
       throw error;
+    } finally {
+      this.activeCompilations.delete(job.id);
     }
   }
 }

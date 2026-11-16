@@ -319,6 +319,20 @@ export function useRecompileJobMutation() {
   });
 }
 
+export function useCancelCompilationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobId: string) => api.cancelCompilation(jobId),
+    onSuccess: (_, jobId) => {
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
+    },
+  });
+}
+
 export function useProbeUrlMutation() {
   return useMutation({
     mutationFn: (url: string) => api.probeUrl(url),
