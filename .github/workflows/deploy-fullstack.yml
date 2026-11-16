@@ -235,6 +235,7 @@ jobs:
           POSTGRES_DB: ${{ secrets.POSTGRES_DB || vars.POSTGRES_DB }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
+          REALTIME_REDIS_TIMEOUT_MS: ${{ vars.REALTIME_REDIS_TIMEOUT_MS }}
           CORS_ORIGIN: ${{ env.CORS_ORIGIN }}
           SEMANTIC_REVIEW_ENABLED: ${{ env.SEMANTIC_REVIEW_ENABLED }}
           SEMANTIC_REVIEW_THRESHOLD: ${{ env.SEMANTIC_REVIEW_THRESHOLD }}

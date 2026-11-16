@@ -1,5 +1,6 @@
 import { Redis, type RedisOptions } from 'ioredis';
 import { logger } from '../../utils/logger.js';
+import { env } from '../../config/env.js';
 import type {
   IRealtimeEventBus,
   RealtimeEvent,
@@ -14,17 +15,23 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
   private readonly subscriber: Redis;
   private readonly listeners = new Map<string, Set<RealtimeEventHandler>>();
   private readonly subscriptions = new Map<string, Promise<void>>();
+  private readonly disconnectHandlers = new Set<() => void>();
   private isClosed = false;
 
   constructor(options: RedisOptions) {
-    this.publisher = new Redis({
+    const connectionOptions: RedisOptions = {
       ...options,
       lazyConnect: false,
-    });
-    this.subscriber = new Redis({
-      ...options,
-      lazyConnect: false,
-    });
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+      commandTimeout: env.REALTIME_REDIS_TIMEOUT_MS,
+      connectTimeout: env.REALTIME_REDIS_TIMEOUT_MS,
+      autoResubscribe: false,
+    };
+    this.publisher = new Redis(connectionOptions);
+    this.subscriber = new Redis(connectionOptions);
+
+    this.subscriber.on('close', () => this.disconnectStreams());
 
     this.subscriber.on('message', (channel: string, message: string) => {
       try {
@@ -67,19 +74,20 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
 
   async publish(event: RealtimeEvent): Promise<void> {
     if (this.isClosed) return;
+    const channel = `${CHANNEL_PREFIX}${event.userId}`;
     try {
-      const channel = `${CHANNEL_PREFIX}${event.userId}`;
       await this.publisher.publish(channel, JSON.stringify(event));
-    } catch (err) {
-      logger.warn('Failed to publish realtime event to Redis channel', {
-        userId: event.userId,
-        type: event.type,
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
+    } catch (error) {
+      this.disconnectStreams();
+      throw error;
     }
   }
 
-  async subscribe(userId: string, handler: RealtimeEventHandler): Promise<() => void> {
+  async subscribe(
+    userId: string,
+    handler: RealtimeEventHandler,
+    onDisconnect?: () => void
+  ): Promise<() => void> {
     if (this.isClosed) throw new Error('Realtime event bus is closed');
 
     let handlers = this.listeners.get(userId);
@@ -88,6 +96,7 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
       this.listeners.set(userId, handlers);
     }
     handlers.add(handler);
+    if (onDisconnect) this.disconnectHandlers.add(onDisconnect);
 
     let subscription = this.subscriptions.get(userId);
     if (!subscription) {
@@ -97,8 +106,9 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
 
     try {
       await subscription;
-      return this.createUnsubscribe(userId, handler);
+      return this.createUnsubscribe(userId, handler, onDisconnect);
     } catch (err) {
+      if (onDisconnect) this.disconnectHandlers.delete(onDisconnect);
       handlers.delete(handler);
       if (handlers.size === 0) this.listeners.delete(userId);
       if (this.subscriptions.get(userId) === subscription) this.subscriptions.delete(userId);
@@ -110,8 +120,17 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
     }
   }
 
-  private createUnsubscribe(userId: string, handler: RealtimeEventHandler): () => void {
+  private disconnectStreams(): void {
+    for (const disconnect of [...this.disconnectHandlers]) disconnect();
+  }
+
+  private createUnsubscribe(
+    userId: string,
+    handler: RealtimeEventHandler,
+    onDisconnect?: () => void
+  ): () => void {
     return () => {
+      if (onDisconnect) this.disconnectHandlers.delete(onDisconnect);
       const current = this.listeners.get(userId);
       if (current) {
         current.delete(handler);
@@ -130,6 +149,8 @@ export class RedisRealtimeEventBus implements IRealtimeEventBus {
     this.isClosed = true;
     this.listeners.clear();
     this.subscriptions.clear();
-    await Promise.allSettled([this.subscriber.quit(), this.publisher.quit()]);
+    this.subscriber.disconnect();
+    this.publisher.disconnect();
+    this.disconnectHandlers.clear();
   }
 }

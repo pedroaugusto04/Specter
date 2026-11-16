@@ -179,6 +179,7 @@ export class ScrapeExecutionService {
           lastError: invalidExtractionMessage,
           ...(selectorFailure ? { failureCount: job.failureCount + 1 } : { failureCount: 0 }),
         });
+        await this.deps.realtimeService?.notifyJobUpdated(job.userId, job.id);
         return null;
       }
       const prepared = await new SuccessfulRunService(this.deps).prepare({

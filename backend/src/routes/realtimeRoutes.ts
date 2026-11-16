@@ -1,3 +1,4 @@
+import type { ServerResponse } from 'node:http';
 import { toRealtimeDto } from '../mappers/realtimeMapper.js';
 import type { FastifyInstance } from 'fastify';
 import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
@@ -11,6 +12,10 @@ export function registerRealtimeRoutes(
   authService: AuthService
 ): void {
   const withAuth = requireAuth(authService);
+  const streams = new Set<ServerResponse>();
+  app.addHook('preClose', async () => {
+    for (const stream of streams) stream.destroy();
+  });
 
   app.get('/api/events', { preHandler: [withAuth] }, async (request, reply) => {
     const userId = requireUser(request).id;
@@ -32,22 +37,32 @@ export function registerRealtimeRoutes(
     }
 
     let unsubscribe: (() => void) | undefined;
-    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+    let streamReady = false;
+    streams.add(raw);
+    const heartbeatTimer = setInterval(() => {
+      if (streamReady && !raw.writableEnded && !raw.destroyed) raw.write(': keepalive\n\n');
+    }, 20_000);
     const cleanup = () => {
+      streams.delete(raw);
       clearInterval(heartbeatTimer);
       unsubscribe?.();
     };
     raw.once('close', cleanup);
-    let streamReady = false;
     try {
       // Wait for Redis SUBSCRIBE acknowledgement before confirming the SSE connection.
-      unsubscribe = await realtimeService.subscribeUser(userId, (event) => {
-        if (!raw.writableEnded && !raw.destroyed) {
-          const message = `event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`;
-          if (streamReady) raw.write(message);
-        }
-      });
+      unsubscribe = await realtimeService.subscribeUser(
+        userId,
+        (event) => {
+          if (!raw.writableEnded && !raw.destroyed) {
+            const message = `event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`;
+            if (streamReady) raw.write(message);
+          }
+        },
+        () => raw.destroy()
+      );
     } catch {
+      cleanup();
+      if (raw.destroyed) return;
       return reply.code(503).send({ error: 'Realtime event stream is temporarily unavailable' });
     }
 
@@ -71,12 +86,5 @@ export function registerRealtimeRoutes(
       timestamp: new Date().toISOString(),
     });
     raw.write(`event: connected\ndata: ${connectedPayload}\n\n`);
-
-    // Heartbeat interval to prevent intermediate reverse proxies (Nginx, Traefik, Cloudflare) from timing out
-    heartbeatTimer = setInterval(() => {
-      if (!raw.writableEnded && !raw.destroyed) {
-        raw.write(': keepalive\n\n');
-      }
-    }, 20_000);
   });
 }

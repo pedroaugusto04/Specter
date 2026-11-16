@@ -21,6 +21,7 @@ export const envSchema = z.object({
     .string()
     .url('REDIS_URL must be a valid Redis URL')
     .default('redis://localhost:6379'),
+  REALTIME_REDIS_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   REDIS_HOST: z.string().min(1).default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
 

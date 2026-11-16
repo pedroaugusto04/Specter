@@ -1,3 +1,7 @@
+import { ExtractionQuality, FailureCode } from '../../src/extraction/constants.js';
+import { InMemoryRealtimeEventBus } from '../../src/providers/realtime/inMemoryRealtime.provider.js';
+import { RealtimeService } from '../../src/services/realtimeService.js';
+import type { RealtimeEvent } from '../../src/providers/realtime/realtime.interface.js';
 import { NoopStorageProvider } from '../../src/providers/storage/noopStorage.provider.js';
 import { fixtureExecutor, fixtureConfiguration } from '../helpers/extractionFixtures.js';
 import { fixturePlan } from '../helpers/extractionFixtures.js';
@@ -50,6 +54,50 @@ describe('Job Compilation, Diff Notifications & Self-Healing State Machine', () 
       consecutiveFailuresForHealing: 2,
       maxHealingRetries: 3,
     });
+  });
+  it('notifies subscribers after an inconclusive run updates the error and failure counter', async () => {
+    const bus = new InMemoryRealtimeEventBus();
+    const realtimeService = new RealtimeService(bus);
+    const job = await repository.createJob({
+      url: 'https://store.example.com/item',
+      userPrompt: 'Monitor title',
+      cronExpression: '0 */6 * * *',
+    });
+    await compilationService.compileJob(job.id);
+    const events: RealtimeEvent[] = [];
+    await bus.subscribe(job.userId, (event) => events.push(event));
+    const executor = fixtureExecutor(scraper);
+    const service = new ScrapeExecutionService({
+      jobRepository: repository,
+      planExecutor: {
+        execute: async (...args) => {
+          const result = await executor.execute(...args);
+          return {
+            ...result,
+            report: {
+              ...result.report,
+              quality: ExtractionQuality.Inconclusive,
+              failureCode: FailureCode.NoProgress,
+              issues: ['Extraction could not be validated.'],
+            },
+          };
+        },
+      },
+      alertRouter: notifier,
+      storageProvider: new NoopStorageProvider(),
+      jobScheduler: scheduler,
+      realtimeService,
+      consecutiveFailuresForHealing: 2,
+      maxHealingRetries: 3,
+    });
+    await service.executeScrape(job.id);
+    expect((await repository.findById(job.id))?.failureCount).toBe(1);
+    expect(events.at(-1)).toMatchObject({ type: 'JOB_UPDATED', jobId: job.id });
+    expect(events.at(-1)?.status).not.toBe('RUNNING');
+    expect((await repository.findRunsByJobId(job.id)).some((run) => run.status === 'FAILED')).toBe(
+      true
+    );
+    await realtimeService.close();
   });
   it('transitions job from PENDING_COMPILATION to ACTIVE after sanitizing DOM, compiling, and passing smoke-test', async () => {
     scraper.setHandler(async (url) => ({

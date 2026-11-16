@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { InMemoryRealtimeEventBus } from '../../src/providers/realtime/inMemoryRealtime.provider.js';
-import type { RealtimeEvent } from '../../src/providers/realtime/realtime.interface.js';
+import type {
+  RealtimeEvent,
+  RealtimeEventHandler,
+} from '../../src/providers/realtime/realtime.interface.js';
 import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
@@ -84,83 +87,106 @@ describe('Realtime EventBus & SSE Streaming', () => {
   });
 
   describe('SSE HTTP Route (/api/events)', () => {
-    it('serves SSE stream headers, handshake event, and pushes live domain events', async () => {
-      const bus = new InMemoryRealtimeEventBus();
-      const realtimeService = new RealtimeService(bus);
+    it.each(['shutdown', 'disconnect', 'unavailable'])(
+      'handles SSE delivery and %s without leaving an open stream',
+      async (mode) => {
+        let disconnect = () => {};
+        const bus = new InMemoryRealtimeEventBus();
+        const originalSubscribe = bus.subscribe.bind(bus);
+        vi.spyOn(bus, 'subscribe').mockImplementation(
+          async (userId: string, handler: RealtimeEventHandler, onDisconnect?: () => void) => {
+            if (mode === 'unavailable') throw new Error('Redis unavailable');
+            disconnect = onDisconnect ?? (() => {});
+            return originalSubscribe(userId, handler);
+          }
+        );
+        const realtimeService = new RealtimeService(bus);
 
-      const jobRepo = new InMemoryJobRepository();
-      const userRepo = new InMemoryUserRepository();
-      const scheduler = new MockJobScheduler();
-      const scraper = new MockScraperEngine();
+        const jobRepo = new InMemoryJobRepository();
+        const userRepo = new InMemoryUserRepository();
+        const scheduler = new MockJobScheduler();
+        const scraper = new MockScraperEngine();
 
-      const jobService = new JobService({
-        jobRepository: jobRepo,
-        jobScheduler: scheduler,
-        compilationControl: { cancelCompilation: () => false },
-        scraperEngine: scraper,
-        realtimeService,
-      });
-      const authService = new AuthService(userRepo);
-      const authenticated = await authService.register({
-        email: 'events@example.com',
-        password: 'events-test-password',
-        name: 'Events owner',
-      });
-      const integrationService = {
-        getIntegrationSettings: async () => ({}),
-        updateIntegrationSettings: async () => ({}),
-        testTelegramNotification: async () => ({ success: true, message: 'ok' }),
-        testWebhookNotification: async () => ({ success: true, message: 'ok', statusCode: 200 }),
-      } as unknown as IntegrationService;
+        const jobService = new JobService({
+          jobRepository: jobRepo,
+          jobScheduler: scheduler,
+          compilationControl: { cancelCompilation: () => false },
+          scraperEngine: scraper,
+          realtimeService,
+        });
+        const authService = new AuthService(userRepo);
+        const authenticated = await authService.register({
+          email: 'events@example.com',
+          password: 'events-test-password',
+          name: 'Events owner',
+        });
+        const integrationService = {
+          getIntegrationSettings: async () => ({}),
+          updateIntegrationSettings: async () => ({}),
+          testTelegramNotification: async () => ({ success: true, message: 'ok' }),
+          testWebhookNotification: async () => ({ success: true, message: 'ok', statusCode: 200 }),
+        } as unknown as IntegrationService;
 
-      const app = await buildApp({
-        jobService,
-        authService,
-        integrationService,
-        realtimeService,
-        enableLogger: false,
-      });
+        const app = await buildApp({
+          jobService,
+          authService,
+          integrationService,
+          realtimeService,
+          enableLogger: false,
+        });
 
-      const anonymous = await app.inject({ method: 'GET', url: '/api/events' });
-      expect(anonymous.statusCode).toBe(401);
-      await app.listen({ port: 0, host: '127.0.0.1' });
-      const address = app.server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
+        const anonymous = await app.inject({ method: 'GET', url: '/api/events' });
+        expect(anonymous.statusCode).toBe(401);
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const address = app.server.address();
+        const port = typeof address === 'object' && address ? address.port : 0;
 
-      const controller = new AbortController();
-      const response = await fetch(`http://127.0.0.1:${port}/api/events`, {
-        signal: controller.signal,
-        headers: { Authorization: `Bearer ${authenticated.tokens.accessToken}` },
-      });
+        const controller = new AbortController();
+        const response = await fetch(`http://127.0.0.1:${port}/api/events`, {
+          signal: controller.signal,
+          headers: { Authorization: `Bearer ${authenticated.tokens.accessToken}` },
+        });
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('text/event-stream');
-      expect(response.headers.get('cache-control')).toBe('no-cache, no-transform');
-      expect(response.headers.get('x-accel-buffering')).toBe('no');
+        if (mode === 'unavailable') {
+          expect(response.status).toBe(503);
+          await app.close();
+          await realtimeService.close();
+          return;
+        }
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('text/event-stream');
+        expect(response.headers.get('cache-control')).toBe('no-cache, no-transform');
+        expect(response.headers.get('x-accel-buffering')).toBe('no');
 
-      const reader = response.body?.getReader();
-      expect(reader).toBeDefined();
+        const reader = response.body?.getReader();
+        expect(reader).toBeDefined();
 
-      // Read initial connection event
-      const firstChunk = await reader!.read();
-      const initialText = new TextDecoder().decode(firstChunk.value);
-      expect(initialText).toContain('event: connected');
-      expect(initialText).toContain('"type":"CONNECTED"');
+        // Read initial connection event
+        const firstChunk = await reader!.read();
+        const initialText = new TextDecoder().decode(firstChunk.value);
+        expect(initialText).toContain('event: connected');
+        expect(initialText).toContain('"type":"CONNECTED"');
 
-      // Publish a realtime event and verify it is pushed through SSE
-      const chunkPromise = reader!.read();
-      await realtimeService.notifyJobUpdated(authenticated.user.id, 'job-123', 'ACTIVE');
-      const liveChunk = await chunkPromise;
-      const liveText = new TextDecoder().decode(liveChunk.value);
+        // Publish a realtime event and verify it is pushed through SSE
+        const chunkPromise = reader!.read();
+        await realtimeService.notifyJobUpdated(authenticated.user.id, 'job-123', 'ACTIVE');
+        const liveChunk = await chunkPromise;
+        const liveText = new TextDecoder().decode(liveChunk.value);
 
-      expect(liveText).toContain('event: JOB_UPDATED');
-      expect(liveText).toContain('"jobId":"job-123"');
-      expect(liveText).toContain('"status":"ACTIVE"');
+        expect(liveText).toContain('event: JOB_UPDATED');
+        expect(liveText).toContain('"jobId":"job-123"');
+        expect(liveText).toContain('"status":"ACTIVE"');
 
-      // Abort connection and verify clean shutdown
-      controller.abort();
-      await app.close();
-      await realtimeService.close();
-    });
+        if (mode === 'disconnect') {
+          const ended = reader!.read().catch(() => ({ done: true }));
+          disconnect();
+          expect((await ended).done).toBe(true);
+        }
+        // Shutdown must finish without requiring the client to abort its SSE request.
+        await app.close();
+        controller.abort();
+        await realtimeService.close();
+      }
+    );
   });
 });

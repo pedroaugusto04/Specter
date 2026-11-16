@@ -45,8 +45,12 @@ export class RealtimeService {
     await this.notify({ type: 'JOB_RUN_COMPLETED', userId, jobId, runId, hasChanges });
   }
 
-  subscribeUser(userId: string, handler: RealtimeEventHandler): Promise<() => void> {
-    return this.eventBus.subscribe(userId, handler);
+  subscribeUser(
+    userId: string,
+    handler: RealtimeEventHandler,
+    onDisconnect?: () => void
+  ): Promise<() => void> {
+    return this.eventBus.subscribe(userId, handler, onDisconnect);
   }
 
   async close(): Promise<void> {

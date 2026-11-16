@@ -6,6 +6,11 @@ export type RealtimeEventHandler = (event: RealtimeEvent) => void;
 export interface IRealtimeEventBus {
   readonly name: string;
   publish(event: RealtimeEvent): Promise<void>;
-  subscribe(userId: string, handler: RealtimeEventHandler): Promise<() => void>;
+  /** Resolves when subscribed; onDisconnect tells callers to close and resynchronize the stream. */
+  subscribe(
+    userId: string,
+    handler: RealtimeEventHandler,
+    onDisconnect?: () => void
+  ): Promise<() => void>;
   close(): Promise<void>;
 }
