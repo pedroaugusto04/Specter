@@ -1,5 +1,5 @@
 'use client';
-import { runProgressLabel } from '@/lib/runProgress';
+import { runProgressPill } from '@/lib/runProgress';
 
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +60,7 @@ export function JobRunCard({
             }
           >
             {run.status === RUN_STATUS.Running
-              ? runProgressLabel(run)
+              ? runProgressPill(run)
               : (run.extractionReport?.quality ?? run.status)}
           </Badge>
           <Badge

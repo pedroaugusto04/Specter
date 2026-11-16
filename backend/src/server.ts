@@ -167,6 +167,7 @@ async function bootstrap(): Promise<void> {
       (jobId) => jobScheduler.enqueueCompilation(jobId, CompilationReason.Initial)
     );
     await reconcileRuns(jobRepository, jobScheduler, realtimeService);
+    await jobScheduler.scheduleRunReconciliation();
     await jobScheduler.scheduleDailyRetentionPruning();
   } catch (err) {
     logger.warn(

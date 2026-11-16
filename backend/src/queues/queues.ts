@@ -171,14 +171,39 @@ export class BullMqJobScheduler implements IJobScheduler {
     }
   }
 
+  async scheduleRunReconciliation(): Promise<void> {
+    const repeatable = await this.maintenanceQueue.getRepeatableJobs();
+    for (const job of repeatable) {
+      if (job.id === 'reconcile-runs' || job.name === 'reconcile-runs') {
+        await this.maintenanceQueue.removeRepeatableByKey(job.key);
+      }
+    }
+    await this.maintenanceQueue.add(
+      'reconcile-runs',
+      {},
+      {
+        jobId: 'reconcile-runs',
+        repeat: {
+          every: env.RUN_RECONCILE_INTERVAL_MS,
+        },
+      }
+    );
+  }
+
   async scheduleDailyRetentionPruning(): Promise<void> {
+    const repeatable = await this.maintenanceQueue.getRepeatableJobs();
+    for (const job of repeatable) {
+      if (job.id === 'daily-retention-pruning' || job.name === 'prune-unchanged-runs') {
+        await this.maintenanceQueue.removeRepeatableByKey(job.key);
+      }
+    }
     await this.maintenanceQueue.add(
       'prune-unchanged-runs',
       {},
       {
         jobId: 'daily-retention-pruning',
         repeat: {
-          every: env.RUN_RECONCILE_INTERVAL_MS,
+          pattern: '0 3 * * *', // Daily at 03:00 AM
         },
       }
     );

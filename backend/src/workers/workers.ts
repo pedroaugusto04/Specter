@@ -77,9 +77,15 @@ export class WorkerManager {
 
     this.maintenanceWorker = new Worker(
       MAINTENANCE_QUEUE_NAME,
-      async () => {
-        await this.deps.reconcileRuns?.();
-        await this.deps.retentionService.pruneUnchangedSnapshots();
+      async (job: Job) => {
+        if (job.name === 'reconcile-runs') {
+          await this.deps.reconcileRuns?.();
+        } else if (job.name === 'prune-unchanged-runs') {
+          await this.deps.retentionService.pruneUnchangedSnapshots();
+        } else {
+          await this.deps.reconcileRuns?.();
+          await this.deps.retentionService.pruneUnchangedSnapshots();
+        }
       },
       {
         concurrency: 1,

@@ -1,5 +1,4 @@
 'use client';
-import { runProgressLabel } from '@/lib/runProgress';
 
 import { ExecutionTimelineChart } from '@/components/dashboard/ExecutionTimelineChart';
 import { ExecutionTimelineStrip } from '@/components/dashboard/ExecutionTimelineStrip';
@@ -123,7 +122,6 @@ export function JobRunsDrawer({
   return (
     <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
       <div className="space-y-6">
-        {job.currentRun && <p role="status">{runProgressLabel(job.currentRun)}</p>}
         {job.status === JOB_STATUS.Failed && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
             <FailureDetails failure={jobFailure ?? USER_FAILURES.requestFailed} />
@@ -172,7 +170,6 @@ export function JobRunsDrawer({
         {/* TAB 1: RUNS LIST */}
         {activeTab === 'runs' && (
           <div className="space-y-6">
-            {job.currentRun && <p role="status">{runProgressLabel(job.currentRun)}</p>}
             {/* Timeline Strip (Status bar over time) */}
             {(timeseriesPoints.length > 0 || runs.length > 0) && (
               <ExecutionTimelineStrip

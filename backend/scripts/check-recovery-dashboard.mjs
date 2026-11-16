@@ -127,7 +127,7 @@ const emit = (type) =>
   );
 try {
   await page.goto(process.env.DASHBOARD_TEST_URL ?? 'http://127.0.0.1:3109/dashboard/');
-  await page.getByText('Checking…', { exact: true }).waitFor();
+  await page.getByText('CHECKING', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'User account menu' }).click();
   await page.getByRole('menuitem', { name: 'Profile' }).click();
   await page.getByText('User Profile', { exact: true }).waitFor();
@@ -135,11 +135,11 @@ try {
   await page.getByRole('button', { name: 'Close dialog' }).click();
   run.phase = 'RETRYING';
   await emit('JOB_UPDATED');
-  await page.getByText('Retrying…', { exact: true }).waitFor();
+  await page.getByText('RETRYING', { exact: true }).waitFor();
   run.phase = 'RECOVERING';
   job.status = 'RECOVERING';
   await page.evaluate(() => window.fixtureEvents.onopen());
-  await page.getByText('Recovering monitor…', { exact: true }).waitFor();
+  await page.getByText('RECOVERING', { exact: true }).waitFor();
   await page
     .getByRole('button', { name: 'View snapshots, compiled selectors and diff history' })
     .click();
