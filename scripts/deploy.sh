@@ -56,6 +56,12 @@ else
 fi
 
 # 3. Build Frontend Locally (Offloads VPS Memory / Avoids OOM)
+if [ -d "extension" ] && command -v zip >/dev/null 2>&1; then
+  log "Packaging companion extension artifact..."
+  mkdir -p frontend/public
+  (cd extension && zip -qr ../frontend/public/specter-companion.zip . -x "specter-companion.zip") || true
+fi
+
 log "Building frontend static export locally..."
 NEXT_PUBLIC_BASE_PATH="" \
 NEXT_PUBLIC_API_URL="/api" \
