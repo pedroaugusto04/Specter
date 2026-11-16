@@ -307,14 +307,14 @@ export function JobsTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left text-sm table-fixed">
+          <table className="w-full min-w-[855px] border-collapse text-left text-sm table-fixed">
             <thead>
               <tr className="border-b border-border text-xs font-mono font-medium uppercase tracking-wider text-muted-foreground bg-muted/30">
-                <th className="py-3 px-3 sm:px-4">Target</th>
-                <th className="w-[125px] px-2.5 py-3">Status</th>
-                <th className="w-[110px] px-2.5 py-3">Schedule</th>
-                <th className="w-[130px] px-2.5 py-3">Last Checked</th>
-                <th className="w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
+                <th className="w-[30%] min-w-[220px] py-3 px-3 sm:px-4">Target</th>
+                <th className="w-[18%] min-w-[155px] px-2.5 py-3">Status</th>
+                <th className="w-[16%] min-w-[130px] px-2.5 py-3">Schedule</th>
+                <th className="w-[16%] min-w-[140px] px-2.5 py-3">Last Checked</th>
+                <th className="w-[20%] min-w-[210px] py-3 pr-3 pl-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -354,7 +354,7 @@ export function JobsTable({
                           target="_blank"
                           rel="noreferrer"
                           title={job.url}
-                          className="truncate hover:underline underline-offset-4 text-xs text-muted-foreground inline-block max-w-[200px] sm:max-w-[280px] md:max-w-md"
+                          className="truncate hover:underline underline-offset-4 text-xs text-muted-foreground block min-w-0"
                         >
                           {formatDisplayUrl(job.url)}
                         </a>

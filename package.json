@@ -8,6 +8,7 @@
     "prod": "docker compose up -d",
     "prod:build": "docker compose up -d --build",
     "prod:down": "docker compose down",
+    "deploy": "bash scripts/deploy.sh",
     "typecheck": "npm run --prefix backend typecheck && npm run --prefix frontend typecheck",
     "test": "npm run --prefix backend test",
     "lint": "npm run --prefix backend lint",
