@@ -334,7 +334,8 @@ export class CompilationService implements ICompilationControl {
         return current ?? job;
       const userMessage = formatUserErrorMessage(error);
 
-      if (!run)
+      const isRateLimited = error instanceof CompilerApiRequestError && error.statusCode === 429;
+      if (!run && !job.extractionPlan && !isRateLimited)
         await this.deps.jobRepository.createRun({
           jobId: job.id,
           extractedData: null,
@@ -342,7 +343,7 @@ export class CompilationService implements ICompilationControl {
             error instanceof ConfigurationFailure
               ? {
                   quality: ExtractionQuality.Invalid,
-                  scope: job.extractionPlan?.intent.scope ?? 'page',
+                  scope: 'page',
                   pagesVisited: 0,
                   issues: [userMessage],
                   sourcesUsed: {},

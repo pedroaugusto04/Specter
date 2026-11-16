@@ -433,4 +433,34 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
     expect((await repository.findById(job.id))?.status).toBe('PAUSED');
     expect(repository.runs).toHaveLength(0);
   });
+
+  it('does not create a failed run in job_runs when an active monitor with extractionPlan fails manual recompilation', async () => {
+    const job = await repository.createJob({
+      url: 'https://example.com/item',
+      userPrompt: 'Monitor price',
+      notificationEmail: 'alerts@example.com',
+      cronExpression: '*/30 * * * *',
+    });
+    // First compile to make it active with an extraction plan
+    await compilationService.compileJob(job.id);
+    const activeJob = await repository.findById(job.id);
+    expect(activeJob?.status).toBe('ACTIVE');
+    expect(activeJob?.extractionPlan).not.toBeNull();
+    const initialRunCount = repository.runs.length;
+
+    // Now make the compiler fail (simulating rate limit / quota exhaustion)
+    compiler.compile = async () => {
+      throw new CompilerApiRequestError(429, 'Usage limit reached', 'Rate limited');
+    };
+
+    // Trigger manual recompilation (which sets status to Recovering before enqueuing)
+    await repository.updateJob(job.id, { status: 'RECOVERING' });
+    await expect(compilationService.compileJob(job.id, CompilationReason.Manual)).rejects.toThrow();
+
+    // Verify: Job stays ACTIVE (preserving existing working plan), lastError is recorded, but NO new fake run was added
+    const afterJob = await repository.findById(job.id);
+    expect(afterJob?.status).toBe('ACTIVE');
+    expect(afterJob?.lastError).toBeTruthy();
+    expect(repository.runs.length).toBe(initialRunCount);
+  });
 });

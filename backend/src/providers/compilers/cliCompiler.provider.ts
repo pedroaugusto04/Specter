@@ -3,7 +3,11 @@ import { spawn, type SpawnOptions, type ChildProcess } from 'child_process';
 import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
-import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
+import {
+  CompilerApiRequestError,
+  CompilerTimeoutError,
+  CompilerValidationError,
+} from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { buildCliCompilerPrompt } from './compilerPrompt.js';
 
@@ -85,10 +89,15 @@ export class CliCompilerProvider implements IModelProvider {
         signal: input.signal,
       };
 
+      let stderrBuffer = '';
       const cliProcess = this.spawnFn(this.cliCommand, args, spawnOpts);
       // Drain streams so a verbose CLI cannot deadlock on a full pipe.
       cliProcess.stdout?.resume();
-      cliProcess.stderr?.resume();
+      cliProcess.stderr?.on('data', (chunk: Buffer | string) => {
+        if (stderrBuffer.length < 8192) {
+          stderrBuffer += chunk.toString();
+        }
+      });
       const exited = new Promise<void>((resolve) => cliProcess.once('close', () => resolve()));
 
       const cleanup = async (): Promise<void> => {
@@ -269,9 +278,26 @@ export class CliCompilerProvider implements IModelProvider {
 
         settled = true;
         await cleanup();
+        const capturedStderr = stderrBuffer.trim();
+        const isRateLimit =
+          /usage limit|rate limit|too many requests|quota|credit|insufficient_quota/i.test(
+            capturedStderr
+          );
+        if (isRateLimit) {
+          reject(
+            new CompilerApiRequestError(
+              429,
+              capturedStderr || 'CLI rate limit exceeded',
+              capturedStderr ? capturedStderr.slice(0, 200) : 'CLI rate limit or quota exceeded'
+            )
+          );
+          return;
+        }
         reject(
           new CompilerValidationError(
-            `${this.name.toUpperCase()} process exited with code ${code ?? 'unknown'} without producing extractor.json`
+            `${this.name.toUpperCase()} process exited with code ${code ?? 'unknown'} without producing extractor.json${
+              capturedStderr ? `: ${capturedStderr.slice(0, 300)}` : ''
+            }`
           )
         );
       });

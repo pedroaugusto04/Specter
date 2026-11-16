@@ -4,7 +4,11 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import { CompilerTimeoutError } from '../../src/errors/domainErrors.js';
+import {
+  CompilerApiRequestError,
+  CompilerTimeoutError,
+  CompilerValidationError,
+} from '../../src/errors/domainErrors.js';
 import { AgyCliCompilerProvider } from '../../src/providers/compilers/agyCliCompiler.provider.js';
 import { reconcilePendingCompilations, reconcileRepeatableJobs } from '../../src/queues/reconciler.js';
 import { RetentionService } from '../../src/services/retentionService.js';
@@ -85,6 +89,65 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
       })
     ).rejects.toThrow(CompilerTimeoutError);
     // Verify temp directory was cleaned up even after timeout
+    expect(await fs.readdir(tempBaseDir)).toEqual([]);
+    await fs.rm(tempBaseDir, { recursive: true, force: true });
+  });
+  it('detects usage and rate limits in CLI stderr and throws CompilerApiRequestError(429)', async () => {
+    const tempBaseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scraper-test-ratelimit-'));
+    const jobId = 'job-ratelimit-1';
+    const provider = new AgyCliCompilerProvider({
+      tempBaseDir,
+      timeoutMs: 5000,
+      cliCommand: process.execPath,
+      cliArgsBuilder: () => [
+        '-e',
+        'console.error("ERROR: You’ve hit your usage limit. Upgrade to Pro or try again at 6:10 PM."); process.exit(1);',
+      ],
+      spawnFn: spawn,
+    });
+    try {
+      await provider.generate({
+        task: 'configure',
+        timeoutMs: 5000,
+        jobId,
+        evidence: '<html><body><h1>Rate limit</h1></body></html>',
+        instructions: 'Test',
+      });
+      expect.fail('Should have thrown CompilerApiRequestError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CompilerApiRequestError);
+      expect((err as CompilerApiRequestError).statusCode).toBe(429);
+      expect((err as CompilerApiRequestError).isRetryable).toBe(true);
+    }
+    expect(await fs.readdir(tempBaseDir)).toEqual([]);
+    await fs.rm(tempBaseDir, { recursive: true, force: true });
+  });
+  it('includes captured stderr in CompilerValidationError when process fails without writing extractor.json', async () => {
+    const tempBaseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scraper-test-stderr-'));
+    const jobId = 'job-stderr-1';
+    const provider = new AgyCliCompilerProvider({
+      tempBaseDir,
+      timeoutMs: 5000,
+      cliCommand: process.execPath,
+      cliArgsBuilder: () => [
+        '-e',
+        'console.error("SyntaxError: Unexpected token in configuration"); process.exit(1);',
+      ],
+      spawnFn: spawn,
+    });
+    try {
+      await provider.generate({
+        task: 'configure',
+        timeoutMs: 5000,
+        jobId,
+        evidence: '<html><body><h1>Failure</h1></body></html>',
+        instructions: 'Test',
+      });
+      expect.fail('Should have thrown CompilerValidationError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CompilerValidationError);
+      expect((err as CompilerValidationError).message).toContain('SyntaxError: Unexpected token');
+    }
     expect(await fs.readdir(tempBaseDir)).toEqual([]);
     await fs.rm(tempBaseDir, { recursive: true, force: true });
   });
