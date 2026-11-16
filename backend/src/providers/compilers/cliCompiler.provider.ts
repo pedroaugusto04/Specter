@@ -4,12 +4,15 @@ import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
 import {
-  CompilerApiRequestError,
   CompilerTimeoutError,
   CompilerValidationError,
 } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { buildCliCompilerPrompt } from './compilerPrompt.js';
+import {
+  defaultCliErrorClassifier,
+  type CliErrorClassifier,
+} from './cliErrorClassifier.js';
 
 export interface CliCompilerOptions {
   providerName?: string;
@@ -19,6 +22,7 @@ export interface CliCompilerOptions {
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
   tempBaseDir?: string;
   timeoutMs?: number;
+  errorClassifier?: CliErrorClassifier;
   spawnFn?:
     | ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess)
     | typeof spawn;
@@ -30,6 +34,7 @@ export class CliCompilerProvider implements IModelProvider {
   private readonly cliArgsBuilder: (promptFile: string, outputFile: string) => string[];
   private readonly tempBaseDir: string;
   private readonly timeoutMs: number;
+  private readonly errorClassifier: CliErrorClassifier;
   private readonly spawnFn:
     | ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess)
     | typeof spawn;
@@ -38,6 +43,7 @@ export class CliCompilerProvider implements IModelProvider {
   constructor(options: CliCompilerOptions = {}) {
     this.name = options.providerName ?? 'cli';
     this.cliCommand = options.cliCommand ?? 'cli';
+    this.errorClassifier = options.errorClassifier ?? defaultCliErrorClassifier;
     this.cliArgsBuilder =
       options.cliArgsBuilder ??
       ((promptFile: string) => [
@@ -279,18 +285,13 @@ export class CliCompilerProvider implements IModelProvider {
         settled = true;
         await cleanup();
         const capturedStderr = stderrBuffer.trim();
-        const isRateLimit =
-          /usage limit|rate limit|too many requests|quota|credit|insufficient_quota/i.test(
-            capturedStderr
-          );
-        if (isRateLimit) {
-          reject(
-            new CompilerApiRequestError(
-              429,
-              capturedStderr || 'CLI rate limit exceeded',
-              capturedStderr ? capturedStderr.slice(0, 200) : 'CLI rate limit or quota exceeded'
-            )
-          );
+        const classified = this.errorClassifier({
+          providerName: this.name,
+          exitCode: code,
+          stderr: capturedStderr,
+        });
+        if (classified) {
+          reject(classified);
           return;
         }
         reject(

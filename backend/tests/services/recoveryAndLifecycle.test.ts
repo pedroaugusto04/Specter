@@ -434,7 +434,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
     expect(repository.runs).toHaveLength(0);
   });
 
-  it('does not create a failed run in job_runs when an active monitor with extractionPlan fails manual recompilation', async () => {
+  it('records failed recompilation run and preserves active extraction plan when recompile fails', async () => {
     const job = await repository.createJob({
       url: 'https://example.com/item',
       userPrompt: 'Monitor price',
@@ -457,10 +457,13 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
     await repository.updateJob(job.id, { status: 'RECOVERING' });
     await expect(compilationService.compileJob(job.id, CompilationReason.Manual)).rejects.toThrow();
 
-    // Verify: Job stays ACTIVE (preserving existing working plan), lastError is recorded, but NO new fake run was added
+    // Verify: Job stays ACTIVE (preserving existing working plan), lastError is recorded, and failed attempt is logged in runs history
     const afterJob = await repository.findById(job.id);
     expect(afterJob?.status).toBe('ACTIVE');
     expect(afterJob?.lastError).toBeTruthy();
-    expect(repository.runs.length).toBe(initialRunCount);
+    expect(repository.runs.length).toBe(initialRunCount + 1);
+    const lastRun = repository.runs[repository.runs.length - 1]!;
+    expect(lastRun.status).toBe('FAILED');
+    expect(lastRun.errorMessage).toContain('temporarily busy');
   });
 });

@@ -9,6 +9,7 @@ import {
   CompilerTimeoutError,
   CompilerValidationError,
 } from '../../src/errors/domainErrors.js';
+import { defaultCliErrorClassifier } from '../../src/providers/compilers/cliErrorClassifier.js';
 import { AgyCliCompilerProvider } from '../../src/providers/compilers/agyCliCompiler.provider.js';
 import { reconcilePendingCompilations, reconcileRepeatableJobs } from '../../src/queues/reconciler.js';
 import { RetentionService } from '../../src/services/retentionService.js';
@@ -150,6 +151,23 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     }
     expect(await fs.readdir(tempBaseDir)).toEqual([]);
     await fs.rm(tempBaseDir, { recursive: true, force: true });
+  });
+  it('correctly classifies structured JSON errors and authentication failures from CLI', () => {
+    const rateLimitJson = defaultCliErrorClassifier({
+      providerName: 'codex',
+      exitCode: 1,
+      stderr: '{"type":"error","message":"You’ve hit your usage limit. Try again at 6:10 PM."}',
+    });
+    expect(rateLimitJson).toBeInstanceOf(CompilerApiRequestError);
+    expect((rateLimitJson as CompilerApiRequestError).statusCode).toBe(429);
+
+    const authError = defaultCliErrorClassifier({
+      providerName: 'codex',
+      exitCode: 1,
+      stderr: 'Error: invalid_api_key or permission_denied for requested model',
+    });
+    expect(authError).toBeInstanceOf(CompilerApiRequestError);
+    expect((authError as CompilerApiRequestError).statusCode).toBe(401);
   });
   it('reconciles repeatable jobs by removing Redis orphans and scheduling missing active DB jobs', async () => {
     const removedKeys: string[] = [];

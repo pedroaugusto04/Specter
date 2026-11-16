@@ -127,6 +127,22 @@ export function JobRunsDrawer({
             <FailureDetails failure={jobFailure ?? USER_FAILURES.requestFailed} />
           </div>
         )}
+        {job.status === JOB_STATUS.Active && jobFailure && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-foreground">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-xs font-mono font-medium text-amber-500 uppercase tracking-wider">
+                  Recompilation Notice
+                </p>
+                <FailureDetails failure={jobFailure} />
+                <p className="text-xs text-muted-foreground pt-1">
+                  The monitor remains active and continues collecting data using its current extraction plan.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
           <button

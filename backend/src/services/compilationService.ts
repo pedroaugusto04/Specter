@@ -334,8 +334,7 @@ export class CompilationService implements ICompilationControl {
         return current ?? job;
       const userMessage = formatUserErrorMessage(error);
 
-      const isRateLimited = error instanceof CompilerApiRequestError && error.statusCode === 429;
-      if (!run && !job.extractionPlan && !isRateLimited)
+      if (!run && !willRetry)
         await this.deps.jobRepository.createRun({
           jobId: job.id,
           extractedData: null,
