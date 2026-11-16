@@ -1,5 +1,6 @@
 'use client';
 import { runProgressPill } from '@/lib/runProgress';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -59,9 +60,14 @@ export function JobRunCard({
                   : 'secondary'
             }
           >
-            {run.status === RUN_STATUS.Running
-              ? runProgressPill(run)
-              : (run.extractionReport?.quality ?? run.status)}
+            {run.status === RUN_STATUS.Running ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span>{runProgressPill(run)}</span>
+                <LoadingSpinner size="xs" />
+              </span>
+            ) : (
+              (run.extractionReport?.quality ?? run.status)
+            )}
           </Badge>
           <Badge
             variant={

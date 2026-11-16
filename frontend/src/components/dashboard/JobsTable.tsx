@@ -1,5 +1,6 @@
 'use client';
 import { runProgressPill } from '@/lib/runProgress';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 import { Button } from '@/components/ui/button';
 import { useModal } from '@/components/ui/modal-dialog';
@@ -58,14 +59,16 @@ function renderStatusPill(status: JobStatus) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-ping" />
-          COMPILING
+          <span>COMPILING</span>
+          <LoadingSpinner size="xs" />
         </span>
       );
     case JOB_STATUS.Recovering:
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-          RECOVERING
+          <span>RECOVERING</span>
+          <LoadingSpinner size="xs" />
         </span>
       );
     case JOB_STATUS.Failed:
@@ -363,8 +366,9 @@ export function JobsTable({
                     <td className="whitespace-nowrap px-2.5 py-3">
                       {job.currentRun ? (
                         <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-primary">
-                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />{' '}
-                          {runProgressPill(job.currentRun!)}
+                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                          <span>{runProgressPill(job.currentRun!)}</span>
+                          <LoadingSpinner size="xs" />
                         </span>
                       ) : (
                         renderStatusPill(job.status)
