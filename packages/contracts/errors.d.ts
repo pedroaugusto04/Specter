@@ -17,6 +17,7 @@ export declare const USER_FAILURES: Readonly<
     | 'sessionUnavailable'
     | 'unsupported'
     | 'executionInterrupted'
+    | 'planLimitReached'
     | 'requestFailed',
     UserFailure
   >

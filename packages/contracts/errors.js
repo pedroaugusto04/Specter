@@ -65,6 +65,11 @@ export const USER_FAILURES = Object.freeze({
     description: 'This check was interrupted before it could finish.',
     nextStep: 'Try again. If this continues, contact support.',
   },
+  planLimitReached: {
+    title: 'Plan Limit Reached',
+    description: 'You have reached your account plan limit for this action.',
+    nextStep: 'Check your current plan usage or pause unused monitors.',
+  },
   requestFailed: {
     title: 'Request Could Not Be Completed',
     description: 'We could not complete this request. Please try again later.',
@@ -73,8 +78,15 @@ export const USER_FAILURES = Object.freeze({
 });
 
 export function getUserFailure(message) {
-  return (
-    Object.values(USER_FAILURES).find((failure) => failure.description === message) ??
-    USER_FAILURES.requestFailed
-  );
+  if (!message) return USER_FAILURES.requestFailed;
+  const match = Object.values(USER_FAILURES).find((failure) => failure.description === message);
+  if (match) return match;
+  if (/limit reached|quota exceeded/i.test(message)) {
+    return {
+      title: USER_FAILURES.planLimitReached.title,
+      description: message,
+      nextStep: USER_FAILURES.planLimitReached.nextStep,
+    };
+  }
+  return USER_FAILURES.requestFailed;
 }
