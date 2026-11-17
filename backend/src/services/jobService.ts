@@ -35,7 +35,7 @@ import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { assertSafeUrl } from '../utils/ssrfValidator.js';
-import { createPaginationMeta, resolvePageResult } from '../utils/pagination.js';
+import { resolvePageResult } from '../utils/pagination.js';
 
 export interface CreateScrapingJobRequest extends CreateJobRequest {
   userId: string;
