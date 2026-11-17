@@ -16,8 +16,10 @@ import {
   useCreateJobMutation,
   useProbeUrlMutation,
   useJobsQuery,
+  useIntegrationsQuery,
 } from '@/hooks/useDashboardQueries';
-import { ApiError, type SessionDto, type UserDto } from '@/lib/api';
+import { api, ApiError, type SessionDto, type UserDto } from '@/lib/api';
+import { useModal } from '@/components/ui/modal-dialog';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
@@ -43,6 +45,8 @@ export function CreateJobForm({
   onDirtyChange,
   isModal = false,
 }: CreateJobFormProps) {
+  const modal = useModal();
+  const userEmail = user?.email?.trim() || '';
   const {
     values,
     reset: resetForm,
@@ -55,7 +59,7 @@ export function CreateJobForm({
     setWebhookUrl,
     setWebhookSecret,
     setCaptureScreenshotOnChange,
-  } = useJobForm();
+  } = useJobForm(userEmail);
   const {
     url,
     name,
@@ -74,13 +78,32 @@ export function CreateJobForm({
   const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
+  // If user loads asynchronously and email alerts haven't been touched yet, populate default email and check alerts
+  const initialEmailSetRef = React.useRef(Boolean(userEmail));
+  React.useEffect(() => {
+    if (userEmail && !initialEmailSetRef.current) {
+      initialEmailSetRef.current = true;
+      resetForm((prev) => {
+        if (!prev.notificationEmail && !prev.sendEmailAlerts) {
+          return {
+            ...prev,
+            sendEmailAlerts: true,
+            notificationEmail: userEmail,
+          };
+        }
+        return prev;
+      });
+    }
+  }, [userEmail, resetForm]);
+
   // If email alert is toggled and user is logged in, auto pre-fill with their email
   React.useEffect(() => {
     if (sendEmailAlerts && user?.email && !notificationEmail) {
       setNotificationEmail(user.email);
     }
-  }, [user, sendEmailAlerts, notificationEmail]);
+  }, [user, sendEmailAlerts, notificationEmail, setNotificationEmail]);
 
+  const { data: integrations } = useIntegrationsQuery(Boolean(user));
   const createJobMutation = useCreateJobMutation();
   const { data: jobs = [], isSuccess: jobsLoaded } = useJobsQuery();
   const probeUrlMutation = useProbeUrlMutation();
@@ -109,11 +132,15 @@ export function CreateJobForm({
     setName(suggestedName);
   }, [jobsLoaded, name, setName, suggestedName]);
 
+  const defaultEmailAlerts = Boolean(user?.email?.trim());
+  const defaultNotificationEmail = user?.email?.trim() || '';
+
   const isDirty = Boolean(
     (name.trim().length > 0 && name.trim() !== suggestedName) ||
     url.trim().length > 0 ||
     userPrompt.trim().length > 0 ||
-    (sendEmailAlerts && notificationEmail.trim().length > 0) ||
+    sendEmailAlerts !== defaultEmailAlerts ||
+    notificationEmail.trim() !== defaultNotificationEmail ||
     (showCustomWebhook && (webhookUrl.trim().length > 0 || webhookSecret.trim().length > 0)) ||
     captureScreenshotOnChange ||
     (useCustomCron && customCron !== '0 */6 * * *')
@@ -122,6 +149,25 @@ export function CreateJobForm({
   React.useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
+
+  const checkHasCommunicationChannels = React.useCallback(
+    (activeUser?: UserDto | null, activeIntegrations?: typeof integrations) => {
+      const effectiveEmail = activeUser?.email || user?.email;
+      const hasEmail = Boolean(sendEmailAlerts && (notificationEmail.trim() || effectiveEmail));
+      const currentIntegrations = activeIntegrations ?? integrations;
+      const hasTelegram = Boolean(
+        currentIntegrations?.telegramEnabled && currentIntegrations?.telegramChatId?.trim()
+      );
+      const hasCustomWebhook = Boolean(showCustomWebhook && webhookUrl.trim());
+      const hasGlobalWebhook = Boolean(
+        currentIntegrations?.webhookEnabled && currentIntegrations?.webhookUrl?.trim()
+      );
+      const hasWebhook = hasCustomWebhook || hasGlobalWebhook;
+
+      return hasEmail || hasTelegram || hasWebhook;
+    },
+    [sendEmailAlerts, notificationEmail, user, integrations, showCustomWebhook, webhookUrl]
+  );
 
   const clearFieldError = (field: JobFormField) => {
     setFieldErrors((prev) => {
@@ -196,7 +242,7 @@ export function CreateJobForm({
     setGlobalError(null);
     try {
       await createJobMutation.mutateAsync(formToCreateJob(values, activeUser?.email));
-      resetForm(emptyJobForm());
+      resetForm(emptyJobForm(activeUser?.email || user?.email || ''));
       setFieldErrors({});
       setProbeState({ status: 'idle' });
       setStep('form');
@@ -259,6 +305,21 @@ export function CreateJobForm({
       return;
     }
 
+    if (!checkHasCommunicationChannels(user, integrations)) {
+      const proceed = await modal.confirm({
+        title: 'No Notification Channels Configured',
+        message:
+          'You have not configured any notification channels (Email, Telegram, or Webhook). You will not receive external alerts when website changes occur.\n\nYou can still view extractions, snapshots, and diffs directly within Specter.\n\nDo you want to create this monitor anyway?',
+        confirmLabel: 'Create Anyway',
+        cancelLabel: 'Configure Alerts',
+        variant: 'warning',
+      });
+
+      if (!proceed) {
+        return;
+      }
+    }
+
     await executeCreateJob(user);
   };
 
@@ -300,6 +361,33 @@ export function CreateJobForm({
           }}
           onSuccess={async (authenticatedUser) => {
             onAuthenticated?.(authenticatedUser);
+
+            let activeIntegrations = integrations;
+            if (!activeIntegrations) {
+              try {
+                activeIntegrations = await api.getIntegrations();
+              } catch {
+                // ignore
+              }
+            }
+
+            if (!checkHasCommunicationChannels(authenticatedUser, activeIntegrations)) {
+              const proceed = await modal.confirm({
+                title: 'No Notification Channels Configured',
+                message:
+                  'You have not configured any notification channels (Email, Telegram, or Webhook). You will not receive external alerts when website changes occur.\n\nYou can still view extractions, snapshots, and diffs directly within Specter.\n\nDo you want to create this monitor anyway?',
+                confirmLabel: 'Create Anyway',
+                cancelLabel: 'Configure Alerts',
+                variant: 'warning',
+              });
+
+              if (!proceed) {
+                setStep('form');
+                onStepChange?.('form');
+                return;
+              }
+            }
+
             await executeCreateJob(authenticatedUser);
           }}
         />

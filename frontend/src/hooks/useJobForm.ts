@@ -2,8 +2,8 @@
 import { emptyJobForm, type JobFormValues } from '@/forms/jobForm';
 import type { SetStateAction } from 'react';
 import { useCallback, useMemo, useState } from 'react';
-export function useJobForm() {
-  const [values, reset] = useState(emptyJobForm);
+export function useJobForm(defaultEmail = '') {
+  const [values, reset] = useState(() => emptyJobForm(defaultEmail));
   const setField = useCallback(
     <K extends keyof JobFormValues>(key: K, action: SetStateAction<JobFormValues[K]>) => {
       reset((previous) => ({

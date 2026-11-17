@@ -9,7 +9,7 @@ export interface ConfirmOptions {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: 'destructive' | 'default';
+  variant?: 'destructive' | 'default' | 'warning';
 }
 
 export interface AlertOptions {
@@ -25,7 +25,7 @@ interface DialogState {
   message: string;
   confirmLabel: string;
   cancelLabel: string;
-  variant: 'destructive' | 'default';
+  variant: 'destructive' | 'default' | 'warning';
   resolve: (value: boolean) => void;
 }
 
@@ -131,10 +131,12 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
                     dialogState.variant === 'destructive'
                       ? 'bg-red-50 border-red-200 text-red-600 dark:bg-red-950/50 dark:border-red-900/50 dark:text-red-400'
-                      : 'bg-muted border-border text-foreground'
+                      : dialogState.variant === 'warning'
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                        : 'bg-muted border-border text-foreground'
                   }`}
                 >
-                  {dialogState.variant === 'destructive' ? (
+                  {dialogState.variant === 'destructive' || dialogState.variant === 'warning' ? (
                     <AlertTriangle className="h-4.5 w-4.5" />
                   ) : (
                     <Info className="h-4.5 w-4.5" />

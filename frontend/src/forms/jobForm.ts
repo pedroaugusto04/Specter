@@ -24,13 +24,15 @@ export interface JobFormValues {
   triggerRules: TriggerRule[];
   triggerMatchMode: TriggerMatchMode;
 }
-export function emptyJobForm(): JobFormValues {
+export function emptyJobForm(defaultEmail = ''): JobFormValues {
+  const email = defaultEmail.trim();
+  const hasEmail = Boolean(email);
   return {
     url: '',
     name: '',
     userPrompt: '',
-    sendEmailAlerts: false,
-    notificationEmail: '',
+    sendEmailAlerts: hasEmail,
+    notificationEmail: email,
     showCustomWebhook: false,
     webhookUrl: '',
     webhookSecret: '',

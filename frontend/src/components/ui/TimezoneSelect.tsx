@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { Check, ChevronsUpDown, Globe, Search, X } from 'lucide-react';
 import { cn, getAllIanaTimezones, getBrowserTimezone, type TimezoneOption } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 export interface TimezoneSelectProps {
   id?: string;
@@ -96,32 +95,33 @@ export function TimezoneSelect({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3.5 py-2 text-sm text-foreground transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className="truncate text-left font-mono text-xs sm:text-sm">
-          {currentOption.label}
+        <span className="flex items-center gap-2.5 truncate text-left font-mono text-xs sm:text-sm">
+          <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{currentOption.label}</span>
         </span>
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground opacity-60" />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[280px] sm:min-w-[360px] rounded-lg border border-border bg-card p-2 text-card-foreground shadow-xl">
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] sm:min-w-[380px] rounded-lg border border-border bg-card p-2.5 text-card-foreground shadow-2xl ring-1 ring-black/5 dark:ring-white/5 animate-in fade-in-0 zoom-in-95">
           {/* Search Header */}
           <div className="relative mb-2">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               ref={inputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by city, region, or GMT offset..."
-              className="h-8.5 w-full rounded-md border border-input bg-muted/30 pl-8 pr-7 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none focus:ring-1 focus:ring-foreground"
+              className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-8 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none focus:ring-1 focus:ring-foreground transition-colors"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="Clear search"
               >
                 <X className="h-3.5 w-3.5" />
@@ -131,7 +131,7 @@ export function TimezoneSelect({
 
           {/* Quick Action: Browser Timezone */}
           {browserTz && (
-            <div className="mb-2 border-b border-border pb-1.5">
+            <div className="mb-2 border-b border-border/80 pb-1.5">
               <button
                 type="button"
                 onClick={() => handleSelect(browserTz)}
@@ -147,9 +147,9 @@ export function TimezoneSelect({
           )}
 
           {/* Timezone List */}
-          <div role="listbox" className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5">
+          <div role="listbox" className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
             {filteredOptions.length === 0 ? (
-              <div className="py-4 text-center text-xs text-muted-foreground">
+              <div className="py-6 text-center text-xs text-muted-foreground">
                 No timezones found matching &ldquo;{searchQuery}&rdquo;
               </div>
             ) : (
@@ -163,14 +163,14 @@ export function TimezoneSelect({
                     aria-selected={isSelected}
                     onClick={() => handleSelect(item.value)}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs text-left transition-colors font-mono',
+                      'flex w-full items-center justify-between rounded-md px-2.5 py-2 text-xs sm:text-sm text-left transition-colors font-mono',
                       isSelected
                         ? 'bg-primary text-primary-foreground font-semibold'
                         : 'text-foreground hover:bg-muted'
                     )}
                   >
                     <span className="truncate pr-2">{item.label}</span>
-                    {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    {isSelected && <Check className="h-4 w-4 shrink-0" />}
                   </button>
                 );
               })
