@@ -109,7 +109,20 @@ success "Frontend deployed and Nginx reloaded."
 
 # 7. Post-Deployment Verification
 log "Verifying backend health endpoint..."
-HEALTH_STATUS=$($SSH_CMD "curl -sf http://127.0.0.1:3001/api/health" || true)
+MAX_RETRIES=15
+RETRY_COUNT=0
+HEALTH_STATUS=""
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  HEALTH_STATUS=$($SSH_CMD "curl -sf http://127.0.0.1:3001/api/health" || true)
+  if [[ "$HEALTH_STATUS" =~ "ok" ]]; then
+    break
+  fi
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  log "Waiting for backend to finish booting (attempt ${RETRY_COUNT}/${MAX_RETRIES})..."
+  sleep 2
+done
+
 if [[ "$HEALTH_STATUS" =~ "ok" ]]; then
   success "Backend health check passed: $HEALTH_STATUS"
 else
