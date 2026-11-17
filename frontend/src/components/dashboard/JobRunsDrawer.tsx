@@ -9,19 +9,23 @@ import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useJobRunsQuery, useJobTimeseriesQuery } from '@/hooks/useDashboardQueries';
-import type { JobRunDto, ScrapingJobDto, TimeseriesRange } from '@/lib/api';
+import { api, type JobRunDto, type ScrapingJobDto, type TimeseriesRange } from '@/lib/api';
 import { USER_FAILURES, type IntentField } from '@specter/contracts';
 import { ExtractionScope, JobStatus } from '@specter/contracts';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels } from '@/lib/extractionDisplay';
 import { formatObservedNumber } from '@/lib/numberFormatting';
+import { runsToCsv, runsToJson, downloadFile } from '@/lib/exportUtils';
 import {
   AlertCircle,
   Camera,
   Clock,
-  ListChecks,
   ExternalLink,
+  FileCode,
+  FileSpreadsheet,
   GitCompare,
+  ListChecks,
+  Loader2,
   SlidersHorizontal,
   Sparkles,
   TrendingUp,
@@ -103,6 +107,43 @@ export function JobRunsDrawer({
   const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  const getRunsForExport = async (): Promise<JobRunDto[]> => {
+    if (!job?.id) return [];
+    if (runs.length >= summary.totalRuns && runs.length > 0) {
+      return runs;
+    }
+    try {
+      setIsExporting(true);
+      const res = await api.getJobRuns(job.id, 1, 100);
+      return res.runs && res.runs.length > 0 ? res.runs : runs;
+    } catch {
+      return runs;
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    if (!job) return;
+    const runsToExport = await getRunsForExport();
+    if (runsToExport.length === 0) return;
+    const csv = runsToCsv(runsToExport);
+    const slug = (job.name || 'monitor').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadFile(csv, `${slug}_runs_${dateStr}.csv`, 'text/csv;charset=utf-8;');
+  };
+
+  const handleExportJson = async () => {
+    if (!job) return;
+    const runsToExport = await getRunsForExport();
+    if (runsToExport.length === 0) return;
+    const json = runsToJson(runsToExport);
+    const slug = (job.name || 'monitor').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadFile(json, `${slug}_runs_${dateStr}.json`, 'application/json;charset=utf-8;');
+  };
 
   const handleSelectRun = (run: { id: string }) => {
     setSelectedRunId(run.id);
@@ -142,44 +183,82 @@ export function JobRunsDrawer({
             </div>
           </div>
         )}
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('runs')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'runs'
-                ? 'bg-card text-foreground shadow-2xs border border-border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Runs ({summary.totalRuns})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('timeline')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'timeline'
-                ? 'bg-card text-foreground shadow-2xs border border-border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            Timeline & Trends
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('schema')}
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
-              activeTab === 'schema'
-                ? 'bg-card text-foreground shadow-2xs border border-border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-            Monitored data
-          </button>
+        {/* Navigation Tabs & Export Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('runs')}
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+                activeTab === 'runs'
+                  ? 'bg-card text-foreground shadow-2xs border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Runs ({summary.totalRuns})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('timeline')}
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+                activeTab === 'timeline'
+                  ? 'bg-card text-foreground shadow-2xs border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Timeline & Trends
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('schema')}
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+                activeTab === 'schema'
+                  ? 'bg-card text-foreground shadow-2xs border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              Monitored data
+            </button>
+          </div>
+
+          {/* Minimalist Export Buttons */}
+          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+            <span className="text-[11px] font-mono text-muted-foreground mr-1 hidden sm:inline">
+              Export:
+            </span>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
+              title="Export runs history as CSV (Excel, Sheets)"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+            >
+              {isExporting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <span>CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportJson}
+              disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
+              title="Export runs history as structured JSON"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+            >
+              {isExporting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileCode className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+              )}
+              <span>JSON</span>
+            </button>
+          </div>
         </div>
 
         {/* TAB 1: RUNS LIST */}

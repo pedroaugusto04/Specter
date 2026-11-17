@@ -10,7 +10,7 @@ import { ChangeStatus, RunStatus } from '@specter/contracts';
 import { formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { localizeExtractedPayload, type ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
 import { USER_FAILURES } from '@specter/contracts';
-import { AlertCircle, Camera, SlidersHorizontal, ZoomIn } from 'lucide-react';
+import { AlertCircle, Camera, Check, Copy, SlidersHorizontal, ZoomIn } from 'lucide-react';
 
 interface JobRunCardProps {
   run: JobRunDto;
@@ -41,6 +41,24 @@ export function JobRunCard({
     run.hasChanges === ChangeStatus.Changed &&
     Boolean(run.screenshotUrl) &&
     Boolean(previousScreenshot);
+
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopyJson = async () => {
+    if (!run.extractedData) return;
+    try {
+      const json = JSON.stringify(
+        localizeExtractedPayload(run.extractedData, extractionFields),
+        null,
+        2
+      );
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore clipboard error
+    }
+  };
 
   return (
     <div
@@ -168,9 +186,32 @@ export function JobRunCard({
       )}
 
       {run.extractedData && (
-        <pre className="mt-2.5 max-h-56 overflow-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-xs text-foreground">
-          {JSON.stringify(localizeExtractedPayload(run.extractedData, extractionFields), null, 2)}
-        </pre>
+        <div className="mt-2.5 overflow-hidden rounded-md border border-border">
+          <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5 text-[11px] font-mono text-muted-foreground">
+            <span>Observed payload</span>
+            <button
+              type="button"
+              onClick={handleCopyJson}
+              className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+              title="Copy JSON payload"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3 text-emerald-500" />
+                  <span className="text-emerald-500 font-medium">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="max-h-56 overflow-auto bg-muted/20 p-3 font-mono text-xs text-foreground">
+            {JSON.stringify(localizeExtractedPayload(run.extractedData, extractionFields), null, 2)}
+          </pre>
+        </div>
       )}
     </div>
   );
