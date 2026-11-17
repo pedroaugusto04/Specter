@@ -8,8 +8,6 @@
 
 Specter turns a URL and a plain-language description into a monitored data feed. It uses AI to configure and validate an extraction plan, then runs that plan on a schedule. Routine checks are deterministic and do not call an AI model; when a page changes, Specter can review and recover the plan.
 
-Specter is **source available** under the [Specter Source Available License](LICENSE). The hosted service is available at [specterdev.online](https://specterdev.online/).
-
 ## Why Specter
 
 Website layouts change, and one-off scrapers tend to break silently. Specter is designed to monitor user-selected pages over time, validate each result before updating its baseline, and report meaningful changes. It is for focused monitoring of URLs you choose, rather than broad web crawling.
