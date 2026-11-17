@@ -11,7 +11,6 @@ services:
       - '${POSTGRES_PORT:-5445}:5432'
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
-      - ./backend/drizzle/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-specter}']
       interval: 10s
@@ -39,7 +38,7 @@ services:
       dockerfile: backend/Dockerfile.dev
     container_name: specter-backend-dev
     restart: unless-stopped
-    command: ['npm', 'run', 'dev']
+    command: ['sh', '-c', 'npm run db:migrate && npm run dev']
     environment:
       NODE_ENV: development
       PORT: 3001
@@ -50,7 +49,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REALTIME_REDIS_TIMEOUT_MS: ${REALTIME_REDIS_TIMEOUT_MS:-5000}
-      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-agy}
+      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-api}
       COMPILER_TIMEOUT_MS: ${COMPILER_TIMEOUT_MS:-300000}
       COMPILER_API_MODEL: ${COMPILER_API_MODEL:-}
       COMPILER_API_KEY: ${COMPILER_API_KEY:-}
@@ -60,11 +59,6 @@ services:
       COMPILER_API_RETRY_MAX_DELAY_MS: ${COMPILER_API_RETRY_MAX_DELAY_MS:-10000}
       COMPILER_RATE_LIMIT_RETRY_DELAY_MS: ${COMPILER_RATE_LIMIT_RETRY_DELAY_MS:-120000}
       EVALS_LIVE_MODELS_ENABLED: ${EVALS_LIVE_MODELS_ENABLED:-false}
-      AGY_CLI_PATH: agy
-      AGY_MODEL: ${AGY_MODEL:-}
-      CODEX_CLI_PATH: codex
-      COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
-      CODEX_SANDBOX: ${CODEX_SANDBOX:-read-only}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-console}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -108,9 +102,6 @@ services:
       - ./backend:/app
       - ./packages/contracts:/packages/contracts
       - /app/node_modules
-      - /home/pedroduarte/.local/bin/agy:/usr/local/bin/agy:ro
-      - agy_profile:/root/.gemini
-      - /tmp/scraper_jobs:/tmp/scraper_jobs
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,4 +135,3 @@ services:
 volumes:
   postgres_dev_data:
   redis_dev_data:
-  agy_profile:

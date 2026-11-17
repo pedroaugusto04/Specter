@@ -48,7 +48,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REALTIME_REDIS_TIMEOUT_MS: ${REALTIME_REDIS_TIMEOUT_MS:-5000}
-      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-agy}
+      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-api}
       COMPILER_TIMEOUT_MS: ${COMPILER_TIMEOUT_MS:-300000}
       COMPILER_API_MODEL: ${COMPILER_API_MODEL:-}
       COMPILER_API_KEY: ${COMPILER_API_KEY:-}
@@ -74,6 +74,7 @@ services:
       DECODO_API_KEY: ${DECODO_API_KEY:-}
       UNBLOCKER_TIMEOUT_MS: ${UNBLOCKER_TIMEOUT_MS:-120000}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-specter-dev-jwt-secret-change-in-production}
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTP_FALLBACK_PROXY: ${HTTP_FALLBACK_PROXY:-}
       ACQUISITION_MAX_ATTEMPTS: ${ACQUISITION_MAX_ATTEMPTS:-5}
@@ -103,9 +104,7 @@ services:
     ports:
       - '3001:3001'
     volumes:
-      - /home/pedroduarte/.local/bin/agy:/usr/local/bin/agy:ro
-      - agy_profile:/root/.gemini
-      - /tmp/scraper_jobs:/tmp/scraper_jobs
+      - compiler_jobs:/tmp/scraper_jobs
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,4 +128,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  agy_profile:
+  compiler_jobs:

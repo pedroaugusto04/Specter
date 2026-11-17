@@ -41,6 +41,7 @@ services:
       - specter-net
 
   backend:
+    # Set DOCKER_IMAGE in the deployment environment, for example in .env.prod.
     image: ${DOCKER_IMAGE}
     container_name: specter-backend
     stop_grace_period: 20m
@@ -56,6 +57,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REALTIME_REDIS_TIMEOUT_MS: ${REALTIME_REDIS_TIMEOUT_MS:-5000}
+      COMPILER_PROVIDER: ${COMPILER_PROVIDER:-api}
+      COMPILER_API_MODEL: ${COMPILER_API_MODEL:-}
+      COMPILER_API_KEY: ${COMPILER_API_KEY:-}
+      COMPILER_API_BASE_URL: ${COMPILER_API_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       COMPILER_TIMEOUT_MS: ${COMPILER_TIMEOUT_MS:-300000}
       PLAYWRIGHT_TIMEOUT_MS: ${PLAYWRIGHT_TIMEOUT_MS:-120000}
       EXTRACTION_ACTION_TIMEOUT_MS: ${EXTRACTION_ACTION_TIMEOUT_MS:-20000}
@@ -73,8 +78,6 @@ services:
       RUN_RECONCILE_INTERVAL_MS: ${RUN_RECONCILE_INTERVAL_MS:-60000}
       COMPILATION_QUEUE_MAX_ATTEMPTS: ${COMPILATION_QUEUE_MAX_ATTEMPTS:-3}
       MAX_RECOVERY_ATTEMPTS: ${MAX_RECOVERY_ATTEMPTS:-3}
-      AGY_CLI_PATH: /usr/local/bin/agy
-      AGY_MODEL: ${AGY_MODEL:-}
       CODEX_CLI_PATH: /usr/local/bin/codex
       COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
       CODEX_SANDBOX: ${CODEX_SANDBOX:-danger-full-access}
@@ -82,10 +85,7 @@ services:
     ports:
       - '${PORT:-3001}:3001'
     volumes:
-      - /home/ubuntu/.local/bin/agy:/usr/local/bin/agy:ro
-      - /home/ubuntu/.gemini:/root/.gemini
-      - /home/ubuntu/.codex:/root/.codex
-      - /tmp/scraper_jobs:/tmp/scraper_jobs
+      - compiler_jobs:/tmp/scraper_jobs
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,3 +102,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  compiler_jobs:

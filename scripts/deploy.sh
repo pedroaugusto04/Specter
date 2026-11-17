@@ -6,9 +6,9 @@ set -euo pipefail
 # Deterministic local-to-VPS deployment without GitHub Actions quota limits.
 # ==============================================================================
 
-VPS_HOST="${VPS_HOST:-163.176.195.173}"
+VPS_HOST="${VPS_HOST:-}"
 VPS_USER="${VPS_USER:-ubuntu}"
-VPS_SSH_KEY="${VPS_SSH_KEY:-/home/pedroduarte/Videos/oracle-cloud/ssh-p-key2.key}"
+VPS_SSH_KEY="${VPS_SSH_KEY:-}"
 DOCKER_IMAGE_TAG="${DOCKER_IMAGE_TAG:-specter-backend:local-recovery}"
 FRONTEND_DEPLOY_PATH="${FRONTEND_DEPLOY_PATH:-/var/www/specter}"
 SKIP_CHECKS="${SKIP_CHECKS:-false}"
@@ -17,6 +17,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "$ROOT_DIR"
+
+if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
+  echo "Set VPS_HOST and VPS_SSH_KEY before deploying." >&2
+  exit 1
+fi
 
 log() {
   echo -e "\033[1;34m[DEPLOY]\033[0m $1"
