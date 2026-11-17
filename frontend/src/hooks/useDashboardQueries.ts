@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   api,
   type DashboardStats,
-  type DiffSummary,
-  type JobRunDto,
   type JobRunsDto,
   type JobTimeseriesDto,
   type PaginatedResponse,
@@ -41,6 +39,14 @@ export const dashboardKeys = {
   sessions: ['sessions'] as const,
 };
 
+function jobListInvalidations(queryClient: QueryClient, includeQuotas = false): Promise<void>[] {
+  const keys = [dashboardKeys.jobs, dashboardKeys.stats];
+  return [
+    ...keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    ...(includeQuotas ? [queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas })] : []),
+  ];
+}
+
 // ==========================================
 // QUERIES
 // ==========================================
@@ -48,13 +54,7 @@ export const dashboardKeys = {
 export function useCurrentUserQuery() {
   return useQuery<UserDto | null>({
     queryKey: dashboardKeys.user,
-    queryFn: async () => {
-      try {
-        return await api.getMe();
-      } catch {
-        return null;
-      }
-    },
+    queryFn: () => api.getMe(),
     staleTime: 60 * 1000,
   });
 }
@@ -191,11 +191,7 @@ export function useInvalidateDashboard() {
 
   const invalidateJobsAndStats = useCallback(
     async (jobId?: string) => {
-      const promises: Promise<unknown>[] = [
-        queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas }),
-        queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs }),
-        queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
-      ];
+      const promises: Promise<unknown>[] = [...jobListInvalidations(queryClient, true)];
       if (jobId) {
         promises.push(queryClient.invalidateQueries({ queryKey: ['jobRuns', jobId] }));
         promises.push(queryClient.invalidateQueries({ queryKey: ['timeseries', jobId] }));
@@ -211,8 +207,7 @@ export function useInvalidateDashboard() {
   const invalidateAll = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: dashboardKeys.user }),
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs }),
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.stats }),
+      ...jobListInvalidations(queryClient),
       queryClient.invalidateQueries({ queryKey: dashboardKeys.integrations }),
       queryClient.invalidateQueries({ queryKey: dashboardKeys.sessions }),
     ]);
@@ -236,8 +231,7 @@ export function useLoginMutation() {
     mutationFn: (credentials: { email: string; password: string }) => api.login(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(dashboardKeys.user, user);
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
     },
   });
 }
@@ -254,8 +248,7 @@ export function useRegisterMutation() {
     }) => api.register(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(dashboardKeys.user, user);
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
     },
   });
 }
@@ -267,8 +260,7 @@ export function useLogoutMutation() {
     mutationFn: () => api.logout(),
     onSuccess: () => {
       queryClient.setQueryData(dashboardKeys.user, null);
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.integrations });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.sessions });
     },
@@ -296,9 +288,7 @@ export function useCreateJobMutation() {
   return useMutation({
     mutationFn: (payload: CreateJobInput) => api.createJob(payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
+      void Promise.all(jobListInvalidations(queryClient, true));
     },
   });
 }
@@ -310,8 +300,7 @@ export function useUpdateJobMutation() {
     mutationFn: ({ id, payload }: { id: string; payload: UpdateJobInput }) =>
       api.updateJob(id, payload),
     onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(variables.id) });
     },
   });
@@ -323,9 +312,7 @@ export function useDeleteJobMutation() {
   return useMutation({
     mutationFn: (jobId: string) => api.deleteJob(jobId),
     onSuccess: (_, jobId) => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
+      void Promise.all(jobListInvalidations(queryClient, true));
       queryClient.removeQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
     },
   });
@@ -338,9 +325,7 @@ export function useTogglePauseMutation() {
     mutationFn: ({ jobId, paused }: { jobId: string; paused: boolean }) =>
       api.togglePause(jobId, paused),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
+      void Promise.all(jobListInvalidations(queryClient, true));
     },
   });
 }
@@ -351,8 +336,7 @@ export function useTriggerJobMutation() {
   return useMutation({
     mutationFn: (jobId: string) => api.triggerNow(jobId),
     onSuccess: (_, jobId) => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
     },
   });
@@ -364,8 +348,7 @@ export function useRecompileJobMutation() {
   return useMutation({
     mutationFn: (jobId: string) => api.triggerRecompile(jobId),
     onSuccess: (_, jobId) => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
     },
   });
@@ -377,8 +360,7 @@ export function useCancelCompilationMutation() {
   return useMutation({
     mutationFn: (jobId: string) => api.cancelCompilation(jobId),
     onSuccess: (_, jobId) => {
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobs });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.stats });
+      void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.quotas });
     },

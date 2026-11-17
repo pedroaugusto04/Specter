@@ -139,7 +139,10 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 
 export const api = {
   getMe(): Promise<UserDto | null> {
-    return request<UserDto | null>('/api/auth/me');
+    return request<UserDto | null>('/api/auth/me').catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 401) return null;
+      throw error;
+    });
   },
 
   login(input: { email: string; password: string }): Promise<UserDto> {

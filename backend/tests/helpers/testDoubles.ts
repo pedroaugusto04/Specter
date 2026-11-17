@@ -132,7 +132,7 @@ export class InMemoryJobRepository implements IJobRepository {
   public jobs = new Map<string, ScrapingJobEntity>();
   public runs: JobRunEntity[] = [];
   public pendingDeliveries: AlertDelivery[] = [];
-  public usageRepository?: IUsageRepository;
+  public usageRepository?: InMemoryUsageRepository;
   async commitRun(
     input: CreateJobRunInput,
     deliveries: AlertDelivery[],

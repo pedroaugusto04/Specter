@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { AlertTriangle, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 export interface ConfirmOptions {
   title?: string;
@@ -90,6 +91,8 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     setDialogState((prev) => ({ ...prev, isOpen: false }));
   }, [dialogState]);
 
+  useBodyScrollLock(dialogState.isOpen);
+
   React.useEffect(() => {
     if (!dialogState.isOpen) return;
 
@@ -101,12 +104,9 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = originalOverflow;
     };
   }, [dialogState.isOpen, handleCancel]);
 

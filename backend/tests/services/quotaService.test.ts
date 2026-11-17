@@ -6,9 +6,6 @@ import type {
   PlanLimits,
 } from '../../src/services/quotas/planLimits.interface.js';
 import { EnvPlanLimitResolver } from '../../src/services/quotas/envPlanLimitResolver.js';
-import { JobService } from '../../src/services/jobService.js';
-import { CompilationService } from '../../src/services/compilationService.js';
-import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import {
   createTestCompilationService,

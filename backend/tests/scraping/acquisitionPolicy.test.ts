@@ -17,7 +17,6 @@ import {
   MockJobScheduler,
   MockNotificationProvider,
 } from '../helpers/testDoubles.js';
-import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import { NoopStorageProvider } from '../../src/providers/storage/noopStorage.provider.js';
 import { presentExtractionReport, formatUserErrorMessage } from '../../src/utils/errorSanitizer.js';
 import type { DocumentAdapter, ExtractionPlan } from '../../src/extraction/contracts.js';

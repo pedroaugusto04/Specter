@@ -52,7 +52,8 @@ describe('Gemini API compiler transport', () => {
     const plan = fixturePlan();
     const fetchFn = vi.fn<typeof fetch>(async (_url, init) => {
       const body = JSON.parse(String(init?.body));
-      expect(body.generationConfig.responseJsonSchema.anyOf).toHaveLength(2);
+      const schema = body.generationConfig.responseJsonSchema;
+      expect(schema.oneOf ?? schema.anyOf).toHaveLength(2);
       expect(JSON.stringify(body.generationConfig.responseJsonSchema)).toContain('intent');
       const prompt = body.contents[0].parts[0].text;
       expect(prompt).not.toContain(JSON.stringify(body.generationConfig.responseJsonSchema));

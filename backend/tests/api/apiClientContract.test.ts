@@ -8,6 +8,29 @@ it('accepts the current HTTP data envelope', async () => {
   );
   expect(await api.getMe()).toBeNull();
 });
+it('treats only authentication rejection as an absent session', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 401 }))
+  );
+  expect(await api.getMe()).toBeNull();
+});
+it('propagates backend outages instead of reporting a logout', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 503 }))
+  );
+  await expect(api.getMe()).rejects.toMatchObject({ status: 503 });
+});
+it('propagates connection failures instead of reporting a logout', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('Network unavailable');
+    })
+  );
+  await expect(api.getMe()).rejects.toThrow('Network unavailable');
+});
 it('rejects obsolete unwrapped success responses', async () => {
   vi.stubGlobal(
     'fetch',

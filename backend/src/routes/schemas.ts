@@ -14,7 +14,9 @@ import {
 // ============================================================================
 
 export const cronExpressionSchema = z
-  .string({ required_error: 'Cron expression is required' })
+  .string({
+    error: (issue) => (issue.input === undefined ? 'Cron expression is required' : undefined),
+  })
   .trim()
   .min(1, 'Cron expression is required')
   .superRefine((cron, ctx) => {
@@ -30,7 +32,7 @@ export const cronExpressionSchema = z
   });
 
 export const targetUrlSchema = z
-  .string({ required_error: 'Target URL is required' })
+  .string({ error: (issue) => (issue.input === undefined ? 'Target URL is required' : undefined) })
   .trim()
   .min(1, 'Target URL is required')
   .url('Target URL must be a valid URL format (e.g. https://example.com)')
@@ -39,7 +41,7 @@ export const targetUrlSchema = z
   });
 
 export const webhookUrlStringSchema = z
-  .string({ required_error: 'Webhook URL is required' })
+  .string({ error: (issue) => (issue.input === undefined ? 'Webhook URL is required' : undefined) })
   .trim()
   .url('Webhook URL must be a valid HTTP or HTTPS URL')
   .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
@@ -63,12 +65,15 @@ export const monitorNameSchema = z
   .max(80, 'Monitor name must be 80 characters or fewer');
 
 export const userPromptSchema = z
-  .string({ required_error: 'Extraction instructions are required' })
+  .string({
+    error: (issue) =>
+      issue.input === undefined ? 'Extraction instructions are required' : undefined,
+  })
   .trim()
   .min(5, 'Extraction instructions must contain at least 5 characters');
 
 export const emailAddressSchema = z
-  .string({ required_error: 'Email is required' })
+  .string({ error: (issue) => (issue.input === undefined ? 'Email is required' : undefined) })
   .trim()
   .min(1, 'Email is required')
   .email('Please enter a valid email address');
@@ -124,7 +129,9 @@ export const jobUpdateSchema = z.object({
 });
 
 export const jobPauseSchema = z.object({
-  paused: z.boolean({ required_error: 'Paused state is required' }),
+  paused: z.boolean({
+    error: (issue) => (issue.input === undefined ? 'Paused state is required' : undefined),
+  }),
 });
 
 const pageQuerySchema = createPaginationQuerySchema(PAGINATION_DEFAULT_PAGE_SIZE);
@@ -166,7 +173,7 @@ export const ianaTimezoneSchema = z
 export const authRegisterSchema = z.object({
   email: emailAddressSchema,
   password: z
-    .string({ required_error: 'Password is required' })
+    .string({ error: (issue) => (issue.input === undefined ? 'Password is required' : undefined) })
     .min(8, 'Password must be at least 8 characters'),
   name: z.string().trim().max(100).optional(),
   timezone: ianaTimezoneSchema.optional(),
@@ -174,7 +181,9 @@ export const authRegisterSchema = z.object({
 
 export const authLoginSchema = z.object({
   email: emailAddressSchema,
-  password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
+  password: z
+    .string({ error: (issue) => (issue.input === undefined ? 'Password is required' : undefined) })
+    .min(1, 'Password is required'),
 });
 
 export const authProfileUpdateSchema = z.object({

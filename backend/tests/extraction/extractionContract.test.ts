@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import { extractionPlanSchema, extractionIntentSchema } from '../../src/types/extractionPlan.js';
 import { fixturePlan } from '../helpers/extractionFixtures.js';
@@ -25,16 +25,19 @@ describe('Single extraction contract', () => {
         fields?: {
           additionalProperties?: {
             anyOf?: JsonSchemaVariant[];
+            oneOf?: JsonSchemaVariant[];
           };
         };
       };
     };
-    const schema = zodToJsonSchema(extractionIntentSchema, {
-      $refStrategy: 'none',
+    const schema = z.toJSONSchema(extractionIntentSchema, {
+      target: 'draft-07',
+      io: 'input',
     }) as JsonSchemaTree;
     expect(schema.additionalProperties).toBe(false);
 
-    const variants = schema.properties?.fields?.additionalProperties?.anyOf ?? [];
+    const alternatives = schema.properties?.fields?.additionalProperties;
+    const variants = alternatives?.oneOf ?? alternatives?.anyOf ?? [];
     const numberVariant = variants.find((v) => v.properties?.type?.const === 'number');
     const booleanVariant = variants.find((v) => v.properties?.type?.const === 'boolean');
 

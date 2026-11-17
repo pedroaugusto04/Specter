@@ -102,7 +102,8 @@ npm test
 npm run lint
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+See [security and reliability changes](docs/hardening.md) for download/probe limits,
+compiler permissions, dependency compatibility and deployment behavior.
 
 ## License
 

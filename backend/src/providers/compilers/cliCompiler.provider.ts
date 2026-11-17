@@ -3,16 +3,11 @@ import { spawn, type SpawnOptions, type ChildProcess } from 'child_process';
 import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
-import {
-  CompilerTimeoutError,
-  CompilerValidationError,
-} from '../../errors/domainErrors.js';
+import { compilerEnvironment } from './cliEnvironment.js';
+import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { buildCliCompilerPrompt } from './compilerPrompt.js';
-import {
-  defaultCliErrorClassifier,
-  type CliErrorClassifier,
-} from './cliErrorClassifier.js';
+import { defaultCliErrorClassifier, type CliErrorClassifier } from './cliErrorClassifier.js';
 
 export interface CliCompilerOptions {
   providerName?: string;
@@ -93,6 +88,7 @@ export class CliCompilerProvider implements IModelProvider {
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
         signal: input.signal,
+        env: compilerEnvironment(this.name),
       };
 
       let stderrBuffer = '';

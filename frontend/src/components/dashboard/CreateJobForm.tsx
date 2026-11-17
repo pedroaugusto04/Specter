@@ -1,6 +1,7 @@
 'use client';
-import { emptyJobForm, formToCreateJob } from '@/forms/jobForm';
+import { DEFAULT_JOB_CRON, emptyJobForm, formToCreateJob } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
+import { useJobFormFeedback } from '@/hooks/useJobFormFeedback';
 import { JobScheduleFields } from './JobScheduleFields';
 import { TriggerHelpCallout } from './TriggerRulesEditor';
 import { getBrowserTimezone } from '@/lib/utils';
@@ -20,7 +21,7 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { api, ApiError, type SessionDto, type UserDto } from '@/lib/api';
 import { useModal } from '@/components/ui/modal-dialog';
-import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
+import { validateUrl, type JobFormField } from '@/lib/validation';
 import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
 import { PAGINATION_MAX_PAGE_SIZE } from '@specter/contracts';
@@ -110,8 +111,15 @@ export function CreateJobForm({
   const jobs = jobsPage?.items ?? [];
   const probeUrlMutation = useProbeUrlMutation();
   const checkSessionMutation = useCheckSessionMutation();
-  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
-  const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const {
+    fieldErrors,
+    setFieldErrors,
+    globalError,
+    setGlobalError,
+    clearFieldError,
+    focusFirstInvalidField,
+    validateFields,
+  } = useJobFormFeedback(values, user?.email);
 
   const [probeState, setProbeState] = React.useState<{
     status: 'idle' | 'probing' | 'accessible' | 'blocked';
@@ -145,7 +153,7 @@ export function CreateJobForm({
     notificationEmail.trim() !== defaultNotificationEmail ||
     (showCustomWebhook && (webhookUrl.trim().length > 0 || webhookSecret.trim().length > 0)) ||
     captureScreenshotOnChange ||
-    (useCustomCron && customCron !== '0 */6 * * *')
+    (useCustomCron && customCron !== DEFAULT_JOB_CRON)
   );
 
   React.useEffect(() => {
@@ -170,35 +178,6 @@ export function CreateJobForm({
     },
     [sendEmailAlerts, notificationEmail, user, integrations, showCustomWebhook, webhookUrl]
   );
-
-  const clearFieldError = (field: JobFormField) => {
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
-
-  const focusFirstInvalidField = (errors: Partial<Record<JobFormField, string>>) => {
-    const errorKeys = Object.keys(errors) as JobFormField[];
-    if (errorKeys.length === 0) return;
-
-    const firstKey = errorKeys[0];
-    const fieldIdMap: Record<JobFormField, string> = {
-      url: 'target-url',
-      name: 'monitor-name',
-      notificationEmail: 'notify-email',
-      userPrompt: 'user-prompt',
-      cronExpression: useCustomCron ? 'custom-cron' : 'cron-preset',
-    };
-
-    const elementId = fieldIdMap[firstKey];
-    if (elementId) {
-      const element = document.getElementById(elementId);
-      element?.focus();
-    }
-  };
 
   const handleUrlBlur = async () => {
     const trimmedUrl = url.trim();
@@ -275,31 +254,26 @@ export function CreateJobForm({
     }
   };
 
+  const confirmWithoutChannels = async (
+    activeUser: UserDto,
+    activeIntegrations: typeof integrations
+  ): Promise<boolean> => {
+    if (checkHasCommunicationChannels(activeUser, activeIntegrations)) return true;
+    return modal.confirm({
+      title: 'No Notification Channels Configured',
+      message:
+        'You have not configured any notification channels (Email, Telegram, or Webhook). You will not receive external alerts when website changes occur.\n\nYou can still view extractions, snapshots, and diffs directly within Specter.\n\nDo you want to create this monitor anyway?',
+      confirmLabel: 'Create Anyway',
+      cancelLabel: 'Configure Alerts',
+      variant: 'warning',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError(null);
 
-    if (sendEmailAlerts && !notificationEmail.trim() && !user?.email) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        notificationEmail: 'Please enter an alert email address.',
-      }));
-      return;
-    }
-
-    const validation = validateJobForm({
-      name,
-      url,
-      userPrompt,
-      notificationEmail: sendEmailAlerts ? notificationEmail : '',
-      cronExpression: effectiveCron,
-    });
-
-    if (!validation.isValid) {
-      setFieldErrors(validation.errors);
-      focusFirstInvalidField(validation.errors);
-      return;
-    }
+    if (!validateFields()) return;
 
     if (!user) {
       setStep('auth');
@@ -307,20 +281,7 @@ export function CreateJobForm({
       return;
     }
 
-    if (!checkHasCommunicationChannels(user, integrations)) {
-      const proceed = await modal.confirm({
-        title: 'No Notification Channels Configured',
-        message:
-          'You have not configured any notification channels (Email, Telegram, or Webhook). You will not receive external alerts when website changes occur.\n\nYou can still view extractions, snapshots, and diffs directly within Specter.\n\nDo you want to create this monitor anyway?',
-        confirmLabel: 'Create Anyway',
-        cancelLabel: 'Configure Alerts',
-        variant: 'warning',
-      });
-
-      if (!proceed) {
-        return;
-      }
-    }
+    if (!(await confirmWithoutChannels(user, integrations))) return;
 
     await executeCreateJob(user);
   };
@@ -373,21 +334,10 @@ export function CreateJobForm({
               }
             }
 
-            if (!checkHasCommunicationChannels(authenticatedUser, activeIntegrations)) {
-              const proceed = await modal.confirm({
-                title: 'No Notification Channels Configured',
-                message:
-                  'You have not configured any notification channels (Email, Telegram, or Webhook). You will not receive external alerts when website changes occur.\n\nYou can still view extractions, snapshots, and diffs directly within Specter.\n\nDo you want to create this monitor anyway?',
-                confirmLabel: 'Create Anyway',
-                cancelLabel: 'Configure Alerts',
-                variant: 'warning',
-              });
-
-              if (!proceed) {
-                setStep('form');
-                onStepChange?.('form');
-                return;
-              }
+            if (!(await confirmWithoutChannels(authenticatedUser, activeIntegrations))) {
+              setStep('form');
+              onStepChange?.('form');
+              return;
             }
 
             await executeCreateJob(authenticatedUser);

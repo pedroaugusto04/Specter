@@ -1,10 +1,8 @@
-import type { MetricQuotaSummary, UserQuotaSummary } from '@specter/contracts';
+import type { UserQuotaSummary } from '@specter/contracts';
 import { QuotaExceededError } from '../errors/domainErrors.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { IUsageRepository } from '../repositories/usageRepository.js';
 import type { IPlanLimitResolver, PlanLimits } from './quotas/planLimits.interface.js';
-
-export type { MetricQuotaSummary, UserQuotaSummary };
 
 export interface QuotaServiceDeps {
   jobRepository: IJobRepository;
@@ -15,7 +13,7 @@ export interface QuotaServiceDeps {
 export class QuotaService {
   constructor(private readonly deps: QuotaServiceDeps) {}
 
-  async getLimits(userId: string): Promise<PlanLimits> {
+  private async getLimits(userId: string): Promise<PlanLimits> {
     return this.deps.planLimitResolver.getLimitsForUser(userId);
   }
 
@@ -51,10 +49,6 @@ export class QuotaService {
     }
   }
 
-  async recordCompilation(userId: string): Promise<void> {
-    await this.deps.usageRepository.incrementCompilations(userId);
-  }
-
   async assertCanExecuteScrape(userId: string): Promise<void> {
     const limits = await this.getLimits(userId);
     const usage = await this.deps.usageRepository.getUsage(userId);
@@ -69,10 +63,6 @@ export class QuotaService {
         }
       );
     }
-  }
-
-  async recordExecution(userId: string): Promise<void> {
-    await this.deps.usageRepository.incrementExecutions(userId);
   }
 
   async getQuotaSummary(userId: string): Promise<UserQuotaSummary> {

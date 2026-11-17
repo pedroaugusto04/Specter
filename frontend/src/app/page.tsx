@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 export default function HomePage() {
-  const { data: user = null } = useCurrentUserQuery();
+  const { data: user = null, error: userError, refetch: refetchUser } = useCurrentUserQuery();
   const { queryClient, invalidateAll } = useInvalidateDashboard();
   const logoutMutation = useLogoutMutation();
   const modals = useDashboardModals();
@@ -122,6 +122,17 @@ export default function HomePage() {
 
       {/* Main Landing Workspace */}
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        {userError && (
+          <div
+            role="status"
+            className="mt-6 flex items-center justify-between gap-4 rounded-md border border-border bg-muted/60 px-4 py-3 text-sm"
+          >
+            <span>Unable to verify your session. Please try again.</span>
+            <Button variant="ghost" size="sm" onClick={() => void refetchUser()}>
+              Retry
+            </Button>
+          </div>
+        )}
         <LandingSection
           user={user}
           onGetStarted={modals.openAuthModal}

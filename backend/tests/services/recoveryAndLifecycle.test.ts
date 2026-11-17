@@ -15,7 +15,6 @@ import {
 import { CompilationService } from '../../src/services/compilationService.js';
 import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import { CompilationReason } from '../../src/queues/scheduler.interface.js';
-import { JobService } from '../../src/services/jobService.js';
 import { JobPresenter } from '../../src/presentation/jobPresenter.js';
 import {
   createTestCompilationService,

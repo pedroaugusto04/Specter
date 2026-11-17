@@ -25,7 +25,6 @@ import {
   AlertCircle,
   Camera,
   Clock,
-  ExternalLink,
   FileCode,
   FileSpreadsheet,
   GitCompare,
@@ -84,7 +83,7 @@ export function JobRunsDrawer({
   }, [job?.id]);
 
   const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
-  const { data: timeseriesData, isLoading: timeseriesLoading } = useJobTimeseriesQuery(
+  const { data: timeseriesData } = useJobTimeseriesQuery(
     job?.id,
     chartRange,
     timeseriesPage,
@@ -507,7 +506,6 @@ export function JobRunsDrawer({
               setChartRange(range);
               setTimeseriesPage(1);
             }}
-            isLoading={timeseriesLoading}
           />
         )}
 

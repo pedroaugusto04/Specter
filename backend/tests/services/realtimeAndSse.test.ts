@@ -7,7 +7,6 @@ import type {
 } from '../../src/providers/realtime/realtime.interface.js';
 import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
-import { JobService } from '../../src/services/jobService.js';
 import { RealtimeService } from '../../src/services/realtimeService.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import {

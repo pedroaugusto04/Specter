@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { env } from '../config/env.js';
 import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { JobService } from '../services/jobService.js';
@@ -64,12 +65,26 @@ export function registerJobRoutes(
     return { data: result };
   });
 
-  app.post('/api/jobs/probe', { preHandler: [withOptionalAuth] }, async (request, reply) => {
-    const user = request.user;
-    const { url } = jobProbeSchema.parse(request.body);
-    const result = await jobService.probeUrl(url, user?.id);
-    return reply.status(200).send({ data: result });
-  });
+  app.post(
+    '/api/jobs/probe',
+    {
+      preHandler: [withOptionalAuth],
+      config: {
+        rateLimit: {
+          max: env.RATE_LIMIT_PROBE_MAX,
+          timeWindow: '1 minute',
+          hook: 'preHandler',
+          keyGenerator: (request) => (request.user ? `user:${request.user.id}` : request.ip),
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = request.user;
+      const { url } = jobProbeSchema.parse(request.body);
+      const result = await jobService.probeUrl(url, user?.id);
+      return reply.status(200).send({ data: result });
+    }
+  );
 
   app.get<{ Params: { id: string } }>(
     '/api/jobs/:id',

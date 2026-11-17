@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { AuthService } from '../../src/services/authService.js';
-import { JobService } from '../../src/services/jobService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import {
@@ -13,7 +12,6 @@ import {
   InMemorySessionRepository,
   InMemoryJobRepository,
   InMemoryIntegrationRepository,
-  MockJobScheduler,
 } from '../helpers/testDoubles.js';
 
 describe('Companion Browser Extension — Session Synchronization & Bearer Auth', () => {

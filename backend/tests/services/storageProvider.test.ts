@@ -6,7 +6,6 @@ import {
   SupabaseStorageProvider,
   createStorageProvider,
 } from '../../src/providers/storage/index.js';
-import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import {
   createTestScrapeExecutionService,
   InMemoryJobRepository,

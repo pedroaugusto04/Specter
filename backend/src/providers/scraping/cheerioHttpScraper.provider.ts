@@ -4,6 +4,7 @@ import { env } from '../../config/env.js';
 import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
+import { readBoundedResponseText } from '../../utils/responseBody.js';
 import type { IScraperEngine, ScrapeOptions, ScrapeResult } from './scraper.interface.js';
 
 const DEFAULT_USER_AGENT =
@@ -13,10 +14,14 @@ export class CheerioScraperEngine implements IScraperEngine {
   public readonly name = 'cheerio';
   private readonly defaultTimeoutMs: number;
   private readonly fetchFn: typeof fetch;
+  private readonly maxResponseBytes: number;
 
-  constructor(options: { timeoutMs?: number; fetchFn?: typeof fetch } = {}) {
+  constructor(
+    options: { timeoutMs?: number; fetchFn?: typeof fetch; maxResponseBytes?: number } = {}
+  ) {
     this.defaultTimeoutMs = options.timeoutMs ?? env.UNBLOCKER_TIMEOUT_MS;
     this.fetchFn = options.fetchFn ?? fetch;
+    this.maxResponseBytes = options.maxResponseBytes ?? env.HTTP_MAX_RESPONSE_BYTES;
   }
 
   async fetchHtml(targetUrl: string, options?: ScrapeOptions): Promise<ScrapeResult> {
@@ -70,7 +75,7 @@ export class CheerioScraperEngine implements IScraperEngine {
       const finalUrl = response.url || currentUrl;
       await assertSafeUrl(finalUrl, 'redirectUrl');
       const httpStatus = response.status;
-      const rawHtml = await response.text();
+      const rawHtml = await readBoundedResponseText(response, this.maxResponseBytes);
 
       // Check HTTP status code, URL redirects, and DOM challenge fingerprints
       detectAntiBotBlock(finalUrl, rawHtml, httpStatus);

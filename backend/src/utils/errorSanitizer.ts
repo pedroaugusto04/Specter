@@ -43,6 +43,8 @@ export function formatUserErrorMessage(error: unknown): string {
   if (accessFailure === AccessFailure.Transient) return USER_ERROR_MESSAGES.websiteUnavailable;
   if (error instanceof DomainError) {
     switch (error.code) {
+      case 'RESPONSE_TOO_LARGE':
+        return 'The website response is too large to process safely.';
       case 'UPSTREAM_HTTP_ERROR':
         return USER_ERROR_MESSAGES.websiteUnavailable;
       case 'CONFIGURATION_REJECTED':

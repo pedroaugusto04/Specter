@@ -168,15 +168,10 @@ export const userWebSessions = pgTable(
 );
 
 export type UserRow = typeof users.$inferSelect;
-export type NewUserRow = typeof users.$inferInsert;
 export type ScrapingJobRow = typeof scrapingJobs.$inferSelect;
-export type NewScrapingJobRow = typeof scrapingJobs.$inferInsert;
 export type JobRunRow = typeof jobRuns.$inferSelect;
-export type NewJobRunRow = typeof jobRuns.$inferInsert;
 export type UserIntegrationRow = typeof userIntegrations.$inferSelect;
-export type NewUserIntegrationRow = typeof userIntegrations.$inferInsert;
 export type UserWebSessionRow = typeof userWebSessions.$inferSelect;
-export type NewUserWebSessionRow = typeof userWebSessions.$inferInsert;
 
 export const userMonthlyUsage = pgTable(
   'user_monthly_usage',
@@ -196,9 +191,6 @@ export const userMonthlyUsage = pgTable(
     index('idx_user_monthly_usage_user_id').on(table.userId),
   ]
 );
-
-export type UserMonthlyUsageRow = typeof userMonthlyUsage.$inferSelect;
-export type NewUserMonthlyUsageRow = typeof userMonthlyUsage.$inferInsert;
 
 export const alertDeliveries = pgTable(
   'alert_deliveries',

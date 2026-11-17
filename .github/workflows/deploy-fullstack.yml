@@ -8,6 +8,8 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'packages/contracts/**'
+      - 'extension/**'
       - 'scripts/deploy/**'
       - 'docker-compose.prod.yml'
       - '.github/workflows/deploy-fullstack.yml'
@@ -78,13 +80,14 @@ env:
   COMPILER_API_MODEL: ${{ vars.COMPILER_API_MODEL || '' }}
   AGY_MODEL: ${{ vars.AGY_MODEL || '' }}
   COMPILER_CODEX_MODEL: ${{ vars.COMPILER_CODEX_MODEL || 'gpt-6-luna' }}
-  CODEX_SANDBOX: ${{ vars.CODEX_SANDBOX || 'danger-full-access' }}
   COMPILER_API_BASE_URL: ${{ vars.COMPILER_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
   COMPILER_API_MAX_RETRIES: ${{ vars.COMPILER_API_MAX_RETRIES || '3' }}
   COMPILER_API_RETRY_BASE_DELAY_MS: ${{ vars.COMPILER_API_RETRY_BASE_DELAY_MS || '1000' }}
   COMPILER_API_RETRY_MAX_DELAY_MS: ${{ vars.COMPILER_API_RETRY_MAX_DELAY_MS || '10000' }}
   COMPILER_RATE_LIMIT_RETRY_DELAY_MS: ${{ vars.COMPILER_RATE_LIMIT_RETRY_DELAY_MS || '120000' }}
   EVALS_LIVE_MODELS_ENABLED: ${{ vars.EVALS_LIVE_MODELS_ENABLED || 'false' }}
+  HTTP_MAX_RESPONSE_BYTES: ${{ vars.HTTP_MAX_RESPONSE_BYTES || '10485760' }}
+  RATE_LIMIT_PROBE_MAX: ${{ vars.RATE_LIMIT_PROBE_MAX || '10' }}
   SCRAPER_ENGINE: ${{ vars.SCRAPER_ENGINE || 'playwright' }}
   SCRAPER_CONCURRENCY: ${{ vars.SCRAPER_CONCURRENCY || '3' }}
   PLAYWRIGHT_TIMEOUT_MS: ${{ vars.PLAYWRIGHT_TIMEOUT_MS || '120000' }}
@@ -122,6 +125,7 @@ jobs:
               - '.github/workflows/deploy-fullstack.yml'
             frontend:
               - 'frontend/**'
+              - 'extension/**'
               - 'packages/contracts/**'
               - '.github/workflows/deploy-fullstack.yml'
 
@@ -172,6 +176,7 @@ jobs:
         env:
           EVALS_LIVE_MODELS_ENABLED: 'false'
         run: |
+          npm run typecheck
           npm run build
           npm run lint
           npm run evaluate:regression
@@ -279,7 +284,6 @@ jobs:
           COMPILER_API_MODEL: ${{ env.COMPILER_API_MODEL }}
           AGY_MODEL: ${{ env.AGY_MODEL }}
           COMPILER_CODEX_MODEL: ${{ env.COMPILER_CODEX_MODEL }}
-          CODEX_SANDBOX: ${{ env.CODEX_SANDBOX }}
           COMPILER_API_KEY: ${{ secrets.COMPILER_API_KEY }}
           COMPILER_API_BASE_URL: ${{ env.COMPILER_API_BASE_URL }}
           COMPILER_API_MAX_RETRIES: ${{ env.COMPILER_API_MAX_RETRIES }}
@@ -295,6 +299,8 @@ jobs:
           SCRAPER_CONCURRENCY: ${{ env.SCRAPER_CONCURRENCY }}
           PLAYWRIGHT_TIMEOUT_MS: ${{ env.PLAYWRIGHT_TIMEOUT_MS }}
           UNBLOCKER_TIMEOUT_MS: ${{ env.UNBLOCKER_TIMEOUT_MS }}
+          HTTP_MAX_RESPONSE_BYTES: ${{ env.HTTP_MAX_RESPONSE_BYTES }}
+          RATE_LIMIT_PROBE_MAX: ${{ env.RATE_LIMIT_PROBE_MAX }}
           COMPILER_TIMEOUT_MS: ${{ env.COMPILER_TIMEOUT_MS }}
           MIN_CRON_INTERVAL_MINUTES: ${{ env.MIN_CRON_INTERVAL_MINUTES }}
           DEFAULT_MAX_ACTIVE_MONITORS: ${{ vars.DEFAULT_MAX_ACTIVE_MONITORS || '5' }}

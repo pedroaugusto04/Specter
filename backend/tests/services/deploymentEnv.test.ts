@@ -18,6 +18,8 @@ const tuning = {
   RECOVERY_WINDOW_MS: '172800000',
   MAX_RECOVERY_ATTEMPTS: '4',
   EVALS_LIVE_MODELS_ENABLED: 'true',
+  HTTP_MAX_RESPONSE_BYTES: '2000000',
+  RATE_LIMIT_PROBE_MAX: '8',
 };
 describe('Environment configuration', () => {
   it('uses documented defaults and rejects invalid tuning values', () => {
@@ -26,6 +28,8 @@ describe('Environment configuration', () => {
       ACCESS_BLOCK_THRESHOLD: 2,
       ACCESS_BLOCK_COOLDOWN_MINUTES: 60,
       EVALS_LIVE_MODELS_ENABLED: false,
+      HTTP_MAX_RESPONSE_BYTES: 10485760,
+      RATE_LIMIT_PROBE_MAX: 10,
     });
     expect(
       parseEnv({

@@ -2,12 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { env } from '../config/env.js';
 import { UnauthorizedError } from '../errors/domainErrors.js';
 import { isAllowedCorsOrigin } from '../utils/corsHelper.js';
-import {
-  optionalAuth,
-  requireAuth,
-  requireUser,
-  resolveAuthenticatedUser,
-} from '../middlewares/authMiddleware.js';
+import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import {
   OAUTH_STATE_COOKIE_NAME,
@@ -16,8 +11,6 @@ import {
   serializeCookie,
 } from '../utils/cookies.js';
 import { authLoginSchema, authProfileUpdateSchema, authRegisterSchema } from './schemas.js';
-
-export { resolveAuthenticatedUser };
 
 function resolveDynamicCallbackUrl(request: FastifyRequest): string {
   const forwardedProto = (request.headers['x-forwarded-proto'] as string | undefined)

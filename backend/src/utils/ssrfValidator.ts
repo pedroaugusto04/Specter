@@ -33,14 +33,6 @@ const BLOCKED_DOMAINS_SUFFIXES = [
  * multicast, or reserved ranges.
  */
 export function isPrivateIp(ip: string): boolean {
-  // If it's IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1 or ::ffff:7f00:1)
-  if (ip.startsWith('::ffff:')) {
-    const rawIpv4 = ip.slice(7);
-    if (net.isIPv4(rawIpv4)) {
-      return isPrivateIp(rawIpv4);
-    }
-  }
-
   const family = net.isIP(ip);
   if (family === 4) {
     const parts = ip.split('.').map((p) => Number(p));
@@ -90,7 +82,17 @@ export function isPrivateIp(ip: string): boolean {
   }
 
   if (family === 6) {
-    const normalized = ip.toLowerCase();
+    // WHATWG URL canonicalization handles expanded, mixed-case and dotted IPv4 tails.
+    const normalized = new URL(`http://[${ip}]/`).hostname.slice(1, -1);
+    if (normalized.startsWith('::ffff:')) {
+      const words = normalized
+        .slice(7)
+        .split(':')
+        .map((word) => parseInt(word, 16));
+      const [high, low] = words;
+      if (words.length !== 2 || high === undefined || low === undefined) return true;
+      return isPrivateIp(`${high >>> 8}.${high & 255}.${low >>> 8}.${low & 255}`);
+    }
 
     // Loopback ::1 and unspecified ::
     if (normalized === '::1' || normalized === '::') return true;
@@ -140,14 +142,11 @@ export function isInternalHostname(hostname: string): boolean {
 /**
  * Validates that a target URL is strictly HTTP or HTTPS and does NOT point
  * to private IP ranges, loopback, cloud metadata endpoints, or internal hostnames.
- * Performs DNS resolution to prevent DNS rebinding attacks.
+ * Rejects hostnames that currently resolve to private addresses. Connection-level
+ * DNS pinning is still required to fully prevent DNS rebinding.
  */
 const dnsSafeCache = new Map<string, number>();
 const DNS_CACHE_TTL_MS = 60_000;
-
-export function clearDnsSafeCache(): void {
-  dnsSafeCache.clear();
-}
 
 export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<string> {
   let parsed: URL;
@@ -188,7 +187,7 @@ export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<
     return parsed.toString();
   }
 
-  // Resolve hostname via DNS to prevent DNS rebinding to internal IPs
+  // Check every returned address; this preflight is not connection-level DNS pinning.
   const cachedExpires = dnsSafeCache.get(hostname);
   if (cachedExpires && cachedExpires > Date.now()) {
     parsed.hash = '';

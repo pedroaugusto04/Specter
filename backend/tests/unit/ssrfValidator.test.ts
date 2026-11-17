@@ -42,6 +42,24 @@ describe('SSRF Protection & URL Validation (ssrfValidator)', () => {
       expect(isPrivateIp('::ffff:192.168.1.1')).toBe(true);
     });
 
+    it.each([
+      '::ffff:7f00:1',
+      '::FFFF:a00:1',
+      '0:0:0:0:0:ffff:c0a8:101',
+      '::ffff:a9fe:a9fe',
+      '0:0:0:0:0:0:0:1',
+      '0:0:0:0:0:0:0:0',
+    ])('blocks equivalent private IPv6 representations: %s', (ip) => {
+      expect(isPrivateIp(ip)).toBe(true);
+    });
+
+    it.each(['::ffff:808:808', '0:0:0:0:0:ffff:101:101', '::ffff:8.8.8.8'])(
+      'preserves public IPv4-mapped addresses: %s',
+      (ip) => {
+        expect(isPrivateIp(ip)).toBe(false);
+      }
+    );
+
     it('detects reserved documentation and protocol assignment blocks (RFC 6890 / 5735)', () => {
       expect(isPrivateIp('192.0.0.1')).toBe(true);
       expect(isPrivateIp('192.0.2.1')).toBe(true);
@@ -85,6 +103,14 @@ describe('SSRF Protection & URL Validation (ssrfValidator)', () => {
   });
 
   describe('assertSafeUrl', () => {
+    it.each([
+      'http://[::ffff:127.0.0.1]/',
+      'http://[::ffff:7f00:1]/',
+      'http://[0:0:0:0:0:ffff:192.168.1.1]/',
+      'http://2130706433/',
+    ])('rejects private URL representations after canonicalization: %s', async (url) => {
+      await expect(assertSafeUrl(url)).rejects.toThrow(/forbidden/i);
+    });
     it('rejects URLs pointing to localhost and internal hostnames', async () => {
       await expect(assertSafeUrl('http://localhost:3000')).rejects.toThrow(/forbidden/i);
       await expect(assertSafeUrl('http://redis:6379')).rejects.toThrow(/forbidden/i);

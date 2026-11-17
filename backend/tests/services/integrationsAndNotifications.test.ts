@@ -5,7 +5,6 @@ import { NotificationDispatcher } from '../../src/providers/notifications/notifi
 import { TelegramNotificationProvider } from '../../src/providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from '../../src/providers/notifications/webhookNotification.provider.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
-import { JobService } from '../../src/services/jobService.js';
 import { AuthService } from '../../src/services/authService.js';
 import type { AlertPayload } from '../../src/providers/notifications/notification.interface.js';
 import { SessionService } from '../../src/services/sessionService.js';

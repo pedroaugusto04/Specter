@@ -3,7 +3,8 @@ import * as React from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_JOB_CRON, type JobFormValues } from '@/forms/jobForm';
-import { cn, getBrowserTimezone, getCronPresets } from '@/lib/utils';
+import { cn, getBrowserTimezone } from '@/lib/utils';
+import { getCronPresets } from '@/lib/cronPresets';
 
 const CUSTOM_SCHEDULE = 'custom';
 type Schedule = Pick<JobFormValues, 'cronPreset' | 'customCron' | 'useCustomCron'>;

@@ -1,7 +1,6 @@
 import { getUserFailure } from '@specter/contracts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-export { CRON_PRESETS, getCronPresets, type CronPreset } from './cronPresets';
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -57,7 +56,7 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
   return { valid: true };
 }
 
-export const FALLBACK_TIMEZONE = 'America/Sao_Paulo';
+export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
 export function getBrowserTimezone(): string {
   if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
@@ -70,12 +69,10 @@ export function getBrowserTimezone(): string {
       // ignore
     }
   }
-  return FALLBACK_TIMEZONE;
+  return DEFAULT_TIMEZONE;
 }
 
-export const DEFAULT_TIMEZONE = FALLBACK_TIMEZONE;
-
-export const COMMON_TIMEZONES = [
+const COMMON_TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'America/Sao Paulo (BRT / UTC-3)' },
   { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
   { value: 'America/New_York', label: 'America/New York (EST/EDT)' },
@@ -122,7 +119,7 @@ export function getAllIanaTimezones(): TimezoneOption[] {
   }
 
   if (!timezones.includes('UTC')) timezones.unshift('UTC');
-  if (!timezones.includes(FALLBACK_TIMEZONE)) timezones.unshift(FALLBACK_TIMEZONE);
+  if (!timezones.includes(DEFAULT_TIMEZONE)) timezones.unshift(DEFAULT_TIMEZONE);
 
   const now = new Date();
   const results: TimezoneOption[] = [];
@@ -172,7 +169,10 @@ export function formatDateTime(isoString: string, timeZone: string = getBrowserT
   }
 }
 
-export function formatCompactDate(isoString: string, timeZone: string = getBrowserTimezone()): string {
+export function formatCompactDate(
+  isoString: string,
+  timeZone: string = getBrowserTimezone()
+): string {
   try {
     const d = new Date(isoString);
     if (Number.isNaN(d.getTime())) return isoString;

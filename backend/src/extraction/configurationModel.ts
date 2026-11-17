@@ -1,7 +1,6 @@
 import { env } from '../config/env.js';
 import { CompilerValidationError } from '../errors/domainErrors.js';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ConfigurationModel, IModelProvider, ModelInput, StageInput } from './model.js';
 import { configurationInstructions, semanticInstructions } from './prompts.js';
 import {
@@ -13,9 +12,10 @@ import { fitEvidenceText } from './evidenceBudget.js';
 import { ModelTask } from './configurationConstants.js';
 import { redactObject, redactText } from './evidence.js';
 import { logger } from '../utils/logger.js';
-function outputContract(schema: z.ZodTypeAny, instructions: string) {
-  const { $schema: _schemaVersion, ...outputSchema } = zodToJsonSchema(schema, {
-    $refStrategy: 'root',
+function outputContract(schema: z.ZodType, instructions: string) {
+  const { $schema: _schemaVersion, ...outputSchema } = z.toJSONSchema(schema, {
+    target: 'draft-07',
+    io: 'input',
   });
   return {
     instructions: instructions.trim(),

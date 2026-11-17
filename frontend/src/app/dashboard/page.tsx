@@ -37,7 +37,7 @@ export default function DashboardPage() {
     JobStatus | 'recovering' | 'paused' | undefined
   >();
   const [jobsSearch, setJobsSearch] = React.useState('');
-  const { data: user = null } = useCurrentUserQuery();
+  const { data: user = null, error: userError, refetch: refetchUser } = useCurrentUserQuery();
   const {
     data: jobsResult,
     isLoading: isJobsLoading,
@@ -73,7 +73,7 @@ export default function DashboardPage() {
   }, [jobs, modals.editingJob]);
 
   const isRefreshing = isJobsLoading || isJobsFetching || isStatsFetching;
-  const connectionError = jobsError || statsError;
+  const connectionError = userError || jobsError || statsError;
   const runningJobIds = React.useMemo(
     () => new Set(jobs.filter((job) => job.currentRun).map((job) => job.id)),
     [jobs]
@@ -136,8 +136,8 @@ export default function DashboardPage() {
   }, [jobs, modals.selectedJob, modals.openJobHistory]);
 
   const handleRefresh = React.useCallback(async () => {
-    await Promise.all([refetchJobs(), refetchStats()]);
-  }, [refetchJobs, refetchStats]);
+    await Promise.all([refetchUser(), refetchJobs(), refetchStats()]);
+  }, [refetchUser, refetchJobs, refetchStats]);
 
   const handleLogout = async () => {
     try {

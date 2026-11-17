@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
+import { env } from '../../src/config/env.js';
 import { isAllowedCorsOrigin } from '../../src/utils/corsHelper.js';
 import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
-import { JobService } from '../../src/services/jobService.js';
 import { TelegramNotificationProvider } from '../../src/providers/notifications/telegramNotification.provider.js';
 import { WebhookNotificationProvider } from '../../src/providers/notifications/webhookNotification.provider.js';
 import { SessionService } from '../../src/services/sessionService.js';
@@ -208,6 +208,46 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     expect(goodLogin.json().data.email).toBe('bob@example.com');
     expect(goodLogin.json()).not.toHaveProperty('token');
     expect(goodLogin.headers['set-cookie']).toBeDefined();
+  });
+
+  it('bounds anonymous probes without blocking ordinary dashboard requests', async () => {
+    const fetch = vi.spyOn(scraperEngine, 'fetchHtml');
+    for (let index = 0; index < env.RATE_LIMIT_PROBE_MAX; index++) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/jobs/probe',
+        payload: { url: 'https://example.com' },
+        headers: { 'x-test-rate-limit': '1' },
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    const rejected = await app.inject({
+      method: 'POST',
+      url: '/api/jobs/probe',
+      payload: { url: 'https://example.com' },
+      headers: { 'x-test-rate-limit': '1' },
+    });
+    expect(rejected.statusCode).toBe(429);
+    expect(fetch).toHaveBeenCalledTimes(env.RATE_LIMIT_PROBE_MAX);
+    expect(
+      (await app.inject({ method: 'GET', url: '/api/jobs', headers: { 'x-test-rate-limit': '1' } }))
+        .statusCode
+    ).toBe(200);
+    const registration = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'probe@example.com', password: 'test-password' },
+    });
+    const authenticated = await app.inject({
+      method: 'POST',
+      url: '/api/jobs/probe',
+      payload: { url: 'https://example.com' },
+      headers: {
+        'x-test-rate-limit': '1',
+        cookie: extractCookieHeader(registration.headers['set-cookie']),
+      },
+    });
+    expect(authenticated.statusCode).toBe(200);
   });
 
   it('allows unauthenticated visitors to view empty dashboard and probe URLs, but blocks monitor creation until signed in', async () => {
@@ -427,7 +467,6 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
     const { buildApp } = await import('../../src/app.js');
     const { AuthService } = await import('../../src/services/authService.js');
     const { IntegrationService } = await import('../../src/services/integrationService.js');
-    const { JobService } = await import('../../src/services/jobService.js');
     const { TelegramNotificationProvider } =
       await import('../../src/providers/notifications/telegramNotification.provider.js');
     const { WebhookNotificationProvider } =

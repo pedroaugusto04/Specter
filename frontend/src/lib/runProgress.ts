@@ -8,9 +8,3 @@ export function runProgressPill(run: JobRunDto): string {
   if (run.phase === RunPhase.Checking) return 'CHECKING';
   return 'RUNNING';
 }
-
-export function runProgressLabel(run: JobRunDto): string {
-  if (run.phase === RunPhase.Recovering) return 'Recovering monitor…';
-  if (run.phase === RunPhase.Retrying || run.phase === RunPhase.Confirming) return 'Retrying…';
-  return 'Checking…';
-}

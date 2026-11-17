@@ -43,7 +43,6 @@ interface Props {
   summary: JobRunsSummaryDto;
   timeRange?: ChartTimeRange;
   onTimeRangeChange?: (range: ChartTimeRange) => void;
-  isLoading?: boolean;
 }
 export function ExecutionTimelineChart({
   runs = [],
@@ -63,7 +62,6 @@ export function ExecutionTimelineChart({
   summary,
   timeRange: controlledTimeRange,
   onTimeRangeChange,
-  isLoading = false,
 }: Props) {
   const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
   const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);

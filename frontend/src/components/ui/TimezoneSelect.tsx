@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Check, ChevronsUpDown, Globe, Search, X } from 'lucide-react';
-import { cn, getAllIanaTimezones, getBrowserTimezone, type TimezoneOption } from '@/lib/utils';
+import { cn, getAllIanaTimezones, getBrowserTimezone } from '@/lib/utils';
 
 export interface TimezoneSelectProps {
   id?: string;
@@ -28,12 +28,14 @@ export function TimezoneSelect({
   const allTimezones = React.useMemo(() => getAllIanaTimezones(), []);
 
   const currentOption = React.useMemo(() => {
-    return allTimezones.find((t) => t.value === value) ?? {
-      value,
-      label: value,
-      offset: '',
-      city: value,
-    };
+    return (
+      allTimezones.find((t) => t.value === value) ?? {
+        value,
+        label: value,
+        offset: '',
+        city: value,
+      }
+    );
   }, [allTimezones, value]);
 
   const filteredOptions = React.useMemo(() => {

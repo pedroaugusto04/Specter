@@ -2,6 +2,7 @@ AGENTS.md
 .agents
 docs/*
 !docs/extraction-engine.md
+!docs/hardening.md
 node_modules/
 dist/
 .next/

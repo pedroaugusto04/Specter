@@ -13,7 +13,7 @@ declare module 'fastify' {
 /**
  * Resolves the authenticated user from bearer token or cookies, refreshing tokens if needed.
  */
-export async function resolveAuthenticatedUser(
+async function resolveAuthenticatedUser(
   request: FastifyRequest,
   reply: FastifyReply,
   authService: AuthService,

@@ -2,6 +2,7 @@
 
 import { formToUpdateJob, jobToForm } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
+import { useJobFormFeedback } from '@/hooks/useJobFormFeedback';
 import { JobScheduleFields } from './JobScheduleFields';
 import { TriggerRulesEditor } from './TriggerRulesEditor';
 import { getBrowserTimezone } from '@/lib/utils';
@@ -14,7 +15,7 @@ import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
 import { ApiError, type ScrapingJobDto, type UserDto } from '@/lib/api';
 import { TriggerMatchMode } from '@specter/contracts';
-import { validateJobForm, type JobFormField } from '@/lib/validation';
+import { type JobFormField } from '@/lib/validation';
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react';
 import * as React from 'react';
 
@@ -62,8 +63,15 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
   const [clearWebhookSecret, setClearWebhookSecret] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
-  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
-  const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const {
+    fieldErrors,
+    setFieldErrors,
+    globalError,
+    setGlobalError,
+    clearFieldError,
+    focusFirstInvalidField,
+    validateFields,
+  } = useJobFormFeedback(values, user?.email, 'edit-');
 
   React.useEffect(() => {
     if (job && isOpen) {
@@ -105,61 +113,13 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       rulesChanged)
   );
 
-  const clearFieldError = (field: JobFormField) => {
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
-
-  const focusFirstInvalidField = (errors: Partial<Record<JobFormField, string>>) => {
-    const errorKeys = Object.keys(errors) as JobFormField[];
-    if (errorKeys.length === 0) return;
-
-    const firstKey = errorKeys[0];
-    const fieldIdMap: Record<JobFormField, string> = {
-      url: 'edit-target-url',
-      name: 'edit-monitor-name',
-      notificationEmail: 'edit-notify-email',
-      userPrompt: 'edit-user-prompt',
-      cronExpression: useCustomCron ? 'edit-custom-cron' : 'edit-cron-preset',
-    };
-
-    const elementId = fieldIdMap[firstKey];
-    if (elementId) {
-      document.getElementById(elementId)?.focus();
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!job) return;
 
     setGlobalError(null);
 
-    if (sendEmailAlerts && !notificationEmail.trim() && !user?.email) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        notificationEmail: 'Please enter an alert email address.',
-      }));
-      return;
-    }
-
-    const validation = validateJobForm({
-      name,
-      url,
-      userPrompt,
-      notificationEmail: sendEmailAlerts ? notificationEmail : '',
-      cronExpression: effectiveCron,
-    });
-
-    if (!validation.isValid) {
-      setFieldErrors(validation.errors);
-      focusFirstInvalidField(validation.errors);
-      return;
-    }
+    if (!validateFields()) return;
 
     setLoading(true);
     try {

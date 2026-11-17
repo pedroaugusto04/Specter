@@ -19,8 +19,6 @@ import {
   fixtureConfiguration,
   fixturePlan,
 } from '../helpers/extractionFixtures.js';
-import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
-import { CompilationService } from '../../src/services/compilationService.js';
 import { NoopStorageProvider } from '../../src/providers/storage/noopStorage.provider.js';
 import { randomUUID } from 'node:crypto';
 

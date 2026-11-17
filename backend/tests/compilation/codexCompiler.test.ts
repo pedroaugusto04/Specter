@@ -2,17 +2,22 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, type SpawnOptions } from 'node:child_process';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CodexCompilerProvider } from '../../src/providers/compilers/codexCompiler.provider.js';
 import { fixturePlan } from '../helpers/extractionFixtures.js';
 const directories: string[] = [];
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
   );
 });
 describe('Codex transport', () => {
   it('uses default read-only arguments with a portable node subprocess', async () => {
+    vi.stubEnv('JWT_SECRET', 'backend-session-secret');
+    vi.stubEnv('DATABASE_URL', 'postgresql://secret@db/app');
+    vi.stubEnv('OPENAI_API_KEY', 'test-cli-credential');
+    vi.stubEnv('CODEX_SANDBOX', 'danger-full-access');
     const root = await mkdtemp(path.join(tmpdir(), 'specter-codex-test-'));
     directories.push(root);
     const executable = path.join(root, 'fake-codex.cjs');
@@ -27,12 +32,13 @@ describe('Codex transport', () => {
       const schema=${JSON.stringify(JSON.stringify({ type: 'object', properties: { version: { type: 'number' } }, required: ['version'] }))};
       if(prompt.split(schema).length!==2)process.exit(14);
       if(!prompt.includes('untrusted data'))process.exit(15);
+      if(process.env.JWT_SECRET || process.env.DATABASE_URL || process.env.ENCRYPTION_KEY || process.env.NODE_OPTIONS)process.exit(16);
+      if(process.env.OPENAI_API_KEY !== 'test-cli-credential')process.exit(17);
       fs.writeFileSync(args[index+1],${JSON.stringify(JSON.stringify(output))});process.exit(0);`
     );
     const provider = new CodexCompilerProvider({
       tempBaseDir: path.join(root, 'work'),
       model: '',
-      sandbox: 'read-only',
       spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
         spawn(process.execPath, [executable, ...args], options),
     });

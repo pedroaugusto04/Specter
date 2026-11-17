@@ -16,10 +16,17 @@ export class DomainError extends Error {
   }
 }
 
-/**
- * Thrown when target website responds with HTTP 403/429 or WAF/CAPTCHA page.
- * System action: Record failure without triggering automatic recovery.
- */
+/** A resource budget violation cannot be fixed by retrying or recompiling selectors. */
+export class ResponseTooLargeError extends DomainError {
+  constructor() {
+    super('The website response exceeds the configured download limit.', {
+      code: 'RESPONSE_TOO_LARGE',
+      statusCode: 422,
+    });
+  }
+}
+
+/** Target website responded with HTTP 403/429 or a WAF/CAPTCHA page. */
 export class AntiBotBlockedError extends DomainError {
   public readonly httpStatus: number;
 

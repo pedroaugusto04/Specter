@@ -4,6 +4,7 @@ import * as React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 export interface DrawerProps {
   isOpen: boolean;
@@ -38,14 +39,7 @@ export function Drawer({
     confirmMessage,
   });
 
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
