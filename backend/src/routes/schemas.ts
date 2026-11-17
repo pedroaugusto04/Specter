@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js';
 import { env } from '../config/env.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
+import { createPaginationQuerySchema } from '../utils/pagination.js';
+import {
+  PAGINATION_DEFAULT_PAGE_SIZE,
+  PAGINATION_RUNS_PAGE_SIZE,
+  PAGINATION_TIMESERIES_PAGE_SIZE,
+} from '@specter/contracts';
 
 // ============================================================================
 // Shared Primitive Schemas
@@ -121,23 +127,18 @@ export const jobPauseSchema = z.object({
   paused: z.boolean({ required_error: 'Paused state is required' }),
 });
 
-export const jobStatusQuerySchema = z.object({
-  status: z
-    .nativeEnum(JobStatus, { errorMap: () => ({ message: 'Invalid status filter' }) })
-    .optional(),
+const pageQuerySchema = createPaginationQuerySchema(PAGINATION_DEFAULT_PAGE_SIZE);
+
+export const listQuerySchema = pageQuerySchema.extend({
+  status: z.union([z.nativeEnum(JobStatus), z.enum(['recovering', 'paused'])]).optional(),
+  search: z.string().trim().max(200).optional(),
 });
 
-export const jobRunsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1, 'Page must be at least 1').default(1),
-  pageSize: z.coerce
-    .number()
-    .int()
-    .min(1, 'Page size must be at least 1')
-    .max(100, 'Page size cannot exceed 100')
-    .default(20),
-});
-
-export const jobTimeseriesQuerySchema = z.object({
+export const paginationQuerySchema = pageQuerySchema;
+export const jobRunsQuerySchema = createPaginationQuerySchema(PAGINATION_RUNS_PAGE_SIZE);
+export const jobTimeseriesQuerySchema = createPaginationQuerySchema(
+  PAGINATION_TIMESERIES_PAGE_SIZE
+).extend({
   range: z.enum(['24h', '7d', '30d', 'all']).default('all'),
 });
 
@@ -158,8 +159,7 @@ export const ianaTimezoneSchema = z
       }
     },
     {
-      message:
-        'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
+      message: 'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
     }
   );
 

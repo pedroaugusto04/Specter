@@ -55,11 +55,7 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
       sendAlert: async () => {},
       sendTestEvent: async () => ({ ok: true }),
     };
-    const integrationService = new IntegrationService(
-      integrationRepo,
-      dummyTelegram,
-      dummyWebhook
-    );
+    const integrationService = new IntegrationService(integrationRepo, dummyTelegram, dummyWebhook);
 
     app = await buildApp({
       jobService,
@@ -176,7 +172,8 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
       },
     });
     expect(listRes.statusCode).toBe(200);
-    expect(listRes.json().data.length).toBe(1);
+    expect(listRes.json().data.items.length).toBe(1);
+    expect(listRes.json().data.pagination.totalItems).toBe(1);
 
     // Delete
     const deleteRes = await app.inject({
@@ -196,6 +193,6 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
         authorization: `Bearer ${token}`,
       },
     });
-    expect(listAfterRes.json().data.length).toBe(0);
+    expect(listAfterRes.json().data.items.length).toBe(0);
   });
 });

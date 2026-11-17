@@ -3,9 +3,11 @@ import * as React from 'react';
 import {
   isCollectionPayload,
   FieldType,
+  PAGINATION_RUNS_PAGE_SIZE,
   type JobRunDto,
   type JobRunsSummaryDto,
   type JobTimeseriesPointDto,
+  type PaginationMeta,
 } from '@specter/contracts';
 import {
   fieldObservations,
@@ -25,7 +27,15 @@ export type ChartTimeRange = '24h' | '7d' | '30d' | 'all';
 
 interface Props {
   runs?: JobRunDto[];
+  previousCollectionRun?: JobRunDto | null;
+  runsPagination?: PaginationMeta;
+  runsPageSize?: number;
+  onRunsPageChange?: (page: number) => void;
   points?: JobTimeseriesPointDto[];
+  previousPoint?: JobTimeseriesPointDto | null;
+  timeseriesPagination?: PaginationMeta;
+  onTimeseriesPageChange?: (page: number) => void;
+  onTimeseriesPageSizeChange?: (pageSize: number) => void;
   fields: TimelineFields;
   revision: string | null;
   identityFields: string[];
@@ -37,7 +47,15 @@ interface Props {
 }
 export function ExecutionTimelineChart({
   runs = [],
+  previousCollectionRun = null,
+  runsPagination,
+  runsPageSize = PAGINATION_RUNS_PAGE_SIZE,
+  onRunsPageChange,
   points,
+  previousPoint = null,
+  timeseriesPagination,
+  onTimeseriesPageChange,
+  onTimeseriesPageSizeChange,
   fields,
   revision,
   identityFields,
@@ -50,8 +68,6 @@ export function ExecutionTimelineChart({
   const [field, setField] = React.useState(Object.keys(fields)[0] ?? '');
   const [textMode, setTextMode] = React.useState<string>(TEXT_MODE.Events);
   const [internalTimeRange, setInternalTimeRange] = React.useState<ChartTimeRange>('all');
-  const [obsPage, setObsPage] = React.useState(1);
-  const obsPageSize = 10;
 
   const timeRange = controlledTimeRange ?? internalTimeRange;
 
@@ -61,30 +77,26 @@ export function ExecutionTimelineChart({
   };
 
   const activeRuns: RunObservationSource[] = React.useMemo(() => {
-    if (points) return points;
+    if (points) return [...(previousPoint ? [previousPoint] : []), ...points];
     if (timeRange === 'all') return runs;
     const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 24 * 7 : 24 * 30;
     const cutoff = Date.now() - hours * 60 * 60 * 1000;
     return runs.filter((r) => Date.parse(r.executedAt) >= cutoff);
-  }, [points, runs, timeRange]);
+  }, [points, previousPoint, runs, timeRange]);
 
   const selected = fields[field] ? field : Object.keys(fields)[0];
   const definition = fields[selected];
+  const pagePointIds = React.useMemo(
+    () => new Set(points ? points.map((point) => point.id) : activeRuns.map((run) => run.id)),
+    [activeRuns, points]
+  );
   const observations = definition
     ? fieldObservations(activeRuns, selected, definition.type, revision)
     : [];
-
-  const reversedObservations = React.useMemo(() => [...observations].reverse(), [observations]);
-  const obsTotalPages = Math.max(1, Math.ceil(reversedObservations.length / obsPageSize));
-  const safeObsPage = Math.min(obsPage, obsTotalPages);
-  const paginatedObservations = reversedObservations.slice(
-    (safeObsPage - 1) * obsPageSize,
-    safeObsPage * obsPageSize
+  const pageObservations = React.useMemo(
+    () => observations.filter((observation) => pagePointIds.has(observation.run.id)).reverse(),
+    [observations, pagePointIds]
   );
-
-  React.useEffect(() => {
-    setObsPage(1);
-  }, [selected, timeRange]);
   const formatTime = (date: string) =>
     Number.isFinite(Date.parse(date)) ? formatDateTime(date, timeZone) : 'Invalid collection date';
   const formatValue = (value: string | number | boolean | null) =>
@@ -104,7 +116,9 @@ export function ExecutionTimelineChart({
     <div className="space-y-5 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {summary.totalRuns} total executions ({activeRuns.length} in range)
+          {summary.totalRuns} total executions (
+          {timeseriesPagination?.totalItems ?? activeRuns.length} in range; showing{' '}
+          {points?.length ?? activeRuns.length})
           {dated.length
             ? ` · ${formatTime(dated[0].executedAt)} — ${formatTime(dated[dated.length - 1].executedAt)}`
             : ''}
@@ -155,6 +169,10 @@ export function ExecutionTimelineChart({
       {collection ? (
         <CollectionHistory
           runs={runs}
+          previousRun={previousCollectionRun}
+          pagination={runsPagination}
+          pageSize={runsPageSize}
+          onPageChange={(page) => onRunsPageChange?.(page)}
           revision={revision}
           identityFields={identityFields}
           formatTime={formatTime}
@@ -218,7 +236,7 @@ export function ExecutionTimelineChart({
                 </tr>
               </thead>
               <tbody>
-                {paginatedObservations.map((p) => (
+                {pageObservations.map((p) => (
                   <tr key={p.run.id} className="border-t border-border">
                     <td className="px-3 py-2">{formatTime(p.run.executedAt)}</td>
                     <td
@@ -247,13 +265,14 @@ export function ExecutionTimelineChart({
               </tbody>
             </table>
           </div>
-          {obsTotalPages > 1 && (
+          {timeseriesPagination && timeseriesPagination.totalItems > 0 && (
             <PaginationControls
-              page={safeObsPage}
-              totalPages={obsTotalPages}
-              totalItems={reversedObservations.length}
-              pageSize={obsPageSize}
-              onPageChange={setObsPage}
+              page={timeseriesPagination.page}
+              totalPages={timeseriesPagination.totalPages}
+              totalItems={timeseriesPagination.totalItems}
+              pageSize={timeseriesPagination.pageSize}
+              onPageChange={(page) => onTimeseriesPageChange?.(page)}
+              onPageSizeChange={(pageSize) => onTimeseriesPageSizeChange?.(pageSize)}
               itemLabel="readings"
             />
           )}

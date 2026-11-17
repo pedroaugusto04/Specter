@@ -3,6 +3,7 @@ import type {
   DashboardStatsDto as DashboardStats,
   JobRunsDto,
   JobTimeseriesDto,
+  PaginatedResponse,
   JobStatus,
   ProbeUrlDto,
   ScrapingJobDto,
@@ -13,6 +14,11 @@ import type {
   UserDto,
   UserIntegrationsDto,
   UserQuotaSummary,
+} from '@specter/contracts';
+import {
+  PAGINATION_DEFAULT_PAGE_SIZE,
+  PAGINATION_RUNS_PAGE_SIZE,
+  PAGINATION_TIMESERIES_PAGE_SIZE,
 } from '@specter/contracts';
 export type {
   ChangeStatus,
@@ -34,6 +40,7 @@ export type {
   JobTimeseriesDto,
   JobTimeseriesPointDto,
   MetricQuotaSummary,
+  PaginatedResponse,
   ScrapingJobDto,
   SessionDto,
   TimeseriesRange,
@@ -175,9 +182,20 @@ export const api = {
     return request<DashboardStats>('/api/stats');
   },
 
-  listJobs(status?: JobStatus): Promise<ScrapingJobDto[]> {
-    const query = status ? `?status=${encodeURIComponent(status)}` : '';
-    return request<ScrapingJobDto[]>(`/api/jobs${query}`);
+  listJobs(
+    options: {
+      page?: number;
+      pageSize?: number;
+      status?: JobStatus | 'recovering' | 'paused';
+      search?: string;
+    } = {}
+  ): Promise<PaginatedResponse<ScrapingJobDto>> {
+    const params = new URLSearchParams();
+    if (options.page !== undefined) params.set('page', String(options.page));
+    if (options.pageSize !== undefined) params.set('pageSize', String(options.pageSize));
+    if (options.status) params.set('status', options.status);
+    if (options.search?.trim()) params.set('search', options.search.trim());
+    return request<PaginatedResponse<ScrapingJobDto>>(`/api/jobs?${params.toString()}`);
   },
 
   probeUrl(url: string): Promise<ProbeUrlDto> {
@@ -263,7 +281,11 @@ export const api = {
     });
   },
 
-  getJobRuns(id: string, page = 1, pageSize = 20): Promise<JobRunsDto> {
+  getJobRuns(
+    id: string,
+    page = 1,
+    pageSize: number = PAGINATION_RUNS_PAGE_SIZE
+  ): Promise<JobRunsDto> {
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
@@ -271,12 +293,22 @@ export const api = {
     return request<JobRunsDto>(`/api/jobs/${id}/runs?${params.toString()}`);
   },
 
-  getJobTimeseries(id: string, range: TimeseriesRange = 'all'): Promise<JobTimeseriesDto> {
-    return request<JobTimeseriesDto>(`/api/jobs/${id}/timeseries?range=${range}`);
+  getJobTimeseries(
+    id: string,
+    range: TimeseriesRange = 'all',
+    page = 1,
+    pageSize: number = PAGINATION_TIMESERIES_PAGE_SIZE
+  ): Promise<JobTimeseriesDto> {
+    const params = new URLSearchParams({ range, page: String(page), pageSize: String(pageSize) });
+    return request<JobTimeseriesDto>(`/api/jobs/${id}/timeseries?${params.toString()}`);
   },
 
-  getSessions(): Promise<SessionDto[]> {
-    return request<SessionDto[]>('/api/sessions');
+  getSessions(
+    page = 1,
+    pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE
+  ): Promise<PaginatedResponse<SessionDto>> {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return request<PaginatedResponse<SessionDto>>(`/api/sessions?${params.toString()}`);
   },
 
   checkSession(domainOrUrl: string): Promise<{ hasSession: boolean; session: SessionDto | null }> {

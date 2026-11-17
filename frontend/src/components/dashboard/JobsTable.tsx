@@ -12,8 +12,9 @@ import {
   useTogglePauseMutation,
   useTriggerJobMutation,
 } from '@/hooks/useDashboardQueries';
-import { JobStatus } from '@specter/contracts';
+import { JobStatus, PAGINATION_DEFAULT_PAGE_SIZE } from '@specter/contracts';
 import type { ScrapingJobDto } from '@/lib/api';
+import type { PaginationMeta } from '@specter/contracts';
 import { getJobActionPermissions, type JobRowActionType } from '@/lib/jobActionPermissions';
 import { DEFAULT_TIMEZONE, formatCompactDate, formatDateTime } from '@/lib/utils';
 import {
@@ -105,6 +106,13 @@ export function JobsTable({
   onEditJob,
   onCreateClick,
   timeZone = DEFAULT_TIMEZONE,
+  pagination,
+  page = 1,
+  pageSize = PAGINATION_DEFAULT_PAGE_SIZE,
+  onPageChange,
+  onPageSizeChange,
+  onSearchChange,
+  onStatusChange,
 }: {
   jobs: ScrapingJobDto[];
   runningJobIds?: Set<string>;
@@ -114,6 +122,13 @@ export function JobsTable({
   onEditJob: (job: ScrapingJobDto) => void;
   onCreateClick?: () => void;
   timeZone?: string;
+  pagination?: PaginationMeta;
+  page?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  onSearchChange?: (search: string) => void;
+  onStatusChange?: (status: JobStatus | 'recovering' | 'paused' | undefined) => void;
 }) {
   const [activeActions, setActiveActions] = React.useState<Record<string, JobRowActionType>>({});
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -148,65 +163,12 @@ export function JobsTable({
     }
   };
 
-  // Counts for filter tabs
-  const activeCount = React.useMemo(
-    () => jobs.filter((j) => j.status === JobStatus.Active).length,
-    [jobs]
-  );
-  const recoveringCount = React.useMemo(
-    () =>
-      jobs.filter(
-        (j) => j.status === JobStatus.Recovering || j.status === JobStatus.PendingCompilation
-      ).length,
-    [jobs]
-  );
-  const pausedOrFailedCount = React.useMemo(
-    () =>
-      jobs.filter((j) => j.status === JobStatus.Paused || j.status === JobStatus.Failed).length,
-    [jobs]
-  );
-
-  // Filtered jobs
-  const filteredJobs = React.useMemo(() => {
-    return jobs.filter((job) => {
-      if (filter === JOB_STATUS_FILTER.Active && job.status !== JobStatus.Active) return false;
-      if (
-        filter === JOB_STATUS_FILTER.Recovering &&
-        job.status !== JobStatus.Recovering &&
-        job.status !== JobStatus.PendingCompilation
-      ) {
-        return false;
-      }
-      if (
-        filter === JOB_STATUS_FILTER.Paused &&
-        job.status !== JobStatus.Paused &&
-        job.status !== JobStatus.Failed
-      ) {
-        return false;
-      }
-
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesName = job.name.toLowerCase().includes(query);
-        const matchesUrl = job.url.toLowerCase().includes(query);
-        const matchesPrompt = job.userPrompt.toLowerCase().includes(query);
-        return matchesName || matchesUrl || matchesPrompt;
-      }
-
-      return true;
-    });
-  }, [jobs, filter, searchQuery]);
-
-  const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(10);
+  const filteredJobs = jobs;
+  const totalPages = pagination?.totalPages ?? 1;
 
   React.useEffect(() => {
-    setPage(1);
-  }, [filter, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paginatedJobs = filteredJobs.slice((safePage - 1) * pageSize, safePage * pageSize);
+    if (pagination && page !== pagination.page) onPageChange?.(pagination.page);
+  }, [onPageChange, page, pagination]);
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -216,29 +178,44 @@ export function JobsTable({
         <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 p-1 overflow-x-auto max-w-full">
           <button
             type="button"
-            onClick={() => setFilter('ALL')}
+            onClick={() => {
+              setFilter('ALL');
+              onStatusChange?.(undefined);
+            }}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
               filter === JOB_STATUS_FILTER.All
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            All <span className="ml-1.5 font-mono text-xs opacity-60">{jobs.length}</span>
+            All{' '}
+            <span className="ml-1.5 font-mono text-xs opacity-60">
+              {filter === 'ALL' ? (pagination?.totalItems ?? 0) : '·'}
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => setFilter(JOB_STATUS_FILTER.Active)}
+            onClick={() => {
+              setFilter(JOB_STATUS_FILTER.Active);
+              onStatusChange?.(JobStatus.Active);
+            }}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
               filter === JOB_STATUS_FILTER.Active
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Active <span className="ml-1.5 font-mono text-xs opacity-60">{activeCount}</span>
+            Active{' '}
+            <span className="ml-1.5 font-mono text-xs opacity-60">
+              {filter === JOB_STATUS_FILTER.Active ? (pagination?.totalItems ?? 0) : '·'}
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => setFilter(JOB_STATUS_FILTER.Recovering)}
+            onClick={() => {
+              setFilter(JOB_STATUS_FILTER.Recovering);
+              onStatusChange?.('recovering');
+            }}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
               filter === JOB_STATUS_FILTER.Recovering
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
@@ -246,11 +223,16 @@ export function JobsTable({
             }`}
           >
             Recovering / Compiling{' '}
-            <span className="ml-1.5 font-mono text-xs opacity-60">{recoveringCount}</span>
+            <span className="ml-1.5 font-mono text-xs opacity-60">
+              {filter === JOB_STATUS_FILTER.Recovering ? (pagination?.totalItems ?? 0) : '·'}
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => setFilter(JOB_STATUS_FILTER.Paused)}
+            onClick={() => {
+              setFilter(JOB_STATUS_FILTER.Paused);
+              onStatusChange?.('paused');
+            }}
             className={`rounded px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
               filter === JOB_STATUS_FILTER.Paused
                 ? 'bg-card text-foreground shadow-2xs border border-border/80'
@@ -258,7 +240,9 @@ export function JobsTable({
             }`}
           >
             Paused / Failed{' '}
-            <span className="ml-1.5 font-mono text-xs opacity-60">{pausedOrFailedCount}</span>
+            <span className="ml-1.5 font-mono text-xs opacity-60">
+              {filter === JOB_STATUS_FILTER.Paused ? (pagination?.totalItems ?? 0) : '·'}
+            </span>
           </button>
         </div>
 
@@ -270,7 +254,10 @@ export function JobsTable({
               type="text"
               placeholder="Filter by URL or instructions..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                onSearchChange?.(e.target.value);
+              }}
               className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
             />
           </div>
@@ -325,7 +312,7 @@ export function JobsTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paginatedJobs.map((job) => {
+              {filteredJobs.map((job) => {
                 const currentAction = activeActions[job.id];
                 const isRunningExtraction = runningJobIds.has(job.id);
                 const isRunning = currentAction === 'run';
@@ -613,17 +600,16 @@ export function JobsTable({
         </div>
       )}
 
-      {totalPages > 1 && (
+      {pagination && pagination.totalItems > 0 && (
         <div className="p-3 sm:p-4 bg-muted/10 border-t border-border">
           <PaginationControls
-            page={safePage}
+            page={pagination.page}
             totalPages={totalPages}
-            totalItems={filteredJobs.length}
+            totalItems={pagination.totalItems}
             pageSize={pageSize}
-            onPageChange={setPage}
+            onPageChange={(nextPage) => onPageChange?.(nextPage)}
             onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPage(1);
+              onPageSizeChange?.(newSize);
             }}
             itemLabel="monitors"
             className="border-t-0 pt-0"

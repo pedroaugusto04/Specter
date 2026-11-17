@@ -4,6 +4,7 @@ import * as React from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
+import { PAGINATION_PAGE_SIZE_OPTIONS } from '@specter/contracts';
 
 export interface PaginationControlsProps {
   page: number;
@@ -24,7 +25,7 @@ export function PaginationControls({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 20, 50],
+  pageSizeOptions = [...PAGINATION_PAGE_SIZE_OPTIONS],
   className,
   itemLabel = 'items',
 }: PaginationControlsProps) {

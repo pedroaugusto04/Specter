@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+import type { PaginationMeta } from '@specter/contracts';
 import type { SessionDto } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
 import { ExternalLink, Globe, Loader2, Lock, ShieldCheck, Trash2 } from 'lucide-react';
@@ -15,6 +17,11 @@ export interface WebSessionsTabProps {
   extensionUrl: string;
   isExternalExtensionUrl: boolean;
   timeZone: string;
+  pagination?: PaginationMeta;
+  page: number;
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 export function WebSessionsTab({
@@ -26,6 +33,11 @@ export function WebSessionsTab({
   extensionUrl,
   isExternalExtensionUrl,
   timeZone,
+  pagination,
+  page,
+  onPageChange,
+  pageSize,
+  onPageSizeChange,
 }: WebSessionsTabProps) {
   return (
     <div className="space-y-4">
@@ -35,12 +47,10 @@ export function WebSessionsTab({
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div className="space-y-1">
-            <h4 className="text-sm font-semibold text-foreground">
-              Authenticated Web Sessions
-            </h4>
+            <h4 className="text-sm font-semibold text-foreground">Authenticated Web Sessions</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Allows Specter to access websites requiring login, 2FA, or password protection.
-              The extension captures your active authenticated browser session with 1 click, without
+              Allows Specter to access websites requiring login, 2FA, or password protection. The
+              extension captures your active authenticated browser session with 1 click, without
               exposing your raw passwords.
             </p>
           </div>
@@ -86,7 +96,7 @@ export function WebSessionsTab({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-          <span>Saved Sessions ({sessions.length})</span>
+          <span>Saved Sessions ({pagination?.totalItems ?? sessions.length})</span>
           <button
             type="button"
             onClick={onRefreshSessions}
@@ -133,7 +143,8 @@ export function WebSessionsTab({
                     )}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    {sess.cookieCount} cookies • Synced on {formatDateTime(sess.updatedAt, timeZone)}
+                    {sess.cookieCount} cookies • Synced on{' '}
+                    {formatDateTime(sess.updatedAt, timeZone)}
                   </div>
                 </div>
                 <Button
@@ -154,6 +165,17 @@ export function WebSessionsTab({
               </div>
             ))}
           </div>
+        )}
+        {pagination && pagination.totalItems > 0 && (
+          <PaginationControls
+            page={page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+            itemLabel="sessions"
+          />
         )}
       </div>
     </div>

@@ -142,6 +142,10 @@ export interface PaginationMeta {
   hasNextPage: boolean;
   hasPrevPage: boolean;
 }
+export interface PaginatedResponse<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}
 export interface JobRunsSummaryDto {
   totalRuns: number;
   changedRuns: number;
@@ -150,6 +154,7 @@ export interface JobRunsSummaryDto {
 }
 export interface JobRunsDto {
   latestSuccessfulRun?: JobRunDto | null;
+  previousCollectionRun?: JobRunDto | null;
   runs: JobRunDto[];
   latestDiff: DiffSummary | null;
   pagination: PaginationMeta;
@@ -169,8 +174,9 @@ export interface JobTimeseriesPointDto {
 export interface JobTimeseriesDto {
   jobId: string;
   range: TimeseriesRange;
-  totalPoints: number;
   points: JobTimeseriesPointDto[];
+  previousPoint: JobTimeseriesPointDto | null;
+  pagination: PaginationMeta;
 }
 export interface SessionCheckDto {
   hasSession: boolean;

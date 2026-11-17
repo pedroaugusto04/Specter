@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
+import { isAllowedCorsOrigin } from '../../src/utils/corsHelper.js';
 import { AuthService } from '../../src/services/authService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
@@ -205,6 +206,8 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     });
     expect(goodLogin.statusCode).toBe(200);
     expect(goodLogin.json().data.email).toBe('bob@example.com');
+    expect(goodLogin.json()).not.toHaveProperty('token');
+    expect(goodLogin.headers['set-cookie']).toBeDefined();
   });
 
   it('allows unauthenticated visitors to view empty dashboard and probe URLs, but blocks monitor creation until signed in', async () => {
@@ -213,7 +216,8 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       url: '/api/jobs',
     });
     expect(jobsRes.statusCode).toBe(200);
-    expect(jobsRes.json().data).toEqual([]);
+    expect(jobsRes.json().data.items).toEqual([]);
+    expect(jobsRes.json().data.pagination.totalItems).toBe(0);
 
     const statsRes = await app.inject({
       method: 'GET',
@@ -278,7 +282,7 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       headers: { cookie: cookieB },
     });
     expect(listBRes.statusCode).toBe(200);
-    expect(listBRes.json().data).toHaveLength(0);
+    expect(listBRes.json().data.items).toHaveLength(0);
 
     // User B tries to modify or delete User A's job -> 404 Not Found
     const patchByB = await app.inject({
@@ -302,7 +306,7 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
       url: '/api/jobs',
       headers: { cookie: cookieA },
     });
-    expect(listARes.json().data).toHaveLength(1);
+    expect(listARes.json().data.items).toHaveLength(1);
 
     const deleteByA = await app.inject({
       method: 'DELETE',
@@ -534,5 +538,28 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
     });
     expect([200, 204]).toContain(res.statusCode);
     expect(res.headers['access-control-allow-origin']).toBe(`chrome-extension://${ALLOWED_EXT_ID}`);
+  });
+
+  it('production: permits only an explicitly configured HTTPS web origin', async () => {
+    const policy = {
+      nodeEnv: 'production',
+      corsOrigins: 'http://old.specter.com,https://app.specter.com,*',
+    };
+    expect(isAllowedCorsOrigin('https://app.specter.com', policy)).toBe(true);
+    expect(isAllowedCorsOrigin('http://old.specter.com', policy)).toBe(false);
+    expect(isAllowedCorsOrigin('https://attacker.example', policy)).toBe(false);
+    expect(isAllowedCorsOrigin('*', policy)).toBe(false);
+    expect(
+      isAllowedCorsOrigin('http://localhost:3000', {
+        nodeEnv: 'development',
+        corsOrigins: 'https://app.specter.com',
+      })
+    ).toBe(true);
+    expect(
+      isAllowedCorsOrigin('chrome-extension://extid', {
+        nodeEnv: 'development',
+        corsOrigins: 'https://app.specter.com',
+      })
+    ).toBe(true);
   });
 });

@@ -1,6 +1,12 @@
 import { JobPresenter } from '../presentation/jobPresenter.js';
 import { DashboardMapper } from '../mappers/dashboardMapper.js';
-import type { CreateJobRequest, UpdateJobRequest } from '@specter/contracts';
+import {
+  ExtractionScope,
+  PAGINATION_RUNS_PAGE_SIZE,
+  PAGINATION_TIMESERIES_PAGE_SIZE,
+  type CreateJobRequest,
+  type UpdateJobRequest,
+} from '@specter/contracts';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { randomUUID } from 'node:crypto';
 import { comparisonPayload } from '../extraction/comparison.js';
@@ -11,6 +17,7 @@ import { JobMapper } from '../mappers/jobMapper.js';
 import type {
   JobRunsDto,
   JobTimeseriesDto,
+  PaginatedResponse,
   ScrapingJobDto,
   TimeseriesRange,
 } from '@specter/contracts';
@@ -28,6 +35,7 @@ import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { assertSafeUrl } from '../utils/ssrfValidator.js';
+import { createPaginationMeta, resolvePageResult } from '../utils/pagination.js';
 
 export interface CreateScrapingJobRequest extends CreateJobRequest {
   userId: string;
@@ -158,9 +166,23 @@ export class JobService {
     return await this.presenter.present(createdEntity);
   }
 
-  async listJobs(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobDto[]> {
-    const entities = await this.jobRepository.findAll(statusFilter, userId);
-    return this.presenter.presentMany(entities);
+  async listJobsPage(input: {
+    status?: JobStatus | 'recovering' | 'paused';
+    userId: string;
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<PaginatedResponse<ScrapingJobDto>> {
+    const result = await resolvePageResult(
+      input.page,
+      input.pageSize,
+      await this.jobRepository.findPage(input),
+      (page) => this.jobRepository.findPage({ ...input, page })
+    );
+    return {
+      items: await this.presenter.presentMany(result.items),
+      pagination: result.pagination,
+    };
   }
 
   async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
@@ -419,7 +441,12 @@ export class JobService {
     await this.realtimeService.notifyJobDeleted(existing.userId, existing.id);
   }
 
-  async getJobRuns(jobId: string, page = 1, pageSize = 20, userId?: string): Promise<JobRunsDto> {
+  async getJobRuns(
+    jobId: string,
+    page = 1,
+    pageSize: number = PAGINATION_RUNS_PAGE_SIZE,
+    userId?: string
+  ): Promise<JobRunsDto> {
     const existing = await this.getOwnedJob(jobId, userId);
 
     const [paginatedResult, summaryStats] = await Promise.all([
@@ -427,7 +454,10 @@ export class JobService {
       this.jobRepository.getJobRunsSummary(jobId),
     ]);
 
-    const { runs: runEntities, totalCount } = paginatedResult;
+    const runPage = await resolvePageResult(page, pageSize, paginatedResult, (safePage) =>
+      this.jobRepository.findPaginatedRunsByJobId(jobId, safePage, pageSize)
+    );
+    const runEntities = runPage.items;
     const runs = runEntities.map(JobMapper.runEntityToDto);
 
     const recentRuns = await this.jobRepository.findRunsByJobId(jobId, 5);
@@ -455,22 +485,25 @@ export class JobService {
       );
     }
 
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const previousCollectionRun =
+      existing.extractionPlan?.intent.scope === ExtractionScope.Collection && runEntities.at(-1)
+        ? await this.jobRepository.findPreviousCompleteCollectionRun(
+            jobId,
+            { executedAt: runEntities.at(-1)!.executedAt, id: runEntities.at(-1)!.id },
+            existing.contractRevision ?? null
+          )
+        : null;
 
     return {
       runs,
+      previousCollectionRun: previousCollectionRun
+        ? JobMapper.runEntityToDto(previousCollectionRun)
+        : null,
       latestSuccessfulRun: await this.jobRepository
         .findLatestSuccessfulRun(jobId)
         .then((run) => (run ? JobMapper.runEntityToDto(run) : null)),
       latestDiff,
-      pagination: {
-        page,
-        pageSize,
-        totalItems: totalCount,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      },
+      pagination: runPage.pagination,
       summary: summaryStats,
     };
   }
@@ -482,18 +515,29 @@ export class JobService {
   async getJobTimeseries(
     jobId: string,
     range: TimeseriesRange = 'all',
+    page = 1,
+    pageSize: number = PAGINATION_TIMESERIES_PAGE_SIZE,
     userId?: string
   ): Promise<JobTimeseriesDto> {
     await this.getOwnedJob(jobId, userId);
 
-    const rows = await this.jobRepository.findTimeseriesByJobId(jobId, range);
-    const points = rows.map(JobMapper.timeseriesPointToDto);
+    const result = await resolvePageResult(
+      page,
+      pageSize,
+      await this.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, page, pageSize),
+      (safePage) =>
+        this.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, safePage, pageSize)
+    );
+    const points = result.items.map(JobMapper.timeseriesPointToDto);
 
     return {
       jobId,
       range,
-      totalPoints: points.length,
       points,
+      previousPoint: result.previousItem
+        ? JobMapper.timeseriesPointToDto(result.previousItem)
+        : null,
+      pagination: result.pagination,
     };
   }
 }

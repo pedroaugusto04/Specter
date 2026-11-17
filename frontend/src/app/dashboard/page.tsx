@@ -24,20 +24,28 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { useRealtimeEvents, type RealtimeEventPayload } from '@/hooks/useRealtimeEvents';
 import { api, type UserDto } from '@/lib/api';
+import { PAGINATION_DEFAULT_PAGE_SIZE, type JobStatus } from '@specter/contracts';
 import { getBrowserTimezone } from '@/lib/utils';
 import { Plus, Radio } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 
 export default function DashboardPage() {
+  const [jobsPage, setJobsPage] = React.useState(1);
+  const [jobsPageSize, setJobsPageSize] = React.useState<number>(PAGINATION_DEFAULT_PAGE_SIZE);
+  const [jobsStatus, setJobsStatus] = React.useState<
+    JobStatus | 'recovering' | 'paused' | undefined
+  >();
+  const [jobsSearch, setJobsSearch] = React.useState('');
   const { data: user = null } = useCurrentUserQuery();
   const {
-    data: jobs = [],
+    data: jobsResult,
     isLoading: isJobsLoading,
     isFetching: isJobsFetching,
     error: jobsError,
     refetch: refetchJobs,
-  } = useJobsQuery();
+  } = useJobsQuery(jobsPage, jobsPageSize, jobsStatus, jobsSearch);
+  const jobs = jobsResult?.items ?? [];
   const {
     data: stats = null,
     isFetching: isStatsFetching,
@@ -247,6 +255,22 @@ export default function DashboardPage() {
           onEditJob={modals.openEditJob}
           onCreateClick={modals.openCreateModal}
           timeZone={effectiveTimeZone}
+          pagination={jobsResult?.pagination}
+          page={jobsPage}
+          pageSize={jobsPageSize}
+          onPageChange={setJobsPage}
+          onPageSizeChange={(value) => {
+            setJobsPageSize(value);
+            setJobsPage(1);
+          }}
+          onSearchChange={(value) => {
+            setJobsSearch(value);
+            setJobsPage(1);
+          }}
+          onStatusChange={(value) => {
+            setJobsStatus(value);
+            setJobsPage(1);
+          }}
         />
       </main>
 

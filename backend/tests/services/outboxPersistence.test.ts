@@ -282,3 +282,52 @@ describe('Persisted execution cycles', () => {
     expect((await repository.getJobRunsSummary(job.id)).totalRuns).toBe(0);
   });
 });
+
+describe('Database-backed pagination', () => {
+  it('uses stable bounded pages and supplies the preceding valid reading as context', async () => {
+    const job = await monitor();
+    const base = Date.now();
+    const runIds: string[] = [];
+    for (let index = 1; index <= 3; index += 1) {
+      const run = await repository.createRun({
+        jobId: job.id,
+        status: 'SUCCESS',
+        hasChanges: 'NO',
+        contractRevision: job.contractRevision,
+        extractedData: { items: [], count: 0 },
+        executedAt: new Date(base + index * 1000),
+        extractionReport: {
+          quality: 'COMPLETE',
+          scope: 'collection',
+          coverage: 'COMPLETE',
+          pagesVisited: 1,
+          issues: [],
+          sourcesUsed: {},
+        },
+      });
+      runIds.push(run.id);
+    }
+
+    const firstPage = await repository.findPaginatedTimeseriesByJobId(job.id, 'all', 1, 2);
+    expect(firstPage.items.map((point) => point.id)).toEqual([runIds[2], runIds[1]]);
+    expect(firstPage.totalItems).toBe(3);
+    expect(firstPage.previousItem?.id).toBe(runIds[0]);
+
+    const priorCollection = await repository.findPreviousCompleteCollectionRun(
+      job.id,
+      { executedAt: firstPage.items[1]!.executedAt, id: firstPage.items[1]!.id },
+      job.contractRevision ?? null
+    );
+    expect(priorCollection?.id).toBe(runIds[0]);
+
+    const filteredPage = await repository.findPage({
+      userId: owner,
+      page: 1,
+      pageSize: 1,
+      search: job.name,
+      status: 'ACTIVE',
+    });
+    expect(filteredPage.totalItems).toBe(1);
+    expect(filteredPage.items[0]?.id).toBe(job.id);
+  });
+});

@@ -23,6 +23,7 @@ import { useModal } from '@/components/ui/modal-dialog';
 import { validateJobForm, validateUrl, type JobFormField } from '@/lib/validation';
 import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
+import { PAGINATION_MAX_PAGE_SIZE } from '@specter/contracts';
 
 export const PENDING_JOB_STORAGE_KEY = 'specter_pending_job';
 
@@ -105,7 +106,8 @@ export function CreateJobForm({
 
   const { data: integrations } = useIntegrationsQuery(Boolean(user));
   const createJobMutation = useCreateJobMutation();
-  const { data: jobs = [], isSuccess: jobsLoaded } = useJobsQuery();
+  const { data: jobsPage, isSuccess: jobsLoaded } = useJobsQuery(1, PAGINATION_MAX_PAGE_SIZE);
+  const jobs = jobsPage?.items ?? [];
   const probeUrlMutation = useProbeUrlMutation();
   const checkSessionMutation = useCheckSessionMutation();
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<JobFormField, string>>>({});
@@ -529,9 +531,7 @@ export function CreateJobForm({
       </FormField>
 
       {/* Info Callout for Conditional Triggers */}
-      {showTriggerInfo && (
-        <TriggerHelpCallout onDismiss={() => setShowTriggerInfo(false)} />
-      )}
+      {showTriggerInfo && <TriggerHelpCallout onDismiss={() => setShowTriggerInfo(false)} />}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <JobScheduleFields

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { env } from '../config/env.js';
 import { UnauthorizedError } from '../errors/domainErrors.js';
+import { isAllowedCorsOrigin } from '../utils/corsHelper.js';
 import {
   optionalAuth,
   requireAuth,
@@ -19,15 +20,25 @@ import { authLoginSchema, authProfileUpdateSchema, authRegisterSchema } from './
 export { resolveAuthenticatedUser };
 
 function resolveDynamicCallbackUrl(request: FastifyRequest): string {
+  const forwardedProto = (request.headers['x-forwarded-proto'] as string | undefined)
+    ?.split(',')[0]
+    ?.trim();
   const proto =
-    (request.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() ||
-    request.protocol ||
-    'http';
+    env.NODE_ENV === 'production' ? 'https' : forwardedProto || request.protocol || 'http';
   const host =
     (request.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() ||
     request.headers.host ||
     'localhost:3001';
-  return `${proto}://${host}/api/auth/google/callback`;
+  let origin: string;
+  try {
+    origin = new URL(`${proto}://${host}`).origin;
+  } catch {
+    throw new UnauthorizedError('Invalid OAuth callback host.');
+  }
+  if (env.NODE_ENV === 'production' && !isAllowedCorsOrigin(origin)) {
+    throw new UnauthorizedError('OAuth callback host is not allowed.');
+  }
+  return `${origin}/api/auth/google/callback`;
 }
 
 export function registerAuthRoutes(app: FastifyInstance, authService: AuthService): void {
@@ -85,7 +96,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
       const input = authLoginSchema.parse(request.body);
       const { user, tokens } = await authService.login(input);
       reply.header('Set-Cookie', authService.buildAuthCookies(tokens));
-      return reply.status(200).send({ data: user, token: tokens.accessToken });
+      return reply.status(200).send({ data: user });
     }
   );
 
@@ -174,7 +185,8 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
 
         reply.header('Set-Cookie', [...authService.buildAuthCookies(tokens), clearStateCookie]);
 
-        const isExtension = (statePayload as unknown as Record<string, unknown>)?.source === 'extension';
+        const isExtension =
+          (statePayload as unknown as Record<string, unknown>)?.source === 'extension';
         if (isExtension) {
           return reply.type('text/html').send(`
             <!doctype html>

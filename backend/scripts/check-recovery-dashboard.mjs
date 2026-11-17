@@ -85,6 +85,7 @@ await page.route('**/api/**', async (route) => {
           ? [run]
           : [{ ...valid, id: 'old', extractedData: { title: 'Older reading' } }],
       latestSuccessfulRun: valid,
+      previousCollectionRun: null,
       latestDiff: null,
       summary: { totalRuns: 21, changedRuns: 0, lastChange: null, averageDurationMs: 30 },
       pagination: {
@@ -97,7 +98,20 @@ await page.route('**/api/**', async (route) => {
       },
     };
   } else if (url.pathname.includes('/timeseries'))
-    data = { jobId: job.id, points: [], totalPoints: 0, range: 'all' };
+    data = {
+      jobId: job.id,
+      points: [],
+      previousPoint: null,
+      range: 'all',
+      pagination: {
+        page: Number(url.searchParams.get('page') || 1),
+        pageSize: Number(url.searchParams.get('pageSize') || 50),
+        totalItems: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+    };
   else if (url.pathname === '/api/quotas') {
     quotaReads++;
     data = Object.fromEntries(

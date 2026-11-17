@@ -28,32 +28,35 @@ async function setup() {
   const sessions: ISessionRepository = {
     findByUserAndDomain: async () => null,
     findById: async () => null,
-    listByUserId: async (userId) => [
-      {
-        id: 'session',
-        userId,
-        domain: 'example.com',
-        name: 'Saved session',
-        cookieCount: 1,
-        storageState: {
-          cookies: [
-            {
-              name: 'secret-cookie',
-              value: 'private-cookie-value',
-              domain: 'example.com',
-              path: '/',
-              expires: -1,
-              secure: true,
-              httpOnly: true,
-              sameSite: 'Lax',
-            },
-          ],
-          origins: [],
+    listPageByUserId: async (userId, page, pageSize) => ({
+      items: [
+        {
+          id: 'session',
+          userId,
+          domain: 'example.com',
+          name: 'Saved session',
+          cookieCount: 1,
+          storageState: {
+            cookies: [
+              {
+                name: 'secret-cookie',
+                value: 'private-cookie-value',
+                domain: 'example.com',
+                path: '/',
+                expires: -1,
+                secure: true,
+                httpOnly: true,
+                sameSite: 'Lax' as const,
+              },
+            ],
+            origins: [],
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ],
+      ].slice((page - 1) * pageSize, page * pageSize),
+      totalItems: 1,
+    }),
     upsert: async () => {
       throw new Error('Not exercised');
     },

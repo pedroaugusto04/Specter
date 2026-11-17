@@ -1,11 +1,12 @@
 import type { RunProgress } from '../types/run.js';
-import { RunPhase } from '@specter/contracts';
+import { PAGINATION_RUNS_PAGE_SIZE, RunPhase } from '@specter/contracts';
 import type { AlertDelivery } from '../notifications/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
-import { and, asc, desc, eq, gte, lt, sql, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql, ne } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { jobRuns, scrapingJobs, alertDeliveries, userMonthlyUsage } from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
+import type { PageResult } from '../utils/pagination.js';
 import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
@@ -77,9 +78,10 @@ export interface JobRunsSummary {
   averageDurationMs: number | null;
 }
 
-export interface PaginatedRunsResult {
-  runs: JobRunEntity[];
-  totalCount: number;
+export type PaginatedRunsResult = PageResult<JobRunEntity>;
+
+export interface PaginatedTimeseriesResult extends PageResult<TimeseriesRowEntity> {
+  previousItem: TimeseriesRowEntity | null;
 }
 
 export interface IJobRepository {
@@ -90,6 +92,13 @@ export interface IJobRepository {
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
   findById(id: string): Promise<ScrapingJobEntity | null>;
   findAll(statusFilter?: JobStatus, userId?: string): Promise<ScrapingJobEntity[]>;
+  findPage(input: {
+    status?: JobStatus | 'recovering' | 'paused';
+    userId: string;
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<{ items: ScrapingJobEntity[]; totalItems: number }>;
   findActiveJobs(): Promise<ScrapingJobEntity[]>;
   updateJob(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity | null>;
   deleteJob(id: string): Promise<boolean>;
@@ -107,7 +116,17 @@ export interface IJobRepository {
     page?: number,
     pageSize?: number
   ): Promise<PaginatedRunsResult>;
-  findTimeseriesByJobId(jobId: string, range?: TimeseriesRange): Promise<TimeseriesRowEntity[]>;
+  findPreviousCompleteCollectionRun(
+    jobId: string,
+    before: { executedAt: Date; id: string },
+    contractRevision: string | null
+  ): Promise<JobRunEntity | null>;
+  findPaginatedTimeseriesByJobId(
+    jobId: string,
+    range: TimeseriesRange,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedTimeseriesResult>;
   getJobRunsSummary(jobId: string): Promise<JobRunsSummary>;
   findLatestSuccessfulRun(jobId: string): Promise<JobRunEntity | null>;
   deleteUnchangedRunsOlderThan(cutoffDate: Date): Promise<number>;
@@ -232,6 +251,46 @@ export class DrizzleJobRepository implements IJobRepository {
         : await this.db.select().from(scrapingJobs).orderBy(desc(scrapingJobs.createdAt));
 
     return rows.map(JobMapper.rowToEntity);
+  }
+
+  async findPage(input: {
+    status?: JobStatus | 'recovering' | 'paused';
+    userId: string;
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<{ items: ScrapingJobEntity[]; totalItems: number }> {
+    const conditions = [eq(scrapingJobs.userId, input.userId)];
+    if (input.status === 'recovering')
+      conditions.push(
+        inArray(scrapingJobs.status, [JobStatus.Recovering, JobStatus.PendingCompilation])
+      );
+    else if (input.status === 'paused')
+      conditions.push(inArray(scrapingJobs.status, [JobStatus.Paused, JobStatus.Failed]));
+    else if (input.status) conditions.push(eq(scrapingJobs.status, input.status));
+    const search = input.search?.trim();
+    if (search) {
+      const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+      conditions.push(
+        or(
+          ilike(scrapingJobs.name, pattern),
+          ilike(scrapingJobs.url, pattern),
+          ilike(scrapingJobs.userPrompt, pattern)
+        )!
+      );
+    }
+    const where = and(...conditions);
+    const [items, [total]] = await Promise.all([
+      this.db
+        .select()
+        .from(scrapingJobs)
+        .where(where)
+        .orderBy(desc(scrapingJobs.createdAt), asc(scrapingJobs.id))
+        .limit(input.pageSize)
+        .offset((input.page - 1) * input.pageSize),
+      this.db.select({ value: count() }).from(scrapingJobs).where(where),
+    ]);
+    return { items: items.map(JobMapper.rowToEntity), totalItems: total?.value ?? 0 };
   }
 
   async findActiveJobs(): Promise<ScrapingJobEntity[]> {
@@ -412,7 +471,7 @@ export class DrizzleJobRepository implements IJobRepository {
   async findPaginatedRunsByJobId(
     jobId: string,
     page = 1,
-    pageSize = 20
+    pageSize = PAGINATION_RUNS_PAGE_SIZE
   ): Promise<PaginatedRunsResult> {
     const offset = Math.max(0, (page - 1) * pageSize);
 
@@ -425,21 +484,49 @@ export class DrizzleJobRepository implements IJobRepository {
         .select()
         .from(jobRuns)
         .where(eq(jobRuns.jobId, jobId))
-        .orderBy(desc(jobRuns.executedAt))
+        .orderBy(desc(jobRuns.executedAt), desc(jobRuns.id))
         .limit(pageSize)
         .offset(offset),
     ]);
 
     return {
-      runs: rows.map(JobMapper.runRowToEntity),
-      totalCount: countResult[0]?.count ?? 0,
+      items: rows.map(JobMapper.runRowToEntity),
+      totalItems: countResult[0]?.count ?? 0,
     };
   }
 
-  async findTimeseriesByJobId(
+  async findPreviousCompleteCollectionRun(
     jobId: string,
-    range: TimeseriesRange = 'all'
-  ): Promise<TimeseriesRowEntity[]> {
+    before: { executedAt: Date; id: string },
+    contractRevision: string | null
+  ): Promise<JobRunEntity | null> {
+    const conditions = [
+      eq(jobRuns.jobId, jobId),
+      eq(jobRuns.status, RunStatus.Success),
+      contractRevision === null
+        ? sql`${jobRuns.contractRevision} is null`
+        : eq(jobRuns.contractRevision, contractRevision),
+      sql`${jobRuns.extractionReport}->>'coverage' in ('COMPLETE', 'EMPTY')`,
+      or(
+        lt(jobRuns.executedAt, before.executedAt),
+        and(eq(jobRuns.executedAt, before.executedAt), lt(jobRuns.id, before.id))
+      )!,
+    ];
+    const [row] = await this.db
+      .select()
+      .from(jobRuns)
+      .where(and(...conditions))
+      .orderBy(desc(jobRuns.executedAt), desc(jobRuns.id))
+      .limit(1);
+    return row ? JobMapper.runRowToEntity(row) : null;
+  }
+
+  async findPaginatedTimeseriesByJobId(
+    jobId: string,
+    range: TimeseriesRange,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedTimeseriesResult> {
     const hours = range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
     const cutoffDate = hours ? new Date(Date.now() - hours * 3600 * 1000) : null;
 
@@ -448,23 +535,29 @@ export class DrizzleJobRepository implements IJobRepository {
       conditions.push(gte(jobRuns.executedAt, cutoffDate));
     }
 
-    const rows = await this.db
-      .select({
-        id: jobRuns.id,
-        executedAt: jobRuns.executedAt,
-        status: jobRuns.status,
-        hasChanges: jobRuns.hasChanges,
-        durationMs: jobRuns.durationMs,
-        contractRevision: jobRuns.contractRevision,
-        errorMessage: jobRuns.errorMessage,
-        extractedData: jobRuns.extractedData,
-      })
-      .from(jobRuns)
-      .where(and(...conditions))
-      .orderBy(asc(jobRuns.executedAt))
-      .limit(1000);
-
-    return rows.map((row) => ({
+    const selection = {
+      id: jobRuns.id,
+      executedAt: jobRuns.executedAt,
+      status: jobRuns.status,
+      hasChanges: jobRuns.hasChanges,
+      durationMs: jobRuns.durationMs,
+      contractRevision: jobRuns.contractRevision,
+      errorMessage: jobRuns.errorMessage,
+      extractedData: jobRuns.extractedData,
+    };
+    const where = and(...conditions);
+    const offset = (page - 1) * pageSize;
+    const [rows, [countRow]] = await Promise.all([
+      this.db
+        .select(selection)
+        .from(jobRuns)
+        .where(where)
+        .orderBy(desc(jobRuns.executedAt), desc(jobRuns.id))
+        .limit(pageSize)
+        .offset(offset),
+      this.db.select({ total: count() }).from(jobRuns).where(where),
+    ]);
+    const items = rows.map((row) => ({
       id: row.id,
       executedAt: row.executedAt,
       status: parseEnumValue(RunStatus, row.status, 'run status'),
@@ -474,6 +567,39 @@ export class DrizzleJobRepository implements IJobRepository {
       errorMessage: row.errorMessage,
       extractedData: row.extractedData,
     }));
+    const oldest = rows.at(-1);
+    const previousRow = oldest
+      ? (
+          await this.db
+            .select(selection)
+            .from(jobRuns)
+            .where(
+              and(
+                ...conditions,
+                or(
+                  lt(jobRuns.executedAt, oldest.executedAt),
+                  and(eq(jobRuns.executedAt, oldest.executedAt), lt(jobRuns.id, oldest.id))
+                )
+              )
+            )
+            .orderBy(desc(jobRuns.executedAt), desc(jobRuns.id))
+            .limit(1)
+        )[0]
+      : undefined;
+    const previousItem = previousRow
+      ? {
+          id: previousRow.id,
+          executedAt: previousRow.executedAt,
+          status: parseEnumValue(RunStatus, previousRow.status, 'run status'),
+          hasChanges: parseEnumValue(ChangeStatus, previousRow.hasChanges, 'change status'),
+          durationMs: previousRow.durationMs,
+          contractRevision: previousRow.contractRevision,
+          errorMessage: previousRow.errorMessage,
+          extractedData: previousRow.extractedData,
+        }
+      : null;
+
+    return { items, previousItem, totalItems: countRow?.total ?? 0 };
   }
 
   async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {

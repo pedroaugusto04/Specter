@@ -1,35 +1,44 @@
 import * as React from 'react';
 import type { JobRunDto } from '@specter/contracts';
+import type { PaginationMeta } from '@specter/contracts';
 import { collectionEvents } from '@/lib/collectionHistory';
 import { localizeExtractedPayload, type ExtractionFieldDefinitions } from '@/lib/extractionDisplay';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export function CollectionHistory({
   runs,
+  previousRun,
+  pagination,
+  pageSize,
+  onPageChange,
   revision,
   identityFields,
   formatTime,
   fields,
 }: {
   runs: JobRunDto[];
+  previousRun: JobRunDto | null;
+  pagination?: PaginationMeta;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   revision: string | null;
   identityFields: string[];
   formatTime: (date: string) => string;
   fields: ExtractionFieldDefinitions;
 }) {
-  const [page, setPage] = React.useState(1);
-  const pageSize = 10;
-  const events = collectionEvents(runs, revision, identityFields);
-  const totalPages = Math.max(1, Math.ceil(events.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paginatedEvents = events.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageRunIds = new Set(runs.map((run) => run.id));
+  const events = collectionEvents(
+    [...(previousRun ? [previousRun] : []), ...runs],
+    revision,
+    identityFields
+  ).filter(({ run }) => pageRunIds.has(run.id));
 
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-        Collection observations ({events.length})
+        Collection observations ({pagination?.totalItems ?? events.length})
       </h3>
-      {paginatedEvents.map(({ run, reliable, changes }) => (
+      {events.map(({ run, reliable, changes }) => (
         <details key={run.id} className="border border-border rounded p-3">
           <summary className="cursor-pointer font-medium text-foreground">
             {formatTime(run.executedAt)} ·{' '}
@@ -45,7 +54,10 @@ export function CollectionHistory({
               </p>
               <pre className="overflow-auto mt-1 rounded bg-muted/40 p-2 font-mono">
                 {JSON.stringify(
-                  localizeExtractedPayload({ previous: change.before, current: change.after }, fields),
+                  localizeExtractedPayload(
+                    { previous: change.before, current: change.after },
+                    fields
+                  ),
                   null,
                   2
                 )}
@@ -58,13 +70,13 @@ export function CollectionHistory({
         </details>
       ))}
 
-      {totalPages > 1 && (
+      {pagination && pagination.totalItems > 0 && (
         <PaginationControls
-          page={safePage}
-          totalPages={totalPages}
-          totalItems={events.length}
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
           pageSize={pageSize}
-          onPageChange={setPage}
+          onPageChange={onPageChange}
           itemLabel="events"
         />
       )}

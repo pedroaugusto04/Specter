@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
 import { userWebSessions } from '../db/schema.js';
 import type { PlaywrightStorageState } from '../types/session.js';
@@ -15,7 +15,11 @@ export interface UpsertSessionInput {
 
 export interface ISessionRepository {
   findByUserAndDomain(userId: string, hostOrDomain: string): Promise<UserWebSessionEntity | null>;
-  listByUserId(userId: string): Promise<UserWebSessionEntity[]>;
+  listPageByUserId(
+    userId: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ items: UserWebSessionEntity[]; totalItems: number }>;
   findById(id: string): Promise<UserWebSessionEntity | null>;
   upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity>;
   delete(userId: string, id: string): Promise<boolean>;
@@ -50,14 +54,28 @@ export class DrizzleSessionRepository implements ISessionRepository {
     return chosen ? SessionMapper.rowToEntity(chosen) : null;
   }
 
-  async listByUserId(userId: string): Promise<UserWebSessionEntity[]> {
-    const rows = await this.db
-      .select()
-      .from(userWebSessions)
-      .where(eq(userWebSessions.userId, userId))
-      .orderBy(desc(userWebSessions.updatedAt));
-
-    return rows.map((r) => SessionMapper.rowToEntity(r));
+  async listPageByUserId(
+    userId: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ items: UserWebSessionEntity[]; totalItems: number }> {
+    const [rows, [total]] = await Promise.all([
+      this.db
+        .select()
+        .from(userWebSessions)
+        .where(eq(userWebSessions.userId, userId))
+        .orderBy(desc(userWebSessions.updatedAt), desc(userWebSessions.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      this.db
+        .select({ value: count() })
+        .from(userWebSessions)
+        .where(eq(userWebSessions.userId, userId)),
+    ]);
+    return {
+      items: rows.map((row) => SessionMapper.rowToEntity(row)),
+      totalItems: total?.value ?? 0,
+    };
   }
 
   async findById(id: string): Promise<UserWebSessionEntity | null> {

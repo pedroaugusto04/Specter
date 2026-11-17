@@ -14,6 +14,7 @@ import {
   useUpdateIntegrationsMutation,
 } from '@/hooks/useDashboardQueries';
 import { type SessionDto, type UserIntegrationsDto } from '@/lib/api';
+import { PAGINATION_DEFAULT_PAGE_SIZE } from '@specter/contracts';
 import { cn, DEFAULT_TIMEZONE } from '@/lib/utils';
 import {
   AlertCircle,
@@ -56,6 +57,12 @@ export function IntegrationsModal({
     /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
   );
   const [sessions, setSessions] = React.useState<SessionDto[]>([]);
+  const [sessionsPage, setSessionsPage] = React.useState(1);
+  const [sessionsPageSize, setSessionsPageSize] = React.useState<number>(
+    PAGINATION_DEFAULT_PAGE_SIZE
+  );
+  const [sessionsPagination, setSessionsPagination] =
+    React.useState<import('@specter/contracts').PaginationMeta>();
   const [isLoadingSessions, setIsLoadingSessions] = React.useState(false);
   const [deletingSessionId, setDeletingSessionId] = React.useState<string | null>(null);
 
@@ -84,11 +91,20 @@ export function IntegrationsModal({
   const [initialData, setInitialData] = React.useState<UserIntegrationsDto | null>(null);
   const modal = useModal();
   const integrationsQuery = useIntegrationsQuery(isOpen);
-  const sessionsQuery = useSessionsQuery(isOpen);
+  const sessionsQuery = useSessionsQuery(isOpen, sessionsPage, sessionsPageSize);
   const updateIntegrationsMutation = useUpdateIntegrationsMutation();
   const deleteSessionMutation = useDeleteSessionMutation();
   const testTelegramMutation = useTestTelegramMutation();
   const testWebhookMutation = useTestWebhookMutation();
+
+  React.useEffect(() => {
+    if (!sessionsQuery.data) return;
+    setSessions(sessionsQuery.data.items);
+    setSessionsPagination(sessionsQuery.data.pagination);
+    if (sessionsPage !== sessionsQuery.data.pagination.page) {
+      setSessionsPage(sessionsQuery.data.pagination.page);
+    }
+  }, [sessionsPage, sessionsQuery.data]);
 
   const fetchIntegrations = React.useCallback(async () => {
     setIsLoading(true);
@@ -121,8 +137,9 @@ export function IntegrationsModal({
     setIsLoadingSessions(true);
     try {
       const res = await sessionsQuery.refetch();
-      const data = res.data || [];
-      setSessions(data || []);
+      const data = res.data;
+      setSessions(data?.items ?? []);
+      setSessionsPagination(data?.pagination);
     } catch {
       // ignore
     } finally {
@@ -389,6 +406,14 @@ export function IntegrationsModal({
             {activeTab === 'sessions' && (
               <WebSessionsTab
                 sessions={sessions}
+                pagination={sessionsPagination}
+                page={sessionsPage}
+                onPageChange={setSessionsPage}
+                pageSize={sessionsPageSize}
+                onPageSizeChange={(size) => {
+                  setSessionsPageSize(size);
+                  setSessionsPage(1);
+                }}
                 isLoadingSessions={isLoadingSessions}
                 deletingSessionId={deletingSessionId}
                 onRefreshSessions={() => void fetchSessions()}

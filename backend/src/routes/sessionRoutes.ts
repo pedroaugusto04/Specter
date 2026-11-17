@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { SessionService } from '../services/sessionService.js';
-import { sessionCheckQuerySchema, syncSessionSchema } from './schemas.js';
+import { paginationQuerySchema, sessionCheckQuerySchema, syncSessionSchema } from './schemas.js';
 
 export function registerSessionRoutes(
   app: FastifyInstance,
@@ -14,7 +14,8 @@ export function registerSessionRoutes(
   // List all authenticated web sessions for the logged-in user
   app.get('/api/sessions', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
-    const sessions = await sessionService.listSessions(user.id);
+    const query = paginationQuerySchema.parse(request.query);
+    const sessions = await sessionService.listSessionsPage(user.id, query.page, query.pageSize);
     return reply.status(200).send({ data: sessions });
   });
 

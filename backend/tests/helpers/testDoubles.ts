@@ -23,20 +23,34 @@ import type {
   DashboardStats,
   IJobRepository,
   JobRunsSummary,
+  PaginatedTimeseriesResult,
   PaginatedRunsResult,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
 import type { TimeseriesRowEntity } from '../../src/types/domain.js';
 import type { TimeseriesRange } from '@specter/contracts';
+import { PAGINATION_RUNS_PAGE_SIZE } from '@specter/contracts';
 import { RealtimeService } from '../../src/services/realtimeService.js';
 import { InMemoryRealtimeEventBus } from '../../src/providers/realtime/inMemoryRealtime.provider.js';
 import { QuotaService } from '../../src/services/quotaService.js';
 import { EnvPlanLimitResolver } from '../../src/services/quotas/envPlanLimitResolver.js';
 import { JobService, type JobServiceDeps } from '../../src/services/jobService.js';
-import { ScrapeExecutionService, type ScrapeExecutionServiceDeps } from '../../src/services/scrapeExecutionService.js';
-import { CompilationService, type CompilationServiceDeps } from '../../src/services/compilationService.js';
-import { NotificationDispatcher, type NotificationDispatcherDeps } from '../../src/providers/notifications/notificationDispatcher.js';
-import { AccessCooldownService, type IAccessCooldownStore } from '../../src/acquisition/cooldown.js';
+import {
+  ScrapeExecutionService,
+  type ScrapeExecutionServiceDeps,
+} from '../../src/services/scrapeExecutionService.js';
+import {
+  CompilationService,
+  type CompilationServiceDeps,
+} from '../../src/services/compilationService.js';
+import {
+  NotificationDispatcher,
+  type NotificationDispatcherDeps,
+} from '../../src/providers/notifications/notificationDispatcher.js';
+import {
+  AccessCooldownService,
+  type IAccessCooldownStore,
+} from '../../src/acquisition/cooldown.js';
 import type {
   CreateUserInput,
   IUserRepository,
@@ -226,6 +240,35 @@ export class InMemoryJobRepository implements IJobRepository {
     });
     return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
+  async findPage(input: {
+    status?: JobStatus | 'recovering' | 'paused';
+    userId: string;
+    page: number;
+    pageSize: number;
+    search?: string;
+  }) {
+    const search = input.search?.trim().toLowerCase();
+    const matching = (await this.findAll(undefined, input.userId)).filter((job) => {
+      if (
+        input.status === 'recovering' &&
+        !['RECOVERING', 'PENDING_COMPILATION'].includes(job.status)
+      )
+        return false;
+      if (input.status === 'paused' && !['PAUSED', 'FAILED'].includes(job.status)) return false;
+      if (
+        input.status &&
+        !['recovering', 'paused'].includes(input.status) &&
+        job.status !== input.status
+      )
+        return false;
+      return (
+        !search ||
+        [job.name, job.url, job.userPrompt].some((value) => value.toLowerCase().includes(search))
+      );
+    });
+    const offset = (input.page - 1) * input.pageSize;
+    return { items: matching.slice(offset, offset + input.pageSize), totalItems: matching.length };
+  }
   async findActiveJobs(): Promise<ScrapingJobEntity[]> {
     return Array.from(this.jobs.values()).filter((j) => j.status === 'ACTIVE');
   }
@@ -285,36 +328,79 @@ export class InMemoryJobRepository implements IJobRepository {
   async findPaginatedRunsByJobId(
     jobId: string,
     page = 1,
-    pageSize = 20
+    pageSize = PAGINATION_RUNS_PAGE_SIZE
   ): Promise<PaginatedRunsResult> {
     const filtered = this.runs
       .filter((r) => r.jobId === jobId)
       .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
     const offset = Math.max(0, (page - 1) * pageSize);
     return {
-      runs: filtered.slice(offset, offset + pageSize),
-      totalCount: filtered.length,
+      items: filtered.slice(offset, offset + pageSize),
+      totalItems: filtered.length,
     };
   }
-  async findTimeseriesByJobId(
+  async findPaginatedTimeseriesByJobId(
     jobId: string,
-    range: TimeseriesRange = 'all'
-  ): Promise<TimeseriesRowEntity[]> {
+    range: TimeseriesRange,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedTimeseriesResult> {
     const hours = range === '24h' ? 24 : range === '7d' ? 24 * 7 : range === '30d' ? 24 * 30 : null;
     const cutoff = hours ? Date.now() - hours * 3600 * 1000 : null;
-    return this.runs
-      .filter((r) => r.jobId === jobId && (!cutoff || r.executedAt.getTime() >= cutoff))
-      .sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime())
-      .map((r) => ({
-        id: r.id,
-        executedAt: r.executedAt,
-        status: r.status,
-        hasChanges: r.hasChanges,
-        durationMs: r.durationMs,
-        contractRevision: r.contractRevision ?? null,
-        errorMessage: r.errorMessage,
-        extractedData: r.extractedData,
-      }));
+    const matching = this.runs
+      .filter(
+        (r) =>
+          r.jobId === jobId &&
+          r.status === 'SUCCESS' &&
+          (!cutoff || r.executedAt.getTime() >= cutoff)
+      )
+      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime() || b.id.localeCompare(a.id));
+    const offset = (page - 1) * pageSize;
+    const toRow = (r: JobRunEntity): TimeseriesRowEntity => ({
+      id: r.id,
+      executedAt: r.executedAt,
+      status: r.status,
+      hasChanges: r.hasChanges,
+      durationMs: r.durationMs,
+      contractRevision: r.contractRevision ?? null,
+      errorMessage: r.errorMessage,
+      extractedData: r.extractedData,
+    });
+    const rows = matching.slice(offset, offset + pageSize);
+    const oldest = rows.at(-1);
+    const previous = oldest
+      ? (matching.find(
+          (run) =>
+            run.executedAt < oldest.executedAt ||
+            (run.executedAt.getTime() === oldest.executedAt.getTime() && run.id < oldest.id)
+        ) ?? null)
+      : null;
+    return {
+      items: rows.map(toRow),
+      previousItem: previous ? toRow(previous) : null,
+      totalItems: matching.length,
+    };
+  }
+  async findPreviousCompleteCollectionRun(
+    jobId: string,
+    before: { executedAt: Date; id: string },
+    contractRevision: string | null
+  ): Promise<JobRunEntity | null> {
+    return (
+      this.runs
+        .filter(
+          (run) =>
+            run.jobId === jobId &&
+            run.status === 'SUCCESS' &&
+            run.contractRevision === contractRevision &&
+            ['COMPLETE', 'EMPTY'].includes(run.extractionReport?.coverage ?? '') &&
+            (run.executedAt < before.executedAt ||
+              (run.executedAt.getTime() === before.executedAt.getTime() && run.id < before.id))
+        )
+        .sort(
+          (a, b) => b.executedAt.getTime() - a.executedAt.getTime() || b.id.localeCompare(a.id)
+        )[0] ?? null
+    );
   }
   async getJobRunsSummary(jobId: string): Promise<JobRunsSummary> {
     const jobRunsList = this.runs.filter((r) => r.jobId === jobId);
@@ -538,8 +624,12 @@ export class InMemorySessionRepository implements ISessionRepository {
     return null;
   }
 
-  async listByUserId(userId: string): Promise<UserWebSessionEntity[]> {
-    return Array.from(this.sessions.values()).filter((s) => s.userId === userId);
+  async listPageByUserId(userId: string, page: number, pageSize: number) {
+    const matching = Array.from(this.sessions.values())
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id.localeCompare(a.id));
+    const offset = (page - 1) * pageSize;
+    return { items: matching.slice(offset, offset + pageSize), totalItems: matching.length };
   }
 
   async findById(id: string): Promise<UserWebSessionEntity | null> {
@@ -626,7 +716,12 @@ export class InMemoryAccessCooldownStore implements IAccessCooldownStore {
   async get(key: string): Promise<number | null> {
     return this.until.get(key) ?? null;
   }
-  async blocked(key: string, threshold: number, durationMs: number, now: number): Promise<number | null> {
+  async blocked(
+    key: string,
+    threshold: number,
+    durationMs: number,
+    now: number
+  ): Promise<number | null> {
     const count = (this.counts.get(key) ?? 0) + 1;
     this.counts.set(key, count);
     if (count >= threshold) {
@@ -646,7 +741,12 @@ export class NoopAccessCooldownStore implements IAccessCooldownStore {
   async get(_key: string): Promise<number | null> {
     return null;
   }
-  async blocked(_key: string, _threshold: number, _durationMs: number, _now: number): Promise<number | null> {
+  async blocked(
+    _key: string,
+    _threshold: number,
+    _durationMs: number,
+    _now: number
+  ): Promise<number | null> {
     return null;
   }
   async clear(_key: string): Promise<void> {}
@@ -693,7 +793,15 @@ export function createTestJobService(overrides: Partial<JobServiceDeps> = {}): J
   });
 }
 
-export function createTestCompilationService(overrides: Partial<CompilationServiceDeps> & { jobRepository: IJobRepository; configurationPipeline: any; alertRouter: any; jobScheduler: any; storageProvider: any }): CompilationService {
+export function createTestCompilationService(
+  overrides: Partial<CompilationServiceDeps> & {
+    jobRepository: IJobRepository;
+    configurationPipeline: any;
+    alertRouter: any;
+    jobScheduler: any;
+    storageProvider: any;
+  }
+): CompilationService {
   return new CompilationService({
     sessionRepository: new InMemorySessionRepository(),
     realtimeService: createTestRealtimeService(),
@@ -702,7 +810,15 @@ export function createTestCompilationService(overrides: Partial<CompilationServi
   });
 }
 
-export function createTestScrapeExecutionService(overrides: Partial<ScrapeExecutionServiceDeps> & { jobRepository: IJobRepository; planExecutor: any; alertRouter: any; jobScheduler: any; storageProvider: any }): ScrapeExecutionService {
+export function createTestScrapeExecutionService(
+  overrides: Partial<ScrapeExecutionServiceDeps> & {
+    jobRepository: IJobRepository;
+    planExecutor: any;
+    alertRouter: any;
+    jobScheduler: any;
+    storageProvider: any;
+  }
+): ScrapeExecutionService {
   const sessionRepo = overrides.sessionRepository ?? new InMemorySessionRepository();
   return new ScrapeExecutionService({
     accessCooldown: new AccessCooldownService(new NoopAccessCooldownStore(), sessionRepo),
@@ -713,11 +829,21 @@ export function createTestScrapeExecutionService(overrides: Partial<ScrapeExecut
   });
 }
 
-export function createTestNotificationDispatcher(overrides: Partial<NotificationDispatcherDeps> = {}): NotificationDispatcher {
+export function createTestNotificationDispatcher(
+  overrides: Partial<NotificationDispatcherDeps> = {}
+): NotificationDispatcher {
   return new NotificationDispatcher({
     emailProvider: { name: 'mock-email', sendAlert: async () => {} },
-    telegramProvider: { name: 'mock-telegram', sendAlert: async () => {}, sendTestMessage: async () => ({ ok: true }) },
-    webhookProvider: { name: 'mock-webhook', sendAlert: async () => {}, sendTestEvent: async () => ({ ok: true }) },
+    telegramProvider: {
+      name: 'mock-telegram',
+      sendAlert: async () => {},
+      sendTestMessage: async () => ({ ok: true }),
+    },
+    webhookProvider: {
+      name: 'mock-webhook',
+      sendAlert: async () => {},
+      sendTestEvent: async () => ({ ok: true }),
+    },
     integrationRepository: new InMemoryIntegrationRepository(),
     userRepository: new InMemoryUserRepository(),
     ...overrides,

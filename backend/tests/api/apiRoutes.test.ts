@@ -208,7 +208,15 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       headers: { cookie: authCookie },
     });
     expect(listRes.statusCode).toBe(200);
-    expect(listRes.json().data).toHaveLength(1);
+    expect(listRes.json().data.items).toHaveLength(1);
+    expect(listRes.json().data.pagination).toMatchObject({
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
+    });
     // Delete job
     const deleteRes = await app.inject({
       method: 'DELETE',
@@ -439,13 +447,38 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     const timeseriesData = timeseriesRes.json().data;
     expect(timeseriesData.jobId).toBe(createdData.id);
     expect(timeseriesData.range).toBe('all');
-    expect(timeseriesData.totalPoints).toBe(25);
+    expect(timeseriesData.pagination.totalItems).toBe(25);
     expect(timeseriesData.points).toHaveLength(25);
+    expect(timeseriesData.pagination).toMatchObject({
+      page: 1,
+      pageSize: 50,
+      totalItems: 25,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
+    });
     const samplePoint = timeseriesData.points[0];
     expect(samplePoint.id).toBeDefined();
     expect(samplePoint.executedAt).toBeDefined();
-    expect(samplePoint.values).toEqual({ price: 101 });
+    expect(samplePoint.values).toEqual({ price: 125 });
     expect(samplePoint.screenshotUrl).toBeUndefined();
     expect(samplePoint.extractionReport).toBeUndefined();
+
+    const timeseriesPage2 = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/timeseries?range=all&page=2&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(timeseriesPage2.statusCode).toBe(200);
+    expect(timeseriesPage2.json().data.points).toHaveLength(10);
+    expect(timeseriesPage2.json().data.pagination).toMatchObject({
+      page: 2,
+      pageSize: 10,
+      totalItems: 25,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPrevPage: true,
+    });
+    expect(timeseriesPage2.json().data.previousPoint.values).toEqual({ price: 105 });
   });
 });

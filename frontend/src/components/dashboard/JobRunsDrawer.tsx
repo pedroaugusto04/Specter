@@ -10,7 +10,12 @@ import { Drawer } from '@/components/ui/drawer';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useJobRunsQuery, useJobTimeseriesQuery } from '@/hooks/useDashboardQueries';
 import { api, type JobRunDto, type ScrapingJobDto, type TimeseriesRange } from '@/lib/api';
-import { USER_FAILURES, type IntentField } from '@specter/contracts';
+import {
+  PAGINATION_RUNS_PAGE_SIZE,
+  PAGINATION_TIMESERIES_PAGE_SIZE,
+  USER_FAILURES,
+  type IntentField,
+} from '@specter/contracts';
 import { ExtractionScope, JobStatus } from '@specter/contracts';
 import { DEFAULT_TIMEZONE, formatDateTime, parseErrorMessage } from '@/lib/utils';
 import { getExtractionFieldLabels } from '@/lib/extractionDisplay';
@@ -66,21 +71,29 @@ export function JobRunsDrawer({
   timeZone?: string;
 }) {
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(20);
+  const [pageSize, setPageSize] = React.useState<number>(PAGINATION_RUNS_PAGE_SIZE);
   const [chartRange, setChartRange] = React.useState<TimeseriesRange>('all');
+  const [timeseriesPage, setTimeseriesPage] = React.useState(1);
+  const [timeseriesPageSize, setTimeseriesPageSize] = React.useState<number>(
+    PAGINATION_TIMESERIES_PAGE_SIZE
+  );
 
   React.useEffect(() => {
     setPage(1);
+    setTimeseriesPage(1);
   }, [job?.id]);
 
   const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
   const { data: timeseriesData, isLoading: timeseriesLoading } = useJobTimeseriesQuery(
     job?.id,
-    chartRange
+    chartRange,
+    timeseriesPage,
+    timeseriesPageSize
   );
 
   const runs: JobRunDto[] = data?.runs ?? [];
   const timeseriesPoints = timeseriesData?.points ?? [];
+  const timeseriesPagination = timeseriesData?.pagination;
   const latestDiff = data?.latestDiff ?? null;
   const pagination = data?.pagination;
   const summary = data?.summary ?? {
@@ -116,8 +129,13 @@ export function JobRunsDrawer({
     }
     try {
       setIsExporting(true);
-      const res = await api.getJobRuns(job.id, 1, 100);
-      return res.runs && res.runs.length > 0 ? res.runs : runs;
+      const firstPage = await api.getJobRuns(job.id, 1, 100);
+      const allRuns = [...firstPage.runs];
+      for (let currentPage = 2; currentPage <= firstPage.pagination.totalPages; currentPage += 1) {
+        const res = await api.getJobRuns(job.id, currentPage, firstPage.pagination.pageSize);
+        allRuns.push(...res.runs);
+      }
+      return allRuns.length > 0 ? allRuns : runs;
     } catch {
       return runs;
     } finally {
@@ -130,7 +148,10 @@ export function JobRunsDrawer({
     const runsToExport = await getRunsForExport();
     if (runsToExport.length === 0) return;
     const csv = runsToCsv(runsToExport);
-    const slug = (job.name || 'monitor').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = (job.name || 'monitor')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     const dateStr = new Date().toISOString().slice(0, 10);
     downloadFile(csv, `${slug}_runs_${dateStr}.csv`, 'text/csv;charset=utf-8;');
   };
@@ -140,7 +161,10 @@ export function JobRunsDrawer({
     const runsToExport = await getRunsForExport();
     if (runsToExport.length === 0) return;
     const json = runsToJson(runsToExport);
-    const slug = (job.name || 'monitor').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = (job.name || 'monitor')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     const dateStr = new Date().toISOString().slice(0, 10);
     downloadFile(json, `${slug}_runs_${dateStr}.json`, 'application/json;charset=utf-8;');
   };
@@ -177,7 +201,8 @@ export function JobRunsDrawer({
                 </p>
                 <FailureDetails failure={jobFailure} />
                 <p className="text-xs text-muted-foreground pt-1">
-                  The monitor remains active and continues collecting data using its current extraction plan.
+                  The monitor remains active and continues collecting data using its current
+                  extraction plan.
                 </p>
               </div>
             </div>
@@ -271,6 +296,11 @@ export function JobRunsDrawer({
                 timeZone={timeZone}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
+                title={
+                  timeseriesPagination
+                    ? `Execution sequence — page ${timeseriesPagination.page} of ${timeseriesPagination.totalPages}`
+                    : undefined
+                }
               />
             )}
 
@@ -432,7 +462,7 @@ export function JobRunsDrawer({
                 </div>
               )}
 
-              {pagination && pagination.totalPages > 1 && (
+              {pagination && pagination.totalItems > 0 && (
                 <PaginationControls
                   page={page}
                   totalPages={pagination.totalPages}
@@ -455,14 +485,28 @@ export function JobRunsDrawer({
           <ExecutionTimelineChart
             key={job.id}
             runs={runs}
+            previousCollectionRun={data?.previousCollectionRun ?? null}
+            runsPagination={pagination}
+            runsPageSize={pageSize}
+            onRunsPageChange={setPage}
             points={timeseriesPoints}
+            previousPoint={timeseriesData?.previousPoint ?? null}
+            timeseriesPagination={timeseriesData?.pagination}
+            onTimeseriesPageChange={setTimeseriesPage}
+            onTimeseriesPageSizeChange={(size) => {
+              setTimeseriesPageSize(size);
+              setTimeseriesPage(1);
+            }}
             revision={job.contractRevision}
             identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
             summary={summary}
             timeRange={chartRange}
-            onTimeRangeChange={setChartRange}
+            onTimeRangeChange={(range) => {
+              setChartRange(range);
+              setTimeseriesPage(1);
+            }}
             isLoading={timeseriesLoading}
           />
         )}

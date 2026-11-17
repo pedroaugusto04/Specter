@@ -9,12 +9,18 @@ import {
   type JobRunDto,
   type JobRunsDto,
   type JobTimeseriesDto,
+  type PaginatedResponse,
   type ScrapingJobDto,
   type SessionDto,
   type TimeseriesRange,
   type UserDto,
   type UserIntegrationsDto,
 } from '@/lib/api';
+import {
+  PAGINATION_DEFAULT_PAGE_SIZE,
+  PAGINATION_RUNS_PAGE_SIZE,
+  PAGINATION_TIMESERIES_PAGE_SIZE,
+} from '@specter/contracts';
 
 export type CreateJobInput = Parameters<typeof api.createJob>[0];
 export type UpdateJobInput = Parameters<typeof api.updateJob>[1];
@@ -24,8 +30,11 @@ export const dashboardKeys = {
   user: ['auth', 'me'] as const,
   quotas: ['quotas'] as const,
   jobs: ['jobs'] as const,
+  jobPage: (page: number, pageSize: number, status?: string, search?: string) =>
+    ['jobs', page, pageSize, status, search] as const,
   job: (id: string) => ['jobs', id] as const,
-  jobRuns: (id: string, page = 1, pageSize = 20) => ['jobRuns', id, page, pageSize] as const,
+  jobRuns: (id: string, page = 1, pageSize: number = PAGINATION_RUNS_PAGE_SIZE) =>
+    ['jobRuns', id, page, pageSize] as const,
   timeseries: (id: string, range: string) => ['timeseries', id, range] as const,
   stats: ['stats'] as const,
   integrations: ['integrations'] as const,
@@ -50,10 +59,15 @@ export function useCurrentUserQuery() {
   });
 }
 
-export function useJobsQuery() {
-  return useQuery<ScrapingJobDto[]>({
-    queryKey: dashboardKeys.jobs,
-    queryFn: () => api.listJobs(),
+export function useJobsQuery(
+  page = 1,
+  pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE,
+  status?: import('@specter/contracts').JobStatus | 'recovering' | 'paused',
+  search = ''
+) {
+  return useQuery<PaginatedResponse<ScrapingJobDto>>({
+    queryKey: dashboardKeys.jobPage(page, pageSize, status, search),
+    queryFn: () => api.listJobs({ page, pageSize, status, search }),
     staleTime: 10 * 1000,
   });
 }
@@ -66,7 +80,11 @@ export function useStatsQuery() {
   });
 }
 
-export function useJobRunsQuery(jobId: string | null | undefined, page = 1, pageSize = 20) {
+export function useJobRunsQuery(
+  jobId: string | null | undefined,
+  page = 1,
+  pageSize: number = PAGINATION_RUNS_PAGE_SIZE
+) {
   return useQuery<JobRunsDto>({
     queryKey: jobId ? dashboardKeys.jobRuns(jobId, page, pageSize) : ['jobRuns', 'none'],
     queryFn: async () => {
@@ -100,15 +118,32 @@ export function useJobRunsQuery(jobId: string | null | undefined, page = 1, page
 
 export function useJobTimeseriesQuery(
   jobId: string | null | undefined,
-  range: TimeseriesRange = 'all'
+  range: TimeseriesRange = 'all',
+  page = 1,
+  pageSize: number = PAGINATION_TIMESERIES_PAGE_SIZE
 ) {
   return useQuery<JobTimeseriesDto>({
-    queryKey: jobId ? dashboardKeys.timeseries(jobId, range) : ['timeseries', 'none'],
+    queryKey: jobId
+      ? [...dashboardKeys.timeseries(jobId, range), page, pageSize]
+      : ['timeseries', 'none'],
     queryFn: async () => {
       if (!jobId) {
-        return { jobId: '', range, totalPoints: 0, points: [] };
+        return {
+          jobId: '',
+          range,
+          points: [],
+          previousPoint: null,
+          pagination: {
+            page: 1,
+            pageSize,
+            totalItems: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        };
       }
-      return api.getJobTimeseries(jobId, range);
+      return api.getJobTimeseries(jobId, range, page, pageSize);
     },
     enabled: Boolean(jobId),
     staleTime: 15 * 1000,
@@ -134,10 +169,14 @@ export function useIntegrationsQuery(enabled = true) {
   });
 }
 
-export function useSessionsQuery(enabled = true) {
-  return useQuery<SessionDto[]>({
-    queryKey: dashboardKeys.sessions,
-    queryFn: () => api.getSessions(),
+export function useSessionsQuery(
+  enabled = true,
+  page = 1,
+  pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE
+) {
+  return useQuery<PaginatedResponse<SessionDto>>({
+    queryKey: [...dashboardKeys.sessions, page, pageSize],
+    queryFn: () => api.getSessions(page, pageSize),
     enabled,
     staleTime: 30 * 1000,
   });

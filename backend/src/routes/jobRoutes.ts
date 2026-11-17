@@ -3,13 +3,14 @@ import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddl
 import type { AuthService } from '../services/authService.js';
 import type { JobService } from '../services/jobService.js';
 import type { QuotaService } from '../services/quotaService.js';
+import { createPaginationMeta } from '../utils/pagination.js';
 import {
   jobInputSchema,
   jobPauseSchema,
   jobProbeSchema,
   jobRunsQuerySchema,
   jobTimeseriesQuerySchema,
-  jobStatusQuerySchema,
+  listQuerySchema,
   jobUpdateSchema,
 } from './schemas.js';
 
@@ -52,13 +53,15 @@ export function registerJobRoutes(
   });
 
   app.get('/api/jobs', { preHandler: [withOptionalAuth] }, async (request) => {
-    const query = jobStatusQuerySchema.parse(request.query);
+    const query = listQuerySchema.parse(request.query);
     const user = request.user;
     if (!user) {
-      return { data: [] };
+      return {
+        data: { items: [], pagination: createPaginationMeta(query.page, query.pageSize, 0) },
+      };
     }
-    const jobs = await jobService.listJobs(query.status, user.id);
-    return { data: jobs };
+    const result = await jobService.listJobsPage({ ...query, userId: user.id });
+    return { data: result };
   });
 
   app.post('/api/jobs/probe', { preHandler: [withOptionalAuth] }, async (request, reply) => {
@@ -162,7 +165,13 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobTimeseriesQuerySchema.parse(request.query);
-      const result = await jobService.getJobTimeseries(request.params.id, query.range, user.id);
+      const result = await jobService.getJobTimeseries(
+        request.params.id,
+        query.range,
+        query.page,
+        query.pageSize,
+        user.id
+      );
       return { data: result };
     }
   );

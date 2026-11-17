@@ -8,6 +8,8 @@ import { SessionMapper } from '../mappers/sessionMapper.js';
 import type { SessionDto } from '@specter/contracts';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import { normalizeDomain } from '../utils/urlNormalizer.js';
+import type { PaginatedResponse } from '@specter/contracts';
+import { resolvePageResult } from '../utils/pagination.js';
 
 export interface SyncSessionInput {
   domain: string;
@@ -36,9 +38,21 @@ export class SessionService {
     return 'Lax';
   }
 
-  async listSessions(userId: string): Promise<SessionDto[]> {
-    const entities = await this.sessionRepository.listByUserId(userId);
-    return entities.map((e) => SessionMapper.entityToDto(e));
+  async listSessionsPage(
+    userId: string,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedResponse<SessionDto>> {
+    const result = await resolvePageResult(
+      page,
+      pageSize,
+      await this.sessionRepository.listPageByUserId(userId, page, pageSize),
+      (safePage) => this.sessionRepository.listPageByUserId(userId, safePage, pageSize)
+    );
+    return {
+      items: result.items.map((entity) => SessionMapper.entityToDto(entity)),
+      pagination: result.pagination,
+    };
   }
 
   async checkSession(userId: string, hostOrUrl: string): Promise<SessionDto | null> {
