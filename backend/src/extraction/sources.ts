@@ -39,6 +39,24 @@ export class DomSourceReader implements ISourceReader {
     let raw: unknown;
     if (target.length <= 1) raw = readSingle(target);
     else {
+      if (source.pattern) {
+        try {
+          const regex = new RegExp(source.pattern, 'u');
+          const patternMatches = new Set<string>();
+          for (let i = 0; i < target.length; i++) {
+            const val = readSingle(target.eq(i))?.trim();
+            if (val) {
+              const m = val.match(regex);
+              if (m) patternMatches.add(m[1] !== undefined ? m[1] : m[0]);
+            }
+          }
+          if (patternMatches.size === 1) {
+            return patternMatches.values().next().value;
+          }
+        } catch {
+          // invalid regex falls through to standard ambiguity check
+        }
+      }
       const distinctValues = new Set<string>();
       for (let i = 0; i < target.length; i++) {
         const val = readSingle(target.eq(i))?.trim();

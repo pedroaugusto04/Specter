@@ -17,7 +17,7 @@ describe('Codex transport', () => {
     vi.stubEnv('JWT_SECRET', 'backend-session-secret');
     vi.stubEnv('DATABASE_URL', 'postgresql://secret@db/app');
     vi.stubEnv('OPENAI_API_KEY', 'test-cli-credential');
-    vi.stubEnv('CODEX_SANDBOX', 'danger-full-access');
+    vi.stubEnv('CODEX_SANDBOX', 'read-only');
     const root = await mkdtemp(path.join(tmpdir(), 'specter-codex-test-'));
     directories.push(root);
     const executable = path.join(root, 'fake-codex.cjs');
@@ -56,6 +56,35 @@ describe('Codex transport', () => {
     });
     expect(result).toEqual(output);
     expect(await readdir(path.join(root, 'work'))).toEqual([]);
+  });
+
+  it('supports configured danger-full-access sandbox for container environments', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'specter-codex-sandbox-'));
+    directories.push(root);
+    const executable = path.join(root, 'fake-codex-sandbox.cjs');
+    const output = fixturePlan();
+    await writeFile(
+      executable,
+      `const fs=require('node:fs');const args=process.argv.slice(2);
+      const expected=['exec','--ephemeral','--skip-git-repo-check','--sandbox','danger-full-access'];
+      if(!expected.every((value,index)=>args[index]===value))process.exit(11);
+      const index=args.indexOf('--output-last-message');
+      fs.writeFileSync(args[index+1], ${JSON.stringify(JSON.stringify(output))});process.exit(0);`
+    );
+    const provider = new CodexCompilerProvider({
+      sandbox: 'danger-full-access',
+      tempBaseDir: path.join(root, 'work'),
+      spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
+        spawn(process.execPath, [executable, ...args], options),
+    });
+    const result = await provider.generate({
+      task: 'configure',
+      timeoutMs: 10000,
+      jobId: 'sandbox-test',
+      evidence: '<h1>Example</h1>',
+      instructions: 'Find the page title',
+    });
+    expect(result).toEqual(output);
   });
 
   it('parses JSON output wrapped in markdown code fences', async () => {

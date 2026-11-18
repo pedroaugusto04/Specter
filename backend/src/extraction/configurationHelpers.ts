@@ -45,12 +45,75 @@ export function precheckCandidatePlanInSnapshot(
   const hasSetup = (plan.strategy.setup?.length ?? 0) > 0;
   if (!hasSetup && plan.strategy.records.kind === 'dom' && snapshot?.html) {
     const $ = cheerio.load(snapshot.html);
-    const recordCount = $(plan.strategy.records.selector).length;
+    const records = $(plan.strategy.records.selector);
+    const recordCount = records.length;
     if (recordCount === 0) {
       return {
         valid: false,
         rejection: `Candidate record selector '${plan.strategy.records.selector}' matched 0 elements in observed DOM. Select an existing container.`,
       };
+    }
+    const firstRecord = records.first();
+    for (const [name, sources] of Object.entries(plan.strategy.fields)) {
+      for (const source of sources) {
+        if (source.kind === 'dom' && source.selector !== ':scope') {
+          let targets;
+          try {
+            targets = firstRecord.find(source.selector);
+            if (
+              targets.length === 0 &&
+              (source.selector.startsWith('meta') || source.selector.startsWith('head'))
+            ) {
+              const root = firstRecord.parents().length ? firstRecord.parents().last() : firstRecord;
+              targets = root.find(source.selector);
+            }
+          } catch {
+            return {
+              valid: false,
+              rejection: `Field '${name}' has invalid CSS selector '${source.selector}'. Provide a valid CSS selector.`,
+            };
+          }
+          if (targets.length > 1) {
+            const distinctValues = new Set<string>();
+            targets.each((_, el) => {
+              const text = (
+                source.attribute === 'text' ? $(el).text() : $(el).attr(source.attribute)
+              )?.trim();
+              if (text) distinctValues.add(text);
+            });
+            if (distinctValues.size > 1) {
+              if (source.pattern) {
+                try {
+                  const regex = new RegExp(source.pattern, 'u');
+                  const patternMatches = new Set<string>();
+                  targets.each((_, el) => {
+                    const text = (
+                      source.attribute === 'text' ? $(el).text() : $(el).attr(source.attribute)
+                    )?.trim();
+                    if (text) {
+                      const m = text.match(regex);
+                      if (m) patternMatches.add(m[1] !== undefined ? m[1] : m[0]);
+                    }
+                  });
+                  if (patternMatches.size === 1) {
+                    continue;
+                  }
+                } catch {
+                  // invalid regex falls through to ambiguity rejection
+                }
+              }
+              const samples = Array.from(distinctValues)
+                .slice(0, 3)
+                .map((v) => JSON.stringify(v.length > 40 ? v.slice(0, 37) + '...' : v))
+                .join(', ');
+              return {
+                valid: false,
+                rejection: `Ambiguous DOM field source: field '${name}' selector '${source.selector}' matched ${targets.length} elements with ${distinctValues.size} distinct values in record (${samples}). Narrow the selector or provide a pattern to isolate a single value.`,
+              };
+            }
+          }
+        }
+      }
     }
   }
   return { valid: true };

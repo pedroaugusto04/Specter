@@ -28,6 +28,7 @@ REDIS_PORT="${REDIS_PORT:-6379}"
 CORS_ORIGIN="${CORS_ORIGIN:-https://specterdev.online,http://specterdev.online,https://www.specterdev.online,http://www.specterdev.online,https://pedro-duarte.ddns.net,http://pedro-duarte.ddns.net,https://pedro-duarte.servehttp.com,http://pedro-duarte.servehttp.com}"
 COMPILER_PROVIDER="${COMPILER_PROVIDER:-codex}"
 COMPILER_CODEX_MODEL="${COMPILER_CODEX_MODEL:-gpt-6-luna}"
+COMPILER_CODEX_SANDBOX="${COMPILER_CODEX_SANDBOX:-danger-full-access}"
 NOTIFICATION_PROVIDER="${NOTIFICATION_PROVIDER:-resend}"
 NOTIFICATION_FROM_EMAIL="${NOTIFICATION_FROM_EMAIL:-noreply@mail.specterdev.online}"
 RESEND_API_KEY="${RESEND_API_KEY:-}"
@@ -66,6 +67,7 @@ keys=(
   AGY_MODEL
   CODEX_CLI_PATH
   COMPILER_CODEX_MODEL
+  COMPILER_CODEX_SANDBOX
   COMPILER_TEMP_DIR
   COMPILER_TIMEOUT_MS
   COMPILER_CONCURRENCY

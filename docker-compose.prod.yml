@@ -82,11 +82,14 @@ services:
       MAX_RECOVERY_ATTEMPTS: ${MAX_RECOVERY_ATTEMPTS:-3}
       CODEX_CLI_PATH: /usr/local/bin/codex
       COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
+      COMPILER_CODEX_SANDBOX: ${COMPILER_CODEX_SANDBOX:-danger-full-access}
       CODEX_HOME: /root/.codex
     ports:
       - '${PORT:-3001}:3001'
     volumes:
       - compiler_jobs:/tmp/scraper_jobs
+      - ${CODEX_HOST_DIR:-/home/ubuntu/.codex}:/root/.codex
+      - ${GEMINI_HOST_DIR:-/home/ubuntu/.gemini}:/root/.gemini
     depends_on:
       postgres:
         condition: service_healthy

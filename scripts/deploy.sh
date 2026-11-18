@@ -95,6 +95,9 @@ log "Cleaning up VPS build directory and dangling images..."
 $SSH_CMD "rm -rf ~/specter-build && sudo docker image prune -f"
 
 # 5. Recreate Backend Container (Preserves .env.prod and DB/Redis volumes)
+log "Syncing docker-compose.prod.yml to VPS..."
+rsync -avz -e "ssh -i $VPS_SSH_KEY -o StrictHostKeyChecking=no" docker-compose.prod.yml "${VPS_USER}@${VPS_HOST}:~/specter/docker-compose.prod.yml"
+
 log "Recreating backend container in production compose..."
 $SSH_CMD "cd ~/specter && sudo docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --no-deps backend"
 success "Backend container updated and running."

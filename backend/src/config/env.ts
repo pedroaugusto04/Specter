@@ -52,6 +52,15 @@ export const envSchema = z.object({
   AGY_MODEL: z.string().trim().default(''),
   CODEX_CLI_PATH: z.string().min(1).default('codex'),
   COMPILER_CODEX_MODEL: z.string().trim().default(''),
+  COMPILER_CODEX_SANDBOX: z
+    .enum(['read-only', 'workspace-write', 'danger-full-access', 'dangerously-bypass-approvals-and-sandbox'])
+    .default(
+      (['read-only', 'workspace-write', 'danger-full-access', 'dangerously-bypass-approvals-and-sandbox'].includes(
+        process.env.CODEX_SANDBOX ?? ''
+      )
+        ? (process.env.CODEX_SANDBOX as 'read-only' | 'workspace-write' | 'danger-full-access' | 'dangerously-bypass-approvals-and-sandbox')
+        : 'read-only')
+    ),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
   COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(300000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),

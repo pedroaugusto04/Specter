@@ -80,6 +80,7 @@ env:
   COMPILER_API_MODEL: ${{ vars.COMPILER_API_MODEL || '' }}
   AGY_MODEL: ${{ vars.AGY_MODEL || '' }}
   COMPILER_CODEX_MODEL: ${{ vars.COMPILER_CODEX_MODEL || 'gpt-6-luna' }}
+  COMPILER_CODEX_SANDBOX: ${{ vars.COMPILER_CODEX_SANDBOX || 'danger-full-access' }}
   COMPILER_API_BASE_URL: ${{ vars.COMPILER_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
   COMPILER_API_MAX_RETRIES: ${{ vars.COMPILER_API_MAX_RETRIES || '3' }}
   COMPILER_API_RETRY_BASE_DELAY_MS: ${{ vars.COMPILER_API_RETRY_BASE_DELAY_MS || '1000' }}
@@ -284,6 +285,7 @@ jobs:
           COMPILER_API_MODEL: ${{ env.COMPILER_API_MODEL }}
           AGY_MODEL: ${{ env.AGY_MODEL }}
           COMPILER_CODEX_MODEL: ${{ env.COMPILER_CODEX_MODEL }}
+          COMPILER_CODEX_SANDBOX: ${{ env.COMPILER_CODEX_SANDBOX }}
           COMPILER_API_KEY: ${{ secrets.COMPILER_API_KEY }}
           COMPILER_API_BASE_URL: ${{ env.COMPILER_API_BASE_URL }}
           COMPILER_API_MAX_RETRIES: ${{ env.COMPILER_API_MAX_RETRIES }}
