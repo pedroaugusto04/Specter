@@ -304,16 +304,16 @@ describe('Field Disambiguation and Semantic Decomposition', () => {
       const parsed = extractionPlanSchema.parse(normalized);
 
       // Verify description fallback to displayName
-      expect(parsed.intent.fields.price_pix.description).toBe('Preço Pix');
-      expect(parsed.intent.fields.price_card.description).toBe('Preço Cartão');
+      expect((parsed.intent.fields.price_pix as any).description).toBe('Preço Pix');
+      expect((parsed.intent.fields.price_card as any).description).toBe('Preço Cartão');
 
       // Verify required fallback to true
-      expect(parsed.intent.fields.price_pix.required).toBe(true);
-      expect(parsed.intent.fields.price_card.required).toBe(true);
+      expect((parsed.intent.fields.price_pix as any).required).toBe(true);
+      expect((parsed.intent.fields.price_card as any).required).toBe(true);
 
       // Verify locale fallback to detected document locale (pt-BR from R$ currency)
-      expect(parsed.intent.fields.price_pix.locale).toBe('pt-BR');
-      expect(parsed.intent.fields.price_card.locale).toBe('pt-BR');
+      expect((parsed.intent.fields.price_pix as any).locale).toBe('pt-BR');
+      expect((parsed.intent.fields.price_card as any).locale).toBe('pt-BR');
 
       // Verify strategy lone sources wrapped in arrays
       expect(Array.isArray(parsed.strategy.fields.price_pix)).toBe(true);
@@ -345,9 +345,9 @@ describe('Field Disambiguation and Semantic Decomposition', () => {
       const normalized = normalizeCandidatePlan(rawCandidate, snapshot);
       const parsed = extractionPlanSchema.parse(normalized);
 
-      expect(parsed.intent.fields.price.description).toBe('price');
-      expect(parsed.intent.fields.price.required).toBe(true);
-      expect(parsed.intent.fields.price.locale).toBe('pt-BR');
+      expect((parsed.intent.fields.price as any).description).toBe('price');
+      expect((parsed.intent.fields.price as any).required).toBe(true);
+      expect((parsed.intent.fields.price as any).locale).toBe('pt-BR');
     });
 
     it('falls back locale to en-US when no signals exist in snapshot or URL', () => {
@@ -382,7 +382,7 @@ describe('Field Disambiguation and Semantic Decomposition', () => {
       const normalized = normalizeCandidatePlan(rawCandidate, genericSnapshot);
       const parsed = extractionPlanSchema.parse(normalized);
 
-      expect(parsed.intent.fields.count.locale).toBe('en-US');
+      expect((parsed.intent.fields.count as any).locale).toBe('en-US');
     });
 
     it('preserves explicitly provided required: false and valid custom locale', () => {
@@ -413,9 +413,9 @@ describe('Field Disambiguation and Semantic Decomposition', () => {
       const normalized = normalizeCandidatePlan(rawCandidate, snapshot);
       const parsed = extractionPlanSchema.parse(normalized);
 
-      expect(parsed.intent.fields.price_discount.required).toBe(false);
-      expect(parsed.intent.fields.price_discount.locale).toBe('en-GB');
-      expect(parsed.intent.fields.price_discount.description).toBe('Optional promotional price');
+      expect((parsed.intent.fields.price_discount as any).required).toBe(false);
+      expect((parsed.intent.fields.price_discount as any).locale).toBe('en-GB');
+      expect((parsed.intent.fields.price_discount as any).description).toBe('Optional promotional price');
     });
   });
 });
