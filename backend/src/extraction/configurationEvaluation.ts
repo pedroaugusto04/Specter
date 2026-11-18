@@ -279,7 +279,7 @@ export async function evaluateConfigurationCorpus(
         const decision = await decide(input, intent);
         if (decision.kind === ConfigurationDecisionKind.Candidate && item.expectedIntent) {
           const candidate = extractionPlanSchema.safeParse(
-            normalizeSingleFieldSources(decision.plan)
+            normalizeSingleFieldSources(decision.plan, item.snapshot)
           );
           if (candidate.success)
             check('intent', sameIntent(candidate.data.intent, item.expectedIntent));

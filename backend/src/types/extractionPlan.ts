@@ -11,6 +11,7 @@ import {
 } from '../extraction/constants.js';
 import { z } from 'zod';
 import { ExtractionQuality } from './enums.js';
+import { detectDocumentLocale, normalizeLocaleTag } from '../utils/localeDetector.js';
 
 export { ExtractionQuality };
 
@@ -98,8 +99,8 @@ export const sourceSchema = z.discriminatedUnion('kind', [
 const fieldProperties = {
   displayName: text.optional(),
   observedLabel: text.optional(),
-  description: text,
-  required: z.boolean(),
+  description: text.default('Field'),
+  required: z.boolean().default(true),
 };
 
 export const extractionIntentSchema = z
@@ -496,57 +497,121 @@ function normalizeConditionValue(cond: unknown): unknown {
 
 /**
  * Normalizes input objects before validation:
- * wraps lone valid sources in arrays and normalizes string/selector locators.
+ * 1. Intent fields: fills missing description (from displayName or field key),
+ *    defaults required to true, and derives locale from snapshot/document or falls back to 'en-US'.
+ * 2. Strategy fields: wraps lone valid sources in arrays and normalizes string/selector locators.
  */
-export function normalizeSingleFieldSources(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object' || !('strategy' in raw)) return raw;
-  const plan = raw as { strategy?: unknown };
-  if (!plan.strategy || typeof plan.strategy !== 'object') return raw;
+export function normalizeCandidatePlan(
+  raw: unknown,
+  snapshot?: { html?: string; url?: string } | string | null
+): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const plan = { ...(raw as Record<string, unknown>) };
 
-  const strategy = { ...(plan.strategy as Record<string, unknown>) };
+  if (plan.intent && typeof plan.intent === 'object') {
+    const intent = { ...(plan.intent as Record<string, unknown>) };
+    if (intent.fields && typeof intent.fields === 'object' && !Array.isArray(intent.fields)) {
+      const docLocale = detectDocumentLocale(snapshot);
+      const fields: Record<string, unknown> = {};
 
-  if (strategy.fields && typeof strategy.fields === 'object' && !Array.isArray(strategy.fields)) {
-    strategy.fields = Object.fromEntries(
-      Object.entries(strategy.fields).map(([key, value]) =>
-        !Array.isArray(value) && sourceSchema.safeParse(value).success
-          ? [key, [value]]
-          : [key, value]
-      )
-    );
-  }
+      for (const [key, fieldVal] of Object.entries(intent.fields)) {
+        if (!fieldVal || typeof fieldVal !== 'object') {
+          fields[key] = fieldVal;
+          continue;
+        }
 
-  if (Array.isArray(strategy.setup)) {
-    strategy.setup = strategy.setup.map((action: unknown) => {
-      if (!action || typeof action !== 'object') return action;
-      const a = action as Record<string, unknown>;
-      if (a.kind === 'click' && 'locator' in a) {
-        return { ...a, locator: normalizeLocatorValue(a.locator) };
+        const field = { ...(fieldVal as Record<string, unknown>) };
+
+        if (typeof field.displayName === 'string' && !field.displayName.trim()) {
+          delete field.displayName;
+        }
+        if (typeof field.observedLabel === 'string' && !field.observedLabel.trim()) {
+          delete field.observedLabel;
+        }
+
+        if (typeof field.description !== 'string' || !field.description.trim()) {
+          field.description =
+            typeof field.displayName === 'string' && field.displayName.trim()
+              ? field.displayName.trim()
+              : key;
+        }
+
+        if (field.required === undefined) {
+          field.required = true;
+        }
+
+        if (field.type === FieldType.Number || field.type === FieldType.Date) {
+          if (typeof field.locale !== 'string' || !field.locale.trim()) {
+            field.locale = docLocale;
+          } else {
+            const normalized = normalizeLocaleTag(field.locale);
+            field.locale = normalized ?? docLocale;
+          }
+        }
+
+        fields[key] = field;
       }
-      if (a.kind === 'wait' && a.condition) {
-        return { ...a, condition: normalizeConditionValue(a.condition) };
+
+      intent.fields = fields;
+    }
+    plan.intent = intent;
+  }
+
+  if (plan.strategy && typeof plan.strategy === 'object') {
+    const strategy = { ...(plan.strategy as Record<string, unknown>) };
+
+    if (strategy.fields && typeof strategy.fields === 'object' && !Array.isArray(strategy.fields)) {
+      strategy.fields = Object.fromEntries(
+        Object.entries(strategy.fields).map(([key, value]) =>
+          !Array.isArray(value) && sourceSchema.safeParse(value).success
+            ? [key, [value]]
+            : [key, value]
+        )
+      );
+    }
+
+    if (Array.isArray(strategy.setup)) {
+      strategy.setup = strategy.setup.map((action: unknown) => {
+        if (!action || typeof action !== 'object') return action;
+        const a = action as Record<string, unknown>;
+        if (a.kind === 'click' && 'locator' in a) {
+          return { ...a, locator: normalizeLocatorValue(a.locator) };
+        }
+        if (a.kind === 'wait' && a.condition) {
+          return { ...a, condition: normalizeConditionValue(a.condition) };
+        }
+        return action;
+      });
+    }
+
+    if (Array.isArray(strategy.ready)) {
+      strategy.ready = strategy.ready.map(normalizeConditionValue);
+    }
+
+    if (Array.isArray(strategy.empty)) {
+      strategy.empty = strategy.empty.map(normalizeConditionValue);
+    }
+
+    if (strategy.pagination && typeof strategy.pagination === 'object') {
+      const pag = { ...(strategy.pagination as Record<string, unknown>) };
+      if ('next' in pag) {
+        pag.next = normalizeLocatorValue(pag.next);
       }
-      return action;
-    });
-  }
-
-  if (Array.isArray(strategy.ready)) {
-    strategy.ready = strategy.ready.map(normalizeConditionValue);
-  }
-
-  if (Array.isArray(strategy.empty)) {
-    strategy.empty = strategy.empty.map(normalizeConditionValue);
-  }
-
-  if (strategy.pagination && typeof strategy.pagination === 'object') {
-    const pag = { ...(strategy.pagination as Record<string, unknown>) };
-    if ('next' in pag) {
-      pag.next = normalizeLocatorValue(pag.next);
+      if (Array.isArray(pag.end)) {
+        pag.end = pag.end.map(normalizeConditionValue);
+      }
+      strategy.pagination = pag;
     }
-    if (Array.isArray(pag.end)) {
-      pag.end = pag.end.map(normalizeConditionValue);
-    }
-    strategy.pagination = pag;
+
+    plan.strategy = strategy;
   }
 
-  return { ...plan, strategy };
+  return plan;
+}
+
+export function normalizeSingleFieldSources(
+  raw: unknown,
+  snapshot?: { html?: string; url?: string } | string | null
+): unknown {
+  return normalizeCandidatePlan(raw, snapshot);
 }

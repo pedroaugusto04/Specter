@@ -6,6 +6,7 @@ import { evaluateTriggerRules } from '../../src/utils/triggerEvaluator.js';
 import { fixturePlan } from '../helpers/extractionFixtures.js';
 import type { DocumentSnapshot } from '../../src/extraction/contracts.js';
 import { TriggerOperator, TriggerMatchMode } from '../../src/extraction/constants.js';
+import { extractionPlanSchema, normalizeCandidatePlan } from '../../src/types/extractionPlan.js';
 
 describe('Field Disambiguation and Semantic Decomposition', () => {
   const snapshot: DocumentSnapshot = {
@@ -266,6 +267,155 @@ describe('Field Disambiguation and Semantic Decomposition', () => {
 
       expect(notTriggered.hasRules).toBe(true);
       expect(notTriggered.triggered).toBe(false);
+    });
+  });
+
+  describe('Candidate plan normalization and defensive fallbacks', () => {
+    it('normalizes candidates where model omitted description, required, and locale', () => {
+      const rawCandidate = {
+        intent: {
+          entity: 'product',
+          mode: 'single',
+          scope: 'page',
+          fields: {
+            price_pix: {
+              type: 'number',
+              displayName: 'Preço Pix',
+            },
+            price_card: {
+              type: 'number',
+              displayName: 'Preço Cartão',
+            },
+          },
+        },
+        strategy: {
+          transport: 'http',
+          records: { kind: 'dom', selector: '.product-card' },
+          ready: [{ kind: 'exists', locator: '.product-card' }],
+          fields: {
+            price_pix: { kind: 'dom', selector: '.price.pix', attribute: 'text' },
+            price_card: { kind: 'dom', selector: '.price.card', attribute: 'text' },
+          },
+        },
+      };
+
+      // snapshot contains R$ currency and Portuguese content
+      const normalized = normalizeCandidatePlan(rawCandidate, snapshot);
+      const parsed = extractionPlanSchema.parse(normalized);
+
+      // Verify description fallback to displayName
+      expect(parsed.intent.fields.price_pix.description).toBe('Preço Pix');
+      expect(parsed.intent.fields.price_card.description).toBe('Preço Cartão');
+
+      // Verify required fallback to true
+      expect(parsed.intent.fields.price_pix.required).toBe(true);
+      expect(parsed.intent.fields.price_card.required).toBe(true);
+
+      // Verify locale fallback to detected document locale (pt-BR from R$ currency)
+      expect(parsed.intent.fields.price_pix.locale).toBe('pt-BR');
+      expect(parsed.intent.fields.price_card.locale).toBe('pt-BR');
+
+      // Verify strategy lone sources wrapped in arrays
+      expect(Array.isArray(parsed.strategy.fields.price_pix)).toBe(true);
+      expect(Array.isArray(parsed.strategy.fields.price_card)).toBe(true);
+    });
+
+    it('falls back description to field key when displayName is also missing', () => {
+      const rawCandidate = {
+        intent: {
+          entity: 'product',
+          mode: 'single',
+          scope: 'page',
+          fields: {
+            price: {
+              type: 'number',
+            },
+          },
+        },
+        strategy: {
+          transport: 'http',
+          records: { kind: 'dom', selector: '.product-card' },
+          ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.product-card' } }],
+          fields: {
+            price: [{ kind: 'dom', selector: '.price', attribute: 'text' }],
+          },
+        },
+      };
+
+      const normalized = normalizeCandidatePlan(rawCandidate, snapshot);
+      const parsed = extractionPlanSchema.parse(normalized);
+
+      expect(parsed.intent.fields.price.description).toBe('price');
+      expect(parsed.intent.fields.price.required).toBe(true);
+      expect(parsed.intent.fields.price.locale).toBe('pt-BR');
+    });
+
+    it('falls back locale to en-US when no signals exist in snapshot or URL', () => {
+      const genericSnapshot: DocumentSnapshot = {
+        html: '<html><body><div>Test</div></body></html>',
+        url: 'https://example.com/test',
+        httpStatus: 200,
+        responses: [],
+      };
+
+      const rawCandidate = {
+        intent: {
+          entity: 'item',
+          mode: 'single',
+          scope: 'page',
+          fields: {
+            count: {
+              type: 'number',
+            },
+          },
+        },
+        strategy: {
+          transport: 'http',
+          records: { kind: 'dom', selector: 'div' },
+          ready: [{ kind: 'exists', locator: { kind: 'css', selector: 'div' } }],
+          fields: {
+            count: [{ kind: 'dom', selector: 'div', attribute: 'text' }],
+          },
+        },
+      };
+
+      const normalized = normalizeCandidatePlan(rawCandidate, genericSnapshot);
+      const parsed = extractionPlanSchema.parse(normalized);
+
+      expect(parsed.intent.fields.count.locale).toBe('en-US');
+    });
+
+    it('preserves explicitly provided required: false and valid custom locale', () => {
+      const rawCandidate = {
+        intent: {
+          entity: 'product',
+          mode: 'single',
+          scope: 'page',
+          fields: {
+            price_discount: {
+              type: 'number',
+              description: 'Optional promotional price',
+              required: false,
+              locale: 'en-GB',
+            },
+          },
+        },
+        strategy: {
+          transport: 'http',
+          records: { kind: 'dom', selector: '.product-card' },
+          ready: [{ kind: 'exists', locator: { kind: 'css', selector: '.product-card' } }],
+          fields: {
+            price_discount: [{ kind: 'dom', selector: '.price.discount', attribute: 'text' }],
+          },
+        },
+      };
+
+      const normalized = normalizeCandidatePlan(rawCandidate, snapshot);
+      const parsed = extractionPlanSchema.parse(normalized);
+
+      expect(parsed.intent.fields.price_discount.required).toBe(false);
+      expect(parsed.intent.fields.price_discount.locale).toBe('en-GB');
+      expect(parsed.intent.fields.price_discount.description).toBe('Optional promotional price');
     });
   });
 });
