@@ -41,6 +41,8 @@ services:
       - specter-net
 
   backend:
+    labels:
+      vigil.repo: pedroaugusto04/Specter
     # Set DOCKER_IMAGE in the deployment environment, for example in .env.prod.
     image: ${DOCKER_IMAGE}
     container_name: specter-backend
