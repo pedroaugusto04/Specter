@@ -186,9 +186,20 @@ export const authLoginSchema = z.object({
     .min(1, 'Password is required'),
 });
 
+const pageLanguageSchema = z.string().trim().max(64).transform((value, ctx) => {
+  try {
+    return new Intl.Locale(value).baseName;
+  } catch {
+    ctx.addIssue({ code: 'custom', message: 'Invalid language tag (e.g. en-US or pt-BR)' });
+    return z.NEVER;
+  }
+});
+
 export const authProfileUpdateSchema = z.object({
   name: z.string().trim().nullable().optional(),
   timezone: ianaTimezoneSchema.optional(),
+  pageLanguage: pageLanguageSchema.nullable().optional(),
+  browserPageLanguage: pageLanguageSchema.nullable().optional(),
 });
 
 // ============================================================================

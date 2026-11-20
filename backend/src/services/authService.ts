@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../errors/domainErrors.js';
 import { UserMapper } from '../mappers/userMapper.js';
 import type { UserDto } from '@specter/contracts';
-import type { IUserRepository } from '../repositories/userRepository.js';
+import type { IUserRepository, UpdateUserPatch } from '../repositories/userRepository.js';
 import {
   ACCESS_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
@@ -200,9 +200,13 @@ export class AuthService {
 
   async updateProfile(
     userId: string,
-    input: { name?: string | null; timezone?: string }
+    input: Pick<UpdateUserPatch, 'name' | 'timezone' | 'pageLanguage' | 'browserPageLanguage'>
   ): Promise<UserDto> {
-    const patch: { name?: string | null; timezone?: string } = {};
+    const { pageLanguage, browserPageLanguage } = input;
+    const patch: UpdateUserPatch = {
+      ...(pageLanguage !== undefined ? { pageLanguage } : {}),
+      ...(browserPageLanguage !== undefined ? { browserPageLanguage } : {}),
+    };
     if (input.name !== undefined) {
       patch.name = input.name?.trim() || null;
     }

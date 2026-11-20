@@ -102,6 +102,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const compilationService = new CompilationService({
+    userRepository,
     jobRepository,
     configurationPipeline,
     alertRouter: notificationDispatcher,
@@ -113,6 +114,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
+    userRepository,
     accessCooldown,
     jobRepository,
     planExecutor: extraction.planExecutor,

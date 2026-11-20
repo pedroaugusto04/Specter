@@ -62,6 +62,7 @@ export class CheerioScraperEngine implements IScraperEngine {
           headers: {
             'User-Agent': DEFAULT_USER_AGENT,
             Accept: 'text/html,application/xhtml+xml,application/json',
+            'Accept-Language': options?.pageLanguage ?? 'pt-BR',
             ...(cookieHeader ? { Cookie: cookieHeader } : {}),
           },
         });

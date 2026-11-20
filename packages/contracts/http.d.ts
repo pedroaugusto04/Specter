@@ -11,6 +11,8 @@ export interface UserDto {
   email: string;
   name: string | null;
   timezone: string;
+  pageLanguage: string | null;
+  browserPageLanguage: string | null;
   createdAt: string;
 }
 

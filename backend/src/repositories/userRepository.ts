@@ -14,6 +14,8 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserPatch {
+  pageLanguage?: string | null;
+  browserPageLanguage?: string | null;
   name?: string | null;
   passwordHash?: string | null;
   googleId?: string | null;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import { getBrowserPageLanguage } from '@/lib/pageLanguage';
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   api,
@@ -54,7 +55,13 @@ function jobListInvalidations(queryClient: QueryClient, includeQuotas = false): 
 export function useCurrentUserQuery() {
   return useQuery<UserDto | null>({
     queryKey: dashboardKeys.user,
-    queryFn: () => api.getMe(),
+    queryFn: async () => {
+      const user = await api.getMe();
+      if (!user || user.pageLanguage !== null || user.browserPageLanguage !== null) return user;
+      const browserPageLanguage = getBrowserPageLanguage();
+      if (!browserPageLanguage) return user;
+      return api.updateProfile({ browserPageLanguage }).catch(() => user);
+    },
     staleTime: 60 * 1000,
   });
 }
@@ -271,7 +278,7 @@ export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name?: string | null; timezone?: string }) => api.updateProfile(data),
+    mutationFn: api.updateProfile,
     onSuccess: (updated) => {
       queryClient.setQueryData(dashboardKeys.user, updated);
     },

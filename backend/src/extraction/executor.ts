@@ -36,6 +36,7 @@ export interface ExecutionResult {
 export interface ExecutionOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
+  pageLanguage?: string;
   storageState?: unknown;
   captureScreenshot?: boolean;
 }

@@ -109,6 +109,8 @@ export class InMemoryUserRepository implements IUserRepository {
       name: input.name ?? null,
       passwordHash: input.passwordHash ?? null,
       googleId: input.googleId ?? null,
+      pageLanguage: null,
+      browserPageLanguage: null,
       timezone: input.timezone ?? 'America/Sao_Paulo',
       createdAt: now,
       updatedAt: now,

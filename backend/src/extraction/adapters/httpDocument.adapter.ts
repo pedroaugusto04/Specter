@@ -20,13 +20,14 @@ export class HttpDocumentAdapter implements DocumentAdapter {
     url: string,
     _request: DocumentRequest,
     context: ExecutionContext,
-    options: { storageState?: unknown; captureScreenshot?: boolean }
+    options: { pageLanguage?: string; storageState?: unknown; captureScreenshot?: boolean }
   ): Promise<DocumentSession> {
     context.check();
     const result = await this.scraper.fetchHtml(await assertSafeUrl(url, 'targetUrl'), {
       timeoutMs: Math.min(context.remaining(), env.UNBLOCKER_TIMEOUT_MS),
       signal: context.signal,
       captureScreenshot: options.captureScreenshot,
+      pageLanguage: options.pageLanguage,
       storageState: (this.external ? undefined : options.storageState) as
         import('../../types/session.js').PlaywrightStorageState | undefined,
     });

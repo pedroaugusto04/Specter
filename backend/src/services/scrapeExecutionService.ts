@@ -28,11 +28,13 @@ import { logger } from '../utils/logger.js';
 import { JobStatus, RunStatus } from '../types/enums.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
+import type { IUserRepository } from '../repositories/userRepository.js';
 import type { QuotaService } from './quotaService.js';
 
 export interface ScrapeExecutionServiceDeps {
   accessCooldown: AccessCooldownService;
   jobRepository: IJobRepository;
+  userRepository?: Pick<IUserRepository, 'findById'>;
   planExecutor: IPlanExecutor;
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
@@ -110,6 +112,8 @@ export class ScrapeExecutionService {
           job.updatedAt
         );
       }
+      const owner = await this.deps.userRepository?.findById(job.userId);
+      const pageLanguage = owner?.pageLanguage ?? owner?.browserPageLanguage ?? undefined;
       const storageState = await resolveSessionStorageState(
         this.deps.sessionRepository,
         job.userId,
@@ -118,6 +122,7 @@ export class ScrapeExecutionService {
       );
       const execution = await this.deps.planExecutor.execute(job.url, job.extractionPlan, {
         storageState,
+        pageLanguage,
         captureScreenshot: job.captureScreenshotOnChange,
       });
       report = execution.report;

@@ -410,6 +410,42 @@ describe('Stateless JWT Cookie Authentication & Multi-Tenant Isolation', () => {
     expect(invalidRes.statusCode).toBe(400);
   });
 
+  it('stores the browser language and lets the user select or clear an override', async () => {
+    const registered = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'language@example.com', password: 'password123' },
+    });
+    expect(registered.statusCode).toBe(201);
+    expect(registered.json().data).toMatchObject({
+      pageLanguage: null,
+      browserPageLanguage: null,
+    });
+    const headers = { cookie: registered.headers['set-cookie'] as string[] };
+    const update = (payload: { pageLanguage?: string | null; browserPageLanguage?: string }) =>
+      app.inject({ method: 'PATCH', url: '/api/auth/profile', headers, payload });
+
+    const detected = await update({ browserPageLanguage: 'en-gb' });
+    expect(detected.json().data).toMatchObject({
+      pageLanguage: null,
+      browserPageLanguage: 'en-GB',
+    });
+
+    expect((await update({ pageLanguage: 'zh-hant-tw' })).statusCode).toBe(200);
+    expect((await update({ pageLanguage: 'en_US' })).statusCode).toBe(400);
+    const profile = await app.inject({ method: 'GET', url: '/api/auth/me', headers });
+    expect(profile.json().data).toMatchObject({
+      pageLanguage: 'zh-Hant-TW',
+      browserPageLanguage: 'en-GB',
+    });
+
+    const automatic = await update({ pageLanguage: null });
+    expect(automatic.json().data).toMatchObject({
+      pageLanguage: null,
+      browserPageLanguage: 'en-GB',
+    });
+  });
+
   it('rejects access tokens in URL query string (disallows ?token=... for security)', async () => {
     const regRes = await app.inject({
       method: 'POST',

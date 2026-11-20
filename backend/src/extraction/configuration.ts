@@ -40,6 +40,7 @@ export interface ConfigurationRequest {
   prompt: string;
   intent?: ExtractionIntent;
   recovery?: RecoveryContext;
+  pageLanguage?: string;
   storageState?: unknown;
   captureScreenshot?: boolean;
   signal?: AbortSignal;
@@ -214,6 +215,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
               timeoutMs: work.remaining(),
               signal: work.signal,
               storageState: request.storageState,
+              pageLanguage: request.pageLanguage,
               captureScreenshot: request.captureScreenshot,
             })
           );

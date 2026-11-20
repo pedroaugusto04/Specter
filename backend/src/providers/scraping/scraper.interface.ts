@@ -4,6 +4,7 @@ export interface ScrapeOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   waitForSelector?: string;
+  pageLanguage?: string;
   storageState?: PlaywrightStorageState;
   captureScreenshot?: boolean;
   premium?: boolean;

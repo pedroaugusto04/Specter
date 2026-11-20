@@ -13,6 +13,8 @@ export interface UserEntity {
   passwordHash: string | null;
   googleId: string | null;
   timezone: string;
+  pageLanguage: string | null;
+  browserPageLanguage: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

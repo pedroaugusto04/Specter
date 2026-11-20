@@ -30,7 +30,7 @@ export class DiscoveryDocumentAdapter implements DocumentAdapter {
     url: string,
     request: DocumentRequest,
     context: ExecutionContext,
-    options: { storageState?: unknown }
+    options: { pageLanguage?: string; storageState?: unknown }
   ): Promise<DocumentSession> {
     const candidates = [
       ...this.browsers,

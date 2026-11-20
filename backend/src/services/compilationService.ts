@@ -32,6 +32,7 @@ import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { logger } from '../utils/logger.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import type { RealtimeService } from './realtimeService.js';
+import type { IUserRepository } from '../repositories/userRepository.js';
 import type { QuotaService } from './quotaService.js';
 import type { ICompilationControl } from './compilationControl.interface.js';
 
@@ -48,6 +49,7 @@ function compilationFailureStatus(input: {
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
+  userRepository?: Pick<IUserRepository, 'findById'>;
   configurationPipeline: IConfigurationPipeline;
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
@@ -191,6 +193,8 @@ export class CompilationService implements ICompilationControl {
         provider: 'configuration-pipeline',
       });
 
+      const owner = await this.deps.userRepository?.findById(job.userId);
+      const pageLanguage = owner?.pageLanguage ?? owner?.browserPageLanguage ?? undefined;
       const storageState = await resolveSessionStorageState(
         this.deps.sessionRepository,
         job.userId,
@@ -221,6 +225,7 @@ export class CompilationService implements ICompilationControl {
             }
           : undefined,
         storageState,
+        pageLanguage,
         captureScreenshot: job.captureScreenshotOnChange,
         signal: abortController.signal,
       });

@@ -49,6 +49,6 @@ export interface DocumentAdapter {
     url: string,
     request: DocumentRequest,
     context: ExecutionContext,
-    options: { storageState?: unknown; captureScreenshot?: boolean }
+    options: { pageLanguage?: string; storageState?: unknown; captureScreenshot?: boolean }
   ): Promise<DocumentSession>;
 }

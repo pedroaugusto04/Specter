@@ -30,6 +30,7 @@ export class ConfigurationSession {
       this.session = await this.run(ConfigurationStage.Acquisition, () =>
         this.adapter.open(this.request.url, {}, this.context, {
           storageState: this.request.storageState,
+          pageLanguage: this.request.pageLanguage,
         })
       );
       for (const action of this.actions) {

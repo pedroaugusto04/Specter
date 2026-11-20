@@ -19,6 +19,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { PageLanguageSelect } from '@/components/ui/PageLanguageSelect';
+import { getBrowserPageLanguage } from '@/lib/pageLanguage';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { useUpdateProfileMutation, useUserQuotasQuery } from '@/hooks/useDashboardQueries';
 import { getBrowserTimezone } from '@/lib/utils';
@@ -45,6 +47,7 @@ export function ProfileModal({
   const updateProfileMutation = useUpdateProfileMutation();
   const { data: quotas, isLoading: isLoadingQuotas } = useUserQuotasQuery(isOpen && Boolean(user));
   const [name, setName] = React.useState('');
+  const [pageLanguage, setPageLanguage] = React.useState<string | null>(null);
   const [timezone, setTimezone] = React.useState(getBrowserTimezone());
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
@@ -53,6 +56,7 @@ export function ProfileModal({
   React.useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setPageLanguage(user.pageLanguage ?? null);
       setTimezone(user.timezone || getBrowserTimezone());
       setErrorMessage(null);
       setSaveSuccess(false);
@@ -70,7 +74,9 @@ export function ProfileModal({
     try {
       const updated = await updateProfileMutation.mutateAsync({
         name: name.trim() || null,
-        timezone,
+        ...(timezone !== (user.timezone || getBrowserTimezone()) ? { timezone } : {}),
+        pageLanguage,
+        ...(pageLanguage === null ? { browserPageLanguage: getBrowserPageLanguage() ?? null } : {}),
       });
       onUserUpdated(updated);
       setSaveSuccess(true);
@@ -97,7 +103,10 @@ export function ProfileModal({
   })();
 
   const isDirty =
-    (user.name || '') !== name.trim() || (user.timezone || getBrowserTimezone()) !== timezone;
+    (user.name || '') !== name.trim() ||
+    (user.timezone || getBrowserTimezone()) !== timezone ||
+    (user.pageLanguage ?? null) !== pageLanguage ||
+    (pageLanguage === null && (user.browserPageLanguage ?? null) !== (getBrowserPageLanguage() ?? null));
 
   return (
     <Dialog
@@ -156,6 +165,15 @@ export function ProfileModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. John Doe"
+              disabled={isSaving}
+            />
+          </FormField>
+
+          <FormField label="Page language" htmlFor="profile-page-language">
+            <PageLanguageSelect
+              id="profile-page-language"
+              value={pageLanguage}
+              onChange={setPageLanguage}
               disabled={isSaving}
             />
           </FormField>

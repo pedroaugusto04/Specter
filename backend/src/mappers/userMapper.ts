@@ -10,6 +10,8 @@ export const UserMapper = {
       name: row.name ?? null,
       passwordHash: row.passwordHash ?? null,
       googleId: row.googleId ?? null,
+      pageLanguage: row.pageLanguage,
+      browserPageLanguage: row.browserPageLanguage,
       timezone: row.timezone ?? 'America/Sao_Paulo',
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -21,6 +23,8 @@ export const UserMapper = {
       id: entity.id,
       email: entity.email,
       name: entity.name,
+      pageLanguage: entity.pageLanguage,
+      browserPageLanguage: entity.browserPageLanguage,
       timezone: entity.timezone || 'America/Sao_Paulo',
       createdAt: entity.createdAt.toISOString(),
     };

@@ -314,7 +314,7 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
     url: string,
     request: DocumentRequest,
     execution: ExecutionContext,
-    options: { storageState?: unknown }
+    options: { pageLanguage?: string; storageState?: unknown }
   ): Promise<DocumentSession> {
     execution.check();
     const safeUrl = await assertSafeUrl(url, 'targetUrl');
@@ -378,14 +378,14 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
       browser = await launch;
       execution.check();
 
+      const locale = options.pageLanguage ?? 'pt-BR';
       const fingerprint = buildChromeFingerprint(browser.version());
       context = await browser.newContext({
         storageState: options.storageState as BrowserContextOptions['storageState'],
         userAgent: fingerprint.userAgent,
         viewport: { width: 1920, height: 1080 },
-        locale: 'pt-BR',
+        locale,
         extraHTTPHeaders: {
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
           Accept:
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'sec-ch-ua': fingerprint.secChUa,
@@ -405,9 +405,6 @@ export class BrowserDocumentAdapter implements DocumentAdapter {
         };
         if (typeof g.navigator !== 'undefined') {
           Object.defineProperty(g.navigator, 'webdriver', { get: () => undefined });
-          Object.defineProperty(g.navigator, 'languages', {
-            get: () => ['pt-BR', 'pt', 'en-US', 'en'],
-          });
           Object.defineProperty(g.navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
         }
         g.chrome = {

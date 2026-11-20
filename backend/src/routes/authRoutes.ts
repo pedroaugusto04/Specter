@@ -50,10 +50,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
   app.patch('/api/auth/profile', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
     const body = authProfileUpdateSchema.parse(request.body);
-    const updated = await authService.updateProfile(user.id, {
-      name: body.name,
-      timezone: body.timezone,
-    });
+    const updated = await authService.updateProfile(user.id, body);
     return reply.status(200).send({ data: updated });
   });
 

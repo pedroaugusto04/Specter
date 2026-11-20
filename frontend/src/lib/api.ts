@@ -164,7 +164,12 @@ export const api = {
     });
   },
 
-  updateProfile(input: { name?: string | null; timezone?: string }): Promise<UserDto> {
+  updateProfile(input: {
+    name?: string | null;
+    timezone?: string;
+    pageLanguage?: string | null;
+    browserPageLanguage?: string | null;
+  }): Promise<UserDto> {
     return request<UserDto>('/api/auth/profile', {
       method: 'PATCH',
       body: JSON.stringify(input),

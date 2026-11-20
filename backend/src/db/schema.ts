@@ -26,6 +26,8 @@ export const users = pgTable(
     name: text('name'),
     passwordHash: text('password_hash'),
     googleId: text('google_id').unique(),
+    pageLanguage: text('page_language'),
+    browserPageLanguage: text('browser_page_language'),
     timezone: text('timezone').default('America/Sao_Paulo').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
