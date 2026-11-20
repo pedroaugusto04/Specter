@@ -186,7 +186,11 @@ export class InMemoryJobRepository implements IJobRepository {
         url: current.url,
         userPrompt: current.userPrompt,
         extractionPlan: patch.extractionPlan,
-        triggerReason: input.recoveredAutomatically ? 'recovery' : 'compilation',
+        triggerReason: input.recoveredAutomatically
+          ? 'recovery'
+          : nextVersion === 1
+          ? 'initial'
+          : 'manual_recompile',
         createdByRunId: run.id,
         createdAt: new Date(),
       });

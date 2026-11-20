@@ -67,6 +67,8 @@ function getVersionReasonLabel(reason: string): string {
   switch (reason) {
     case 'initial':
       return 'Initial setup';
+    case 'compilation':
+      return 'Compilation';
     case 'manual_recompile':
       return 'Manual recompile';
     case 'prompt_edit':
@@ -165,6 +167,7 @@ export function JobRunsDrawer({
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
+  const [restoringVersionNumber, setRestoringVersionNumber] = React.useState<number | null>(null);
 
   const handleRollback = async (version: JobPlanVersionDto) => {
     if (!job?.id) return;
@@ -176,12 +179,15 @@ export function JobRunsDrawer({
     });
     if (!confirmed) return;
     try {
+      setRestoringVersionNumber(version.versionNumber);
       await rollbackMutation.mutateAsync({
         jobId: job.id,
         versionNumber: version.versionNumber,
       });
     } catch {
       // Query cache invalidation handles refresh
+    } finally {
+      setRestoringVersionNumber(null);
     }
   };
 
@@ -738,12 +744,16 @@ export function JobRunsDrawer({
                               disabled={rollbackMutation.isPending}
                               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 cursor-pointer shadow-2xs"
                             >
-                              {rollbackMutation.isPending ? (
+                              {restoringVersionNumber === ver.versionNumber ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
                                 <RotateCcw className="h-3 w-3 text-muted-foreground" />
                               )}
-                              <span>Restore</span>
+                              <span>
+                                {restoringVersionNumber === ver.versionNumber
+                                  ? 'Restoring...'
+                                  : 'Restore'}
+                              </span>
                             </button>
                           )}
                         </div>

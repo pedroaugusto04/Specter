@@ -493,6 +493,11 @@ export class DrizzleJobRepository implements IJobRepository {
           .where(eq(scrapingJobs.id, input.jobId));
 
         if (jobRow) {
+          const triggerReason = input.recoveredAutomatically
+            ? 'recovery'
+            : nextVersion === 1
+            ? 'initial'
+            : 'manual_recompile';
           await tx.insert(jobPlanVersions).values({
             jobId: input.jobId,
             versionNumber: nextVersion,
@@ -501,7 +506,7 @@ export class DrizzleJobRepository implements IJobRepository {
             url: jobRow.url,
             userPrompt: jobRow.userPrompt,
             extractionPlan: patch.extractionPlan,
-            triggerReason: input.recoveredAutomatically ? 'recovery' : 'compilation',
+            triggerReason,
             createdByRunId: row.id,
             createdAt: updatedAt,
           });

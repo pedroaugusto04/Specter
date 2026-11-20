@@ -483,28 +483,18 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(timeseriesPage2.json().data.previousPoint.values).toEqual({ price: 105 });
 
     // 8. Plan Versioning and Rollback
-    const planV1 = {
-      ...fixturePlan,
-      intent: {
-        ...fixturePlan.intent,
-        userPrompt: 'Extract title and price v1',
-        fields: {
-          title: { type: 'string' as const, displayName: 'Title' },
-          price: { type: 'number' as const, displayName: 'Price' },
-        },
+    const planV1 = fixturePlan({
+      fields: {
+        title: { type: 'string', sources: [{ kind: 'dom', selector: 'h1', attribute: 'text' }] },
+        price: { type: 'number', sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }] },
       },
-    };
-    const planV2 = {
-      ...fixturePlan,
-      intent: {
-        ...fixturePlan.intent,
-        userPrompt: 'Extract price and stock v2',
-        fields: {
-          price: { type: 'number' as const, displayName: 'Price' },
-          stock: { type: 'number' as const, displayName: 'Stock' },
-        },
+    });
+    const planV2 = fixturePlan({
+      fields: {
+        price: { type: 'number', sources: [{ kind: 'dom', selector: '.price', attribute: 'text' }] },
+        stock: { type: 'number', sources: [{ kind: 'dom', selector: '.stock', attribute: 'text' }] },
       },
-    };
+    });
 
     await repository.savePlanVersion({
       jobId: createdData.id,

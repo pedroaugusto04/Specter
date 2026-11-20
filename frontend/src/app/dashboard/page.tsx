@@ -26,7 +26,8 @@ import { useRealtimeEvents, type RealtimeEventPayload } from '@/hooks/useRealtim
 import { api, type UserDto } from '@/lib/api';
 import { PAGINATION_DEFAULT_PAGE_SIZE, type JobStatus } from '@specter/contracts';
 import { getBrowserTimezone } from '@/lib/utils';
-import { AlertCircle, Plus, Radio, X } from 'lucide-react';
+import { ToastContainer, useToast } from '@/components/ui/Toast';
+import { Plus, Radio } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 
@@ -79,24 +80,7 @@ export default function DashboardPage() {
     [jobs]
   );
 
-  const [toasts, setToasts] = React.useState<
-    Array<{ id: string; title?: string; message: string; type: 'warning' | 'error' | 'info' }>
-  >([]);
-
-  const removeToast = React.useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const addToast = React.useCallback(
-    (toast: { title?: string; message: string; type: 'warning' | 'error' | 'info' }) => {
-      const id = `${Date.now()}-${Math.random()}`;
-      setToasts((prev) => [...prev, { id, ...toast }]);
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 8000);
-    },
-    []
-  );
+  const { toasts, addToast, removeToast } = useToast();
 
   const { connectionMode } = useRealtimeEvents({
     enabled: Boolean(user),
@@ -371,35 +355,7 @@ export default function DashboardPage() {
         timeZone={effectiveTimeZone}
       />
 
-      {toasts.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md w-full px-4 sm:px-0">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              role="alert"
-              className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-card p-4 shadow-lg text-foreground backdrop-blur-md"
-            >
-              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-              <div className="flex-1 space-y-1 min-w-0">
-                {toast.title && (
-                  <p className="text-xs font-mono font-medium text-amber-500 uppercase tracking-wider">
-                    {toast.title}
-                  </p>
-                )}
-                <p className="text-sm leading-relaxed text-foreground">{toast.message}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="text-muted-foreground hover:text-foreground p-1 -mr-1 -mt-1 rounded cursor-pointer"
-                aria-label="Dismiss alert"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   );
 }
