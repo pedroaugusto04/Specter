@@ -28,7 +28,8 @@ export function buildObservationEvidence(params: {
 
   let activeFeedback = feedback;
   if (!feedback && toolCount >= 3) {
-    activeFeedback = `Decision budget notice: You have completed ${toolCount} tool observations and have sufficient structural evidence. Do not call additional tools. In this turn, you MUST emit kind 'candidate' with your best extraction plan derived from observed evidence.`;
+    const remaining = Math.max(0, 5 - toolCount);
+    activeFeedback = `Observation budget notice: You have used ${toolCount} of 5 tool observations. ${remaining} remain. Return kind 'candidate' when the evidence supports the plan. If an important uncertainty remains and observations are available, use a tool to investigate it.`;
   }
 
   return JSON.stringify({
