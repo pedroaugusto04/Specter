@@ -41,7 +41,7 @@ export function ChartPointTooltip({
     <div
       ref={tooltipRef}
       role="status"
-      className="pointer-events-none fixed z-[9999] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-xl font-mono whitespace-nowrap"
+      className="pointer-events-none fixed z-[9999] rounded-md border border-border bg-background text-foreground px-3 py-2 text-xs shadow-xl font-mono whitespace-nowrap"
       style={{
         left: position.left,
         top: position.top,
