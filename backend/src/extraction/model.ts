@@ -5,7 +5,15 @@ export type {
   ConfigurationTool,
   SemanticVerdict,
 } from './configurationSchemas.js';
-import type { ExtractionIntent } from './contracts.js';
+import type { ExtractionIntent, ExtractionPlan, ExtractionReport } from './contracts.js';
+
+export interface RecoveryContext {
+  failure: Pick<
+    ExtractionReport,
+    'failureCode' | 'failureReason' | 'quality' | 'issues' | 'evidence'
+  >;
+  previousStrategy?: ExtractionPlan['strategy'];
+}
 
 export interface ModelInput {
   jobId: string;
@@ -25,6 +33,9 @@ export interface StageInput {
   url: string;
   prompt: string;
   evidence: string;
+  feedback?: string;
+  lastRejectedPlan?: unknown;
+  recovery?: RecoveryContext;
   timeoutMs: number;
   signal?: AbortSignal;
 }

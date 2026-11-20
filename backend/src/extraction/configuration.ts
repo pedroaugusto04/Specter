@@ -9,7 +9,7 @@ import type {
   SemanticReview,
   StageTrace,
 } from './contracts.js';
-import type { ConfigurationModel, StageInput } from './model.js';
+import type { ConfigurationModel, RecoveryContext, StageInput } from './model.js';
 import type { IExtractionExecutor, ExecutionResult } from './executor.js';
 import { createExecutionContext } from './context.js';
 import { extractionPlanSchema, normalizeCandidatePlan } from '../types/extractionPlan.js';
@@ -39,6 +39,7 @@ export interface ConfigurationRequest {
   url: string;
   prompt: string;
   intent?: ExtractionIntent;
+  recovery?: RecoveryContext;
   storageState?: unknown;
   captureScreenshot?: boolean;
   signal?: AbortSignal;
@@ -94,6 +95,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
 
     let attempts = 0;
     let feedback = '';
+    let lastRejectedPlan: unknown;
 
     const fail = (message: string, review?: SemanticReview): never => {
       throw new ConfigurationFailure(message, trace, review);
@@ -143,7 +145,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
       for (let decisionIndex = 0; decisionIndex < this.options.maxDecisions; decisionIndex++) {
         work.check();
         const available = this.options.evidenceLimit;
-        const evidence = buildObservationEvidence({
+        const { evidence, activeFeedback } = buildObservationEvidence({
           snapshot,
           history,
           feedback,
@@ -152,7 +154,15 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
 
         try {
           const decision = await run(ConfigurationStage.Configure, () =>
-            this.model.decide(buildStageInput(evidence), request.intent)
+            this.model.decide(
+              {
+                ...buildStageInput(evidence),
+                feedback: activeFeedback,
+                lastRejectedPlan,
+                recovery: request.recovery,
+              },
+              request.intent
+            )
           );
 
           if (decision.kind === ConfigurationDecisionKind.Tool) {
@@ -174,6 +184,7 @@ export class ConfigurationPipeline implements IConfigurationPipeline {
           // Candidate branch
           progress.reset();
           attempts++;
+          lastRejectedPlan = decision.plan;
 
           const plan = extractionPlanSchema.parse(normalizeCandidatePlan(decision.plan, snapshot));
           if (request.intent && !sameIntent(request.intent, plan.intent)) {

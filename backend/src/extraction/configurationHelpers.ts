@@ -18,7 +18,7 @@ export function buildObservationEvidence(params: {
   history: unknown[];
   feedback: string;
   availableLimit: number;
-}): string {
+}): { evidence: string; activeFeedback: string } {
   const { snapshot, history, feedback, availableLimit } = params;
   const toolCount = countToolHistory(history);
 
@@ -32,11 +32,13 @@ export function buildObservationEvidence(params: {
     activeFeedback = `Observation budget notice: You have used ${toolCount} of 5 tool observations. ${remaining} remain. Return kind 'candidate' when the evidence supports the plan. If an important uncertainty remains and observations are available, use a tool to investigate it.`;
   }
 
-  return JSON.stringify({
-    feedback: redactText(activeFeedback),
-    observation: observationPacket(snapshot, observationBudget),
-    history: redactObject([...history].reverse()),
-  });
+  return {
+    activeFeedback: redactText(activeFeedback),
+    evidence: JSON.stringify({
+      observation: observationPacket(snapshot, observationBudget),
+      history: redactObject([...history].reverse()),
+    }),
+  };
 }
 
 export function precheckCandidatePlanInSnapshot(
@@ -65,7 +67,9 @@ export function precheckCandidatePlanInSnapshot(
               targets.length === 0 &&
               (source.selector.startsWith('meta') || source.selector.startsWith('head'))
             ) {
-              const root = firstRecord.parents().length ? firstRecord.parents().last() : firstRecord;
+              const root = firstRecord.parents().length
+                ? firstRecord.parents().last()
+                : firstRecord;
               targets = root.find(source.selector);
             }
           } catch {
@@ -139,8 +143,5 @@ export function buildValidationHistoryEntry(
 }
 
 export function isScopedOrInteractiveTool(toolKind: string): boolean {
-  return (
-    toolKind === ConfigurationToolKind.Inspect ||
-    toolKind === ConfigurationToolKind.Interact
-  );
+  return toolKind === ConfigurationToolKind.Inspect || toolKind === ConfigurationToolKind.Interact;
 }

@@ -202,11 +202,24 @@ export class CompilationService implements ICompilationControl {
       );
       abortController.signal.throwIfAborted();
 
+      const failure = run?.extractionReport;
       const configured = await this.deps.configurationPipeline.configure({
         jobId: job.id,
         url: job.url,
         prompt: job.userPrompt,
         intent: job.extractionPlan?.intent,
+        recovery: failure
+          ? {
+              failure: {
+                failureCode: failure.failureCode,
+                failureReason: failure.failureReason,
+                quality: failure.quality,
+                issues: failure.issues?.slice(0, 8) ?? [],
+                evidence: failure.evidence?.slice(0, 8),
+              },
+              previousStrategy: job.extractionPlan?.strategy,
+            }
+          : undefined,
         storageState,
         captureScreenshot: job.captureScreenshotOnChange,
         signal: abortController.signal,

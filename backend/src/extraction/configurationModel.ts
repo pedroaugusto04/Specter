@@ -37,7 +37,26 @@ async function task(
   };
   const overhead = contract.instructions.length + JSON.stringify(contract.outputSchema).length;
   const limit = env.CONFIGURATION_MAX_INPUT_CHARS - overhead;
-  const packet = (evidence: string) => JSON.stringify({ ...base, pageEvidence: evidence });
+  // Give each diagnostic its own share so page evidence cannot displace it.
+  const diagnosticLimit = Math.min(
+    8_000,
+    Math.floor((limit - JSON.stringify({ ...base, pageEvidence: '' }).length) / 8)
+  );
+  const diagnostic = (value: unknown): string | undefined => {
+    if (value === undefined || diagnosticLimit < 100) return undefined;
+    const content =
+      typeof value === 'string'
+        ? redactText(value, value.length)
+        : JSON.stringify(redactObject(value));
+    return fitEvidenceText(content, diagnosticLimit, (text) => JSON.stringify(text));
+  };
+  const diagnostics = {
+    feedback: diagnostic(input.feedback || undefined),
+    recovery: diagnostic(input.recovery),
+    lastRejectedPlan: diagnostic(input.lastRejectedPlan),
+  };
+  const packet = (evidence: string) =>
+    JSON.stringify({ ...base, ...diagnostics, pageEvidence: evidence });
   const evidence = fitEvidenceText(
     redactText(input.evidence, input.evidence.length),
     limit,
