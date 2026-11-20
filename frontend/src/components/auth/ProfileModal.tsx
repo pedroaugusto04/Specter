@@ -174,7 +174,7 @@ export function ProfileModal({
           <FormField
             label="Scraper Language"
             htmlFor="profile-scraper-language"
-            hint="Crawlers and monitored targets access pages using this language (via Accept-Language headers and browser locale). Websites that adapt content by language will display in this locale."
+            hint="Monitored websites are checked in this language. Sites that support multiple languages will show text and prices in this language."
           >
             <PageLanguageSelect
               id="profile-scraper-language"
