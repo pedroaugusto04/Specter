@@ -172,12 +172,12 @@ export function ProfileModal({
           </FormField>
 
           <FormField
-            label="Page Language"
-            htmlFor="profile-page-language"
-            hint="Language headers and locale sent to websites when scraping."
+            label="Scraper Language"
+            htmlFor="profile-scraper-language"
+            hint="Crawlers and monitored targets access pages using this language (via Accept-Language headers and browser locale). Websites that adapt content by language will display in this locale."
           >
             <PageLanguageSelect
-              id="profile-page-language"
+              id="profile-scraper-language"
               value={pageLanguage}
               onChange={setPageLanguage}
               disabled={isSaving}
@@ -296,11 +296,11 @@ export function ProfileModal({
               </span>
             </div>
 
-            {/* Page Language */}
+            {/* Scraper Language */}
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Globe className="h-3.5 w-3.5" />
-                <span>Page Language</span>
+                <span>Scraper Language</span>
               </div>
               <span className="font-mono text-foreground">
                 {describeLanguage(user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE)).label}
