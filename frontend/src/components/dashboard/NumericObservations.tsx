@@ -18,7 +18,7 @@ export function NumericObservations({
   formatValue: (value: number) => string;
 }) {
   const [mode, setMode] = React.useState<string>(SCALE_MODE.Adjusted);
-  const [hovered, setHovered] = React.useState<Observation | null>(null);
+  const [hovered, setHovered] = React.useState<{ point: Observation; x: number; y: number } | null>(null);
 
   const points = React.useMemo(
     () => observations.filter((p) => typeof p.value === 'number'),
@@ -43,6 +43,12 @@ export function NumericObservations({
 
   const getX = (ts: number) =>
     end === start ? 365 : 110 + ((ts - start) / (end - start)) * 510;
+  const showTooltip = (point: Observation, element: SVGCircleElement) => {
+    const svg = element.ownerSVGElement;
+    if (!svg) return;
+    const pointRect = element.getBoundingClientRect();
+    setHovered({ point, x: pointRect.left + pointRect.width / 2, y: pointRect.top });
+  };
 
   const stepPath = React.useMemo(() => {
     if (displayPoints.length < 2) return '';
@@ -83,6 +89,7 @@ export function NumericObservations({
       </div>
 
       <div className="overflow-x-auto">
+        <div className="relative">
         <svg
           viewBox="0 0 640 225"
           className="w-full min-w-[32rem]"
@@ -125,13 +132,13 @@ export function NumericObservations({
               key={point.run.id}
               cx={getX(point.timestamp)}
               cy={y(point.value as number)}
-              r="4"
+              r="7"
               fill="currentColor"
               className="cursor-pointer focus:outline-none focus-visible:stroke-primary hover:r-5 transition-all"
               tabIndex={0}
-              onMouseEnter={() => setHovered(point)}
+              onMouseEnter={(event) => showTooltip(point, event.currentTarget)}
               onMouseLeave={() => setHovered(null)}
-              onFocus={() => setHovered(point)}
+              onFocus={(event) => showTooltip(point, event.currentTarget)}
               onBlur={() => setHovered(null)}
               aria-label={`${formatTime(point.run.executedAt)}: ${formatValue(point.value as number)}`}
             />
@@ -144,16 +151,17 @@ export function NumericObservations({
             {formatTime(new Date(end).toISOString())}
           </text>
         </svg>
-      </div>
-
-      {hovered && (
-        <div
-          role="status"
-          className="inline-block rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md font-mono"
-        >
-          <span className="font-semibold">{formatTime(hovered.run.executedAt)}</span>: {formatValue(hovered.value as number)}
+        {hovered && (
+          <div
+            role="status"
+            className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md font-mono whitespace-nowrap"
+            style={{ left: hovered.x, top: hovered.y - 8 }}
+          >
+            <span className="font-semibold">{formatTime(hovered.point.run.executedAt)}</span>: {formatValue(hovered.point.value as number)}
+          </div>
+        )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
