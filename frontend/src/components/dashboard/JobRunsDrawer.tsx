@@ -113,7 +113,7 @@ export function JobRunsDrawer({
     PAGINATION_TIMESERIES_PAGE_SIZE
   );
   const [versionPage, setVersionPage] = React.useState(1);
-  const { confirm } = useModal();
+  const { confirm, alert } = useModal();
 
   React.useEffect(() => {
     setPage(1);
@@ -184,8 +184,11 @@ export function JobRunsDrawer({
         jobId: job.id,
         versionNumber: version.versionNumber,
       });
-    } catch {
-      // Query cache invalidation handles refresh
+    } catch (err) {
+      await alert({
+        title: 'Restore Failed',
+        message: err instanceof Error ? err.message : 'Could not restore this version.',
+      });
     } finally {
       setRestoringVersionNumber(null);
     }

@@ -539,6 +539,39 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(versionsBody.versions[1].versionNumber).toBe(1);
     expect(versionsBody.versions[1].isActive).toBe(false);
 
+    // Tenancy check: another user cannot view versions or rollback
+    const attackerReg = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'attacker@example.com', password: 'password123', name: 'Attacker' },
+    });
+    const attackerCookie = extractCookieHeader(attackerReg.headers['set-cookie']);
+
+    const attackerVersionsRes = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/versions`,
+      headers: { cookie: attackerCookie },
+    });
+    expect(attackerVersionsRes.statusCode).toBe(404);
+
+    const attackerRollbackRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/rollback`,
+      headers: { cookie: attackerCookie },
+      payload: { versionNumber: 1 },
+    });
+    expect(attackerRollbackRes.statusCode).toBe(404);
+
+    // Pagination clamping: requesting out-of-range page safely clamps to max page
+    const clampedVersionsRes = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/versions?page=99&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(clampedVersionsRes.statusCode).toBe(200);
+    expect(clampedVersionsRes.json().data.pagination.page).toBe(1);
+    expect(clampedVersionsRes.json().data.pagination.hasNextPage).toBe(false);
+
     // Rollback to version 1
     const rollbackRes = await app.inject({
       method: 'POST',

@@ -201,9 +201,9 @@ export function registerJobRoutes(
       const query = jobPlanVersionsQuerySchema.parse(request.query);
       const result = await jobService.listPlanVersions(
         request.params.id,
-        user.id,
         query.page,
-        query.pageSize
+        query.pageSize,
+        user.id
       );
       return { data: result };
     }

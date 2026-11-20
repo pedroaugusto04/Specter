@@ -441,35 +441,39 @@ export class JobService {
 
   async listPlanVersions(
     jobId: string,
-    userId?: string,
     page = 1,
-    pageSize = 10
+    pageSize = 10,
+    userId?: string
   ): Promise<JobPlanVersionsDto> {
     const existing = await this.getOwnedJob(jobId, userId);
-    const { items, totalItems } = await this.jobRepository.findPaginatedPlanVersions(
+    const initialResult = await this.jobRepository.findPaginatedPlanVersions(
       jobId,
       page,
       pageSize
     );
-    const versions = items.map((item) =>
+
+    const versionPage = await resolvePageResult(page, pageSize, initialResult, (safePage) =>
+      this.jobRepository.findPaginatedPlanVersions(jobId, safePage, pageSize)
+    );
+
+    const versions = versionPage.items.map((item) =>
       JobMapper.planVersionEntityToDto(item, existing.planRevision)
     );
-    const activeVersion = versions.find((v) => v.isActive);
 
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    let activeVersionNumber: number | null = null;
+    if (existing.planRevision) {
+      const activeEntity = await this.jobRepository.findPlanVersionByRevision(
+        jobId,
+        existing.planRevision
+      );
+      activeVersionNumber = activeEntity?.versionNumber ?? null;
+    }
 
     return {
       jobId: existing.id,
-      activeVersionNumber: activeVersion?.versionNumber ?? null,
+      activeVersionNumber,
       versions,
-      pagination: {
-        page,
-        pageSize,
-        totalItems,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      },
+      pagination: versionPage.pagination,
     };
   }
 
