@@ -133,6 +133,10 @@ export interface IJobRepository {
     jobId: string,
     versionNumber: number
   ): Promise<JobPlanVersionEntity | null>;
+  findPlanVersionByRevision(
+    jobId: string,
+    planRevision: string
+  ): Promise<JobPlanVersionEntity | null>;
   purgeEvidence(cutoffDate: Date): Promise<void>;
   findRunsByJobId(jobId: string, limit?: number): Promise<JobRunEntity[]>;
   findPaginatedRunsByJobId(
@@ -825,6 +829,20 @@ export class DrizzleJobRepository implements IJobRepository {
       .from(jobPlanVersions)
       .where(
         and(eq(jobPlanVersions.jobId, jobId), eq(jobPlanVersions.versionNumber, versionNumber))
+      )
+      .limit(1);
+    return row ? JobMapper.planVersionRowToEntity(row) : null;
+  }
+
+  async findPlanVersionByRevision(
+    jobId: string,
+    planRevision: string
+  ): Promise<JobPlanVersionEntity | null> {
+    const [row] = await this.db
+      .select()
+      .from(jobPlanVersions)
+      .where(
+        and(eq(jobPlanVersions.jobId, jobId), eq(jobPlanVersions.planRevision, planRevision))
       )
       .limit(1);
     return row ? JobMapper.planVersionRowToEntity(row) : null;

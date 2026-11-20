@@ -235,6 +235,12 @@ export class InMemoryJobRepository implements IJobRepository {
     );
     return found ? { ...found } : null;
   }
+  async findPlanVersionByRevision(jobId: string, planRevision: string) {
+    const found = this.planVersions.find(
+      (v) => v.jobId === jobId && v.planRevision === planRevision
+    );
+    return found ? { ...found } : null;
+  }
   async cancelRuns(jobId: string) {
     for (const run of this.runs)
       if (run.jobId === jobId && run.status === 'RUNNING') {

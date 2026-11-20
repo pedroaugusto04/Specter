@@ -401,9 +401,25 @@ export class CompilationService implements ICompilationControl {
           hasExistingPlan: Boolean(job.extractionPlan),
           error,
         });
+
+        let fallbackPatch: Partial<import('../repositories/jobRepository.js').UpdateJobPatch> = {};
+        if (failureStatus === JobStatus.Active && job.extractionPlan && job.planRevision) {
+          const stableVersion = await this.deps.jobRepository.findPlanVersionByRevision(
+            job.id,
+            job.planRevision
+          );
+          if (stableVersion) {
+            fallbackPatch = {
+              userPrompt: stableVersion.userPrompt,
+              url: stableVersion.url,
+            };
+          }
+        }
+
         await this.deps.jobRepository.updateJob(job.id, {
           status: failureStatus,
           lastError: userMessage,
+          ...fallbackPatch,
         });
         await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, failureStatus);
         if (failureStatus === JobStatus.Active && job.extractionPlan) {

@@ -568,6 +568,44 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(versionsResAfter.json().data.versions[1].versionNumber).toBe(1);
     expect(versionsResAfter.json().data.versions[1].isActive).toBe(true);
 
+    // Idempotent: restoring already active version 1 returns 200 without changes
+    const idempotentRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/rollback`,
+      headers: { cookie: authCookie },
+      payload: { versionNumber: 1 },
+    });
+    expect(idempotentRes.statusCode).toBe(200);
+
+    // Can switch back and forth freely: restore version 2
+    const rollbackV2Res = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/rollback`,
+      headers: { cookie: authCookie },
+      payload: { versionNumber: 2 },
+    });
+    expect(rollbackV2Res.statusCode).toBe(200);
+    expect(rollbackV2Res.json().data.userPrompt).toBe('Extract price and stock v2');
+
+    const jobAfterV2 = await repository.findById(createdData.id);
+    expect(jobAfterV2?.planRevision).toBe('rev-2');
+    expect(jobAfterV2?.userPrompt).toBe('Extract price and stock v2');
+
+    // Restoring a version while paused keeps the job paused
+    await repository.updateJob(createdData.id, { status: 'PAUSED', bullmqRepeatableKey: null });
+    const rollbackPausedRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/rollback`,
+      headers: { cookie: authCookie },
+      payload: { versionNumber: 1 },
+    });
+    expect(rollbackPausedRes.statusCode).toBe(200);
+    expect(rollbackPausedRes.json().data.status).toBe('PAUSED');
+    const jobAfterPausedRollback = await repository.findById(createdData.id);
+    expect(jobAfterPausedRollback?.status).toBe('PAUSED');
+    expect(jobAfterPausedRollback?.planRevision).toBe('rev-1');
+    expect(jobAfterPausedRollback?.bullmqRepeatableKey).toBeNull();
+
     // 9. Concurrency check: Recompile returns 409 Conflict if already compiling or running
     await repository.updateJob(createdData.id, { status: 'RECOVERING' });
     const conflictCompilingRes = await app.inject({

@@ -499,8 +499,14 @@ export class JobService {
       throw new NotFoundError(`Plan version ${versionNumber} not found for this monitor.`);
     }
 
+    if (existing.planRevision && existing.planRevision === targetVersion.planRevision) {
+      return this.presenter.present(existing);
+    }
+
+    const isPaused = existing.status === JobStatus.Paused;
     let bullmqRepeatableKey = existing.bullmqRepeatableKey;
-    if (existing.status === JobStatus.Active || existing.status === JobStatus.Failed) {
+
+    if (!isPaused) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
         existing.id,
@@ -514,9 +520,9 @@ export class JobService {
       contractRevision: targetVersion.contractRevision,
       userPrompt: targetVersion.userPrompt,
       url: targetVersion.url,
-      status: JobStatus.Active,
+      status: isPaused ? JobStatus.Paused : JobStatus.Active,
       lastError: null,
-      bullmqRepeatableKey,
+      bullmqRepeatableKey: isPaused ? null : bullmqRepeatableKey,
     });
 
     const resultDto = await this.presenter.present(updated ?? existing);
