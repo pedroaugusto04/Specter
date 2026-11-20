@@ -103,4 +103,4 @@ npm run lint
 ```
 ## License
 
-Specter is source available under the [Specter Source Available License](LICENSE), not an OSI-approved open-source license. The license permits personal, educational, and internal business use, with restrictions on commercial redistribution and offering the software as a service. The hosted Specter service is operated by the project owner.
+Specter is source available under the [Specter Source Available License](LICENSE). The license permits personal, educational, and internal business use, with restrictions on commercial redistribution and offering the software as a service. The hosted Specter service is operated by the project owner.
