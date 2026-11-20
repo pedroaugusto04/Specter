@@ -1,5 +1,6 @@
 import type { Observation } from '@/lib/chartUtils';
 import * as React from 'react';
+import { ChartPointTooltip } from './ChartPointTooltip';
 export function StateObservations({
   observations,
   formatTime,
@@ -67,13 +68,9 @@ export function StateObservations({
               ))}
           </svg>
           {hovered && observations.some((p) => p.run.id === hovered.point.run.id && p.value === category) && (
-            <div
-              role="status"
-              className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md whitespace-nowrap"
-              style={{ left: hovered.x, top: hovered.y - 8 }}
-            >
+            <ChartPointTooltip x={hovered.x} y={hovered.y}>
               <span className="font-medium">{formatTime(hovered.point.run.executedAt)}</span>: {hovered.point.value === null ? 'Unavailable observation' : String(hovered.point.value)}
-            </div>
+            </ChartPointTooltip>
           )}
           </div>
         </div>

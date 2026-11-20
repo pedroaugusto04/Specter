@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import { ChartPointTooltip } from './ChartPointTooltip';
 import {
   numericScale,
   axisLabels,
@@ -152,13 +153,9 @@ export function NumericObservations({
           </text>
         </svg>
         {hovered && (
-          <div
-            role="status"
-            className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md font-mono whitespace-nowrap"
-            style={{ left: hovered.x, top: hovered.y - 8 }}
-          >
+          <ChartPointTooltip x={hovered.x} y={hovered.y}>
             <span className="font-semibold">{formatTime(hovered.point.run.executedAt)}</span>: {formatValue(hovered.point.value as number)}
-          </div>
+          </ChartPointTooltip>
         )}
         </div>
       </div>
