@@ -805,6 +805,7 @@ export function createTestCompilationService(
   }
 ): CompilationService {
   return new CompilationService({
+    userRepository: new InMemoryUserRepository(),
     sessionRepository: new InMemorySessionRepository(),
     realtimeService: createTestRealtimeService(),
     quotaService: createTestQuotaService(overrides.jobRepository),
@@ -823,6 +824,7 @@ export function createTestScrapeExecutionService(
 ): ScrapeExecutionService {
   const sessionRepo = overrides.sessionRepository ?? new InMemorySessionRepository();
   return new ScrapeExecutionService({
+    userRepository: new InMemoryUserRepository(),
     accessCooldown: new AccessCooldownService(new NoopAccessCooldownStore(), sessionRepo),
     sessionRepository: sessionRepo,
     realtimeService: createTestRealtimeService(),

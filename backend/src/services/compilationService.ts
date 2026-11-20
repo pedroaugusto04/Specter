@@ -49,7 +49,7 @@ function compilationFailureStatus(input: {
 
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
-  userRepository?: Pick<IUserRepository, 'findById'>;
+  userRepository: Pick<IUserRepository, 'findById'>;
   configurationPipeline: IConfigurationPipeline;
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
@@ -193,7 +193,7 @@ export class CompilationService implements ICompilationControl {
         provider: 'configuration-pipeline',
       });
 
-      const owner = await this.deps.userRepository?.findById(job.userId);
+      const owner = await this.deps.userRepository.findById(job.userId);
       const pageLanguage = owner?.pageLanguage ?? owner?.browserPageLanguage ?? undefined;
       const storageState = await resolveSessionStorageState(
         this.deps.sessionRepository,

@@ -34,7 +34,7 @@ import type { QuotaService } from './quotaService.js';
 export interface ScrapeExecutionServiceDeps {
   accessCooldown: AccessCooldownService;
   jobRepository: IJobRepository;
-  userRepository?: Pick<IUserRepository, 'findById'>;
+  userRepository: Pick<IUserRepository, 'findById'>;
   planExecutor: IPlanExecutor;
   alertRouter: IAlertRouter;
   jobScheduler: IJobScheduler;
@@ -112,7 +112,7 @@ export class ScrapeExecutionService {
           job.updatedAt
         );
       }
-      const owner = await this.deps.userRepository?.findById(job.userId);
+      const owner = await this.deps.userRepository.findById(job.userId);
       const pageLanguage = owner?.pageLanguage ?? owner?.browserPageLanguage ?? undefined;
       const storageState = await resolveSessionStorageState(
         this.deps.sessionRepository,
