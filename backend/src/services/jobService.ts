@@ -499,23 +499,6 @@ export class JobService {
       throw new NotFoundError(`Plan version ${versionNumber} not found for this monitor.`);
     }
 
-    const latestVersionNumber = await this.jobRepository.getLatestPlanVersionNumber(jobId);
-    const newVersionNumber = latestVersionNumber + 1;
-    const newPlanRevision = `v${newVersionNumber}-rollback-to-v${versionNumber}`;
-
-    // Record the rollback as a new version entry for full auditability
-    await this.jobRepository.savePlanVersion({
-      jobId: existing.id,
-      versionNumber: newVersionNumber,
-      planRevision: newPlanRevision,
-      contractRevision: targetVersion.contractRevision,
-      url: existing.url,
-      userPrompt: existing.userPrompt,
-      extractionPlan: targetVersion.extractionPlan,
-      triggerReason: 'rollback',
-      createdByRunId: null,
-    });
-
     let bullmqRepeatableKey = existing.bullmqRepeatableKey;
     if (existing.status === JobStatus.Active || existing.status === JobStatus.Failed) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
@@ -527,8 +510,10 @@ export class JobService {
 
     const updated = await this.jobRepository.updateJob(jobId, {
       extractionPlan: targetVersion.extractionPlan,
-      planRevision: newPlanRevision,
+      planRevision: targetVersion.planRevision,
       contractRevision: targetVersion.contractRevision,
+      userPrompt: targetVersion.userPrompt,
+      url: targetVersion.url,
       status: JobStatus.Active,
       lastError: null,
       bullmqRepeatableKey,

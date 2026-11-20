@@ -548,9 +548,11 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(rollbackRes.statusCode).toBe(200);
     expect(rollbackRes.json().data.status).toBe('ACTIVE');
+    expect(rollbackRes.json().data.userPrompt).toBe('Extract title and price v1');
 
     const jobAfterRollback = await repository.findById(createdData.id);
-    expect(jobAfterRollback?.planRevision).toBe('v3-rollback-to-v1');
+    expect(jobAfterRollback?.planRevision).toBe('rev-1');
+    expect(jobAfterRollback?.userPrompt).toBe('Extract title and price v1');
     expect(jobAfterRollback?.extractionPlan).toEqual(planV1);
 
     const versionsResAfter = await app.inject({
@@ -559,9 +561,12 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       headers: { cookie: authCookie },
     });
     expect(versionsResAfter.statusCode).toBe(200);
-    expect(versionsResAfter.json().data.activeVersionNumber).toBe(3);
-    expect(versionsResAfter.json().data.versions[0].versionNumber).toBe(3);
-    expect(versionsResAfter.json().data.versions[0].isActive).toBe(true);
+    expect(versionsResAfter.json().data.versions).toHaveLength(2);
+    expect(versionsResAfter.json().data.activeVersionNumber).toBe(1);
+    expect(versionsResAfter.json().data.versions[0].versionNumber).toBe(2);
+    expect(versionsResAfter.json().data.versions[0].isActive).toBe(false);
+    expect(versionsResAfter.json().data.versions[1].versionNumber).toBe(1);
+    expect(versionsResAfter.json().data.versions[1].isActive).toBe(true);
 
     // 9. Concurrency check: Recompile returns 409 Conflict if already compiling or running
     await repository.updateJob(createdData.id, { status: 'RECOVERING' });
