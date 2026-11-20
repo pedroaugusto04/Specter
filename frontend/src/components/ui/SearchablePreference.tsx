@@ -36,7 +36,7 @@ export function SearchablePreference({
 
   const currentLabel =
     options.find((option) => option.value === value)?.label ??
-    (value === browserOption.value ? browserOption.label : value);
+    (value === browserOption.value ? browserOption.detail || browserOption.label : value);
   const query = searchQuery.trim().toLowerCase();
   const filteredOptions = React.useMemo(() => {
     const matches = options.filter((option) =>

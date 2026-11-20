@@ -19,8 +19,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
-import { PageLanguageSelect } from '@/components/ui/PageLanguageSelect';
-import { getBrowserPageLanguage } from '@/lib/pageLanguage';
+import { PageLanguageSelect, describeLanguage } from '@/components/ui/PageLanguageSelect';
+import { DEFAULT_PAGE_LANGUAGE, getBrowserPageLanguage } from '@/lib/pageLanguage';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { useUpdateProfileMutation, useUserQuotasQuery } from '@/hooks/useDashboardQueries';
 import { getBrowserTimezone } from '@/lib/utils';
@@ -46,8 +46,9 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const updateProfileMutation = useUpdateProfileMutation();
   const { data: quotas, isLoading: isLoadingQuotas } = useUserQuotasQuery(isOpen && Boolean(user));
+  const browserPageLanguage = React.useMemo(() => getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE, []);
   const [name, setName] = React.useState('');
-  const [pageLanguage, setPageLanguage] = React.useState<string | null>(null);
+  const [pageLanguage, setPageLanguage] = React.useState(browserPageLanguage);
   const [timezone, setTimezone] = React.useState(getBrowserTimezone());
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
@@ -56,7 +57,7 @@ export function ProfileModal({
   React.useEffect(() => {
     if (user) {
       setName(user.name || '');
-      setPageLanguage(user.pageLanguage ?? null);
+      setPageLanguage(user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE));
       setTimezone(user.timezone || getBrowserTimezone());
       setErrorMessage(null);
       setSaveSuccess(false);
@@ -64,6 +65,9 @@ export function ProfileModal({
   }, [user, isOpen]);
 
   if (!user) return null;
+
+  const currentEffectiveLanguage =
+    user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +79,7 @@ export function ProfileModal({
       const updated = await updateProfileMutation.mutateAsync({
         name: name.trim() || null,
         ...(timezone !== (user.timezone || getBrowserTimezone()) ? { timezone } : {}),
-        pageLanguage,
-        ...(pageLanguage === null ? { browserPageLanguage: getBrowserPageLanguage() ?? null } : {}),
+        ...(pageLanguage !== currentEffectiveLanguage ? { pageLanguage } : {}),
       });
       onUserUpdated(updated);
       setSaveSuccess(true);
@@ -105,8 +108,7 @@ export function ProfileModal({
   const isDirty =
     (user.name || '') !== name.trim() ||
     (user.timezone || getBrowserTimezone()) !== timezone ||
-    (user.pageLanguage ?? null) !== pageLanguage ||
-    (pageLanguage === null && (user.browserPageLanguage ?? null) !== (getBrowserPageLanguage() ?? null));
+    currentEffectiveLanguage !== pageLanguage;
 
   return (
     <Dialog
@@ -169,7 +171,11 @@ export function ProfileModal({
             />
           </FormField>
 
-          <FormField label="Page language" htmlFor="profile-page-language">
+          <FormField
+            label="Page Language"
+            htmlFor="profile-page-language"
+            hint="Language headers and locale sent to websites when scraping."
+          >
             <PageLanguageSelect
               id="profile-page-language"
               value={pageLanguage}
@@ -287,6 +293,17 @@ export function ProfileModal({
               </div>
               <span className="font-mono text-foreground">
                 {user.timezone || getBrowserTimezone()}
+              </span>
+            </div>
+
+            {/* Page Language */}
+            <div className="flex items-center justify-between py-1 border-b border-border/40">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Globe className="h-3.5 w-3.5" />
+                <span>Page Language</span>
+              </div>
+              <span className="font-mono text-foreground">
+                {describeLanguage(user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE)).label}
               </span>
             </div>
 
