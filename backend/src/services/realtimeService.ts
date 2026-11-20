@@ -45,6 +45,21 @@ export class RealtimeService {
     await this.notify({ type: 'JOB_RUN_COMPLETED', userId, jobId, runId, hasChanges });
   }
 
+  async notifyJobCompilationFailed(
+    userId: string,
+    jobId: string,
+    message: string,
+    fallbackToPrevious: boolean
+  ): Promise<void> {
+    await this.notify({
+      type: 'JOB_COMPILATION_FAILED',
+      userId,
+      jobId,
+      message,
+      fallbackToPrevious,
+    });
+  }
+
   subscribeUser(
     userId: string,
     handler: RealtimeEventHandler,

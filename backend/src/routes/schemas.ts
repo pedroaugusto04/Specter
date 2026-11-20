@@ -143,6 +143,10 @@ export const listQuerySchema = pageQuerySchema.extend({
 
 export const paginationQuerySchema = pageQuerySchema;
 export const jobRunsQuerySchema = createPaginationQuerySchema(PAGINATION_RUNS_PAGE_SIZE);
+export const jobPlanVersionsQuerySchema = createPaginationQuerySchema(10);
+export const rollbackJobSchema = z.object({
+  versionNumber: z.number().int().positive('Version number must be a positive integer'),
+});
 export const jobTimeseriesQuerySchema = createPaginationQuerySchema(
   PAGINATION_TIMESERIES_PAGE_SIZE
 ).extend({

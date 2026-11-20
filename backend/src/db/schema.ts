@@ -174,6 +174,7 @@ export type ScrapingJobRow = typeof scrapingJobs.$inferSelect;
 export type JobRunRow = typeof jobRuns.$inferSelect;
 export type UserIntegrationRow = typeof userIntegrations.$inferSelect;
 export type UserWebSessionRow = typeof userWebSessions.$inferSelect;
+export type JobPlanVersionRow = typeof jobPlanVersions.$inferSelect;
 
 export const userMonthlyUsage = pgTable(
   'user_monthly_usage',
@@ -219,5 +220,29 @@ export const alertDeliveries = pgTable(
   (table) => [
     uniqueIndex('idx_alert_delivery_unique').on(table.runId, table.channel, table.destination),
     index('idx_alert_delivery_pending').on(table.status, table.nextAttemptAt),
+  ]
+);
+
+export const jobPlanVersions = pgTable(
+  'job_plan_versions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => scrapingJobs.id, { onDelete: 'cascade' }),
+    versionNumber: integer('version_number').notNull(),
+    planRevision: text('plan_revision').notNull(),
+    contractRevision: text('contract_revision'),
+    url: text('url').notNull(),
+    userPrompt: text('user_prompt').notNull(),
+    extractionPlan: jsonb('extraction_plan').$type<ExtractionPlan>().notNull(),
+    triggerReason: text('trigger_reason').notNull(),
+    createdByRunId: uuid('created_by_run_id').references(() => jobRuns.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_job_plan_versions_job_id').on(table.jobId),
+    uniqueIndex('uq_job_plan_version').on(table.jobId, table.versionNumber),
+    index('idx_job_plan_versions_created_at').on(table.jobId, table.createdAt),
   ]
 );

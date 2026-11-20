@@ -4,10 +4,22 @@ import type { AlertDelivery } from '../notifications/contracts.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql, ne } from 'drizzle-orm';
 import { getDb, type Database } from '../db/index.js';
-import { jobRuns, scrapingJobs, alertDeliveries, userMonthlyUsage } from '../db/schema.js';
+import {
+  jobRuns,
+  scrapingJobs,
+  alertDeliveries,
+  userMonthlyUsage,
+  jobPlanVersions,
+} from '../db/schema.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type { PageResult } from '../utils/pagination.js';
-import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
+import type {
+  JobPlanVersionEntity,
+  JobRunEntity,
+  NewJobPlanVersion,
+  ScrapingJobEntity,
+  TimeseriesRowEntity,
+} from '../types/domain.js';
 import type { ExtractionPlan } from '../types/extractionPlan.js';
 import type { ExtractedPayload } from '../types/extractor.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
@@ -88,6 +100,7 @@ export interface IJobRepository {
   beginRun(job: ScrapingJobEntity, originQueueId: string): Promise<JobRunEntity | null>;
   findRun(id: string): Promise<JobRunEntity | null>;
   findRunningRuns(): Promise<JobRunEntity[]>;
+  findRunningRun(jobId: string): Promise<JobRunEntity | null>;
   cancelRuns(jobId: string): Promise<void>;
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
   findById(id: string): Promise<ScrapingJobEntity | null>;
@@ -109,6 +122,17 @@ export interface IJobRepository {
     patch?: UpdateJobPatch,
     expectedUpdatedAt?: Date
   ): Promise<JobRunEntity>;
+  savePlanVersion(version: NewJobPlanVersion): Promise<JobPlanVersionEntity>;
+  getLatestPlanVersionNumber(jobId: string): Promise<number>;
+  findPaginatedPlanVersions(
+    jobId: string,
+    page?: number,
+    pageSize?: number
+  ): Promise<{ items: JobPlanVersionEntity[]; totalItems: number }>;
+  findPlanVersionByNumber(
+    jobId: string,
+    versionNumber: number
+  ): Promise<JobPlanVersionEntity | null>;
   purgeEvidence(cutoffDate: Date): Promise<void>;
   findRunsByJobId(jobId: string, limit?: number): Promise<JobRunEntity[]>;
   findPaginatedRunsByJobId(
@@ -149,6 +173,14 @@ export class DrizzleJobRepository implements IJobRepository {
     return (await this.db.select().from(jobRuns).where(eq(jobRuns.status, RunStatus.Running))).map(
       JobMapper.runRowToEntity
     );
+  }
+  async findRunningRun(jobId: string): Promise<JobRunEntity | null> {
+    const [row] = await this.db
+      .select()
+      .from(jobRuns)
+      .where(and(eq(jobRuns.jobId, jobId), eq(jobRuns.status, RunStatus.Running)))
+      .limit(1);
+    return row ? JobMapper.runRowToEntity(row) : null;
   }
   async cancelRuns(jobId: string): Promise<void> {
     await this.db
@@ -446,6 +478,35 @@ export class DrizzleJobRepository implements IJobRepository {
             deliveries.map((delivery) => ({ ...delivery, runId: row.id, jobId: input.jobId }))
           )
           .onConflictDoNothing();
+      if (patch?.extractionPlan) {
+        const [maxVerRow] = await tx
+          .select({
+            maxVersion: sql<number>`COALESCE(MAX(${jobPlanVersions.versionNumber}), 0)::int`,
+          })
+          .from(jobPlanVersions)
+          .where(eq(jobPlanVersions.jobId, input.jobId));
+        const nextVersion = (maxVerRow?.maxVersion ?? 0) + 1;
+
+        const [jobRow] = await tx
+          .select({ url: scrapingJobs.url, userPrompt: scrapingJobs.userPrompt })
+          .from(scrapingJobs)
+          .where(eq(scrapingJobs.id, input.jobId));
+
+        if (jobRow) {
+          await tx.insert(jobPlanVersions).values({
+            jobId: input.jobId,
+            versionNumber: nextVersion,
+            planRevision: patch.planRevision ?? `v${nextVersion}`,
+            contractRevision: patch.contractRevision ?? null,
+            url: jobRow.url,
+            userPrompt: jobRow.userPrompt,
+            extractionPlan: patch.extractionPlan,
+            triggerReason: input.recoveredAutomatically ? 'recovery' : 'compilation',
+            createdByRunId: row.id,
+            createdAt: updatedAt,
+          });
+        }
+      }
       return JobMapper.runRowToEntity(row);
     });
   }
@@ -708,5 +769,59 @@ export class DrizzleJobRepository implements IJobRepository {
       .where(and(eq(scrapingJobs.userId, userId), ne(scrapingJobs.status, JobStatus.Paused)));
 
     return row?.count ?? 0;
+  }
+
+  async savePlanVersion(version: NewJobPlanVersion): Promise<JobPlanVersionEntity> {
+    const [row] = await this.db.insert(jobPlanVersions).values(version).returning();
+    if (!row) throw new Error('Failed to save job plan version.');
+    return JobMapper.planVersionRowToEntity(row);
+  }
+
+  async getLatestPlanVersionNumber(jobId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ maxVersion: sql<number>`COALESCE(MAX(${jobPlanVersions.versionNumber}), 0)::int` })
+      .from(jobPlanVersions)
+      .where(eq(jobPlanVersions.jobId, jobId));
+    return row?.maxVersion ?? 0;
+  }
+
+  async findPaginatedPlanVersions(
+    jobId: string,
+    page = 1,
+    pageSize = 10
+  ): Promise<{ items: JobPlanVersionEntity[]; totalItems: number }> {
+    const offset = Math.max(0, (page - 1) * pageSize);
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(jobPlanVersions)
+      .where(eq(jobPlanVersions.jobId, jobId));
+    const totalItems = countResult?.count ?? 0;
+
+    const rows = await this.db
+      .select()
+      .from(jobPlanVersions)
+      .where(eq(jobPlanVersions.jobId, jobId))
+      .orderBy(desc(jobPlanVersions.versionNumber))
+      .limit(pageSize)
+      .offset(offset);
+
+    return {
+      items: rows.map(JobMapper.planVersionRowToEntity),
+      totalItems,
+    };
+  }
+
+  async findPlanVersionByNumber(
+    jobId: string,
+    versionNumber: number
+  ): Promise<JobPlanVersionEntity | null> {
+    const [row] = await this.db
+      .select()
+      .from(jobPlanVersions)
+      .where(
+        and(eq(jobPlanVersions.jobId, jobId), eq(jobPlanVersions.versionNumber, versionNumber))
+      )
+      .limit(1);
+    return row ? JobMapper.planVersionRowToEntity(row) : null;
   }
 }

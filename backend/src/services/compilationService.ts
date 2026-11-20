@@ -406,6 +406,14 @@ export class CompilationService implements ICompilationControl {
           lastError: userMessage,
         });
         await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, failureStatus);
+        if (failureStatus === JobStatus.Active && job.extractionPlan) {
+          await this.deps.realtimeService.notifyJobCompilationFailed(
+            job.userId,
+            job.id,
+            userMessage,
+            true
+          );
+        }
       }
 
       throw error;

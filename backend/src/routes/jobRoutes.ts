@@ -8,11 +8,13 @@ import { createPaginationMeta } from '../utils/pagination.js';
 import {
   jobInputSchema,
   jobPauseSchema,
+  jobPlanVersionsQuerySchema,
   jobProbeSchema,
   jobRunsQuerySchema,
   jobTimeseriesQuerySchema,
   listQuerySchema,
   jobUpdateSchema,
+  rollbackJobSchema,
 } from './schemas.js';
 
 export function registerJobRoutes(
@@ -188,6 +190,37 @@ export function registerJobRoutes(
         user.id
       );
       return { data: result };
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/api/jobs/:id/versions',
+    { preHandler: [withAuth] },
+    async (request) => {
+      const user = requireUser(request);
+      const query = jobPlanVersionsQuerySchema.parse(request.query);
+      const result = await jobService.listPlanVersions(
+        request.params.id,
+        user.id,
+        query.page,
+        query.pageSize
+      );
+      return { data: result };
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { versionNumber: number } }>(
+    '/api/jobs/:id/rollback',
+    { preHandler: [withAuth] },
+    async (request) => {
+      const user = requireUser(request);
+      const body = rollbackJobSchema.parse(request.body);
+      const updated = await jobService.rollbackPlanVersion(
+        request.params.id,
+        body.versionNumber,
+        user.id
+      );
+      return { data: updated };
     }
   );
 

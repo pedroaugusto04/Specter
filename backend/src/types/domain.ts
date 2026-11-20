@@ -93,4 +93,20 @@ export interface TimeseriesRowEntity {
   extractedData: ExtractedPayload | null;
 }
 
+export interface JobPlanVersionEntity {
+  id: string;
+  jobId: string;
+  versionNumber: number;
+  planRevision: string;
+  contractRevision: string | null;
+  url: string;
+  userPrompt: string;
+  extractionPlan: ExtractionPlan;
+  triggerReason: string;
+  createdByRunId: string | null;
+  createdAt: Date;
+}
+
+export type NewJobPlanVersion = Omit<JobPlanVersionEntity, 'id' | 'createdAt'>;
+
 export type { DiffChangeEntry, DiffSummary } from '@specter/contracts';

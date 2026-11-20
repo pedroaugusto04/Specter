@@ -189,7 +189,37 @@ export interface NotificationTestDto {
   message: string;
 }
 
-export type RealtimeEventType = 'JOB_CREATED' | 'JOB_UPDATED' | 'JOB_DELETED' | 'JOB_RUN_COMPLETED';
+export interface JobPlanVersionDto {
+  id: string;
+  jobId: string;
+  versionNumber: number;
+  planRevision: string;
+  contractRevision: string | null;
+  url: string;
+  userPrompt: string;
+  triggerReason: string;
+  isActive: boolean;
+  fields: Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
+  createdAt: string;
+}
+
+export interface JobPlanVersionsDto {
+  jobId: string;
+  activeVersionNumber: number | null;
+  versions: JobPlanVersionDto[];
+  pagination: PaginationMeta;
+}
+
+export interface RollbackJobRequest {
+  versionNumber: number;
+}
+
+export type RealtimeEventType =
+  | 'JOB_CREATED'
+  | 'JOB_UPDATED'
+  | 'JOB_DELETED'
+  | 'JOB_RUN_COMPLETED'
+  | 'JOB_COMPILATION_FAILED';
 export interface RealtimeEventDto {
   type: RealtimeEventType;
   userId: string;
@@ -197,5 +227,7 @@ export interface RealtimeEventDto {
   status?: string;
   runId?: string;
   hasChanges?: string;
+  message?: string;
+  fallbackToPrevious?: boolean;
   timestamp: string;
 }

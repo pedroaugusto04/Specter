@@ -8,8 +8,20 @@ import { JobRunCard } from '@/components/dashboard/JobRunCard';
 import { Badge } from '@/components/ui/badge';
 import { Drawer } from '@/components/ui/drawer';
 import { PaginationControls } from '@/components/ui/PaginationControls';
-import { useJobRunsQuery, useJobTimeseriesQuery } from '@/hooks/useDashboardQueries';
-import { api, type JobRunDto, type ScrapingJobDto, type TimeseriesRange } from '@/lib/api';
+import { useModal } from '@/components/ui/modal-dialog';
+import {
+  useJobRunsQuery,
+  useJobTimeseriesQuery,
+  useJobVersionsQuery,
+  useRollbackJobMutation,
+} from '@/hooks/useDashboardQueries';
+import {
+  api,
+  type JobPlanVersionDto,
+  type JobRunDto,
+  type ScrapingJobDto,
+  type TimeseriesRange,
+} from '@/lib/api';
 import {
   PAGINATION_RUNS_PAGE_SIZE,
   PAGINATION_TIMESERIES_PAGE_SIZE,
@@ -24,12 +36,15 @@ import { runsToCsv, runsToJson, downloadFile } from '@/lib/exportUtils';
 import {
   AlertCircle,
   Camera,
+  CheckCircle2,
   Clock,
   FileCode,
   FileSpreadsheet,
   GitCompare,
+  History,
   ListChecks,
   Loader2,
+  RotateCcw,
   SlidersHorizontal,
   Sparkles,
   TrendingUp,
@@ -47,6 +62,25 @@ const MONITOR_STATUS = {
   [JobStatus.Paused]: { label: 'Paused', variant: 'secondary' },
   [JobStatus.Failed]: { label: 'Needs attention', variant: 'destructive' },
 } as const;
+
+function getVersionReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'initial':
+      return 'Initial setup';
+    case 'manual_recompile':
+      return 'Manual recompile';
+    case 'prompt_edit':
+      return 'Prompt update';
+    case 'url_edit':
+      return 'URL update';
+    case 'recovery':
+      return 'Auto-recovery';
+    case 'rollback':
+      return 'Rollback';
+    default:
+      return reason.replace(/_/g, ' ');
+  }
+}
 
 function displayValue(
   value: string | number | boolean | null | undefined,
@@ -76,10 +110,13 @@ export function JobRunsDrawer({
   const [timeseriesPageSize, setTimeseriesPageSize] = React.useState<number>(
     PAGINATION_TIMESERIES_PAGE_SIZE
   );
+  const [versionPage, setVersionPage] = React.useState(1);
+  const { confirm } = useModal();
 
   React.useEffect(() => {
     setPage(1);
     setTimeseriesPage(1);
+    setVersionPage(1);
   }, [job?.id]);
 
   const { data, isLoading: loading } = useJobRunsQuery(job?.id, page, pageSize);
@@ -89,6 +126,14 @@ export function JobRunsDrawer({
     timeseriesPage,
     timeseriesPageSize
   );
+  const { data: versionsData, isLoading: versionsLoading } = useJobVersionsQuery(
+    job?.id,
+    versionPage
+  );
+  const rollbackMutation = useRollbackJobMutation();
+
+  const versions = versionsData?.versions ?? [];
+  const versionPagination = versionsData?.pagination;
 
   const runs: JobRunDto[] = data?.runs ?? [];
   const timeseriesPoints = timeseriesData?.points ?? [];
@@ -116,10 +161,29 @@ export function JobRunsDrawer({
   const latestScreenshotRun = runsWithScreenshot[0] ?? null;
   const priorScreenshotRun = runsWithScreenshot[1] ?? null;
 
-  const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema'>('runs');
+  const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema' | 'versions'>('runs');
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
+
+  const handleRollback = async (version: JobPlanVersionDto) => {
+    if (!job?.id) return;
+    const confirmed = await confirm({
+      title: `Restore Version ${version.versionNumber}?`,
+      message: `Restore version ${version.versionNumber}? Subsequent runs will use this version's selectors and tracked fields.`,
+      confirmLabel: 'Restore',
+      variant: 'default',
+    });
+    if (!confirmed) return;
+    try {
+      await rollbackMutation.mutateAsync({
+        jobId: job.id,
+        versionNumber: version.versionNumber,
+      });
+    } catch {
+      // Query cache invalidation handles refresh
+    }
+  };
 
   const getRunsForExport = async (): Promise<JobRunDto[]> => {
     if (!job?.id) return [];
@@ -245,6 +309,18 @@ export function JobRunsDrawer({
             >
               <ListChecks className="h-3.5 w-3.5" />
               Monitored data
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('versions')}
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+                activeTab === 'versions'
+                  ? 'bg-card text-foreground shadow-2xs border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              Versions {versionPagination ? `(${versionPagination.totalItems})` : ''}
             </button>
           </div>
 
@@ -595,6 +671,125 @@ export function JobRunsDrawer({
                   <FailureDetails failure={jobFailure} />
                 </div>
               )}
+          </section>
+        )}
+
+        {/* TAB 4: PLAN VERSIONS */}
+        {activeTab === 'versions' && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <History className="h-4 w-4" />
+                Plan Versions
+              </div>
+              <span className="text-xs font-mono text-muted-foreground">
+                {versionPagination ? `${versionPagination.totalItems} total ${versionPagination.totalItems === 1 ? 'version' : 'versions'}` : ''}
+              </span>
+            </div>
+
+            {versionsLoading ? (
+              <div className="flex items-center justify-center p-12 text-sm text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Loading version history...
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                No plan versions recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {versions.map((ver) => {
+                  const fieldKeys = Object.keys(ver.fields ?? {});
+                  return (
+                    <div
+                      key={ver.id}
+                      className={`rounded-lg border p-4 transition-colors ${
+                        ver.isActive
+                          ? 'border-emerald-500/40 bg-emerald-500/[0.02] shadow-2xs'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-sm font-bold text-foreground">
+                            v{ver.versionNumber}
+                          </span>
+                          {ver.isActive ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle2 className="h-3 w-3" /> Current
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                              Previous
+                            </span>
+                          )}
+                          <span className="inline-flex items-center rounded bg-muted/60 px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                            {getVersionReasonLabel(ver.triggerReason)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {formatDateTime(ver.createdAt, timeZone)}
+                          </span>
+                          {!ver.isActive && (
+                            <button
+                              type="button"
+                              onClick={() => handleRollback(ver)}
+                              disabled={rollbackMutation.isPending}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 cursor-pointer shadow-2xs"
+                            >
+                              {rollbackMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3 w-3 text-muted-foreground" />
+                              )}
+                              <span>Restore</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2 text-xs">
+                        {ver.userPrompt && (
+                          <div>
+                            <span className="font-mono text-muted-foreground mr-1.5">Prompt:</span>
+                            <span className="text-foreground">{ver.userPrompt}</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="font-mono text-muted-foreground mr-1">Fields:</span>
+                          {fieldKeys.length > 0 ? (
+                            fieldKeys.map((f) => (
+                              <span
+                                key={f}
+                                className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground"
+                              >
+                                {ver.fields[f]?.displayName || f}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">None defined</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {versionPagination && versionPagination.totalPages > 1 && (
+                  <div className="pt-2">
+                    <PaginationControls
+                      page={versionPagination.page}
+                      totalPages={versionPagination.totalPages}
+                      totalItems={versionPagination.totalItems}
+                      pageSize={versionPagination.pageSize}
+                      onPageChange={setVersionPage}
+                      itemLabel="versions"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 

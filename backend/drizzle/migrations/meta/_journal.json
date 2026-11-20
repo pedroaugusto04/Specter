@@ -127,6 +127,13 @@
       "when": 1795188909667,
       "tag": "0017_page_language",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795209198975,
+      "tag": "0018_mean_scorpion",
+      "breakpoints": true
     }
   ]
 }

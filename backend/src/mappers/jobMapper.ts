@@ -4,11 +4,17 @@ import type {
   ScrapingJobDto,
   JobRunDto,
   JobTimeseriesPointDto,
+  JobPlanVersionDto,
   ExtractedPayload,
 } from '@specter/contracts';
 import type { AccessState } from '../acquisition/cooldown.js';
-import type { JobRunRow, ScrapingJobRow } from '../db/schema.js';
-import type { JobRunEntity, ScrapingJobEntity, TimeseriesRowEntity } from '../types/domain.js';
+import type { JobPlanVersionRow, JobRunRow, ScrapingJobRow } from '../db/schema.js';
+import type {
+  JobPlanVersionEntity,
+  JobRunEntity,
+  ScrapingJobEntity,
+  TimeseriesRowEntity,
+} from '../types/domain.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
 
 export const JobMapper = {
@@ -159,6 +165,46 @@ export const JobMapper = {
       contractRevision: entity.contractRevision ?? null,
       errorMessage: presentStoredError(entity.errorMessage),
       values: JobMapper.extractScalarValues(entity.extractedData),
+    };
+  },
+
+  planVersionRowToEntity(row: JobPlanVersionRow): JobPlanVersionEntity {
+    return {
+      id: row.id,
+      jobId: row.jobId,
+      versionNumber: row.versionNumber,
+      planRevision: row.planRevision,
+      contractRevision: row.contractRevision,
+      url: row.url,
+      userPrompt: row.userPrompt,
+      extractionPlan: row.extractionPlan,
+      triggerReason: row.triggerReason,
+      createdByRunId: row.createdByRunId,
+      createdAt: row.createdAt,
+    };
+  },
+
+  planVersionEntityToDto(
+    entity: JobPlanVersionEntity,
+    activePlanRevision?: string | null
+  ): JobPlanVersionDto {
+    return {
+      id: entity.id,
+      jobId: entity.jobId,
+      versionNumber: entity.versionNumber,
+      planRevision: entity.planRevision,
+      contractRevision: entity.contractRevision,
+      url: entity.url,
+      userPrompt: entity.userPrompt,
+      triggerReason: entity.triggerReason,
+      isActive: Boolean(activePlanRevision && entity.planRevision === activePlanRevision),
+      fields: Object.fromEntries(
+        Object.entries(entity.extractionPlan?.intent?.fields ?? {}).map(([key, field]) => [
+          key,
+          { displayName: field.displayName, type: field.type, locale: field.locale },
+        ])
+      ),
+      createdAt: entity.createdAt.toISOString(),
     };
   },
 };

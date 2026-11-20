@@ -12,9 +12,10 @@ import { randomUUID } from 'node:crypto';
 import { comparisonPayload } from '../extraction/comparison.js';
 import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { logger } from '../utils/logger.js';
-import { NotFoundError, ValidationError } from '../errors/domainErrors.js';
+import { ConflictError, NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
 import type {
+  JobPlanVersionsDto,
   JobRunsDto,
   JobTimeseriesDto,
   PaginatedResponse,
@@ -258,16 +259,35 @@ export class JobService {
       patch.contractRevision = randomUUID();
     }
 
-    const needsRecompile =
-      (patch.url !== undefined && patch.url !== existing.url) ||
-      (patch.userPrompt !== undefined && patch.userPrompt !== existing.userPrompt);
+    const urlChanged = patch.url !== undefined && patch.url !== existing.url;
+    const promptChanged =
+      patch.userPrompt !== undefined && patch.userPrompt !== existing.userPrompt;
+    const needsRecompile = urlChanged || promptChanged;
 
     if (needsRecompile) {
-      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      patch.bullmqRepeatableKey = null;
-      patch.status = JobStatus.PendingCompilation;
-      patch.extractionPlan = null;
-      patch.lastError = null;
+      const isDomainChange = Boolean(
+        urlChanged &&
+          (() => {
+            try {
+              return new URL(patch.url!).origin !== new URL(existing.url).origin;
+            } catch {
+              return true;
+            }
+          })()
+      );
+
+      if (isDomainChange || !existing.extractionPlan) {
+        // Domain changed or no previous plan: old selectors cannot be used as fallback
+        await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+        patch.bullmqRepeatableKey = null;
+        patch.status = JobStatus.PendingCompilation;
+        patch.extractionPlan = null;
+        patch.lastError = null;
+      } else {
+        // Safe Shadow Compilation: Keep previous extractionPlan as fallback
+        patch.status = JobStatus.Recovering;
+        patch.lastError = null;
+      }
     } else if (patch.cronExpression !== undefined && existing.status === JobStatus.Active) {
       await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
       patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
@@ -394,12 +414,126 @@ export class JobService {
   async triggerManualRecompile(id: string, userId?: string): Promise<ScrapingJobDto> {
     const existing = await this.getOwnedJob(id, userId);
 
+    if (
+      existing.status === JobStatus.Recovering ||
+      existing.status === JobStatus.PendingCompilation
+    ) {
+      throw new ConflictError('A compilation is already in progress for this monitor.');
+    }
+
+    const runningRun = await this.jobRepository.findRunningRun(existing.id);
+    if (runningRun) {
+      throw new ConflictError(
+        'Cannot recompile while an extraction is currently running. Please wait for the current run to finish.'
+      );
+    }
+
     const updated = await this.jobRepository.updateJob(id, {
       status: JobStatus.Recovering,
       lastError: null,
     });
 
     await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
+    const resultDto = await this.presenter.present(updated ?? existing);
+    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
+    return resultDto;
+  }
+
+  async listPlanVersions(
+    jobId: string,
+    userId?: string,
+    page = 1,
+    pageSize = 10
+  ): Promise<JobPlanVersionsDto> {
+    const existing = await this.getOwnedJob(jobId, userId);
+    const { items, totalItems } = await this.jobRepository.findPaginatedPlanVersions(
+      jobId,
+      page,
+      pageSize
+    );
+    const versions = items.map((item) =>
+      JobMapper.planVersionEntityToDto(item, existing.planRevision)
+    );
+    const activeVersion = versions.find((v) => v.isActive);
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+    return {
+      jobId: existing.id,
+      activeVersionNumber: activeVersion?.versionNumber ?? null,
+      versions,
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  async rollbackPlanVersion(
+    jobId: string,
+    versionNumber: number,
+    userId?: string
+  ): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(jobId, userId);
+
+    if (
+      existing.status === JobStatus.Recovering ||
+      existing.status === JobStatus.PendingCompilation
+    ) {
+      throw new ConflictError('Cannot restore a version while compilation is in progress.');
+    }
+
+    const runningRun = await this.jobRepository.findRunningRun(existing.id);
+    if (runningRun) {
+      throw new ConflictError(
+        'Cannot restore a version while an extraction is currently running.'
+      );
+    }
+
+    const targetVersion = await this.jobRepository.findPlanVersionByNumber(jobId, versionNumber);
+    if (!targetVersion) {
+      throw new NotFoundError(`Plan version ${versionNumber} not found for this monitor.`);
+    }
+
+    const latestVersionNumber = await this.jobRepository.getLatestPlanVersionNumber(jobId);
+    const newVersionNumber = latestVersionNumber + 1;
+    const newPlanRevision = `v${newVersionNumber}-rollback-to-v${versionNumber}`;
+
+    // Record the rollback as a new version entry for full auditability
+    await this.jobRepository.savePlanVersion({
+      jobId: existing.id,
+      versionNumber: newVersionNumber,
+      planRevision: newPlanRevision,
+      contractRevision: targetVersion.contractRevision,
+      url: existing.url,
+      userPrompt: existing.userPrompt,
+      extractionPlan: targetVersion.extractionPlan,
+      triggerReason: 'rollback',
+      createdByRunId: null,
+    });
+
+    let bullmqRepeatableKey = existing.bullmqRepeatableKey;
+    if (existing.status === JobStatus.Active || existing.status === JobStatus.Failed) {
+      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
+        existing.id,
+        existing.cronExpression
+      );
+    }
+
+    const updated = await this.jobRepository.updateJob(jobId, {
+      extractionPlan: targetVersion.extractionPlan,
+      planRevision: newPlanRevision,
+      contractRevision: targetVersion.contractRevision,
+      status: JobStatus.Active,
+      lastError: null,
+      bullmqRepeatableKey,
+    });
+
     const resultDto = await this.presenter.present(updated ?? existing);
     await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
     return resultDto;

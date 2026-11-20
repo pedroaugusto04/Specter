@@ -1,6 +1,7 @@
 import type {
   CreateJobRequest,
   DashboardStatsDto as DashboardStats,
+  JobPlanVersionsDto,
   JobRunsDto,
   JobTimeseriesDto,
   PaginatedResponse,
@@ -35,6 +36,8 @@ export type {
   DashboardStatsDto as DashboardStats,
   DiffChangeEntry,
   DiffSummary,
+  JobPlanVersionDto,
+  JobPlanVersionsDto,
   JobRunDto,
   JobRunsDto,
   JobTimeseriesDto,
@@ -252,6 +255,25 @@ export const api = {
     return request<ScrapingJobDto>(`/api/jobs/${id}/cancel-compilation`, {
       method: 'POST',
       body: JSON.stringify({}),
+    });
+  },
+
+  getJobVersions(
+    id: string,
+    page = 1,
+    pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE
+  ): Promise<JobPlanVersionsDto> {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return request<JobPlanVersionsDto>(`/api/jobs/${id}/versions?${params.toString()}`);
+  },
+
+  rollbackJobVersion(id: string, versionNumber: number): Promise<ScrapingJobDto> {
+    return request<ScrapingJobDto>(`/api/jobs/${id}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ versionNumber }),
     });
   },
 

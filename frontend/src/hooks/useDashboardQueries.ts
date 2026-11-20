@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import {
   api,
   type DashboardStats,
+  type JobPlanVersionsDto,
   type JobRunsDto,
   type JobTimeseriesDto,
   type PaginatedResponse,
@@ -34,6 +35,8 @@ export const dashboardKeys = {
   job: (id: string) => ['jobs', id] as const,
   jobRuns: (id: string, page = 1, pageSize: number = PAGINATION_RUNS_PAGE_SIZE) =>
     ['jobRuns', id, page, pageSize] as const,
+  jobVersions: (id: string, page = 1, pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE) =>
+    ['jobVersions', id, page, pageSize] as const,
   timeseries: (id: string, range: string) => ['timeseries', id, range] as const,
   stats: ['stats'] as const,
   integrations: ['integrations'] as const,
@@ -119,6 +122,37 @@ export function useJobRunsQuery(
     },
     enabled: Boolean(jobId),
     staleTime: 5 * 1000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useJobVersionsQuery(
+  jobId: string | null | undefined,
+  page = 1,
+  pageSize: number = PAGINATION_DEFAULT_PAGE_SIZE
+) {
+  return useQuery<JobPlanVersionsDto>({
+    queryKey: jobId ? dashboardKeys.jobVersions(jobId, page, pageSize) : ['jobVersions', 'none'],
+    queryFn: async () => {
+      if (!jobId) {
+        return {
+          jobId: '',
+          activeVersionNumber: null,
+          versions: [],
+          pagination: {
+            page: 1,
+            pageSize,
+            totalItems: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        };
+      }
+      return api.getJobVersions(jobId, page, pageSize);
+    },
+    enabled: Boolean(jobId),
+    staleTime: 10 * 1000,
     placeholderData: (prev) => prev,
   });
 }
@@ -357,6 +391,20 @@ export function useRecompileJobMutation() {
     onSuccess: (_, jobId) => {
       void Promise.all(jobListInvalidations(queryClient));
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(jobId) });
+    },
+  });
+}
+
+export function useRollbackJobMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ jobId, versionNumber }: { jobId: string; versionNumber: number }) =>
+      api.rollbackJobVersion(jobId, versionNumber),
+    onSuccess: (_, variables) => {
+      void Promise.all(jobListInvalidations(queryClient));
+      void queryClient.invalidateQueries({ queryKey: ['jobVersions', variables.jobId] });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.jobRuns(variables.jobId) });
     },
   });
 }

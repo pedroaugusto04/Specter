@@ -27,7 +27,11 @@ import type {
   PaginatedRunsResult,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
-import type { TimeseriesRowEntity } from '../../src/types/domain.js';
+import type {
+  JobPlanVersionEntity,
+  NewJobPlanVersion,
+  TimeseriesRowEntity,
+} from '../../src/types/domain.js';
 import type { TimeseriesRange } from '@specter/contracts';
 import { PAGINATION_RUNS_PAGE_SIZE } from '@specter/contracts';
 import { RealtimeService } from '../../src/services/realtimeService.js';
@@ -133,6 +137,7 @@ export class InMemoryUserRepository implements IUserRepository {
 export class InMemoryJobRepository implements IJobRepository {
   public jobs = new Map<string, ScrapingJobEntity>();
   public runs: JobRunEntity[] = [];
+  public planVersions: JobPlanVersionEntity[] = [];
   public pendingDeliveries: AlertDelivery[] = [];
   public usageRepository?: InMemoryUsageRepository;
   async commitRun(
@@ -167,6 +172,25 @@ export class InMemoryJobRepository implements IJobRepository {
       this.jobs.set(input.jobId, { ...current, ...patch, updatedAt });
       run.monitorUpdatedAt = updatedAt;
     }
+    if (patch?.extractionPlan) {
+      const versions = this.planVersions.filter((v) => v.jobId === input.jobId);
+      const nextVersion = versions.length
+        ? Math.max(...versions.map((v) => v.versionNumber)) + 1
+        : 1;
+      this.planVersions.push({
+        id: crypto.randomUUID(),
+        jobId: input.jobId,
+        versionNumber: nextVersion,
+        planRevision: patch.planRevision ?? `v${nextVersion}`,
+        contractRevision: patch.contractRevision ?? null,
+        url: current.url,
+        userPrompt: current.userPrompt,
+        extractionPlan: patch.extractionPlan,
+        triggerReason: input.recoveredAutomatically ? 'recovery' : 'compilation',
+        createdByRunId: run.id,
+        createdAt: new Date(),
+      });
+    }
     return run;
   }
   async findRun(id: string) {
@@ -174,6 +198,38 @@ export class InMemoryJobRepository implements IJobRepository {
   }
   async findRunningRuns() {
     return this.runs.filter((run) => run.status === 'RUNNING');
+  }
+  async findRunningRun(jobId: string) {
+    return this.runs.find((run) => run.jobId === jobId && run.status === 'RUNNING') ?? null;
+  }
+  async savePlanVersion(version: NewJobPlanVersion): Promise<JobPlanVersionEntity> {
+    const entity: JobPlanVersionEntity = {
+      ...version,
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+    };
+    this.planVersions.push(entity);
+    return { ...entity };
+  }
+  async getLatestPlanVersionNumber(jobId: string): Promise<number> {
+    const versions = this.planVersions.filter((v) => v.jobId === jobId);
+    if (!versions.length) return 0;
+    return Math.max(...versions.map((v) => v.versionNumber));
+  }
+  async findPaginatedPlanVersions(jobId: string, page = 1, pageSize = 10) {
+    const versions = this.planVersions
+      .filter((v) => v.jobId === jobId)
+      .sort((a, b) => b.versionNumber - a.versionNumber);
+    const totalItems = versions.length;
+    const offset = Math.max(0, (page - 1) * pageSize);
+    const items = versions.slice(offset, offset + pageSize).map((v) => ({ ...v }));
+    return { items, totalItems };
+  }
+  async findPlanVersionByNumber(jobId: string, versionNumber: number) {
+    const found = this.planVersions.find(
+      (v) => v.jobId === jobId && v.versionNumber === versionNumber
+    );
+    return found ? { ...found } : null;
   }
   async cancelRuns(jobId: string) {
     for (const run of this.runs)

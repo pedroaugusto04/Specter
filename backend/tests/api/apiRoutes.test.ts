@@ -287,7 +287,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(updatedData1.status).toBe('ACTIVE');
     expect(scheduler.scheduledRepeatables.get(job.id)).toBe(`repeat:${job.id}:0 */12 * * *`);
     expect(scheduler.compilationQueue).toHaveLength(1); // Only initial compilation, not re-queued
-    // 3. Update prompt: should invalidate schema, reset repeatable, and re-enqueue compilation
+    // 3. Update prompt: should retain previous plan as fallback, transition to RECOVERING, reset repeatable, and re-enqueue compilation
     const updatePromptRes = await app.inject({
       method: 'PATCH',
       url: `/api/jobs/${job.id}`,
@@ -301,8 +301,9 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     expect(updatedData2.userPrompt).toBe(
       'Extract shoe name, stock quantity, and current price in USD'
     );
-    expect(updatedData2.status).toBe('PENDING_COMPILATION');
-    expect(scheduler.scheduledRepeatables.has(job.id)).toBe(false);
+    expect(updatedData2.status).toBe('RECOVERING');
+    // In safe recompilation, the active schedule remains active with fallback selectors
+    expect(scheduler.scheduledRepeatables.has(job.id)).toBe(true);
     expect(scheduler.compilationQueue).toHaveLength(2);
     expect(scheduler.compilationQueue[1]).toEqual({ jobId: job.id, reason: 'manual' });
     // 4. Validation error on invalid update payload
@@ -480,5 +481,124 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       hasPrevPage: true,
     });
     expect(timeseriesPage2.json().data.previousPoint.values).toEqual({ price: 105 });
+
+    // 8. Plan Versioning and Rollback
+    const planV1 = {
+      ...fixturePlan,
+      intent: {
+        ...fixturePlan.intent,
+        userPrompt: 'Extract title and price v1',
+        fields: {
+          title: { type: 'string' as const, displayName: 'Title' },
+          price: { type: 'number' as const, displayName: 'Price' },
+        },
+      },
+    };
+    const planV2 = {
+      ...fixturePlan,
+      intent: {
+        ...fixturePlan.intent,
+        userPrompt: 'Extract price and stock v2',
+        fields: {
+          price: { type: 'number' as const, displayName: 'Price' },
+          stock: { type: 'number' as const, displayName: 'Stock' },
+        },
+      },
+    };
+
+    await repository.savePlanVersion({
+      jobId: createdData.id,
+      versionNumber: 1,
+      planRevision: 'rev-1',
+      contractRevision: 'crev-1',
+      url: 'https://www.mercadolivre.com.br/produto-xyz',
+      userPrompt: 'Extract title and price v1',
+      triggerReason: 'initial',
+      extractionPlan: planV1,
+      createdByRunId: null,
+    });
+
+    await repository.savePlanVersion({
+      jobId: createdData.id,
+      versionNumber: 2,
+      planRevision: 'rev-2',
+      contractRevision: 'crev-2',
+      url: 'https://www.mercadolivre.com.br/produto-xyz',
+      userPrompt: 'Extract price and stock v2',
+      triggerReason: 'prompt_edit',
+      extractionPlan: planV2,
+      createdByRunId: null,
+    });
+
+    await repository.updateJob(createdData.id, {
+      planRevision: 'rev-2',
+      extractionPlan: planV2,
+      status: 'ACTIVE',
+    });
+
+    const versionsRes = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/versions?page=1&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(versionsRes.statusCode).toBe(200);
+    const versionsBody = versionsRes.json().data;
+    expect(versionsBody.versions).toHaveLength(2);
+    expect(versionsBody.versions[0].versionNumber).toBe(2);
+    expect(versionsBody.versions[0].isActive).toBe(true);
+    expect(versionsBody.versions[1].versionNumber).toBe(1);
+    expect(versionsBody.versions[1].isActive).toBe(false);
+
+    // Rollback to version 1
+    const rollbackRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/rollback`,
+      headers: { cookie: authCookie },
+      payload: { versionNumber: 1 },
+    });
+    expect(rollbackRes.statusCode).toBe(200);
+    expect(rollbackRes.json().data.status).toBe('ACTIVE');
+
+    const jobAfterRollback = await repository.findById(createdData.id);
+    expect(jobAfterRollback?.planRevision).toBe('v3-rollback-to-v1');
+    expect(jobAfterRollback?.extractionPlan).toEqual(planV1);
+
+    const versionsResAfter = await app.inject({
+      method: 'GET',
+      url: `/api/jobs/${createdData.id}/versions?page=1&pageSize=10`,
+      headers: { cookie: authCookie },
+    });
+    expect(versionsResAfter.statusCode).toBe(200);
+    expect(versionsResAfter.json().data.activeVersionNumber).toBe(3);
+    expect(versionsResAfter.json().data.versions[0].versionNumber).toBe(3);
+    expect(versionsResAfter.json().data.versions[0].isActive).toBe(true);
+
+    // 9. Concurrency check: Recompile returns 409 Conflict if already compiling or running
+    await repository.updateJob(createdData.id, { status: 'RECOVERING' });
+    const conflictCompilingRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/recompile`,
+      headers: { cookie: authCookie },
+      payload: {},
+    });
+    expect(conflictCompilingRes.statusCode).toBe(409);
+
+    await repository.updateJob(createdData.id, { status: 'ACTIVE' });
+    await repository.createRun({
+      jobId: createdData.id,
+      status: 'RUNNING',
+      hasChanges: 'NO',
+      durationMs: 0,
+      extractedData: null,
+      executedAt: new Date(),
+    });
+
+    const conflictRunningRes = await app.inject({
+      method: 'POST',
+      url: `/api/jobs/${createdData.id}/recompile`,
+      headers: { cookie: authCookie },
+      payload: {},
+    });
+    expect(conflictRunningRes.statusCode).toBe(409);
   });
 });
