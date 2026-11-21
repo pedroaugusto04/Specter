@@ -12,7 +12,7 @@ import {
   useTogglePauseMutation,
   useTriggerJobMutation,
 } from '@/hooks/useDashboardQueries';
-import { JobStatus, PAGINATION_DEFAULT_PAGE_SIZE } from '@specter/contracts';
+import { JobStatus, PAGINATION_DEFAULT_PAGE_SIZE, USER_FAILURES } from '@specter/contracts';
 import type { ScrapingJobDto } from '@/lib/api';
 import type { PaginationMeta } from '@specter/contracts';
 import { getJobActionPermissions, type JobRowActionType } from '@/lib/jobActionPermissions';
@@ -178,11 +178,7 @@ export function JobsTable({
   };
 
   const handleShowFailureDetails = async (job: ScrapingJobDto) => {
-    const failure = parseErrorMessage(job.lastError);
-    if (!failure) {
-      onSelectJobForHistory(job);
-      return;
-    }
+    const failure = parseErrorMessage(job.lastError) ?? USER_FAILURES.requestFailed;
 
     const confirmed = await modal.confirm({
       title: failure.title,
