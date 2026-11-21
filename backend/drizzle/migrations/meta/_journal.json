@@ -134,6 +134,13 @@
       "when": 1795209198975,
       "tag": "0018_mean_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795226896042,
+      "tag": "0019_brainy_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

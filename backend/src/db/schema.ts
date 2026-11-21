@@ -31,8 +31,7 @@ export const users = pgTable(
     timezone: text('timezone').default('America/Sao_Paulo').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index('idx_users_email').on(table.email)]
+  }
 );
 
 export const userIntegrations = pgTable(
@@ -56,8 +55,7 @@ export const userIntegrations = pgTable(
 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index('idx_user_integrations_user_id').on(table.userId)]
+  }
 );
 
 export const scrapingJobs = pgTable(
