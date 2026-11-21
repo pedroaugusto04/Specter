@@ -626,10 +626,14 @@ describe('Common execution and comparisons', () => {
 
   it('defaults DOM source attribute to text when omitted', () => {
     const candidate = structuredClone(plan);
-    // Remove attribute from the DOM source for price
-    delete (candidate.strategy.fields.price[0] as Record<string, unknown>).attribute;
+    const priceSources = candidate.strategy.fields.price as Array<Record<string, unknown>>;
+    const firstCandidateSource = priceSources[0];
+    if (firstCandidateSource) {
+      delete firstCandidateSource.attribute;
+    }
     const parsed = extractionPlanSchema.parse(candidate);
-    expect(parsed.strategy.fields.price[0].attribute).toBe('text');
+    const firstSource = parsed.strategy.fields.price?.[0];
+    expect(firstSource && 'attribute' in firstSource ? firstSource.attribute : undefined).toBe('text');
   });
 
   it('drops incomplete items in a collection while preserving valid records', () => {
