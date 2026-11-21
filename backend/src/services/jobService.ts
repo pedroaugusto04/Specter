@@ -256,7 +256,7 @@ export class JobService {
           validated.error.issues.map((issue) => ({ field: 'triggerRules', message: issue.message }))
         );
       patch.extractionPlan = validated.data;
-      patch.contractRevision = randomUUID();
+      patch.contractRevision = existing.contractRevision ?? randomUUID();
     }
 
     const urlChanged = patch.url !== undefined && patch.url !== existing.url;
