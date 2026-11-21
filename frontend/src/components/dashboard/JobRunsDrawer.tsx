@@ -260,7 +260,7 @@ export function JobRunsDrawer({
       isOpen={Boolean(job)}
       onClose={onClose}
       title={job.name}
-      widthClass="w-full max-w-full sm:max-w-2xl lg:max-w-[800px]"
+      widthClass="w-full max-w-full sm:max-w-2xl lg:max-w-[820px]"
     >
       <div className="space-y-6">
         {job.status === JobStatus.Failed && (
@@ -287,11 +287,11 @@ export function JobRunsDrawer({
         )}
         {/* Navigation Tabs & Export Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-0.5 sm:gap-1 rounded-md border border-border bg-muted/40 p-1 overflow-x-auto sm:overflow-x-visible scrollbar-none">
             <button
               type="button"
               onClick={() => setActiveTab('runs')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'runs'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -303,7 +303,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('timeline')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'timeline'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -315,7 +315,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('schema')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'schema'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -327,7 +327,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('versions')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'versions'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -348,12 +348,12 @@ export function JobRunsDrawer({
               onClick={handleExportCsv}
               disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
               title="Export runs history as CSV (Excel, Sheets)"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-[11px] font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
             >
               {isExporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
               )}
               <span>CSV</span>
             </button>
@@ -363,12 +363,12 @@ export function JobRunsDrawer({
               onClick={handleExportJson}
               disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
               title="Export runs history as structured JSON"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-[11px] font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
             >
               {isExporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <FileCode className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                <FileCode className="h-3 w-3 text-sky-600 dark:text-sky-400" />
               )}
               <span>JSON</span>
             </button>
