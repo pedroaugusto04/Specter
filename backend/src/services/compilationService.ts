@@ -206,13 +206,14 @@ export class CompilationService implements ICompilationControl {
       );
       abortController.signal.throwIfAborted();
 
+      const isRecovery = reason === CompilationReason.Recovery;
       const failure = run?.extractionReport;
       const configured = await this.deps.configurationPipeline.configure({
         jobId: job.id,
         url: job.url,
         prompt: job.userPrompt,
-        intent: job.extractionPlan?.intent,
-        recovery: failure
+        intent: isRecovery ? job.extractionPlan?.intent : undefined,
+        recovery: isRecovery && failure
           ? {
               failure: {
                 failureCode: failure.failureCode,
@@ -233,7 +234,7 @@ export class CompilationService implements ICompilationControl {
       if (!isAcceptedExtractionQuality(configured.execution.report.quality))
         throw new CompilerValidationError('Recovery output did not pass extraction validation.');
       const compiledSchema = configured.plan;
-      if (job.extractionPlan && !sameIntent(job.extractionPlan.intent, compiledSchema.intent))
+      if (isRecovery && job.extractionPlan && !sameIntent(job.extractionPlan.intent, compiledSchema.intent))
         throw new CompilerValidationError(
           'Recovery cannot change extraction intent. Review the monitor instructions.'
         );
