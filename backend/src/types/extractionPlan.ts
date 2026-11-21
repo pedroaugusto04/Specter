@@ -83,7 +83,8 @@ export const sourceSchema = z.discriminatedUnion('kind', [
         .describe('text reads textContent; otherwise use the HTML attribute name.')
         .refine((attribute) => !['textContent', 'innerText'].includes(attribute), {
           message: 'Use "text" to read DOM text.',
-        }),
+        })
+        .default('text'),
       pattern: text
         .describe('Unicode regex: first capture group, or whole match when no group exists.')
         .optional(),

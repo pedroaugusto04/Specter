@@ -624,6 +624,14 @@ describe('Common execution and comparisons', () => {
     ).not.toThrow();
   });
 
+  it('defaults DOM source attribute to text when omitted', () => {
+    const candidate = structuredClone(plan);
+    // Remove attribute from the DOM source for price
+    delete (candidate.strategy.fields.price[0] as Record<string, unknown>).attribute;
+    const parsed = extractionPlanSchema.parse(candidate);
+    expect(parsed.strategy.fields.price[0].attribute).toBe('text');
+  });
+
   it('drops incomplete items in a collection while preserving valid records', () => {
     // 2 valid rows with id and price, and 1 ad/spacer row missing price
     const html =
