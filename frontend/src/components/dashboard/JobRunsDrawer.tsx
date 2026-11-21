@@ -260,7 +260,7 @@ export function JobRunsDrawer({
       isOpen={Boolean(job)}
       onClose={onClose}
       title={job.name}
-      widthClass="w-full max-w-full sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl"
+      widthClass="w-full max-w-full sm:max-w-2xl lg:max-w-[800px]"
     >
       <div className="space-y-6">
         {job.status === JobStatus.Failed && (
