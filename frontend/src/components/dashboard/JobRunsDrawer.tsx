@@ -256,7 +256,12 @@ export function JobRunsDrawer({
   if (!job) return null;
 
   return (
-    <Drawer isOpen={Boolean(job)} onClose={onClose} title={job.name}>
+    <Drawer
+      isOpen={Boolean(job)}
+      onClose={onClose}
+      title={job.name}
+      widthClass="w-full max-w-full sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl"
+    >
       <div className="space-y-6">
         {job.status === JobStatus.Failed && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
@@ -282,11 +287,11 @@ export function JobRunsDrawer({
         )}
         {/* Navigation Tabs & Export Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1 overflow-x-auto">
+          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1 overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => setActiveTab('runs')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'runs'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -298,7 +303,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('timeline')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'timeline'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -310,7 +315,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('schema')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'schema'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -322,7 +327,7 @@ export function JobRunsDrawer({
             <button
               type="button"
               onClick={() => setActiveTab('versions')}
-              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'versions'
                   ? 'bg-card text-foreground shadow-2xs border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -343,7 +348,7 @@ export function JobRunsDrawer({
               onClick={handleExportCsv}
               disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
               title="Export runs history as CSV (Excel, Sheets)"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
             >
               {isExporting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -358,7 +363,7 @@ export function JobRunsDrawer({
               onClick={handleExportJson}
               disabled={isExporting || (runs.length === 0 && summary.totalRuns === 0)}
               title="Export runs history as structured JSON"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
             >
               {isExporting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
