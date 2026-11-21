@@ -16,10 +16,62 @@ import {
   SelectorMismatchError,
   UnauthorizedError,
 } from '../errors/domainErrors.js';
+import { ConfigurationFailure } from '../extraction/configurationFailure.js';
 
 const USER_ERROR_MESSAGES = Object.fromEntries(
   Object.entries(USER_FAILURES).map(([key, failure]) => [key, failure.description])
 ) as Record<keyof typeof USER_FAILURES, string>;
+
+function formatConfigurationFailure(error: DomainError): string {
+  if (error instanceof ConfigurationFailure && error.semanticReview?.reasons?.length) {
+    const reasons = error.semanticReview.reasons.filter(Boolean);
+    if (reasons.length > 0) {
+      return JSON.stringify({
+        title: 'Extraction Review Not Confirmed',
+        description: reasons.join(' '),
+        nextStep: 'Clarify your instructions or verify that the target information is shown as expected.',
+      });
+    }
+  }
+
+  const message = error.message;
+
+  const fieldMatch = message.match(/Required field '([^']+)' is missing or invalid/i);
+  if (fieldMatch) {
+    const field = fieldMatch[1];
+    return JSON.stringify({
+      title: 'Required Field Not Found',
+      description: `We could not find the '${field}' field on the page with the provided instructions.`,
+      nextStep: `Check that '${field}' is visible on the page and clarify your monitoring instructions.`,
+    });
+  }
+
+  if (/no valid records could be extracted|could not locate target record/i.test(message)) {
+    return JSON.stringify({
+      title: 'Target Content Not Found',
+      description: 'We could not locate the main content or item container on this page.',
+      nextStep: 'Check that the page loads the expected content and verify the target URL.',
+    });
+  }
+
+  if (/ambiguous DOM field source|must be selected unambiguously/i.test(message)) {
+    return JSON.stringify({
+      title: 'Ambiguous Content Selection',
+      description: 'Multiple matching items were found on the page, but single-item monitoring was requested.',
+      nextStep: 'Clarify your instructions to specify exactly which item on the page to track.',
+    });
+  }
+
+  if (/duplicate collection identity/i.test(message)) {
+    return JSON.stringify({
+      title: 'Duplicate Collection Items',
+      description: 'Multiple collection items share identical identifiers on the page.',
+      nextStep: 'Ensure the target collection items have distinct visible identifiers or links.',
+    });
+  }
+
+  return USER_ERROR_MESSAGES.configurationRejected;
+}
 
 /** Maps internal exceptions to short user-facing messages without exposing technical details. */
 export function formatUserErrorMessage(error: unknown): string {
@@ -49,7 +101,7 @@ export function formatUserErrorMessage(error: unknown): string {
         return USER_ERROR_MESSAGES.websiteUnavailable;
       case 'CONFIGURATION_REJECTED':
       case 'CONFIGURATION_OPERATION_FAILED':
-        return USER_ERROR_MESSAGES.configurationRejected;
+        return formatConfigurationFailure(error);
       case 'DECRYPTION_FAILED':
         return USER_ERROR_MESSAGES.sessionUnavailable;
       case 'UNSUPPORTED_CAPABILITY':

@@ -127,4 +127,66 @@ describe('public failure details', () => {
     expect(parsed.description).toBe('The requested price only appears after selecting a size.');
     expect(parsed.nextStep).toBe('Provide a direct URL with the size selected.');
   });
+
+  it('formats deterministic configuration failures into structured actionable user errors', () => {
+    // 1. Missing required field
+    const fieldErr = new ConfigurationFailure(
+      "Required field 'quantity' is missing or invalid. Failed sources: [{\"source\":{\"kind\":\"dom\",\"selector\":\".foo\"},\"raw\":null}]",
+      []
+    );
+    const formattedFieldErr = formatUserErrorMessage(fieldErr);
+    const parsedField = getUserFailure(formattedFieldErr);
+    expect(parsedField.title).toBe('Required Field Not Found');
+    expect(parsedField.description).toBe(
+      "We could not find the 'quantity' field on the page with the provided instructions."
+    );
+    expect(parsedField.nextStep).toBe(
+      "Check that 'quantity' is visible on the page and clarify your monitoring instructions."
+    );
+
+    // 2. Missing records / target content
+    const missingRecordsErr = new ConfigurationFailure(
+      'No valid records could be extracted from candidate items (0 matched .product). Check field selectors.',
+      []
+    );
+    const parsedMissing = getUserFailure(formatUserErrorMessage(missingRecordsErr));
+    expect(parsedMissing.title).toBe('Target Content Not Found');
+    expect(parsedMissing.description).toBe(
+      'We could not locate the main content or item container on this page.'
+    );
+
+    // 3. Ambiguous selection
+    const ambiguousErr = new ConfigurationFailure(
+      'Ambiguous DOM field source (.price matched 5 elements with distinct values without pattern)',
+      []
+    );
+    const parsedAmbiguous = getUserFailure(formatUserErrorMessage(ambiguousErr));
+    expect(parsedAmbiguous.title).toBe('Ambiguous Content Selection');
+    expect(parsedAmbiguous.description).toBe(
+      'Multiple matching items were found on the page, but single-item monitoring was requested.'
+    );
+
+    // 4. Duplicate collection items
+    const duplicateErr = new ConfigurationFailure(
+      "Duplicate collection identity for 'item-1'. Multiple records share the same identity fields [id].",
+      []
+    );
+    const parsedDuplicate = getUserFailure(formatUserErrorMessage(duplicateErr));
+    expect(parsedDuplicate.title).toBe('Duplicate Collection Items');
+
+    // 5. Semantic review rejection
+    const semanticErr = new ConfigurationFailure(
+      'Semantic review rejected candidate',
+      [],
+      {
+        status: 'REJECTED' as any,
+        score: 2,
+        reasons: ['The page sells shirts, not books as requested.'],
+        evidenceRefs: ['item1'],
+      }
+    );
+    const parsedSemantic = getUserFailure(formatUserErrorMessage(semanticErr));
+    expect(parsedSemantic.title).toBe('Extraction Review Not Confirmed');
+    expect(parsedSemantic.description).toBe('The page sells shirts, not books as requested.');
+  });
 });
