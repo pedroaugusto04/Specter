@@ -586,7 +586,7 @@ export function JobRunsDrawer({
               setTimeseriesPageSize(size);
               setTimeseriesPage(1);
             }}
-            revision={job.contractRevision}
+            revision={null}
             identityFields={job.extractionPlan?.intent.identityFields ?? []}
             fields={extractionFields}
             timeZone={timeZone}
