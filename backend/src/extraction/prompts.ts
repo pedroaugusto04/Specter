@@ -8,7 +8,8 @@ Return exactly one JSON object matching the supplied schema. Use kind "tool" wit
 - intent.fields defines field meanings, types, and type-specific options. strategy.fields uses the same keys and lists sources in fallback order, even for a single source. Record identity belongs in intent.identityFields.
 
 ### Intent
-- Use English snake_case field IDs, display names in the user's language, and literal observed labels. Distinguish multiple representations only when relevant to the request or alert. Bind alert rules to the field that matches the condition and keep record predicates in strategy.filters.
+- Use English snake_case field IDs, display names in the user's language, and literal observed labels. Distinguish multiple representations only when relevant to the request or alert.
+- When the user request specifies notification or alert conditions (e.g. notify when price drops, changes, or reaches a threshold), populate intent.triggerRules using the schema's operators. For percentage changes (percentage_drop, percentage_increase), set value as the numeric percentage (e.g. 5 for 5%). Keep row selection predicates in strategy.filters.
 - Use single mode for one entity with page scope and empty identityFields. Use collection mode for recurring entities. Page scope covers the current page, and collection scope covers the entire logical collection. Collection identity fields must be required and distinguish logical records. Prefer stable URLs or IDs and use composite keys when needed.
 - Put locale on numeric and applicable date field definitions. Use observed number formatting rather than currency alone. Use lowercase normalized booleanValues for booleans and normalizeVolatileText only when it preserves the meaning of a string. Dates support ISO and numeric calendar formats. Use the observed locale to resolve ambiguous date order.
 
