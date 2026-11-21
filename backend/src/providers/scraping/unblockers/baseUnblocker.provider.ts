@@ -7,8 +7,17 @@ import { normalizeUnblockerError } from './unblockerErrors.js';
 
 export abstract class BaseUnblockerProvider implements IUnblockerProvider {
   abstract readonly name: string;
+  protected readonly apiKey: string;
+  protected readonly fetchFn: typeof fetch;
 
-  abstract isEnabled(): boolean;
+  constructor(options: { apiKey?: string; token?: string; fetchFn?: typeof fetch } = {}) {
+    this.apiKey = (options.apiKey ?? options.token ?? '').trim();
+    this.fetchFn = options.fetchFn ?? fetch;
+  }
+
+  isEnabled(): boolean {
+    return Boolean(this.apiKey && this.apiKey.length > 0);
+  }
 
   protected abstract executeAttempt(
     targetUrl: string,

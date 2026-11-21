@@ -1,6 +1,7 @@
 import { env } from '../../../config/env.js';
 import { logger } from '../../../utils/logger.js';
 import { parseProxyConfig } from '../../../utils/proxyParser.js';
+import { getErrorMessage } from '../../../utils/htmlEscape.js';
 
 export interface ProviderQuotaInfo {
   provider: string;
@@ -12,20 +13,18 @@ export interface ProviderQuotaInfo {
   error?: string;
 }
 
-export async function checkScraperApiQuota(
+async function fetchProviderAccount<T>(
+  provider: string,
   apiKey: string,
-  fetchFn: typeof fetch = fetch
-): Promise<ProviderQuotaInfo> {
-  const provider = 'scraperapi';
+  urlStr: string,
+  fetchFn: typeof fetch
+): Promise<{ ok: true; data: T } | { ok: false; info: ProviderQuotaInfo }> {
   if (!apiKey || apiKey.trim().length === 0) {
-    return { provider, enabled: false };
+    return { ok: false, info: { provider, enabled: false } };
   }
 
   try {
-    const url = new URL('https://api.scraperapi.com/account');
-    url.searchParams.set('api_key', apiKey.trim());
-
-    const res = await fetchFn(url.toString(), {
+    const res = await fetchFn(urlStr, {
       method: 'GET',
       signal: AbortSignal.timeout(6000),
     });
@@ -33,37 +32,58 @@ export async function checkScraperApiQuota(
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       return {
-        provider,
-        enabled: true,
-        error: `HTTP ${res.status}: ${body.slice(0, 100)}`,
+        ok: false,
+        info: {
+          provider,
+          enabled: true,
+          error: `HTTP ${res.status}: ${body.slice(0, 100)}`,
+        },
       };
     }
 
-    const data = (await res.json()) as {
-      requestLimit?: number;
-      requestCount?: number;
-      concurrencyLimit?: number;
-    };
-
-    const limit = data.requestLimit ?? 0;
-    const used = data.requestCount ?? 0;
-    const remaining = Math.max(0, limit - used);
-
-    return {
-      provider,
-      enabled: true,
-      limit,
-      used,
-      remaining,
-      details: `${remaining} / ${limit} requests remaining (concurrency: ${data.concurrencyLimit ?? 'N/A'})`,
-    };
+    const data = (await res.json()) as T;
+    return { ok: true, data };
   } catch (err) {
     return {
-      provider,
-      enabled: true,
-      error: err instanceof Error ? err.message : String(err),
+      ok: false,
+      info: {
+        provider,
+        enabled: true,
+        error: getErrorMessage(err),
+      },
     };
   }
+}
+
+export async function checkScraperApiQuota(
+  apiKey: string,
+  fetchFn: typeof fetch = fetch
+): Promise<ProviderQuotaInfo> {
+  const provider = 'scraperapi';
+  const url = new URL('https://api.scraperapi.com/account');
+  url.searchParams.set('api_key', apiKey ? apiKey.trim() : '');
+
+  const result = await fetchProviderAccount<{
+    requestLimit?: number;
+    requestCount?: number;
+    concurrencyLimit?: number;
+  }>(provider, apiKey, url.toString(), fetchFn);
+
+  if (!result.ok) return result.info;
+
+  const data = result.data;
+  const limit = data.requestLimit ?? 0;
+  const used = data.requestCount ?? 0;
+  const remaining = Math.max(0, limit - used);
+
+  return {
+    provider,
+    enabled: true,
+    limit,
+    used,
+    remaining,
+    details: `${remaining} / ${limit} requests remaining (concurrency: ${data.concurrencyLimit ?? 'N/A'})`,
+  };
 }
 
 export async function checkScrapingBeeQuota(
@@ -71,52 +91,29 @@ export async function checkScrapingBeeQuota(
   fetchFn: typeof fetch = fetch
 ): Promise<ProviderQuotaInfo> {
   const provider = 'scrapingbee';
-  if (!apiKey || apiKey.trim().length === 0) {
-    return { provider, enabled: false };
-  }
+  const url = new URL('https://app.scrapingbee.com/api/v1/usage');
+  url.searchParams.set('api_key', apiKey ? apiKey.trim() : '');
 
-  try {
-    const url = new URL('https://app.scrapingbee.com/api/v1/usage');
-    url.searchParams.set('api_key', apiKey.trim());
+  const result = await fetchProviderAccount<{
+    max_api_credit?: number;
+    used_api_credit?: number;
+  }>(provider, apiKey, url.toString(), fetchFn);
 
-    const res = await fetchFn(url.toString(), {
-      method: 'GET',
-      signal: AbortSignal.timeout(6000),
-    });
+  if (!result.ok) return result.info;
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      return {
-        provider,
-        enabled: true,
-        error: `HTTP ${res.status}: ${body.slice(0, 100)}`,
-      };
-    }
+  const data = result.data;
+  const limit = data.max_api_credit ?? 0;
+  const used = data.used_api_credit ?? 0;
+  const remaining = Math.max(0, limit - used);
 
-    const data = (await res.json()) as {
-      max_api_credit?: number;
-      used_api_credit?: number;
-    };
-
-    const limit = data.max_api_credit ?? 0;
-    const used = data.used_api_credit ?? 0;
-    const remaining = Math.max(0, limit - used);
-
-    return {
-      provider,
-      enabled: true,
-      limit,
-      used,
-      remaining,
-      details: `${remaining} / ${limit} credits remaining`,
-    };
-  } catch (err) {
-    return {
-      provider,
-      enabled: true,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
+  return {
+    provider,
+    enabled: true,
+    limit,
+    used,
+    remaining,
+    details: `${remaining} / ${limit} credits remaining`,
+  };
 }
 
 export async function checkCrawlbaseQuota(

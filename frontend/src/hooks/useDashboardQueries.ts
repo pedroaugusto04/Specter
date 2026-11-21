@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { getBrowserPageLanguage } from '@/lib/pageLanguage';
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken, type QueryClient } from '@tanstack/react-query';
 import {
   api,
   type DashboardStats,
@@ -97,30 +97,7 @@ export function useJobRunsQuery(
 ) {
   return useQuery<JobRunsDto>({
     queryKey: jobId ? dashboardKeys.jobRuns(jobId, page, pageSize) : ['jobRuns', 'none'],
-    queryFn: async () => {
-      if (!jobId) {
-        return {
-          runs: [],
-          latestDiff: null,
-          pagination: {
-            page: 1,
-            pageSize,
-            totalItems: 0,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-          summary: {
-            totalRuns: 0,
-            changedRuns: 0,
-            lastChange: null,
-            averageDurationMs: null,
-          },
-        };
-      }
-      return api.getJobRuns(jobId, page, pageSize);
-    },
-    enabled: Boolean(jobId),
+    queryFn: jobId ? () => api.getJobRuns(jobId, page, pageSize) : skipToken,
     staleTime: 5 * 1000,
     placeholderData: (prev) => prev,
   });
@@ -133,25 +110,7 @@ export function useJobVersionsQuery(
 ) {
   return useQuery<JobPlanVersionsDto>({
     queryKey: jobId ? dashboardKeys.jobVersions(jobId, page, pageSize) : ['jobVersions', 'none'],
-    queryFn: async () => {
-      if (!jobId) {
-        return {
-          jobId: '',
-          activeVersionNumber: null,
-          versions: [],
-          pagination: {
-            page: 1,
-            pageSize,
-            totalItems: 0,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-        };
-      }
-      return api.getJobVersions(jobId, page, pageSize);
-    },
-    enabled: Boolean(jobId),
+    queryFn: jobId ? () => api.getJobVersions(jobId, page, pageSize) : skipToken,
     staleTime: 10 * 1000,
     placeholderData: (prev) => prev,
   });
@@ -167,26 +126,7 @@ export function useJobTimeseriesQuery(
     queryKey: jobId
       ? [...dashboardKeys.timeseries(jobId, range), page, pageSize]
       : ['timeseries', 'none'],
-    queryFn: async () => {
-      if (!jobId) {
-        return {
-          jobId: '',
-          range,
-          points: [],
-          previousPoint: null,
-          pagination: {
-            page: 1,
-            pageSize,
-            totalItems: 0,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-        };
-      }
-      return api.getJobTimeseries(jobId, range, page, pageSize);
-    },
-    enabled: Boolean(jobId),
+    queryFn: jobId ? () => api.getJobTimeseries(jobId, range, page, pageSize) : skipToken,
     staleTime: 15 * 1000,
     placeholderData: (prev) => prev,
   });

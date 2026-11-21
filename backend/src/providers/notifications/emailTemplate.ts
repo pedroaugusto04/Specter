@@ -1,17 +1,7 @@
 import type { AlertPayload } from './notification.interface.js';
 import { env } from '../../config/env.js';
 import { formatEmailDateTime } from '../../utils/dateFormatter.js';
-
-function escapeHtml(value: unknown): string {
-  if (value === null || value === undefined) return '—';
-  const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '../../utils/htmlEscape.js';
 
 /**
  * Builds a responsive, enterprise-grade HTML email with Specter brand identity,

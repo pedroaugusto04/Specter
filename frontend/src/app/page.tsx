@@ -32,7 +32,6 @@ export default function HomePage() {
   // If URL has ?jobId=... from email alert, redirect to /dashboard?jobId=...
   // If URL has ?auth_error=google_failed, open auth modal with error
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const targetJobId = params.get('jobId');
     if (targetJobId) {

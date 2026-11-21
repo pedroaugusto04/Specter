@@ -59,17 +59,11 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
 export function getBrowserTimezone(): string {
-  if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz && typeof tz === 'string' && tz.trim().length > 0) {
-        return tz;
-      }
-    } catch {
-      // ignore
-    }
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone.trim() || DEFAULT_TIMEZONE;
+  } catch {
+    return DEFAULT_TIMEZONE;
   }
-  return DEFAULT_TIMEZONE;
 }
 
 const COMMON_TIMEZONES = [
@@ -106,9 +100,9 @@ export function getAllIanaTimezones(): TimezoneOption[] {
 
   let timezones: string[] = [];
 
-  if (typeof Intl !== 'undefined' && typeof (Intl as any).supportedValuesOf === 'function') {
+  if ('supportedValuesOf' in Intl && typeof Intl.supportedValuesOf === 'function') {
     try {
-      timezones = (Intl as any).supportedValuesOf('timeZone');
+      timezones = Intl.supportedValuesOf('timeZone');
     } catch {
       timezones = [];
     }
@@ -148,55 +142,47 @@ export function getAllIanaTimezones(): TimezoneOption[] {
   return results;
 }
 
-export function formatDateTime(isoString: string, timeZone: string = getBrowserTimezone()): string {
+function formatWithTimezone(
+  isoString: string,
+  options: Intl.DateTimeFormatOptions,
+  timeZone: string
+): string {
   try {
     const d = new Date(isoString);
     if (Number.isNaN(d.getTime())) return isoString;
-    return new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-      timeZone,
-    }).format(d);
+    return new Intl.DateTimeFormat('en-US', { ...options, timeZone }).format(d);
   } catch {
     try {
-      return new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'medium',
-      }).format(new Date(isoString));
+      return new Intl.DateTimeFormat('en-US', options).format(new Date(isoString));
     } catch {
       return isoString;
     }
   }
 }
 
+export function formatDateTime(isoString: string, timeZone: string = getBrowserTimezone()): string {
+  return formatWithTimezone(
+    isoString,
+    { dateStyle: 'medium', timeStyle: 'medium' },
+    timeZone
+  );
+}
+
 export function formatCompactDate(
   isoString: string,
   timeZone: string = getBrowserTimezone()
 ): string {
-  try {
-    const d = new Date(isoString);
-    if (Number.isNaN(d.getTime())) return isoString;
-    return new Intl.DateTimeFormat('en-US', {
+  return formatWithTimezone(
+    isoString,
+    {
       month: 'short',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-      timeZone,
-    }).format(d);
-  } catch {
-    try {
-      return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }).format(new Date(isoString));
-    } catch {
-      return isoString;
-    }
-  }
+    },
+    timeZone
+  );
 }
 
 export function parseErrorMessage(rawError: string | null | undefined) {

@@ -114,7 +114,7 @@ export default function DashboardPage() {
 
   // Automatically submit pending draft if user just signed in
   React.useEffect(() => {
-    if (user && typeof window !== 'undefined') {
+    if (user) {
       const rawPending = sessionStorage.getItem(PENDING_JOB_STORAGE_KEY);
       if (rawPending) {
         sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
@@ -145,7 +145,7 @@ export default function DashboardPage() {
 
   // Automatically open job drawer if redirected via email alert with ?jobId=...
   React.useEffect(() => {
-    if (typeof window === 'undefined' || !jobs.length || modals.selectedJob) return;
+    if (!jobs.length || modals.selectedJob) return;
     const params = new URLSearchParams(window.location.search);
     const targetJobId = params.get('jobId');
     if (!targetJobId) return;

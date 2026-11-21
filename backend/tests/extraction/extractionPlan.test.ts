@@ -2,7 +2,7 @@ import { ExtractionExecutor } from '../../src/extraction/executor.js';
 import type { DocumentAdapter } from '../../src/extraction/contracts.js';
 import { standardSourceReaders } from '../../src/extraction/sources.js';
 import { describe, it, expect } from 'vitest';
-import { extractionPlanSchema, normalizeSingleFieldSources } from '../../src/types/extractionPlan.js';
+import { extractionPlanSchema, normalizeCandidatePlan } from '../../src/types/extractionPlan.js';
 import { PageExtractor } from '../../src/extraction/pageExtractor.js';
 import { convertFieldValue } from '../../src/extraction/values.js';
 import { matchesRecord } from '../../src/extraction/recordFilter.js';
@@ -609,7 +609,7 @@ describe('Common execution and comparisons', () => {
         },
       },
     };
-    const normalized = normalizeSingleFieldSources(raw) as any;
+    const normalized = normalizeCandidatePlan(raw) as any;
     expect(Array.isArray(normalized.strategy.fields.title)).toBe(true);
     expect(normalized.strategy.ready[0].locator).toEqual({ kind: 'css', selector: '.card' });
     expect(normalized.strategy.empty[0].locator).toEqual({ kind: 'css', selector: '.empty' });

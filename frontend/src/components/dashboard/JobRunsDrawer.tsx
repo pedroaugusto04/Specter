@@ -217,31 +217,24 @@ export function JobRunsDrawer({
     }
   };
 
-  const handleExportCsv = async () => {
+  const handleExport = async (format: 'csv' | 'json') => {
     if (!job) return;
     const runsToExport = await getRunsForExport();
     if (runsToExport.length === 0) return;
-    const csv = runsToCsv(runsToExport);
+
+    const content = format === 'csv' ? runsToCsv(runsToExport) : runsToJson(runsToExport);
+    const mimeType =
+      format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json;charset=utf-8;';
     const slug = (job.name || 'monitor')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
     const dateStr = new Date().toISOString().slice(0, 10);
-    downloadFile(csv, `${slug}_runs_${dateStr}.csv`, 'text/csv;charset=utf-8;');
+    downloadFile(content, `${slug}_runs_${dateStr}.${format}`, mimeType);
   };
 
-  const handleExportJson = async () => {
-    if (!job) return;
-    const runsToExport = await getRunsForExport();
-    if (runsToExport.length === 0) return;
-    const json = runsToJson(runsToExport);
-    const slug = (job.name || 'monitor')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-    const dateStr = new Date().toISOString().slice(0, 10);
-    downloadFile(json, `${slug}_runs_${dateStr}.json`, 'application/json;charset=utf-8;');
-  };
+  const handleExportCsv = () => handleExport('csv');
+  const handleExportJson = () => handleExport('json');
 
   const handleSelectRun = (run: { id: string }) => {
     setSelectedRunId(run.id);

@@ -609,10 +609,3 @@ export function normalizeCandidatePlan(
 
   return plan;
 }
-
-export function normalizeSingleFieldSources(
-  raw: unknown,
-  snapshot?: { html?: string; url?: string } | string | null
-): unknown {
-  return normalizeCandidatePlan(raw, snapshot);
-}

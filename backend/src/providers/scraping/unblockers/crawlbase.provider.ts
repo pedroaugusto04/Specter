@@ -9,17 +9,12 @@ import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
 export class CrawlbaseUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'crawlbase';
-  private readonly token: string;
-  private readonly fetchFn: typeof fetch;
 
   constructor(options: { token?: string; fetchFn?: typeof fetch } = {}) {
-    super();
-    this.token = options.token ?? env.CRAWLBASE_TOKEN;
-    this.fetchFn = options.fetchFn ?? fetch;
-  }
-
-  isEnabled(): boolean {
-    return Boolean(this.token && this.token.trim().length > 0);
+    super({
+      token: options.token ?? env.CRAWLBASE_TOKEN,
+      fetchFn: options.fetchFn,
+    });
   }
 
   protected override shouldEscalateToPremium(err: unknown): boolean {
@@ -35,7 +30,7 @@ export class CrawlbaseUnblockerProvider extends BaseUnblockerProvider {
   ): Promise<ScrapeResult> {
     signal.throwIfAborted();
     const endpoint = new URL('https://api.crawlbase.com/');
-    endpoint.searchParams.set('token', this.token.trim());
+    endpoint.searchParams.set('token', this.apiKey.trim());
     endpoint.searchParams.set('url', targetUrl);
     endpoint.searchParams.set('javascript', 'true');
     if (usePremium) {

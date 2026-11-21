@@ -46,7 +46,7 @@ export function useRealtimeEvents({
   }, [onReconnect]);
 
   React.useEffect(() => {
-    if (!enabled || typeof window === 'undefined') {
+    if (!enabled) {
       setConnectionMode('disconnected');
       return;
     }
@@ -59,7 +59,7 @@ export function useRealtimeEvents({
       if (fallbackTimer) return;
       fallbackTimer = setInterval(() => {
         // Only poll if window/tab is visible
-        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        if (document.visibilityState === 'hidden') {
           return;
         }
         onReconnectRef.current?.();

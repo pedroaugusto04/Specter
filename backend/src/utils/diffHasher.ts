@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { DiffChangeEntry, DiffSummary } from '../types/domain.js';
+import { formatHtmlCell } from './htmlEscape.js';
 
 /**
  * Patterns for volatile strings that should not trigger false-positive diff alerts:
@@ -99,16 +100,6 @@ function flattenPayload(
   return target;
 }
 
-function escapeHtml(value: unknown): string {
-  const str = value === null || value === undefined ? '—' : String(value);
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function renderDiffSummaryText(changes: DiffChangeEntry[]): string {
   if (changes.length === 0) {
     return 'No significant changes detected across monitored fields.';
@@ -151,10 +142,10 @@ function renderDiffSummaryHtml(changes: DiffChangeEntry[]): string {
             : 'Removed';
 
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:13px;">${escapeHtml(change.field)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:13px;">${formatHtmlCell(change.field)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;"><span style="background:${badgeColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${badgeLabel}</span></td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;">${escapeHtml(change.previousValue)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:13px;">${escapeHtml(change.currentValue)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;">${formatHtmlCell(change.previousValue)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:13px;">${formatHtmlCell(change.currentValue)}</td>
       </tr>`;
     })
     .join('');

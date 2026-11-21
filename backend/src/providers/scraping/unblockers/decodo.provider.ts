@@ -21,17 +21,12 @@ interface DecodoScrapeResponse {
 
 export class DecodoUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'decodo';
-  private readonly apiKey: string;
-  private readonly fetchFn: typeof fetch;
 
   constructor(options: { apiKey?: string; fetchFn?: typeof fetch } = {}) {
-    super();
-    this.apiKey = options.apiKey ?? env.DECODO_API_KEY;
-    this.fetchFn = options.fetchFn ?? fetch;
-  }
-
-  isEnabled(): boolean {
-    return Boolean(this.apiKey && this.apiKey.trim().length > 0);
+    super({
+      apiKey: options.apiKey ?? env.DECODO_API_KEY,
+      fetchFn: options.fetchFn,
+    });
   }
 
   protected async executeAttempt(

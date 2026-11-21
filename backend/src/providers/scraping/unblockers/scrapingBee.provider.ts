@@ -8,17 +8,12 @@ import { BaseUnblockerProvider } from './baseUnblocker.provider.js';
 
 export class ScrapingBeeUnblockerProvider extends BaseUnblockerProvider {
   public readonly name = 'scrapingbee';
-  private readonly apiKey: string;
-  private readonly fetchFn: typeof fetch;
 
   constructor(options: { apiKey?: string; fetchFn?: typeof fetch } = {}) {
-    super();
-    this.apiKey = options.apiKey ?? env.SCRAPINGBEE_API_KEY;
-    this.fetchFn = options.fetchFn ?? fetch;
-  }
-
-  isEnabled(): boolean {
-    return Boolean(this.apiKey && this.apiKey.trim().length > 0);
+    super({
+      apiKey: options.apiKey ?? env.SCRAPINGBEE_API_KEY,
+      fetchFn: options.fetchFn,
+    });
   }
 
   protected async executeAttempt(
