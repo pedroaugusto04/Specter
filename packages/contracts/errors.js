@@ -77,8 +77,31 @@ export const USER_FAILURES = Object.freeze({
   },
 });
 
+export function parseStructuredUserFailure(message) {
+  if (typeof message === 'string' && message.startsWith('{') && message.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed && typeof parsed.description === 'string' && typeof parsed.nextStep === 'string') {
+        return {
+          title:
+            typeof parsed.title === 'string' && parsed.title.trim()
+              ? parsed.title.trim()
+              : USER_FAILURES.configurationRejected.title,
+          description: parsed.description.trim(),
+          nextStep: parsed.nextStep.trim(),
+        };
+      }
+    } catch {
+      // Fallback to static matching
+    }
+  }
+  return null;
+}
+
 export function getUserFailure(message) {
   if (!message) return USER_FAILURES.requestFailed;
+  const structured = parseStructuredUserFailure(message);
+  if (structured) return structured;
   const match = Object.values(USER_FAILURES).find((failure) => failure.description === message);
   if (match) return match;
   if (/limit reached|quota exceeded/i.test(message)) {

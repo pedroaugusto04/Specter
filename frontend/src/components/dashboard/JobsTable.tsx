@@ -16,11 +16,17 @@ import { JobStatus, PAGINATION_DEFAULT_PAGE_SIZE } from '@specter/contracts';
 import type { ScrapingJobDto } from '@/lib/api';
 import type { PaginationMeta } from '@specter/contracts';
 import { getJobActionPermissions, type JobRowActionType } from '@/lib/jobActionPermissions';
-import { DEFAULT_TIMEZONE, formatCompactDate, formatDateTime } from '@/lib/utils';
+import {
+  DEFAULT_TIMEZONE,
+  formatCompactDate,
+  formatDateTime,
+  parseErrorMessage,
+} from '@/lib/utils';
 import {
   Clock,
   ExternalLink,
   History,
+  Info,
   Loader2,
   Pause,
   Pencil,
@@ -54,7 +60,7 @@ function formatDisplayUrl(rawUrl: string): string {
   }
 }
 
-function renderStatusPill(status: JobStatus) {
+function renderStatusPill(status: JobStatus, onFailedClick?: () => void, failureTooltip?: string) {
   switch (status) {
     case JobStatus.Active:
       return (
@@ -81,10 +87,18 @@ function renderStatusPill(status: JobStatus) {
       );
     case JobStatus.Failed:
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          FAILED
-        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFailedClick?.();
+          }}
+          title={failureTooltip || 'Click to view failure details & recommendations'}
+          className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-red-700 hover:bg-red-100/90 hover:border-red-400 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer group"
+        >
+          <Info className="h-3 w-3 text-red-600 dark:text-red-400 group-hover:scale-110 transition-transform" />
+          <span>FAILED</span>
+        </button>
       );
     case JobStatus.Paused:
     default:
@@ -160,6 +174,25 @@ export function JobsTable({
         delete next[jobId];
         return next;
       });
+    }
+  };
+
+  const handleShowFailureDetails = async (job: ScrapingJobDto) => {
+    const failure = parseErrorMessage(job.lastError);
+    if (!failure) {
+      onSelectJobForHistory(job);
+      return;
+    }
+
+    const confirmed = await modal.confirm({
+      title: failure.title,
+      message: `${failure.description}\n\nWhat you can do:\n${failure.nextStep}`,
+      confirmLabel: 'Edit Monitor',
+      cancelLabel: 'Close',
+      variant: 'default',
+    });
+    if (confirmed) {
+      onEditJob(job);
     }
   };
 
@@ -365,7 +398,13 @@ export function JobsTable({
                           <LoadingSpinner size="xs" />
                         </span>
                       ) : (
-                        renderStatusPill(job.status)
+                        renderStatusPill(
+                          job.status,
+                          () => handleShowFailureDetails(job),
+                          job.lastError
+                            ? `Click to view recommendations: ${parseErrorMessage(job.lastError)?.title ?? 'Details'}`
+                            : 'Click to view failure details & recommendations'
+                        )
                       )}
                       {job.accessState && (
                         <p className="mt-2 text-xs text-muted-foreground">

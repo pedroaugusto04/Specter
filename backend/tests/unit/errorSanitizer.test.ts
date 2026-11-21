@@ -113,4 +113,18 @@ describe('public failure details', () => {
       USER_FAILURES.requestFailed.description
     );
   });
+
+  it('preserves and parses structured user failures with custom issue and next steps', () => {
+    const customStructured = JSON.stringify({
+      title: 'Monitor Setup Could Not Be Verified',
+      description: 'The requested price only appears after selecting a size.',
+      nextStep: 'Provide a direct URL with the size selected.',
+    });
+
+    expect(presentStoredError(customStructured)).toBe(customStructured);
+    const parsed = getUserFailure(customStructured);
+    expect(parsed.title).toBe('Monitor Setup Could Not Be Verified');
+    expect(parsed.description).toBe('The requested price only appears after selecting a size.');
+    expect(parsed.nextStep).toBe('Provide a direct URL with the size selected.');
+  });
 });

@@ -9,12 +9,20 @@ import type { IConfigurationPipeline } from '../extraction/configuration.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
 import { randomUUID } from 'crypto';
 import {
+  AntiBotBlockedError,
+  BrowserCapacityError,
   CompilerApiRequestError,
+  CompilerTimeoutError,
   DomainError,
+  NavigationTimeoutError,
   NotFoundError,
   CompilerValidationError,
   QuotaExceededError,
+  SelectorMismatchError,
+  UnauthorizedError,
 } from '../errors/domainErrors.js';
+import { classifyAccessFailure } from '../acquisition/failure.js';
+import type { CompilationDiagnosticService } from './compilationDiagnosticService.js';
 import type { IStorageProvider } from '../providers/storage/index.js';
 import type { IJobScheduler } from '../queues/scheduler.interface.js';
 import { CompilationReason } from '../queues/scheduler.interface.js';
@@ -47,6 +55,28 @@ function compilationFailureStatus(input: {
   return hasExistingPlan ? JobStatus.Active : JobStatus.Failed;
 }
 
+function isActionableCompilationError(error: unknown): boolean {
+  if (
+    error instanceof AntiBotBlockedError ||
+    error instanceof BrowserCapacityError ||
+    error instanceof CompilerApiRequestError ||
+    error instanceof CompilerTimeoutError ||
+    error instanceof NavigationTimeoutError ||
+    error instanceof QuotaExceededError ||
+    error instanceof UnauthorizedError
+  ) {
+    return false;
+  }
+  const accessFailure = classifyAccessFailure(error);
+  if (accessFailure !== undefined) return false;
+  return (
+    error instanceof ConfigurationFailure ||
+    error instanceof CompilerValidationError ||
+    error instanceof SelectorMismatchError ||
+    (error instanceof DomainError && error.code === 'CONFIGURATION_REJECTED')
+  );
+}
+
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
   userRepository: Pick<IUserRepository, 'findById'>;
@@ -57,6 +87,7 @@ export interface CompilationServiceDeps {
   sessionRepository: ISessionRepository;
   realtimeService: RealtimeService;
   quotaService: QuotaService;
+  diagnosticService?: CompilationDiagnosticService;
 }
 
 export class CompilationService implements ICompilationControl {
@@ -213,18 +244,19 @@ export class CompilationService implements ICompilationControl {
         url: job.url,
         prompt: job.userPrompt,
         intent: isRecovery ? job.extractionPlan?.intent : undefined,
-        recovery: isRecovery && failure
-          ? {
-              failure: {
-                failureCode: failure.failureCode,
-                failureReason: failure.failureReason,
-                quality: failure.quality,
-                issues: failure.issues?.slice(0, 8) ?? [],
-                evidence: failure.evidence?.slice(0, 8),
-              },
-              previousStrategy: job.extractionPlan?.strategy,
-            }
-          : undefined,
+        recovery:
+          isRecovery && failure
+            ? {
+                failure: {
+                  failureCode: failure.failureCode,
+                  failureReason: failure.failureReason,
+                  quality: failure.quality,
+                  issues: failure.issues?.slice(0, 8) ?? [],
+                  evidence: failure.evidence?.slice(0, 8),
+                },
+                previousStrategy: job.extractionPlan?.strategy,
+              }
+            : undefined,
         storageState,
         pageLanguage,
         captureScreenshot: job.captureScreenshotOnChange,
@@ -234,7 +266,11 @@ export class CompilationService implements ICompilationControl {
       if (!isAcceptedExtractionQuality(configured.execution.report.quality))
         throw new CompilerValidationError('Recovery output did not pass extraction validation.');
       const compiledSchema = configured.plan;
-      if (isRecovery && job.extractionPlan && !sameIntent(job.extractionPlan.intent, compiledSchema.intent))
+      if (
+        isRecovery &&
+        job.extractionPlan &&
+        !sameIntent(job.extractionPlan.intent, compiledSchema.intent)
+      )
         throw new CompilerValidationError(
           'Recovery cannot change extraction intent. Review the monitor instructions.'
         );
@@ -351,7 +387,26 @@ export class CompilationService implements ICompilationControl {
         current.updatedAt.getTime() !== job.updatedAt.getTime()
       )
         return current ?? job;
-      const userMessage = formatUserErrorMessage(error);
+      let userMessage = formatUserErrorMessage(error);
+      if (!willRetry && isActionableCompilationError(error) && this.deps.diagnosticService) {
+        try {
+          const diagnosis = await this.deps.diagnosticService.diagnose({
+            jobId: job.id,
+            url: job.url,
+            userPrompt: job.userPrompt,
+            failureReason: error instanceof Error ? error.message : undefined,
+          });
+          if (diagnosis) {
+            userMessage = JSON.stringify({
+              title: 'Monitor Setup Could Not Be Verified',
+              description: diagnosis.issue,
+              nextStep: diagnosis.nextSteps,
+            });
+          }
+        } catch {
+          // Keep default userMessage on diagnostic failure
+        }
+      }
 
       if (!run && !willRetry)
         await this.deps.jobRepository.createRun({
@@ -429,6 +484,13 @@ export class CompilationService implements ICompilationControl {
             job.id,
             userMessage,
             true
+          );
+        } else if (failureStatus === JobStatus.Failed) {
+          await this.deps.realtimeService.notifyJobCompilationFailed(
+            job.userId,
+            job.id,
+            userMessage,
+            false
           );
         }
       }

@@ -87,14 +87,22 @@ export default function DashboardPage() {
     onJobEvent: React.useCallback(
       (event: RealtimeEventPayload) => {
         void invalidateJobsAndStats(event.jobId);
-        if (event.type === 'JOB_COMPILATION_FAILED' && event.fallbackToPrevious) {
+        if (event.type === 'JOB_COMPILATION_FAILED') {
           const targetJob = jobs.find((j) => j.id === event.jobId);
           const jobName = targetJob?.name || 'Monitor';
-          addToast({
-            type: 'warning',
-            title: 'Recompilation Notice',
-            message: `Recompilation failed for "${jobName}". Monitor remains active using previous stable selectors.`,
-          });
+          if (event.fallbackToPrevious) {
+            addToast({
+              type: 'warning',
+              title: 'Recompilation Notice',
+              message: `Recompilation failed for "${jobName}". Monitor remains active using previous stable selectors.`,
+            });
+          } else {
+            addToast({
+              type: 'error',
+              title: 'Monitor Setup Needs Attention',
+              message: `Setup could not be completed for "${jobName}". Click the FAILED status to view recommendations.`,
+            });
+          }
         }
       },
       [invalidateJobsAndStats, jobs, addToast]

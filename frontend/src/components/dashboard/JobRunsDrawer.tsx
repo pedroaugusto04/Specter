@@ -163,7 +163,9 @@ export function JobRunsDrawer({
   const latestScreenshotRun = runsWithScreenshot[0] ?? null;
   const priorScreenshotRun = runsWithScreenshot[1] ?? null;
 
-  const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema' | 'versions'>('runs');
+  const [activeTab, setActiveTab] = React.useState<'runs' | 'timeline' | 'schema' | 'versions'>(
+    'runs'
+  );
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = React.useState<string | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -697,7 +699,9 @@ export function JobRunsDrawer({
                 Plan Versions
               </div>
               <span className="text-xs font-mono text-muted-foreground">
-                {versionPagination ? `${versionPagination.totalItems} total ${versionPagination.totalItems === 1 ? 'version' : 'versions'}` : ''}
+                {versionPagination
+                  ? `${versionPagination.totalItems} total ${versionPagination.totalItems === 1 ? 'version' : 'versions'}`
+                  : ''}
               </span>
             </div>
 
@@ -829,14 +833,9 @@ function FailureDetails({
   return (
     <div className="min-w-0 flex-1">
       <p className="font-semibold">{failure.title}</p>
-      <details className="mt-2">
-        <summary className="cursor-pointer font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
-          View failure details
-        </summary>
-        <p className="mt-2 leading-relaxed">{failure.description}</p>
-        <p className="mt-2 font-medium">What you can do</p>
-        <p className="mt-1 leading-relaxed">{failure.nextStep}</p>
-      </details>
+      <p className="mt-2 leading-relaxed">{failure.description}</p>
+      <p className="mt-2 font-medium">What you can do</p>
+      <p className="mt-1 leading-relaxed text-muted-foreground">{failure.nextStep}</p>
     </div>
   );
 }

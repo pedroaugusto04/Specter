@@ -1,5 +1,9 @@
 /** Backend protocol identifiers shared by schemas, orchestration and evaluation. */
-export const ModelTask = { Configure: 'configure', Semantic: 'semantic' } as const;
+export const ModelTask = {
+  Configure: 'configure',
+  Semantic: 'semantic',
+  Diagnostic: 'diagnostic',
+} as const;
 export type ModelTask = (typeof ModelTask)[keyof typeof ModelTask];
 export const ConfigurationDecisionKind = { Tool: 'tool', Candidate: 'candidate' } as const;
 export const ConfigurationToolKind = {

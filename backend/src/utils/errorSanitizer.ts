@@ -1,4 +1,4 @@
-import { USER_FAILURES, getUserFailure } from '@specter/contracts';
+import { USER_FAILURES, getUserFailure, parseStructuredUserFailure } from '@specter/contracts';
 import { AccessFailure } from '../types/access.js';
 import { ExtractionQuality, FailureCode } from '../extraction/constants.js';
 import { classifyAccessFailure } from '../acquisition/failure.js';
@@ -106,5 +106,6 @@ export function presentExtractionReport(report: ExtractionReport): ExtractionRep
 /** Only approved public copy may cross the API boundary, including for historical records. */
 export function presentStoredError(message: string | null): string | null {
   if (!message) return null;
+  if (parseStructuredUserFailure(message)) return message;
   return getUserFailure(message).description;
 }

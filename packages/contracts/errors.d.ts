@@ -22,4 +22,5 @@ export declare const USER_FAILURES: Readonly<
     UserFailure
   >
 >;
+export declare function parseStructuredUserFailure(message: unknown): UserFailure | null;
 export declare function getUserFailure(message: string): UserFailure;

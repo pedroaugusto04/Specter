@@ -36,6 +36,7 @@ import { EnvPlanLimitResolver } from './services/quotas/envPlanLimitResolver.js'
 import { QuotaService } from './services/quotaService.js';
 import { AuthService } from './services/authService.js';
 import { CompilationService } from './services/compilationService.js';
+import { CompilationDiagnosticService } from './services/compilationDiagnosticService.js';
 import { IntegrationService } from './services/integrationService.js';
 import { JobService } from './services/jobService.js';
 import { RealtimeService } from './services/realtimeService.js';
@@ -111,6 +112,7 @@ async function bootstrap(): Promise<void> {
     sessionRepository,
     realtimeService,
     quotaService,
+    diagnosticService: new CompilationDiagnosticService(compilerProvider),
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({

@@ -111,7 +111,7 @@ class FixtureModelProvider implements IModelProvider {
   constructor(private readonly responses: ConfigurationEvaluationCase['responses']) {}
 
   async generate(input: ModelInput): Promise<unknown> {
-    const response = this.responses[input.task];
+    const response = (this.responses as Record<string, unknown>)[input.task];
     if (response === undefined) throw new Error(`Missing recorded response for ${input.task}.`);
     if (!Array.isArray(response)) return structuredClone(response);
     const offset = this.offsets.get(input.task) ?? 0;
