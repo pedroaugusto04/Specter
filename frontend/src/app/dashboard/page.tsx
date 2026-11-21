@@ -284,6 +284,7 @@ export default function DashboardPage() {
             setJobsPageSize(value);
             setJobsPage(1);
           }}
+          search={jobsSearch}
           onSearchChange={(value) => {
             setJobsSearch(value);
             setJobsPage(1);

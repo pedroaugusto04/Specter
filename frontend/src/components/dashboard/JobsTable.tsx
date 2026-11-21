@@ -36,8 +36,10 @@ import {
   Search,
   Square,
   Trash2,
+  X,
   Zap,
 } from 'lucide-react';
+import { useDebounce } from '@/hooks/useDebounce';
 import * as React from 'react';
 
 const JOB_STATUS_FILTER = {
@@ -125,6 +127,7 @@ export function JobsTable({
   pageSize = PAGINATION_DEFAULT_PAGE_SIZE,
   onPageChange,
   onPageSizeChange,
+  search,
   onSearchChange,
   onStatusChange,
 }: {
@@ -141,12 +144,47 @@ export function JobsTable({
   pageSize?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  search?: string;
   onSearchChange?: (search: string) => void;
   onStatusChange?: (status: JobStatus | 'recovering' | 'paused' | undefined) => void;
 }) {
   const [activeActions, setActiveActions] = React.useState<Record<string, JobRowActionType>>({});
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState(search ?? '');
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [filter, setFilter] = React.useState<StatusFilter>('ALL');
+  const isInitialMount = React.useRef(true);
+  const onSearchChangeRef = React.useRef(onSearchChange);
+  const lastDispatchedRef = React.useRef(searchQuery);
+
+  React.useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  });
+
+  React.useEffect(() => {
+    if (search !== undefined && search !== searchQuery) {
+      setSearchQuery(search);
+      lastDispatchedRef.current = search;
+    }
+  }, [search]);
+
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (lastDispatchedRef.current !== debouncedSearch) {
+      lastDispatchedRef.current = debouncedSearch;
+      onSearchChangeRef.current?.(debouncedSearch);
+    }
+  }, [debouncedSearch]);
+
+  const handleClearSearch = React.useCallback(() => {
+    setSearchQuery('');
+    if (lastDispatchedRef.current !== '') {
+      lastDispatchedRef.current = '';
+      onSearchChangeRef.current?.('');
+    }
+  }, []);
   const modal = useModal();
   const triggerJobMutation = useTriggerJobMutation();
   const recompileJobMutation = useRecompileJobMutation();
@@ -283,12 +321,19 @@ export function JobsTable({
               type="text"
               placeholder="Filter by URL or instructions..."
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                onSearchChange?.(e.target.value);
-              }}
-              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-8 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <Button
