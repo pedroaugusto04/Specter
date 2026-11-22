@@ -43,7 +43,13 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     const langfuse = getLangfuse();
 
     let promptText = MODEL_SYSTEM_INSTRUCTIONS;
+    let taskInstructions = input.instructions;
     let promptClient:
+      | Parameters<
+          NonNullable<ReturnType<NonNullable<typeof langfuse>['trace']>>['generation']
+        >[0]['prompt']
+      | undefined;
+    let taskPromptClient:
       | Parameters<
           NonNullable<ReturnType<NonNullable<typeof langfuse>['trace']>>['generation']
         >[0]['prompt']
@@ -72,6 +78,39 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       } catch {
         promptText = MODEL_SYSTEM_INSTRUCTIONS;
       }
+
+      if (input.task) {
+        const isStandardPrompt =
+          input.instructions.includes('Build the smallest reproducible extraction plan') ||
+          input.instructions.includes('Check extracted data and provenance') ||
+          input.instructions.includes('helpful and concise support assistant');
+
+        if (isStandardPrompt) {
+          try {
+            const taskPromptName = `specter-task-${input.task}`;
+            const fetchedTaskPrompt = await langfuse.getPrompt(taskPromptName, undefined, {
+              type: 'text',
+              fallback: input.instructions,
+              cacheTtlSeconds: 300,
+            });
+            taskPromptClient = fetchedTaskPrompt;
+            taskInstructions = fetchedTaskPrompt.compile() || input.instructions;
+
+            if (fetchedTaskPrompt.isFallback) {
+              langfuse
+                .createPrompt({
+                  name: taskPromptName,
+                  type: 'text',
+                  prompt: input.instructions,
+                  labels: ['production'],
+                })
+                .catch(() => {});
+            }
+          } catch {
+            taskInstructions = input.instructions;
+          }
+        }
+      }
     }
 
     const trace = langfuse?.trace({
@@ -79,8 +118,13 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       sessionId: input.jobId ? `job:${input.jobId}` : undefined,
       userId: 'specter-compiler',
       tags: ['specter', 'compilation', input.task || 'extract'],
-      input: { task: input.task, instructions: input.instructions },
-      metadata: { model: this.model, jobId: input.jobId },
+      input: { task: input.task, instructions: taskInstructions },
+      metadata: {
+        model: this.model,
+        jobId: input.jobId,
+        taskPromptName: taskPromptClient?.name,
+        taskPromptVersion: taskPromptClient?.version,
+      },
     });
     const generation = trace?.generation({
       name: 'gemini-compile',
@@ -88,7 +132,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       prompt: promptClient,
       input: {
         task: input.task,
-        instructions: input.instructions,
+        instructions: taskInstructions,
         systemInstruction: promptText,
       },
       startTime,
@@ -114,7 +158,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
           {
             role: 'user',
             parts: [
-              { text: `Task (${input.task}):\n${input.instructions}` },
+              { text: `Task (${input.task}):\n${taskInstructions}` },
               { text: `Untrusted evidence:\n${input.evidence}` },
             ],
           },
@@ -280,6 +324,53 @@ export class GeminiApiCompilerProvider implements IModelProvider {
           value: isNonEmpty ? 1 : 0,
           comment: isNonEmpty ? 'Structured output contains data' : 'Output was empty or null',
         });
+
+        if (
+          input.task === 'semantic' &&
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'score' in parsed
+        ) {
+          const semanticScore = Number((parsed as Record<string, unknown>).score);
+          if (!Number.isNaN(semanticScore)) {
+            const rawReasons = (parsed as Record<string, unknown>).reasons;
+            const reasons = Array.isArray(rawReasons)
+              ? rawReasons.slice(0, 3).map(String).join('; ')
+              : '';
+            langfuse?.score({
+              traceId: trace.id,
+              name: 'semantic_score',
+              value: semanticScore,
+              comment: `Semantic review score (0-10): ${reasons}`.slice(0, 300),
+            });
+          }
+        } else if (
+          input.task === 'configure' &&
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'kind' in parsed
+        ) {
+          const kind = (parsed as Record<string, unknown>).kind;
+          const isCandidate = kind === 'candidate';
+          langfuse?.score({
+            traceId: trace.id,
+            name: 'decision_kind',
+            value: isCandidate ? 1 : 0,
+            comment: `Decision: ${String(kind)} (${isCandidate ? 'Full Plan' : 'Tool Observation'})`,
+          });
+        } else if (
+          input.task === 'diagnostic' &&
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'issue' in parsed
+        ) {
+          langfuse?.score({
+            traceId: trace.id,
+            name: 'diagnostic_resolved',
+            value: 1,
+            comment: 'Diagnostic generated for user',
+          });
+        }
       }
       return parsed;
     } catch (error) {
