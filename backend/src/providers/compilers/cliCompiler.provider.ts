@@ -81,6 +81,9 @@ export class CliCompilerProvider implements IModelProvider {
     const langfuse = getLangfuse();
     const trace = langfuse?.trace({
       name: 'specter:compiler:cli',
+      sessionId: jobId ? `job:${jobId}` : undefined,
+      userId: 'specter-cli-compiler',
+      tags: ['specter', 'cli-compiler', this.name],
       input: { jobId, instructions: userPrompt },
       metadata: { cliCommand: this.cliCommand, provider: this.name },
     });

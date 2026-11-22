@@ -43,6 +43,9 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     const langfuse = getLangfuse();
     const trace = langfuse?.trace({
       name: 'specter:compiler:gemini',
+      sessionId: input.jobId ? `job:${input.jobId}` : undefined,
+      userId: 'specter-compiler',
+      tags: ['specter', 'compilation', input.task || 'extract'],
       input: { task: input.task, instructions: input.instructions },
       metadata: { model: this.model, jobId: input.jobId },
     });
