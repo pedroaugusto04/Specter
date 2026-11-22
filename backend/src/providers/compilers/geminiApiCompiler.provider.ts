@@ -130,9 +130,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         ...(input.signal ? [input.signal] : []),
       ]),
     };
-    let attemptCount = 0;
+    let retryCount = 0;
     for (let attempt = 0; ; attempt++) {
-      attemptCount = attempt;
       try {
         response = await this.fetchFn(url, init);
       } catch (error) {
@@ -146,12 +145,14 @@ export class GeminiApiCompilerProvider implements IModelProvider {
             throw new CompilerTimeoutError('Gemini API request timed out', error);
           throw new CompilerApiRequestError(undefined, error);
         }
+        retryCount++;
         await this.waitBeforeRetry(attempt, undefined, init.signal ?? undefined);
         continue;
       }
       if (response.status === 429) break;
       if (response.status !== 408 && response.status < 500) break;
       if (attempt >= env.COMPILER_API_MAX_RETRIES) break;
+      retryCount++;
       const retryAfter = response.headers.get('retry-after');
       await this.waitBeforeRetry(attempt, retryAfter, init.signal ?? undefined);
     }
@@ -178,8 +179,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       langfuse?.score({
         traceId: trace.id,
         name: 'retry_count',
-        value: attemptCount,
-        comment: attemptCount === 0 ? 'Succeeded on first attempt' : `Required ${attemptCount} retries`,
+        value: retryCount,
+        comment: retryCount === 0 ? 'Succeeded on first attempt' : `Required ${retryCount} retries`,
       });
     }
 
