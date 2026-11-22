@@ -41,6 +41,39 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     const timeoutMs = Math.min(input.timeoutMs, env.COMPILER_TIMEOUT_MS);
     const startTime = new Date();
     const langfuse = getLangfuse();
+
+    let promptText = MODEL_SYSTEM_INSTRUCTIONS;
+    let promptClient:
+      | Parameters<
+          NonNullable<ReturnType<NonNullable<typeof langfuse>['trace']>>['generation']
+        >[0]['prompt']
+      | undefined;
+
+    if (langfuse) {
+      try {
+        const fetchedPrompt = await langfuse.getPrompt('specter-compiler', undefined, {
+          type: 'text',
+          fallback: MODEL_SYSTEM_INSTRUCTIONS,
+          cacheTtlSeconds: 300,
+        });
+        promptClient = fetchedPrompt;
+        promptText = fetchedPrompt.compile() || MODEL_SYSTEM_INSTRUCTIONS;
+
+        if (fetchedPrompt.isFallback) {
+          langfuse
+            .createPrompt({
+              name: 'specter-compiler',
+              type: 'text',
+              prompt: MODEL_SYSTEM_INSTRUCTIONS,
+              labels: ['production'],
+            })
+            .catch(() => {});
+        }
+      } catch {
+        promptText = MODEL_SYSTEM_INSTRUCTIONS;
+      }
+    }
+
     const trace = langfuse?.trace({
       name: 'specter:compiler:gemini',
       sessionId: input.jobId ? `job:${input.jobId}` : undefined,
@@ -52,7 +85,12 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     const generation = trace?.generation({
       name: 'gemini-compile',
       model: this.model,
-      input: { task: input.task, instructions: input.instructions },
+      prompt: promptClient,
+      input: {
+        task: input.task,
+        instructions: input.instructions,
+        systemInstruction: promptText,
+      },
       startTime,
     });
 
@@ -68,7 +106,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         systemInstruction: {
           parts: [
             {
-              text: MODEL_SYSTEM_INSTRUCTIONS,
+              text: promptText,
             },
           ],
         },
@@ -92,7 +130,9 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         ...(input.signal ? [input.signal] : []),
       ]),
     };
+    let attemptCount = 0;
     for (let attempt = 0; ; attempt++) {
+      attemptCount = attempt;
       try {
         response = await this.fetchFn(url, init);
       } catch (error) {
@@ -134,17 +174,54 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       );
     }
 
+    if (trace) {
+      langfuse?.score({
+        traceId: trace.id,
+        name: 'retry_count',
+        value: attemptCount,
+        comment: attemptCount === 0 ? 'Succeeded on first attempt' : `Required ${attemptCount} retries`,
+      });
+    }
+
     let data: GeminiResponse;
     try {
       data = (await response.json()) as GeminiResponse;
     } catch (error) {
       generation?.end({ output: { error: 'invalid_json_response' }, level: 'ERROR' });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'schema_valid',
+          value: 0,
+          comment: 'Gemini API returned an invalid response',
+        });
+      }
       throw new CompilerValidationError('Gemini API returned an invalid response', error);
     }
 
     const candidate = data.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const isStop = finishReason === 'STOP';
+
+    if (trace) {
+      langfuse?.score({
+        traceId: trace.id,
+        name: 'finish_reason_stop',
+        value: isStop ? 1 : 0,
+        comment: `finishReason: ${finishReason || 'unknown'}`,
+      });
+    }
+
     if (!candidate || candidate.finishReason === 'MAX_TOKENS') {
       generation?.end({ output: { error: 'incomplete_result' }, level: 'ERROR' });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'schema_valid',
+          value: 0,
+          comment: 'Incomplete result (MAX_TOKENS or missing candidate)',
+        });
+      }
       throw new CompilerValidationError('Gemini API did not return a complete result');
     }
     const output = candidate.content?.parts
@@ -153,11 +230,36 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       .trim();
     if (output && output.length > env.COMPILER_MAX_OUTPUT_CHARS) {
       generation?.end({ output: { error: 'size_limit_exceeded' }, level: 'ERROR' });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'output_size_valid',
+          value: 0,
+          comment: `Model output exceeds configured size limit (${output.length} > ${env.COMPILER_MAX_OUTPUT_CHARS})`,
+        });
+      }
       throw new CompilerValidationError('Model output exceeds the configured size limit.');
     }
     if (!output) {
       generation?.end({ output: { error: 'empty_result' }, level: 'ERROR' });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'schema_valid',
+          value: 0,
+          comment: 'Gemini API returned an empty result',
+        });
+      }
       throw new CompilerValidationError('Gemini API returned an empty result');
+    }
+
+    if (trace) {
+      langfuse?.score({
+        traceId: trace.id,
+        name: 'output_size_valid',
+        value: 1,
+        comment: `Model output size: ${output.length} characters`,
+      });
     }
 
     try {
@@ -170,6 +272,14 @@ export class GeminiApiCompilerProvider implements IModelProvider {
           name: 'schema_valid',
           value: 1,
           comment: 'Valid JSON output from Gemini',
+        });
+        const isNonEmpty =
+          typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0;
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'non_empty_result',
+          value: isNonEmpty ? 1 : 0,
+          comment: isNonEmpty ? 'Structured output contains data' : 'Output was empty or null',
         });
       }
       return parsed;
