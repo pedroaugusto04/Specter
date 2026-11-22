@@ -1,0 +1,783 @@
+{
+  "reportVersion": 1,
+  "generatedAt": "2026-11-22T18:30:41.520Z",
+  "mode": "offline-recorded-models",
+  "nodeVersion": "v24.22.3",
+  "corpusHash": "57e85a25709e2c10801257c5428d17356f6708106a3275443ac3cc2e2f926774",
+  "passed": true,
+  "configuration": {
+    "cases": 16,
+    "fieldAccuracy": 1,
+    "entityAccuracy": 1,
+    "qualityAccuracy": 1,
+    "falseAlerts": 0,
+    "missedAlerts": 0,
+    "falseAcceptances": 0,
+    "checks": {
+      "intent": {
+        "passed": 16,
+        "total": 16
+      },
+      "acceptance": {
+        "passed": 16,
+        "total": 16
+      },
+      "extraction": {
+        "passed": 12,
+        "total": 12
+      },
+      "quality": {
+        "passed": 16,
+        "total": 16
+      },
+      "semantic": {
+        "passed": 14,
+        "total": 14
+      },
+      "alerts": {
+        "passed": 5,
+        "total": 5
+      },
+      "budget:configure": {
+        "passed": 16,
+        "total": 16
+      },
+      "budget:semantic": {
+        "passed": 16,
+        "total": 16
+      },
+      "routine:price drop": {
+        "passed": 1,
+        "total": 1
+      },
+      "routine:missing price": {
+        "passed": 1,
+        "total": 1
+      },
+      "routine:recovered unchanged": {
+        "passed": 1,
+        "total": 1
+      },
+      "routineWithoutModels": {
+        "passed": 2,
+        "total": 2
+      },
+      "routine:reordered": {
+        "passed": 1,
+        "total": 1
+      },
+      "routine:added": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "modelCalls": 39,
+    "modelDurationMs": 0,
+    "modelCallsByTask": {
+      "configure": {
+        "calls": 25,
+        "failures": 0,
+        "durationMs": 0
+      },
+      "semantic": {
+        "calls": 14,
+        "failures": 0,
+        "durationMs": 0
+      }
+    },
+    "stages": {
+      "acquisition": {
+        "calls": 17,
+        "failures": 0,
+        "durationMs": 0
+      },
+      "configure": {
+        "calls": 25,
+        "failures": 0,
+        "durationMs": 127
+      },
+      "validation": {
+        "calls": 16,
+        "failures": 0,
+        "durationMs": 41
+      },
+      "semantic": {
+        "calls": 14,
+        "failures": 1,
+        "durationMs": 29
+      },
+      "tool:interact": {
+        "calls": 2,
+        "failures": 0,
+        "durationMs": 1
+      },
+      "tool:query": {
+        "calls": 1,
+        "failures": 0,
+        "durationMs": 1
+      },
+      "tool:structured": {
+        "calls": 1,
+        "failures": 0,
+        "durationMs": 1
+      },
+      "tool:responses": {
+        "calls": 1,
+        "failures": 0,
+        "durationMs": 0
+      }
+    },
+    "durationMs": 291,
+    "results": [
+      {
+        "category": "product-dom",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "alerts": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 59,
+        "name": "main product title and price",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "product-dom",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 13,
+        "name": "Brazilian localized product price",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "interaction-replay",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 26,
+        "name": "discovery reveals current price",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "temporal",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "routine:price drop": true,
+          "routine:missing price": true,
+          "routine:recovered unchanged": true,
+          "routineWithoutModels": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 22,
+        "name": "routine change outage and recovery",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "plan-repair",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 28,
+        "name": "invalid model strategy repaired",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "source-repair",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 20,
+        "name": "wrong selector repaired from feedback",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "semantic-rejection",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 9,
+        "name": "semantic rejection prevents activation",
+        "passed": true,
+        "quality": "FAILED",
+        "semanticStatus": "REJECTED",
+        "error": "ConfigurationFailure"
+      },
+      {
+        "category": "semantic-degraded",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 10,
+        "name": "invalid semantic response prevents activation",
+        "passed": true,
+        "quality": "FAILED",
+        "semanticStatus": "ERROR",
+        "error": "ConfigurationFailure"
+      },
+      {
+        "category": "ambiguity",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "quality": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 11,
+        "name": "ambiguous prices cannot activate",
+        "passed": true,
+        "quality": "FAILED",
+        "error": "ConfigurationFailure"
+      },
+      {
+        "category": "interaction-replay",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "quality": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 3,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 21,
+        "name": "discovery without replayable setup is rejected",
+        "passed": true,
+        "quality": "FAILED",
+        "error": "ConfigurationFailure"
+      },
+      {
+        "category": "jsonld",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 10,
+        "name": "JSON-LD product fields",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "network",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "alerts": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 6,
+        "name": "observed JSON response configuration",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "collection-identity",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "alerts": true,
+          "routine:reordered": true,
+          "routine:added": true,
+          "routineWithoutModels": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 13,
+        "name": "collection reorder and additions",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "product-dom",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "alerts": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 13,
+        "name": "query selector before proposal",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "jsonld",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 15,
+        "name": "inspect structured sources before proposal",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      },
+      {
+        "category": "network",
+        "checks": {
+          "intent": true,
+          "acceptance": true,
+          "extraction": true,
+          "quality": true,
+          "semantic": true,
+          "alerts": true,
+          "budget:configure": true,
+          "budget:semantic": true
+        },
+        "modelCallsByTask": {
+          "configure": {
+            "calls": 2,
+            "failures": 0,
+            "durationMs": 0
+          },
+          "semantic": {
+            "calls": 1,
+            "failures": 0,
+            "durationMs": 0
+          }
+        },
+        "durationMs": 15,
+        "name": "inspect observed response before proposal",
+        "passed": true,
+        "quality": "COMPLETE",
+        "semanticStatus": "PASSED"
+      }
+    ]
+  },
+  "extraction": {
+    "cases": 12,
+    "fieldAccuracy": 1,
+    "entityAccuracy": 1,
+    "qualityAccuracy": 1,
+    "falseAlerts": 0,
+    "falseComplete": 0,
+    "missedAlerts": 0,
+    "durationMs": 8,
+    "modelCalls": 0,
+    "results": [
+      {
+        "name": "main product excludes recommendations",
+        "passed": true,
+        "quality": "COMPLETE"
+      },
+      {
+        "name": "ambiguous prices rejected",
+        "passed": true,
+        "quality": "INVALID"
+      },
+      {
+        "name": "missing required price rejected",
+        "passed": true,
+        "quality": "INVALID"
+      },
+      {
+        "name": "two prices are not concatenated",
+        "passed": true,
+        "quality": "INVALID"
+      },
+      {
+        "name": "real price change",
+        "passed": true,
+        "quality": "COMPLETE"
+      },
+      {
+        "name": "confirmed empty collection",
+        "passed": true,
+        "quality": "EMPTY"
+      },
+      {
+        "name": "unconfirmed missing collection",
+        "passed": true,
+        "quality": "INCONCLUSIVE"
+      },
+      {
+        "name": "HTTP error cannot establish empty baseline",
+        "passed": true,
+        "quality": "BLOCKED"
+      },
+      {
+        "name": "service outage cannot establish baseline",
+        "passed": true,
+        "quality": "INCONCLUSIVE"
+      },
+      {
+        "name": "volatile text does not send an alert",
+        "passed": true,
+        "quality": "COMPLETE"
+      },
+      {
+        "name": "JSON-LD uses the declared product",
+        "passed": true,
+        "quality": "COMPLETE"
+      },
+      {
+        "name": "observed response uses declared fields",
+        "passed": true,
+        "quality": "COMPLETE"
+      }
+    ]
+  },
+  "isolatedStages": {
+    "cases": 18,
+    "passed": true,
+    "results": [
+      {
+        "name": "main product title and price",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 5
+      },
+      {
+        "name": "main product title and price",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 2
+      },
+      {
+        "name": "Brazilian localized product price",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 4
+      },
+      {
+        "name": "Brazilian localized product price",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 6
+      },
+      {
+        "name": "discovery reveals current price",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "discovery reveals current price",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "JSON-LD product fields",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "JSON-LD product fields",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 2
+      },
+      {
+        "name": "observed JSON response configuration",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "observed JSON response configuration",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 1
+      },
+      {
+        "name": "collection reorder and additions",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 4
+      },
+      {
+        "name": "collection reorder and additions",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "query selector before proposal",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 2
+      },
+      {
+        "name": "query selector before proposal",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 2
+      },
+      {
+        "name": "inspect structured sources before proposal",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 3
+      },
+      {
+        "name": "inspect structured sources before proposal",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 2
+      },
+      {
+        "name": "inspect observed response before proposal",
+        "stage": "configure",
+        "passed": true,
+        "durationMs": 6
+      },
+      {
+        "name": "inspect observed response before proposal",
+        "stage": "semantic",
+        "passed": true,
+        "durationMs": 3
+      }
+    ]
+  }
+}
