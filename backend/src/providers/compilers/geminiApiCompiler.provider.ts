@@ -43,13 +43,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     const langfuse = getLangfuse();
 
     let promptText = MODEL_SYSTEM_INSTRUCTIONS;
-    let taskInstructions = input.instructions;
     let promptClient:
-      | Parameters<
-          NonNullable<ReturnType<NonNullable<typeof langfuse>['trace']>>['generation']
-        >[0]['prompt']
-      | undefined;
-    let taskPromptClient:
       | Parameters<
           NonNullable<ReturnType<NonNullable<typeof langfuse>['trace']>>['generation']
         >[0]['prompt']
@@ -78,39 +72,6 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       } catch {
         promptText = MODEL_SYSTEM_INSTRUCTIONS;
       }
-
-      if (input.task) {
-        const isStandardPrompt =
-          input.instructions.includes('Build the smallest reproducible extraction plan') ||
-          input.instructions.includes('Check extracted data and provenance') ||
-          input.instructions.includes('helpful and concise support assistant');
-
-        if (isStandardPrompt) {
-          try {
-            const taskPromptName = `specter-task-${input.task}`;
-            const fetchedTaskPrompt = await langfuse.getPrompt(taskPromptName, undefined, {
-              type: 'text',
-              fallback: input.instructions,
-              cacheTtlSeconds: 300,
-            });
-            taskPromptClient = fetchedTaskPrompt;
-            taskInstructions = fetchedTaskPrompt.compile() || input.instructions;
-
-            if (fetchedTaskPrompt.isFallback) {
-              langfuse
-                .createPrompt({
-                  name: taskPromptName,
-                  type: 'text',
-                  prompt: input.instructions,
-                  labels: ['production'],
-                })
-                .catch(() => {});
-            }
-          } catch {
-            taskInstructions = input.instructions;
-          }
-        }
-      }
     }
 
     const trace = langfuse?.trace({
@@ -118,12 +79,11 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       sessionId: input.jobId ? `job:${input.jobId}` : undefined,
       userId: 'specter-compiler',
       tags: ['specter', 'compilation', input.task || 'extract'],
-      input: { task: input.task, instructions: taskInstructions },
+      input: { task: input.task, instructions: input.instructions },
       metadata: {
         model: this.model,
         jobId: input.jobId,
-        taskPromptName: taskPromptClient?.name,
-        taskPromptVersion: taskPromptClient?.version,
+        task: input.task,
       },
     });
     const generation = trace?.generation({
@@ -132,7 +92,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       prompt: promptClient,
       input: {
         task: input.task,
-        instructions: taskInstructions,
+        instructions: input.instructions,
         systemInstruction: promptText,
       },
       startTime,
@@ -158,7 +118,7 @@ export class GeminiApiCompilerProvider implements IModelProvider {
           {
             role: 'user',
             parts: [
-              { text: `Task (${input.task}):\n${taskInstructions}` },
+              { text: `Task (${input.task}):\n${input.instructions}` },
               { text: `Untrusted evidence:\n${input.evidence}` },
             ],
           },

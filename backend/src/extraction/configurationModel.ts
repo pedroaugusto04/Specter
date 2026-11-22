@@ -12,6 +12,7 @@ import { fitEvidenceText } from './evidenceBudget.js';
 import { ModelTask } from './configurationConstants.js';
 import { redactObject, redactText } from './evidence.js';
 import { logger } from '../utils/logger.js';
+import { getManagedPrompt } from '../providers/langfuse.js';
 function outputContract(schema: z.ZodType, instructions: string) {
   const { $schema: _schemaVersion, ...outputSchema } = z.toJSONSchema(schema, {
     target: 'draft-07',
@@ -151,21 +152,26 @@ function validateOutput<T>(
 export function createConfigurationModel(model: IModelProvider): ConfigurationModel {
   return {
     decide: async (input, intent) => {
+      const instructions = await getManagedPrompt(
+        'specter-task-configure',
+        configurationInstructions
+      );
       const output = await task(
         model,
         input,
         ModelTask.Configure,
-        outputContract(modelConfigurationDecisionSchema, configurationInstructions),
+        outputContract(modelConfigurationDecisionSchema, instructions),
         { fixedIntent: intent }
       );
       return validateOutput(input, ModelTask.Configure, output, configurationDecisionSchema);
     },
     review: async (input, intent, result) => {
+      const instructions = await getManagedPrompt('specter-task-semantic', semanticInstructions);
       const output = await task(
         model,
         input,
         ModelTask.Semantic,
-        outputContract(semanticVerdictSchema, semanticInstructions),
+        outputContract(semanticVerdictSchema, instructions),
         { intent, result }
       );
       return validateOutput(input, ModelTask.Semantic, output, semanticVerdictSchema);

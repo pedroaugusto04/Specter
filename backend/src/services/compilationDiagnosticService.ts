@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { IModelProvider } from '../extraction/model.js';
 import { ModelTask } from '../extraction/configurationConstants.js';
 import { logger } from '../utils/logger.js';
+import { getManagedPrompt } from '../providers/langfuse.js';
 
 export interface DiagnosticInput {
   jobId: string;
@@ -54,10 +55,15 @@ export class CompilationDiagnosticService {
         io: 'input',
       });
 
+      const instructions = await getManagedPrompt(
+        'specter-task-diagnostic',
+        DIAGNOSTIC_INSTRUCTIONS
+      );
+
       const output = await this.modelProvider.generate({
         jobId: input.jobId,
         task: ModelTask.Diagnostic,
-        instructions: DIAGNOSTIC_INSTRUCTIONS,
+        instructions,
         outputSchema: outputSchema as Record<string, unknown>,
         evidence,
         timeoutMs,

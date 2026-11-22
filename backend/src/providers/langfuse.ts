@@ -31,3 +31,30 @@ export function getLangfuse(): Langfuse | null {
   isInitialized = true;
   return langfuseInstance;
 }
+
+export async function getManagedPrompt(name: string, fallback: string): Promise<string> {
+  const langfuse = getLangfuse();
+  if (!langfuse) {
+    return fallback;
+  }
+  try {
+    const fetched = await langfuse.getPrompt(name, undefined, {
+      type: 'text',
+      fallback,
+      cacheTtlSeconds: 300,
+    });
+    if (fetched.isFallback) {
+      langfuse
+        .createPrompt({
+          name,
+          type: 'text',
+          prompt: fallback,
+          labels: ['production'],
+        })
+        .catch(() => {});
+    }
+    return fetched.compile() || fallback;
+  } catch {
+    return fallback;
+  }
+}
