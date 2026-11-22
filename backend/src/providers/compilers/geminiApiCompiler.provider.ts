@@ -7,6 +7,7 @@ import {
   CompilerTimeoutError,
   CompilerValidationError,
 } from '../../errors/domainErrors.js';
+import { getLangfuse } from '../langfuse.js';
 
 export interface GeminiApiCompilerOptions {
   model?: string;
@@ -38,6 +39,20 @@ export class GeminiApiCompilerProvider implements IModelProvider {
 
   async generate(input: ModelInput): Promise<unknown> {
     const timeoutMs = Math.min(input.timeoutMs, env.COMPILER_TIMEOUT_MS);
+    const startTime = new Date();
+    const langfuse = getLangfuse();
+    const trace = langfuse?.trace({
+      name: 'specter:compiler:gemini',
+      input: { task: input.task, instructions: input.instructions },
+      metadata: { model: this.model, jobId: input.jobId },
+    });
+    const generation = trace?.generation({
+      name: 'gemini-compile',
+      model: this.model,
+      input: { task: input.task, instructions: input.instructions },
+      startTime,
+    });
+
     let response: Response;
     const url = `${this.baseUrl}/models/${encodeURIComponent(this.model)}:generateContent`;
     const init: RequestInit = {
@@ -78,9 +93,12 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       try {
         response = await this.fetchFn(url, init);
       } catch (error) {
-        if (init.signal?.aborted)
+        if (init.signal?.aborted) {
+          generation?.end({ output: { error: 'cancelled_or_timeout' }, level: 'ERROR' });
           throw new CompilerTimeoutError('Model request cancelled or timed out', error);
+        }
         if (attempt >= env.COMPILER_API_MAX_RETRIES) {
+          generation?.end({ output: { error: String(error) }, level: 'ERROR' });
           if (error instanceof Error && error.name === 'TimeoutError')
             throw new CompilerTimeoutError('Gemini API request timed out', error);
           throw new CompilerApiRequestError(undefined, error);
@@ -100,6 +118,11 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       const errorText = body.replace(/\s+/g, ' ').trim().slice(0, 300);
       const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
       const retryInfo = response.status === 429 ? parseRetryInfo(body) : undefined;
+      generation?.end({
+        output: errorText,
+        level: 'ERROR',
+        statusMessage: `HTTP ${response.status}`,
+      });
       throw new CompilerApiRequestError(
         response.status,
         undefined,
@@ -112,23 +135,35 @@ export class GeminiApiCompilerProvider implements IModelProvider {
     try {
       data = (await response.json()) as GeminiResponse;
     } catch (error) {
+      generation?.end({ output: { error: 'invalid_json_response' }, level: 'ERROR' });
       throw new CompilerValidationError('Gemini API returned an invalid response', error);
     }
 
     const candidate = data.candidates?.[0];
-    if (!candidate || candidate.finishReason === 'MAX_TOKENS')
+    if (!candidate || candidate.finishReason === 'MAX_TOKENS') {
+      generation?.end({ output: { error: 'incomplete_result' }, level: 'ERROR' });
       throw new CompilerValidationError('Gemini API did not return a complete result');
+    }
     const output = candidate.content?.parts
       ?.map((part) => part.text ?? '')
       .join('')
       .trim();
-    if (output && output.length > env.COMPILER_MAX_OUTPUT_CHARS)
+    if (output && output.length > env.COMPILER_MAX_OUTPUT_CHARS) {
+      generation?.end({ output: { error: 'size_limit_exceeded' }, level: 'ERROR' });
       throw new CompilerValidationError('Model output exceeds the configured size limit.');
-    if (!output) throw new CompilerValidationError('Gemini API returned an empty result');
+    }
+    if (!output) {
+      generation?.end({ output: { error: 'empty_result' }, level: 'ERROR' });
+      throw new CompilerValidationError('Gemini API returned an empty result');
+    }
 
     try {
-      return JSON.parse(output) as unknown;
+      const parsed = JSON.parse(output) as unknown;
+      generation?.end({ output: parsed });
+      trace?.update({ output: parsed });
+      return parsed;
     } catch (error) {
+      generation?.end({ output: { error: 'output_not_valid_json' }, level: 'ERROR' });
       throw new CompilerValidationError('Gemini API result was not valid JSON', error);
     }
   }

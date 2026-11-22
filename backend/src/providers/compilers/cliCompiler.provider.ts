@@ -8,6 +8,7 @@ import { CompilerTimeoutError, CompilerValidationError } from '../../errors/doma
 import { logger } from '../../utils/logger.js';
 import { buildCliCompilerPrompt } from './compilerPrompt.js';
 import { defaultCliErrorClassifier, type CliErrorClassifier } from './cliErrorClassifier.js';
+import { getLangfuse } from '../langfuse.js';
 
 export interface CliCompilerOptions {
   providerName?: string;
@@ -77,7 +78,20 @@ export class CliCompilerProvider implements IModelProvider {
       'utf-8'
     );
 
-    return new Promise<unknown>((resolve, reject) => {
+    const langfuse = getLangfuse();
+    const trace = langfuse?.trace({
+      name: 'specter:compiler:cli',
+      input: { jobId, instructions: userPrompt },
+      metadata: { cliCommand: this.cliCommand, provider: this.name },
+    });
+    const span = trace?.span({
+      name: 'cli-subprocess',
+      input: { jobId, timeoutMs },
+      startTime: new Date(startTime),
+    });
+
+    try {
+      const result = await new Promise<unknown>((resolve, reject) => {
       let settled = false;
       let watcherClosed = false;
       let fileWatcher: FSWatcher | null = null;
@@ -299,5 +313,13 @@ export class CliCompilerProvider implements IModelProvider {
         );
       });
     });
+    span?.end({ output: result });
+    trace?.update({ output: result });
+    return result;
+  } catch (err) {
+    span?.end({ output: { error: String(err) }, level: 'ERROR' });
+    trace?.update({ output: { error: String(err) } });
+    throw err;
   }
+}
 }
