@@ -130,9 +130,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
         ...(input.signal ? [input.signal] : []),
       ]),
     };
-    let attemptCount = 0;
-    for (let attempt = 0; ; attempt++) {
-      attemptCount = attempt;
+    let attempt = 0;
+    for (; ; attempt++) {
       try {
         response = await this.fetchFn(url, init);
       } catch (error) {
@@ -178,8 +177,8 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       langfuse?.score({
         traceId: trace.id,
         name: 'retry_count',
-        value: attemptCount,
-        comment: attemptCount === 0 ? 'Succeeded on first attempt' : `Required ${attemptCount} retries`,
+        value: attempt,
+        comment: attempt === 0 ? 'Succeeded on first attempt' : `Required ${attempt} retries`,
       });
     }
 
