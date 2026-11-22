@@ -164,9 +164,25 @@ export class GeminiApiCompilerProvider implements IModelProvider {
       const parsed = JSON.parse(output) as unknown;
       generation?.end({ output: parsed });
       trace?.update({ output: parsed });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'schema_valid',
+          value: 1,
+          comment: 'Valid JSON output from Gemini',
+        });
+      }
       return parsed;
     } catch (error) {
       generation?.end({ output: { error: 'output_not_valid_json' }, level: 'ERROR' });
+      if (trace) {
+        langfuse?.score({
+          traceId: trace.id,
+          name: 'schema_valid',
+          value: 0,
+          comment: 'Gemini API result was not valid JSON',
+        });
+      }
       throw new CompilerValidationError('Gemini API result was not valid JSON', error);
     }
   }
