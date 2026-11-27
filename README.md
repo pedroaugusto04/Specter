@@ -141,9 +141,4 @@ Specter is designed to run efficiently on standard VPS infrastructure. Routine s
 <a name="license"></a>
 ## License
 
-Specter is available under the [Specter Source Available License](LICENSE). 
-
-- **Permitted**: Personal use, educational projects, and internal business monitoring.
-- **Restricted**: Commercial redistribution, white-labeling, or offering Specter as a commercial hosted service (SaaS) to third parties.
-
-The hosted version of Specter is operated by the project owner.
+Specter is available under the [Specter Source Available License](LICENSE).
