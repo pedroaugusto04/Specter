@@ -93,6 +93,7 @@ const jsonLd = {
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'All',
       url: siteUrl,
+      codeRepository: 'https://github.com/pedroaugusto04/Specter',
       description: 'Website change monitoring and visual diff tracking with automated alerts.',
       offers: {
         '@type': 'Offer',

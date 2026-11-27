@@ -18,5 +18,6 @@ Specter is an automated website monitoring tool that detects visual and content 
 
 ## Canonical URLs
 - Website: https://specterdev.online
+- GitHub: https://github.com/pedroaugusto04/Specter
 - Privacy Policy: https://specterdev.online/privacy/
 - Terms of Service: https://specterdev.online/terms/
