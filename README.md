@@ -1,106 +1,151 @@
 # Specter
 
 <p align="center">
-  <img src="backend/src/assets/specter-logo.png" alt="Specter" width="180" />
+  <img src="assets/specter-logo.png" alt="Specter" width="160" />
 </p>
 
-<p align="center"><strong>Monitor changes on the web, without writing a scraper for every site.</strong></p>
+<p align="center">
+  <strong>Autonomous web change monitor with AI-assisted setup and deterministic execution.</strong>
+</p>
 
-Specter turns a URL and a plain-language description into a monitored data feed. It uses AI to configure and validate an extraction plan, then runs that plan on a schedule. Routine checks are deterministic and do not call an AI model; when a page changes, Specter can review and recover the plan.
+<p align="center">
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#screenshots">Screenshots</a> •
+  <a href="#quick-start-with-docker">Quick Start</a> •
+  <a href="#self-hosting">Self-Hosting</a> •
+  <a href="#license">License</a>
+</p>
 
-## Why Specter
+---
 
-Website layouts change, and one-off scrapers tend to break silently. Specter is designed to monitor user-selected pages over time, validate each result before updating its baseline, and report meaningful changes. It is for focused monitoring of URLs you choose, rather than broad web crawling.
+## What is Specter?
 
-## How it works
+Specter turns any web page into a monitored, structured data feed from a simple URL and a plain-language prompt (e.g., *"track the product price and stock availability"*).
 
-1. Describe what you want to monitor and provide a page URL.
-2. Specter inspects the page and uses a configured model to create and validate an extraction plan.
-3. A scheduled worker fetches the page using HTTP or a browser and executes the plan without an AI call on routine runs.
-4. Valid results are compared with the previous baseline and changes are sent through configured notification channels.
-5. If a site change makes extraction fail, bounded recovery can revise the plan.
+- **Code-Gen Once, Deterministic Execution**: AI is only invoked during setup or recovery. Routine scheduled checks run directly via Playwright or HTTP with **zero LLM token overhead**.
+- **Visual & Structured Diffs**: Detect meaningful data modifications and review changes with side-by-side screenshot comparisons.
+- **Self-Healing Pipelines**: If a website redesign breaks CSS selectors, bounded auto-recovery analyzes the updated DOM and repairs the extraction plan automatically.
+- **Smart Notifications**: Instant alerts via Webhooks, Email, or Telegram when tracked data changes.
 
-## Architecture
+---
+
+<a name="screenshots"></a>
+## Screenshots
+
+### 1. Centralized Monitor Dashboard
+Track all monitored targets, execution cadences, schema sync states, and historical change counts in one view.
+![Monitor Dashboard](assets/screenshots/01-dashboard.png)
+
+### 2. Visual & Structured Diffs
+Compare modifications instantly with interactive before/after visual sliders and exact field-level deltas.
+![Visual Diff Comparison](assets/screenshots/02-visual-diff.png)
+
+### 3. Historical Trends & Analytics
+Inspect numerical values over time with automatic plateau compression and historical variation trends.
+![Timeline and Trends](assets/screenshots/03-timeline-trends.png)
+
+### 4. Transparent Versioning & Rollback
+Full version control for every extraction plan. Review prompt iterations, audit automated healing decisions, and rollback schemas with one click.
+![Plan Versioning](assets/screenshots/04-versioning-recovery.png)
+
+---
+
+<a name="how-it-works"></a>
+## How It Works
 
 ```mermaid
 flowchart LR
-    User[User] --> Web[Next.js dashboard]
-    Web --> API[Fastify API]
-    API --> DB[(PostgreSQL)]
-    API --> Queue[BullMQ queues]
-    Queue --> Worker[Scraping workers]
-    Worker --> Browser[Playwright / HTTP + Cheerio]
-    Worker --> Model[Compiler provider]
-    Worker --> DB
-    Worker --> Notify[Email, Telegram, webhook]
-    Queue <--> Redis[(Redis)]
+    User([User Prompt & URL]) --> Compiler[Extraction Compiler\nAI-assisted plan synthesis]
+    Compiler --> Plan[(Extraction Plan\nSelectors, Schema & Validation)]
+    Plan --> Worker[Scheduled Workers\nDeterministic 0-token runs]
+    Worker --> Engine[Playwright / HTTP Engine]
+    Engine --> Diff[Diffing & Change Detection]
+    Diff --> Notify[Alerts\nEmail / Telegram / Webhook]
+    Diff -. Redesign or Broken Selectors .-> AutoHeal[Self-Healing Recovery\nBounded plan revision]
+    AutoHeal -. Updates .-> Plan
 ```
 
-The repository is a TypeScript monorepo:
+1. **Synthesize Plan**: You provide a target URL and what you want to extract. Specter fetches the live DOM and uses a model (Gemini or Codex) to compile robust CSS selectors, parsing rules, and schema assertions.
+2. **Deterministic Polling**: Scheduled background workers periodically execute the compiled plan using headless Chromium or lightweight HTTP. No AI models are called during normal execution, keeping operational costs near zero.
+3. **Diff & Alert**: Extracted records are normalized and hashed. When values deviate from the baseline, Specter captures visual snapshots and triggers notification channels.
+4. **Self-Healing Loop**: If layout changes break extraction, Specter's bounded recovery detects the structural failure and re-synthesizes the extraction plan automatically.
 
-- `frontend/` — Next.js App Router dashboard.
-- `backend/` — Fastify API, BullMQ workers, Drizzle ORM, extraction pipeline, and provider adapters.
-- `packages/contracts/` — shared API and domain contracts.
-- PostgreSQL stores users, monitors, plans, runs, and snapshots; Redis backs queues and coordination.
+---
 
-## Run locally with Docker
+<a name="quick-start-with-docker"></a>
+## Quick Start with Docker
 
-### Requirements
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) & Docker Compose
+- A [Google Gemini API Key](https://aistudio.google.com/) (free tier available; used only when creating or recovering monitors)
 
-- Docker Engine with the Compose plugin
-- A Gemini API key for configuring monitors (the default compiler provider)
+### 1. Initialize Environment
 
-### 1. Configure the environment
+Run the automated setup script to generate configuration and encryption keys:
 
 ```bash
-cp .env.example .env
+./scripts/setup.sh
 ```
 
-Edit `.env` and set the required local values:
+*(Alternatively, copy `.env.example` to `.env` manually and set `ENCRYPTION_KEY` using `openssl rand -hex 32`)*.
 
-| Variable | Required for | How to set it |
-| --- | --- | --- |
-| `ENCRYPTION_KEY` | Backend startup | Generate with `openssl rand -hex 32` |
-| `COMPILER_API_KEY` | AI-assisted monitor setup | Your Gemini API key |
-| `COMPILER_API_MODEL` | AI-assisted monitor setup | Gemini model name, for example `gemini-2.5-flash` |
+Add your Gemini API key to `.env`:
+```env
+COMPILER_API_KEY=your_gemini_api_key_here
+```
 
-Generate the encryption key with:
+### 2. Start Specter
 
 ```bash
-openssl rand -hex 32
+docker compose -f docker-compose.dev.yml up
 ```
 
-Paste the output into `ENCRYPTION_KEY` in `.env`.
+Open your browser:
+- **Dashboard**: [http://localhost:3005](http://localhost:3005)
+- **Backend API**: [http://localhost:3001](http://localhost:3001)
 
-The example file uses local-only database credentials, console notifications, and development JWT settings. Do not reuse those defaults in a public deployment. Email delivery, Google sign-in, proxy/unblocker services, and screenshot storage are optional integrations; configure them only if you need them.
-
-### 2. Start the app
-
+To stop the containers:
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml down
 ```
 
-Open the dashboard at [http://localhost:3005](http://localhost:3005). The API is available at [http://localhost:3001](http://localhost:3001). The first build installs the Playwright browser and can take a few minutes.
+---
 
-Stop the containers with `Ctrl+C`, or run `docker compose -f docker-compose.dev.yml down`. Add `-v` only if you also want to delete the local PostgreSQL and Redis data.
+<a name="self-hosting"></a>
+## Self-Hosting
 
-## Self-hosting
+Specter is designed to run efficiently on low-cost infrastructure. Because routine scraping runs deterministically without continuous LLM streaming, a modest **1 vCPU / 2 GB RAM VPS** (e.g., Hetzner, DigitalOcean) easily handles dozens of active monitors.
 
-The Compose files have different purposes:
+### Production Deployment
 
-- `docker-compose.dev.yml` builds and runs the full development stack with source mounts and hot reload.
-- `docker-compose.yml` is the full container build stack; use it for a local production-style build after configuring `.env`.
-- `docker-compose.prod.yml` is for the backend deployment workflow. It expects `.env.prod` for runtime configuration and `DOCKER_IMAGE` for the published backend image; set both in the deployment environment, not the local `.env.example`.
+1. **Environment Configuration**:
+   - Copy `.env.example` to your production environment file (e.g. `.env.prod`).
+   - Generate a cryptographically secure `ENCRYPTION_KEY` (`openssl rand -hex 32`).
+   - Set a strong, unique `JWT_SECRET` (at least 32 characters).
+   - Set `CORS_ORIGIN` and `FRONTEND_URL` to match your public domain.
+   - Configure your notification provider (Console or Resend).
 
-For production, configure unique secrets, a stable `ENCRYPTION_KEY`, the public frontend/API URLs, and a supported compiler provider. Keep `.env` and `.env.prod` private. See [`.env.example`](.env.example) for available settings and [the extraction engine guide](docs/extraction-engine.md) for detailed behavior.
+2. **Run Production Containers**:
+   ```bash
+   docker compose up -d --build
+   ```
+   Database migrations run automatically on container boot.
 
-## Development
+3. **Reverse Proxy (Nginx / Caddy / Cloudflare)**:
+   Route incoming traffic to:
+   - Frontend UI: `http://127.0.0.1:3005` (or static export via Nginx)
+   - Backend API: `http://127.0.0.1:3001` (with WebSocket / SSE support enabled for real-time progress)
 
-```bash
-npm run typecheck
-npm test
-npm run lint
-```
+For detailed extraction engine configuration, anti-bot cascades, and proxy rotation, see the [Extraction Engine Guide](docs/extraction-engine.md).
+
+---
+
+<a name="license"></a>
 ## License
 
-Specter is source available under the [Specter Source Available License](LICENSE). The license permits personal, educational, and internal business use, with restrictions on commercial redistribution and offering the software as a service. The hosted Specter service is operated by the project owner.
+Specter is available under the [Specter Source Available License](LICENSE). 
+
+- **Permitted**: Personal use, educational projects, and internal business monitoring.
+- **Restricted**: Commercial redistribution, white-labeling, or offering Specter as a commercial hosted service (SaaS) to third parties.
+
+The hosted version of Specter is operated by the project owner.

@@ -139,7 +139,8 @@ else
 fi
 
 log "Verifying public dashboard URL..."
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://specterdev.online/dashboard/ || true)
+PUBLIC_DASHBOARD_URL="${FRONTEND_PUBLIC_URL:-https://specterdev.online}/dashboard/"
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_DASHBOARD_URL" || true)
 if [ "$HTTP_STATUS" = "200" ]; then
   success "Public dashboard reachable: HTTP ${HTTP_STATUS}"
 else

@@ -9,8 +9,9 @@ dist/
 out/
 coverage/
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!backend/.env.example
 .deploy/
 *.log
 .DS_Store
