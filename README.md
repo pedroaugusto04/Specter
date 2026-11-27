@@ -114,7 +114,7 @@ docker compose -f docker-compose.dev.yml down
 <a name="self-hosting"></a>
 ## Self-Hosting
 
-Specter is designed to run efficiently on low-cost infrastructure. Because routine scraping runs deterministically without continuous LLM streaming, a modest **1 vCPU / 2 GB RAM VPS** (e.g., Hetzner, DigitalOcean) easily handles dozens of active monitors.
+Specter is designed to run efficiently on standard VPS infrastructure. Routine scheduled scraping runs deterministically without continuous LLM streaming, keeping operational resource usage low.
 
 ### Production Deployment
 
@@ -135,8 +135,6 @@ Specter is designed to run efficiently on low-cost infrastructure. Because routi
    Route incoming traffic to:
    - Frontend UI: `http://127.0.0.1:3005` (or static export via Nginx)
    - Backend API: `http://127.0.0.1:3001` (with WebSocket / SSE support enabled for real-time progress)
-
-For detailed extraction engine configuration, anti-bot cascades, and proxy rotation, see the [Extraction Engine Guide](docs/extraction-engine.md).
 
 ---
 
