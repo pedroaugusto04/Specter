@@ -8,6 +8,7 @@ import {
 import { reconcileRuns } from '../../src/queues/runReconciler.js';
 import {
   createTestCompilationService,
+  createTestRealtimeService,
   createTestScrapeExecutionService,
   InMemoryJobRepository,
   MockNotificationProvider,
@@ -28,7 +29,11 @@ describe.skipIf(!process.env.RECOVERY_TEST_REDIS_PORT)(
   () => {
     it('reconciles missing work, preserves delayed tasks, and finishes recovery once across queues', async () => {
       const connection = { host: '127.0.0.1', port: Number(process.env.RECOVERY_TEST_REDIS_PORT) };
-      const scheduler = new BullMqJobScheduler(connection);
+      const scheduler = new BullMqJobScheduler({
+        connection,
+        resolveTimezone: async () => 'UTC',
+      });
+      const realtime = createTestRealtimeService();
       await scheduler.scrapeQueue.obliterate({ force: true });
       await scheduler.compilationQueue.obliterate({ force: true });
       const repo = new InMemoryJobRepository();
@@ -75,10 +80,10 @@ describe.skipIf(!process.env.RECOVERY_TEST_REDIS_PORT)(
         undefined,
         active.updatedAt
       );
-      await reconcileRuns(repo, scheduler);
+      await reconcileRuns(repo, scheduler, realtime);
       const taskId = `run-${run.id}-0`;
       expect(await scheduler.scrapeQueue.getJob(taskId)).toBeDefined();
-      await reconcileRuns(repo, scheduler);
+      await reconcileRuns(repo, scheduler, realtime);
       expect(await scheduler.scrapeQueue.getJobCounts('delayed')).toMatchObject({ delayed: 1 });
       const scrapeWorker = new Worker(
         SCRAPE_EXECUTION_QUEUE_NAME,

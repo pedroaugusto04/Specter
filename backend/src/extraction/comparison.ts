@@ -1,4 +1,4 @@
-import { sameRecord } from '@specter/contracts';
+import { isCollectionPayload, sameRecord } from '@specter/contracts';
 import { EntityChangeKind } from './constants.js';
 import type { EntityChange } from './contracts.js';
 import type { ExtractedPayload, ExtractedRecord } from '../types/extractor.js';
@@ -43,7 +43,7 @@ export function compareSnapshots(
 }
 
 export function comparisonPayload(payload: ExtractedPayload, identityFields: string[]): unknown {
-  if (!('items' in payload) || !Array.isArray(payload.items)) return payload;
+  if (!isCollectionPayload(payload)) return payload;
   return {
     records: Object.fromEntries(
       payload.items.map((record) => [recordIdentity(record, identityFields), record])
@@ -52,6 +52,6 @@ export function comparisonPayload(payload: ExtractedPayload, identityFields: str
 }
 
 export function payloadRecords(payload: ExtractedPayload): ExtractedRecord[] {
-  if ('items' in payload && Array.isArray(payload.items)) return payload.items;
+  if (isCollectionPayload(payload)) return payload.items;
   return Object.keys(payload).length ? [payload as ExtractedRecord] : [];
 }

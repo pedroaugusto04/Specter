@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
-import { getDb, type Database } from '../db/index.js';
+import type { Database } from '../db/index.js';
 import { alertDeliveries } from '../db/schema.js';
 import type { IOutboxRepository, PendingDelivery } from '../notifications/contracts.js';
+
 export class DrizzleOutboxRepository implements IOutboxRepository {
-  constructor(private readonly db: Database = getDb()) {}
+  constructor(private readonly db: Database) {}
+
   async claim(limit: number, maxAttempts: number): Promise<PendingDelivery[]> {
     const token = randomUUID();
-    const rows = await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       await tx
         .update(alertDeliveries)
         .set({
@@ -50,8 +52,8 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
       }
       return claimed;
     });
-    return rows;
   }
+
   async complete(id: string, token: string): Promise<void> {
     await this.db
       .update(alertDeliveries)
@@ -64,6 +66,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
       })
       .where(and(eq(alertDeliveries.id, id), eq(alertDeliveries.claimToken, token)));
   }
+
   async fail(id: string, token: string, error: string, maxAttempts: number): Promise<void> {
     await this.db
       .update(alertDeliveries)

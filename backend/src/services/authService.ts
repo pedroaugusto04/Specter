@@ -1,8 +1,16 @@
 import crypto from 'node:crypto';
-import { env } from '../config/env.js';
-import { NotFoundError, UnauthorizedError, ValidationError } from '../errors/domainErrors.js';
-import { UserMapper } from '../mappers/userMapper.js';
 import type { UserDto } from '@specter/contracts';
+import { env } from '../config/env.js';
+import {
+  EmailAlreadyRegisteredError,
+  InvalidCredentialsError,
+  InvalidSessionError,
+  OAuthExchangeError,
+  OAuthNotConfiguredError,
+  OAuthStateError,
+  UserNotFoundError,
+} from '../errors/domainErrors.js';
+import { UserMapper } from '../mappers/userMapper.js';
 import type { IUserRepository, UpdateUserPatch } from '../repositories/userRepository.js';
 import {
   ACCESS_COOKIE_NAME,
@@ -10,9 +18,9 @@ import {
   REFRESH_COOKIE_NAME,
   serializeCookie,
 } from '../utils/cookies.js';
+import { resolveTimezone } from '../utils/dateFormatter.js';
 import { signJwt, verifyJwt, type JwtPayload } from '../utils/jwt.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
-import { resolveTimezone } from '../utils/dateFormatter.js';
 
 export interface AuthTokenPair {
   accessToken: string;
@@ -64,59 +72,37 @@ export class AuthService {
     return Boolean(this.googleClientId && this.googleClientSecret);
   }
 
+  private buildCookie(name: string, value: string, maxAge: number): string {
+    return serializeCookie(name, value, {
+      httpOnly: true,
+      secure: this.cookieSecure,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge,
+    });
+  }
+
   public buildAuthCookies(tokens: AuthTokenPair): string[] {
     return [
-      serializeCookie(ACCESS_COOKIE_NAME, tokens.accessToken, {
-        httpOnly: true,
-        secure: this.cookieSecure,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: this.accessExpiresSeconds,
-      }),
-      serializeCookie(REFRESH_COOKIE_NAME, tokens.refreshToken, {
-        httpOnly: true,
-        secure: this.cookieSecure,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: this.refreshExpiresSeconds,
-      }),
+      this.buildCookie(ACCESS_COOKIE_NAME, tokens.accessToken, this.accessExpiresSeconds),
+      this.buildCookie(REFRESH_COOKIE_NAME, tokens.refreshToken, this.refreshExpiresSeconds),
     ];
   }
 
   public buildClearAuthCookies(): string[] {
     return [
-      serializeCookie(ACCESS_COOKIE_NAME, '', {
-        httpOnly: true,
-        secure: this.cookieSecure,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 0,
-      }),
-      serializeCookie(REFRESH_COOKIE_NAME, '', {
-        httpOnly: true,
-        secure: this.cookieSecure,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 0,
-      }),
-      serializeCookie(OAUTH_STATE_COOKIE_NAME, '', {
-        httpOnly: true,
-        secure: this.cookieSecure,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 0,
-      }),
+      this.buildCookie(ACCESS_COOKIE_NAME, '', 0),
+      this.buildCookie(REFRESH_COOKIE_NAME, '', 0),
+      this.buildClearOAuthStateCookie(),
     ];
   }
 
   public buildOAuthStateCookie(stateToken: string): string {
-    return serializeCookie(OAUTH_STATE_COOKIE_NAME, stateToken, {
-      httpOnly: true,
-      secure: this.cookieSecure,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: 600,
-    });
+    return this.buildCookie(OAUTH_STATE_COOKIE_NAME, stateToken, 600);
+  }
+
+  public buildClearOAuthStateCookie(): string {
+    return this.buildCookie(OAUTH_STATE_COOKIE_NAME, '', 0);
   }
 
   private issueTokens(user: { id: string; email: string; name: string | null }): AuthTokenPair {
@@ -143,9 +129,7 @@ export class AuthService {
     const existing = await this.userRepository.findByEmail(normalizedEmail);
 
     if (existing) {
-      throw new ValidationError('An account with this email already exists.', [
-        { field: 'email', message: 'An account with this email already exists.' },
-      ]);
+      throw new EmailAlreadyRegisteredError();
     }
 
     const passwordHash = await hashPassword(input.password);
@@ -156,9 +140,10 @@ export class AuthService {
       ...(input.timezone ? { timezone: resolveTimezone(input.timezone) } : {}),
     });
 
-    const userDto = UserMapper.entityToDto(created);
-    const tokens = this.issueTokens(created);
-    return { user: userDto, tokens };
+    return {
+      user: UserMapper.entityToDto(created),
+      tokens: this.issueTokens(created),
+    };
   }
 
   async login(input: {
@@ -168,56 +153,60 @@ export class AuthService {
     const normalizedEmail = input.email.trim().toLowerCase();
     const existing = await this.userRepository.findByEmail(normalizedEmail);
 
-    if (!existing || !existing.passwordHash) {
-      throw new UnauthorizedError('Invalid email or password.');
+    if (!existing?.passwordHash) {
+      throw new InvalidCredentialsError();
     }
 
     const isValid = await verifyPassword(input.password, existing.passwordHash);
     if (!isValid) {
-      throw new UnauthorizedError('Invalid email or password.');
+      throw new InvalidCredentialsError();
     }
 
-    const userDto = UserMapper.entityToDto(existing);
-    const tokens = this.issueTokens(existing);
-    return { user: userDto, tokens };
+    return {
+      user: UserMapper.entityToDto(existing),
+      tokens: this.issueTokens(existing),
+    };
   }
 
   async refresh(refreshToken: string): Promise<{ user: UserDto; tokens: AuthTokenPair }> {
     const payload = verifyJwt(refreshToken, this.jwtSecret, 'refresh');
-    if (!payload || !payload.sub) {
-      throw new UnauthorizedError('Invalid or expired session.');
+    if (!payload?.sub) {
+      throw new InvalidSessionError('expired');
     }
 
     const existing = await this.userRepository.findById(payload.sub);
     if (!existing) {
-      throw new UnauthorizedError('User account no longer exists.');
+      throw new InvalidSessionError('user_missing');
     }
 
-    const userDto = UserMapper.entityToDto(existing);
-    const tokens = this.issueTokens(existing);
-    return { user: userDto, tokens };
+    return {
+      user: UserMapper.entityToDto(existing),
+      tokens: this.issueTokens(existing),
+    };
   }
 
   async updateProfile(
     userId: string,
     input: Pick<UpdateUserPatch, 'name' | 'timezone' | 'pageLanguage' | 'browserPageLanguage'>
   ): Promise<UserDto> {
-    const { pageLanguage, browserPageLanguage } = input;
     const patch: UpdateUserPatch = {
-      ...(pageLanguage !== undefined ? { pageLanguage } : {}),
-      ...(browserPageLanguage !== undefined ? { browserPageLanguage } : {}),
+      ...(input.pageLanguage !== undefined ? { pageLanguage: input.pageLanguage } : {}),
+      ...(input.browserPageLanguage !== undefined
+        ? { browserPageLanguage: input.browserPageLanguage }
+        : {}),
+      ...(input.name !== undefined ? { name: input.name?.trim() || null } : {}),
+      ...(input.timezone !== undefined ? { timezone: resolveTimezone(input.timezone) } : {}),
     };
-    if (input.name !== undefined) {
-      patch.name = input.name?.trim() || null;
-    }
-    if (input.timezone !== undefined) {
-      patch.timezone = resolveTimezone(input.timezone);
-    }
+
     const updated = await this.userRepository.updateUser(userId, patch);
     if (!updated) {
-      throw new NotFoundError('User account not found.');
+      throw new UserNotFoundError(userId);
     }
-    if (input.timezone !== undefined) await this.onTimezoneChanged?.(userId);
+
+    if (input.timezone !== undefined) {
+      await this.onTimezoneChanged?.(userId);
+    }
+
     return UserMapper.entityToDto(updated);
   }
 
@@ -253,18 +242,18 @@ export class AuthService {
 
   createGoogleAuthorizationUrl(
     resolvedCallbackUrl?: string,
-    extraStateData?: Record<string, unknown>
+    extraStateData?: { source?: 'web' | 'extension' }
   ): {
     authUrl: string;
     stateToken: string;
   } {
     if (!this.isGoogleConfigured()) {
-      throw new ValidationError('Google Sign-In is not configured on this server.');
+      throw new OAuthNotConfiguredError();
     }
 
     const callbackUrl = resolvedCallbackUrl || this.googleCallbackUrl;
     if (!callbackUrl) {
-      throw new ValidationError('Google OAuth callback URL is not configured.');
+      throw new OAuthNotConfiguredError(true);
     }
 
     const nonce = crypto.randomBytes(16).toString('hex');
@@ -296,7 +285,7 @@ export class AuthService {
     resolvedCallbackUrl?: string;
   }): Promise<{ user: UserDto; tokens: AuthTokenPair; statePayload: JwtPayload }> {
     if (!this.isGoogleConfigured()) {
-      throw new ValidationError('Google Sign-In is not configured on this server.');
+      throw new OAuthNotConfiguredError();
     }
 
     if (
@@ -304,12 +293,12 @@ export class AuthService {
       !params.expectedStateCookie ||
       params.state !== params.expectedStateCookie
     ) {
-      throw new UnauthorizedError('Invalid OAuth state parameter.');
+      throw new OAuthStateError('invalid');
     }
 
     const statePayload = verifyJwt(params.state, this.jwtSecret, 'oauth_state');
     if (!statePayload) {
-      throw new UnauthorizedError('Expired or invalid OAuth state.');
+      throw new OAuthStateError('expired');
     }
 
     const callbackUrl = params.resolvedCallbackUrl || this.googleCallbackUrl;
@@ -327,12 +316,12 @@ export class AuthService {
     });
 
     if (!tokenRes.ok) {
-      throw new UnauthorizedError('Failed to exchange Google OAuth authorization code.');
+      throw new OAuthExchangeError('token');
     }
 
     const tokenData = (await tokenRes.json()) as { access_token?: string };
     if (!tokenData.access_token) {
-      throw new UnauthorizedError('Google OAuth did not return an access token.');
+      throw new OAuthExchangeError('access_token');
     }
 
     const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -340,7 +329,7 @@ export class AuthService {
     });
 
     if (!profileRes.ok) {
-      throw new UnauthorizedError('Failed to fetch user profile from Google.');
+      throw new OAuthExchangeError('profile');
     }
 
     const profile = (await profileRes.json()) as {
@@ -350,7 +339,7 @@ export class AuthService {
     };
 
     if (!profile.sub || !profile.email) {
-      throw new UnauthorizedError('Google account did not provide a valid email address.');
+      throw new OAuthExchangeError('email');
     }
 
     const normalizedEmail = profile.email.trim().toLowerCase();
@@ -373,8 +362,10 @@ export class AuthService {
       }
     }
 
-    const userDto = UserMapper.entityToDto(user);
-    const tokens = this.issueTokens(user);
-    return { user: userDto, tokens, statePayload };
+    return {
+      user: UserMapper.entityToDto(user),
+      tokens: this.issueTokens(user),
+      statePayload,
+    };
   }
 }

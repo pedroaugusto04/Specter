@@ -1,6 +1,6 @@
 import type { ScrapingJobDto } from '@/lib/api';
-import { JobStatus } from '@specter/contracts';
 import { formatDateTime } from '@/lib/utils';
+import { JobStatus } from '@specter/contracts';
 
 export type JobRowActionType = 'run' | 'recompile' | 'cancel-compilation' | 'pause' | 'delete';
 
@@ -38,71 +38,61 @@ export function getJobActionPermissions({
   const isRunning = isExecutingExtraction || currentAction === 'run';
   const isPaused = job.status === JobStatus.Paused;
   const isFailed = job.status === JobStatus.Failed;
-  const isAccessBlocked = Boolean(
-    job.accessState?.retryAt && new Date(job.accessState.retryAt).getTime() > Date.now()
-  );
+  const retryAt = job.accessState?.retryAt;
+  const isAccessBlocked = Boolean(retryAt && new Date(retryAt).getTime() > Date.now());
 
-  // Edit Action
-  let editDisabled = isJobBusy || isCompiling || isRunning;
-  let editTitle = 'Edit monitor configuration';
-  if (isCompiling) {
-    editTitle = 'Cannot edit monitor while selector compilation is in progress';
-  } else if (isRunning) {
-    editTitle = 'Cannot edit monitor while extraction is in progress';
-  } else if (isJobBusy) {
-    editTitle = 'Action in progress...';
-  }
+  const editDisabled = isJobBusy || isCompiling || isRunning;
+  const editTitle = isCompiling
+    ? 'Cannot edit monitor while selector compilation is in progress'
+    : isRunning
+      ? 'Cannot edit monitor while extraction is in progress'
+      : isJobBusy
+        ? 'Action in progress...'
+        : 'Edit monitor configuration';
 
-  // Run Immediate Action
-  let runDisabled = isJobBusy || isCompiling || isRunning || isFailed || isAccessBlocked;
-  let runTitle = 'Run immediate extraction';
-  if (isCompiling) {
-    runTitle = 'Cannot run extraction while selector compilation is in progress';
-  } else if (isRunning) {
-    runTitle = 'Executing extraction...';
-  } else if (isFailed) {
-    runTitle =
-      'Cannot run extraction on a failed monitor. Please recompile selectors or edit the monitor.';
-  } else if (isAccessBlocked && job.accessState?.retryAt) {
-    runTitle = `Target access is currently blocked. Next attempt allowed after ${formatDateTime(
-      job.accessState.retryAt,
-      timeZone
-    )}`;
-  } else if (isJobBusy) {
-    runTitle = 'Action in progress...';
-  }
+  const runDisabled = isJobBusy || isCompiling || isRunning || isFailed || isAccessBlocked;
+  const runTitle = isCompiling
+    ? 'Cannot run extraction while selector compilation is in progress'
+    : isRunning
+      ? 'Executing extraction...'
+      : isFailed
+        ? 'Cannot run extraction on a failed monitor. Please recompile selectors or edit the monitor.'
+        : isAccessBlocked
+          ? `Target access is currently blocked. Next attempt allowed after ${formatDateTime(retryAt!, timeZone)}`
+          : isJobBusy
+            ? 'Action in progress...'
+            : 'Run immediate extraction';
 
-  // Recompile / Stop Compilation Action
-  let recompileDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning;
-  let recompileTitle = isCompiling ? 'Stop compilation' : 'Recompile selectors';
-  if (isRunning) {
-    recompileTitle = 'Cannot recompile while extraction is running';
-  } else if (isJobBusy && currentAction !== 'recompile') {
-    recompileTitle = 'Action in progress...';
-  }
+  const recompileDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning;
+  const recompileTitle = isRunning
+    ? 'Cannot recompile while extraction is running'
+    : isJobBusy && currentAction !== 'recompile'
+      ? 'Action in progress...'
+      : isCompiling
+        ? 'Stop compilation'
+        : 'Recompile selectors';
 
-  // Pause / Resume Action
-  let pauseDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning || isFailed;
-  let pauseTitle = isPaused ? 'Resume schedule' : 'Pause schedule';
-  if (isFailed) {
-    pauseTitle =
-      'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.';
-  } else if (isCompiling) {
-    pauseTitle = 'Stop compilation and pause monitor';
-  } else if (isRunning) {
-    pauseTitle = 'Cannot change schedule state while extraction is running';
-  } else if (isJobBusy) {
-    pauseTitle = 'Action in progress...';
-  }
+  const pauseDisabled = (isJobBusy && currentAction !== 'recompile') || isRunning || isFailed;
+  const pauseTitle = isFailed
+    ? 'Cannot change schedule on a failed monitor. Please recompile or fix the monitor first.'
+    : isCompiling
+      ? 'Stop compilation and pause monitor'
+      : isRunning
+        ? 'Cannot change schedule state while extraction is running'
+        : isJobBusy
+          ? 'Action in progress...'
+          : isPaused
+            ? 'Resume schedule'
+            : 'Pause schedule';
 
-  // Delete Action
-  let deleteDisabled = isJobBusy || isRunning;
-  let deleteTitle = isCompiling ? 'Stop compilation and delete monitor' : 'Delete monitor';
-  if (isRunning) {
-    deleteTitle = 'Cannot delete while extraction is in progress';
-  } else if (isJobBusy) {
-    deleteTitle = 'Action in progress...';
-  }
+  const deleteDisabled = isJobBusy || isRunning;
+  const deleteTitle = isRunning
+    ? 'Cannot delete while extraction is in progress'
+    : isJobBusy
+      ? 'Action in progress...'
+      : isCompiling
+        ? 'Stop compilation and delete monitor'
+        : 'Delete monitor';
 
   return {
     edit: { disabled: editDisabled, title: editTitle },

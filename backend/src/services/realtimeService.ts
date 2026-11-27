@@ -1,8 +1,10 @@
+import type { ChangeStatus, JobStatus, RunStatus } from '@specter/contracts';
 import type {
   IRealtimeEventBus,
   RealtimeEvent,
   RealtimeEventHandler,
 } from '../providers/realtime/realtime.interface.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
 export class RealtimeService {
@@ -19,16 +21,20 @@ export class RealtimeService {
         type: event.type,
         userId: event.userId,
         jobId: event.jobId,
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage: getErrorMessage(err),
       });
     }
   }
 
-  async notifyJobCreated(userId: string, jobId: string, status?: string): Promise<void> {
+  async notifyJobCreated(userId: string, jobId: string, status?: JobStatus): Promise<void> {
     await this.notify({ type: 'JOB_CREATED', userId, jobId, status });
   }
 
-  async notifyJobUpdated(userId: string, jobId: string, status?: string): Promise<void> {
+  async notifyJobUpdated(
+    userId: string,
+    jobId: string,
+    status?: JobStatus | RunStatus
+  ): Promise<void> {
     await this.notify({ type: 'JOB_UPDATED', userId, jobId, status });
   }
 
@@ -40,7 +46,7 @@ export class RealtimeService {
     userId: string,
     jobId: string,
     runId: string,
-    hasChanges?: string
+    hasChanges?: ChangeStatus
   ): Promise<void> {
     await this.notify({ type: 'JOB_RUN_COMPLETED', userId, jobId, runId, hasChanges });
   }

@@ -3,13 +3,16 @@ import type {
   DashboardStatsDto as DashboardStats,
   JobPlanVersionsDto,
   JobRunsDto,
+  JobStatusFilter,
   JobTimeseriesDto,
+  NotificationTestDto,
   PaginatedResponse,
-  JobStatus,
   ProbeUrlDto,
   ScrapingJobDto,
+  SessionCheckDto,
   SessionDto,
   TimeseriesRange,
+  TriggerJobDto,
   UpdateIntegrationsRequest,
   UpdateJobRequest,
   UserDto,
@@ -20,29 +23,19 @@ import {
   PAGINATION_DEFAULT_PAGE_SIZE,
   PAGINATION_RUNS_PAGE_SIZE,
   PAGINATION_TIMESERIES_PAGE_SIZE,
-} from '@specter/contracts';
-export type {
-  ChangeStatus,
-  ExtractionQuality,
-  ExtractionPlan,
-  JobStatus,
-  RunStatus,
-  TriggerMatchMode,
-  TriggerOperator,
-  TriggerRule,
+  getUserFailure,
+  parseStructuredUserFailure,
 } from '@specter/contracts';
 
 export type {
   DashboardStatsDto as DashboardStats,
-  DiffChangeEntry,
-  DiffSummary,
   JobPlanVersionDto,
   JobPlanVersionsDto,
   JobRunDto,
   JobRunsDto,
+  JobStatusFilter,
   JobTimeseriesDto,
   JobTimeseriesPointDto,
-  MetricQuotaSummary,
   PaginatedResponse,
   ScrapingJobDto,
   SessionDto,
@@ -62,15 +55,18 @@ export class ApiError extends Error {
   public readonly code?: string;
   public readonly details?: ApiValidationErrorDetail[];
   public readonly fieldErrors: Record<string, string>;
+  public readonly retryAfterSeconds?: number;
+  public readonly upstreamStatus?: number;
 
   constructor(
     message: string,
     status: number,
     data?: {
       error?: string;
-      message?: string;
       details?: ApiValidationErrorDetail[];
       fields?: Record<string, string>;
+      retryAfterSeconds?: number;
+      status?: number;
     }
   ) {
     super(message);
@@ -79,7 +75,57 @@ export class ApiError extends Error {
     this.code = data?.error;
     this.details = data?.details;
     this.fieldErrors = { ...(data?.fields ?? {}) };
+    this.retryAfterSeconds = data?.retryAfterSeconds;
+    this.upstreamStatus = data?.status;
   }
+}
+
+/**
+ * Splits an API error into recognized form field errors and a user-visible global message.
+ * Ensures unmapped fields (e.g. `root`, `webhookUrl`, `triggerRules`) are never silently swallowed.
+ */
+export function extractFormError<TField extends string>(
+  error: unknown,
+  allowedFields: readonly TField[],
+  fallbackMessage: string
+): {
+  fieldErrors: Partial<Record<TField, string>>;
+  globalError: string | null;
+} {
+  if (error instanceof ApiError) {
+    const allowed = new Set<string>(allowedFields);
+    const mapped: Partial<Record<TField, string>> = {};
+    const unmappedMessages: string[] = [];
+
+    for (const [field, message] of Object.entries(error.fieldErrors)) {
+      if (allowed.has(field)) {
+        mapped[field as TField] = message;
+      } else if (message) {
+        unmappedMessages.push(message);
+      }
+    }
+
+    const parsedStructured = parseStructuredUserFailure(error.message);
+    const readableMessage = parsedStructured
+      ? parsedStructured.description
+      : error.message || getUserFailure(error.message).description;
+
+    const hasMapped = Object.keys(mapped).length > 0;
+    const globalError =
+      unmappedMessages.length > 0
+        ? unmappedMessages.join(' ')
+        : hasMapped
+          ? null
+          : readableMessage;
+
+    return { fieldErrors: mapped, globalError };
+  }
+
+  if (error instanceof Error && error.message) {
+    return { fieldErrors: {}, globalError: error.message };
+  }
+
+  return { fieldErrors: {}, globalError: fallbackMessage };
 }
 
 export function getApiBaseUrl(): string {
@@ -197,7 +243,7 @@ export const api = {
     options: {
       page?: number;
       pageSize?: number;
-      status?: JobStatus | 'recovering' | 'paused';
+      status?: JobStatusFilter;
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<ScrapingJobDto>> {
@@ -237,8 +283,8 @@ export const api = {
     });
   },
 
-  triggerNow(id: string): Promise<{ queued: boolean; mode: 'scrape' | 'compile' }> {
-    return request<{ queued: boolean; mode: 'scrape' | 'compile' }>(`/api/jobs/${id}/trigger`, {
+  triggerNow(id: string): Promise<TriggerJobDto> {
+    return request<TriggerJobDto>(`/api/jobs/${id}/trigger`, {
       method: 'POST',
       body: JSON.stringify({}),
     });
@@ -294,18 +340,15 @@ export const api = {
     });
   },
 
-  testTelegram(input: { chatId: string }): Promise<{ success: boolean; message: string }> {
-    return request<{ success: boolean; message: string }>('/api/integrations/telegram/test', {
+  testTelegram(input: { chatId: string }): Promise<NotificationTestDto> {
+    return request<NotificationTestDto>('/api/integrations/telegram/test', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   },
 
-  testWebhook(input: {
-    webhookUrl: string;
-    secret?: string | null;
-  }): Promise<{ success: boolean; message: string }> {
-    return request<{ success: boolean; message: string }>('/api/integrations/webhook/test', {
+  testWebhook(input: { webhookUrl: string; secret?: string | null }): Promise<NotificationTestDto> {
+    return request<NotificationTestDto>('/api/integrations/webhook/test', {
       method: 'POST',
       body: JSON.stringify(input),
     });
@@ -341,8 +384,8 @@ export const api = {
     return request<PaginatedResponse<SessionDto>>(`/api/sessions?${params.toString()}`);
   },
 
-  checkSession(domainOrUrl: string): Promise<{ hasSession: boolean; session: SessionDto | null }> {
-    return request<{ hasSession: boolean; session: SessionDto | null }>(
+  checkSession(domainOrUrl: string): Promise<SessionCheckDto> {
+    return request<SessionCheckDto>(
       `/api/sessions/check?url=${encodeURIComponent(domainOrUrl)}`
     );
   },

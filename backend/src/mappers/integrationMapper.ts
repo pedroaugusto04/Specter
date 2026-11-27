@@ -9,17 +9,19 @@ export const IntegrationMapper = {
       id: row.id,
       userId: row.userId,
       telegramEnabled: row.telegramEnabled,
-      telegramBotToken: decryptText(row.telegramBotToken),
-      telegramChatId: row.telegramChatId ?? null,
+      telegramChatId: row.telegramChatId,
       webhookEnabled: row.webhookEnabled,
-      webhookUrl: row.webhookUrl ?? null,
+      webhookUrl: row.webhookUrl,
       webhookSecret: decryptText(row.webhookSecret),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
   },
 
-  entityToDto(entity: UserIntegrationEntity): UserIntegrationsDto {
+  entityToDto(
+    entity: UserIntegrationEntity,
+    botUsername: string | null
+  ): UserIntegrationsDto {
     return {
       id: entity.id,
       userId: entity.userId,
@@ -28,12 +30,13 @@ export const IntegrationMapper = {
       webhookEnabled: entity.webhookEnabled,
       webhookUrl: entity.webhookUrl,
       hasWebhookSecret: Boolean(entity.webhookSecret),
+      botUsername,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
     };
   },
 
-  emptyDto(userId: string): UserIntegrationsDto {
+  emptyDto(userId: string, botUsername: string | null): UserIntegrationsDto {
     return {
       id: null,
       userId,
@@ -42,6 +45,7 @@ export const IntegrationMapper = {
       webhookEnabled: false,
       webhookUrl: null,
       hasWebhookSecret: false,
+      botUsername,
       createdAt: null,
       updatedAt: null,
     };

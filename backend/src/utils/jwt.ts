@@ -6,6 +6,7 @@ export interface JwtPayload {
   sub: string;
   email?: string;
   name?: string | null;
+  source?: 'web' | 'extension';
   type: JwtTokenType;
   iat: number;
   exp: number;
@@ -25,6 +26,10 @@ function base64UrlDecode(input: string): string {
   return Buffer.from(padded, 'base64').toString('utf8');
 }
 
+function signHmacSha256(data: string, secret: string): string {
+  return base64UrlEncode(crypto.createHmac('sha256', secret).update(data).digest());
+}
+
 export function signJwt(
   payload: Omit<JwtPayload, 'iat' | 'exp'>,
   secret: string,
@@ -41,15 +46,7 @@ export function signJwt(
   const payloadEncoded = base64UrlEncode(JSON.stringify(fullPayload));
   const data = `${headerEncoded}.${payloadEncoded}`;
 
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(data)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-
-  return `${data}.${signature}`;
+  return `${data}.${signHmacSha256(data, secret)}`;
 }
 
 export function verifyJwt(
@@ -65,13 +62,7 @@ export function verifyJwt(
     if (!headerEncoded || !payloadEncoded || !signatureProvided) return null;
 
     const data = `${headerEncoded}.${payloadEncoded}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(data)
-      .digest('base64')
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
+    const expectedSignature = signHmacSha256(data, secret);
 
     const sigBuf = Buffer.from(signatureProvided, 'utf8');
     const expectedBuf = Buffer.from(expectedSignature, 'utf8');

@@ -17,7 +17,7 @@ export function createExecutionContext(timeoutMs: number, signal?: AbortSignal):
           combined.reason instanceof Error ? combined.reason.message : 'Execution cancelled.',
           combined.reason
         );
-      if (Date.now() >= deadline) throw new Error('Execution deadline exhausted.');
+      if (Date.now() >= deadline) throw new NavigationTimeoutError('Execution deadline exhausted.');
     },
   };
 }

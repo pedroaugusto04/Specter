@@ -11,7 +11,6 @@ export function registerSessionRoutes(
 ): void {
   const withAuth = requireAuth(authService);
 
-  // List all authenticated web sessions for the logged-in user
   app.get('/api/sessions', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
     const query = paginationQuerySchema.parse(request.query);
@@ -19,7 +18,6 @@ export function registerSessionRoutes(
     return reply.status(200).send({ data: sessions });
   });
 
-  // Check if a specific domain or URL has a saved session
   app.get('/api/sessions/check', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
     const query = sessionCheckQuerySchema.parse(request.query);
@@ -28,16 +26,14 @@ export function registerSessionRoutes(
     return reply.status(200).send({
       data: {
         hasSession: Boolean(session),
-        session: session ?? null,
+        session,
       },
     });
   });
 
-  // Sync / Upload cookies from the browser extension
   app.post('/api/sessions/sync', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
     const input = syncSessionSchema.parse(request.body);
-
     const session = await sessionService.syncSession(user.id, input);
     return reply.status(200).send({
       message: `Session for ${session.domain} synchronized successfully with ${session.cookieCount} cookies.`,
@@ -45,21 +41,12 @@ export function registerSessionRoutes(
     });
   });
 
-  // Delete a saved session
   app.delete<{ Params: { id: string } }>(
     '/api/sessions/:id',
     { preHandler: [withAuth] },
     async (request, reply) => {
       const user = requireUser(request);
-      const success = await sessionService.deleteSession(user.id, request.params.id);
-
-      if (!success) {
-        return reply.status(404).send({
-          error: 'NOT_FOUND',
-          message: 'Session not found or already deleted.',
-        });
-      }
-
+      await sessionService.deleteSession(user.id, request.params.id);
       return reply.status(204).send();
     }
   );

@@ -45,7 +45,6 @@ export const userIntegrations = pgTable(
 
     // Telegram Integration
     telegramEnabled: boolean('telegram_enabled').default(false).notNull(),
-    telegramBotToken: text('telegram_bot_token'),
     telegramChatId: text('telegram_chat_id'),
 
     // Webhook Integration
@@ -84,6 +83,7 @@ export const scrapingJobs = pgTable(
     status: text('status', {
       enum: Object.values(JobStatus) as [string, ...string[]],
     })
+      .$type<JobStatus>()
       .default(JobStatus.PendingCompilation)
       .notNull(),
 
@@ -120,8 +120,12 @@ export const jobRuns = pgTable(
 
     hasChanges: text('has_changes', {
       enum: Object.values(ChangeStatus) as [string, ...string[]],
-    }).notNull(),
-    status: text('status', { enum: Object.values(RunStatus) as [string, ...string[]] }).notNull(),
+    })
+      .$type<ChangeStatus>()
+      .notNull(),
+    status: text('status', { enum: Object.values(RunStatus) as [string, ...string[]] })
+      .$type<RunStatus>()
+      .notNull(),
     errorMessage: text('error_message'),
     httpStatus: integer('http_status'),
     durationMs: integer('duration_ms'),

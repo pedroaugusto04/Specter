@@ -36,6 +36,8 @@ export function evaluationWouldAlert(input: {
           url: input.url,
           userPrompt: input.prompt,
           notificationEmail: '',
+          webhookUrl: null,
+          webhookSecret: null,
           extractionPlan: input.plan,
         },
         currentData: current,

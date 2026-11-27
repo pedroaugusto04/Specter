@@ -6,6 +6,7 @@ export interface UserFailure {
 export declare const USER_FAILURES: Readonly<
   Record<
     | 'resourceUnavailable'
+    | 'responseTooLarge'
     | 'accessBlocked'
     | 'requestTimedOut'
     | 'requestedDataUnavailable'
@@ -22,5 +23,6 @@ export declare const USER_FAILURES: Readonly<
     UserFailure
   >
 >;
+export declare function formatStructuredUserFailure(failure: UserFailure): string;
 export declare function parseStructuredUserFailure(message: unknown): UserFailure | null;
 export declare function getUserFailure(message: string): UserFailure;

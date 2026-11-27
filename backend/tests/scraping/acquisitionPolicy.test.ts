@@ -14,6 +14,7 @@ import { fixturePlan, fixturePolicy } from '../helpers/extractionFixtures.js';
 import {
   createTestScrapeExecutionService,
   InMemoryJobRepository,
+  InMemorySessionRepository,
   MockJobScheduler,
   MockNotificationProvider,
 } from '../helpers/testDoubles.js';
@@ -219,7 +220,7 @@ describe('Per-monitor access cooldown', () => {
     }))!;
     const cooldown = new AccessCooldownService(
       new InMemoryAccessCooldownStore(),
-      undefined,
+      new InMemorySessionRepository(),
       2,
       3600000
     );

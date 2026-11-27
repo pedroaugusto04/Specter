@@ -1,51 +1,58 @@
-import { JobPresenter } from '../presentation/jobPresenter.js';
-import { DashboardMapper } from '../mappers/dashboardMapper.js';
+import { randomUUID } from 'node:crypto';
 import {
   ExtractionScope,
   PAGINATION_RUNS_PAGE_SIZE,
   PAGINATION_TIMESERIES_PAGE_SIZE,
   type CreateJobRequest,
+  type DashboardStatsDto,
+  type JobPlanVersionsDto,
+  type JobRunsDto,
+  type JobStatusFilter,
+  type JobTimeseriesDto,
+  type PaginatedResponse,
+  type ProbeUrlDto,
+  type ScrapingJobDto,
+  type TimeseriesRange,
+  type TriggerJobDto,
   type UpdateJobRequest,
 } from '@specter/contracts';
-import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import { randomUUID } from 'node:crypto';
+import { env } from '../config/env.js';
+import {
+  CompilationAlreadyInProgressError,
+  ExtractionRunInProgressError,
+  InvalidCronExpressionError,
+  InvalidTriggerConfigurationError,
+  JobNotFoundError,
+  MonitorNameAlreadyExistsError,
+  NoCompilationInProgressError,
+  PlanVersionNotFoundError,
+  ValidationError,
+} from '../errors/domainErrors.js';
 import { comparisonPayload } from '../extraction/comparison.js';
-import { extractionPlanSchema } from '../types/extractionPlan.js';
-import { logger } from '../utils/logger.js';
-import { ConflictError, NotFoundError, ValidationError } from '../errors/domainErrors.js';
 import { JobMapper } from '../mappers/jobMapper.js';
-import type {
-  JobPlanVersionsDto,
-  JobRunsDto,
-  JobTimeseriesDto,
-  PaginatedResponse,
-  ScrapingJobDto,
-  TimeseriesRange,
-} from '@specter/contracts';
+import type { JobPresenter } from '../presentation/jobPresenter.js';
 import type { IScraperEngine } from '../providers/scraping/scraper.interface.js';
 import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
+import type { IJobRepository, UpdateJobPatch } from '../repositories/jobRepository.js';
 import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type {
-  DashboardStats,
-  IJobRepository,
-  UpdateJobPatch,
-} from '../repositories/jobRepository.js';
 import type { DiffSummary, ScrapingJobEntity } from '../types/domain.js';
 import { JobStatus, RunStatus } from '../types/enums.js';
+import { extractionPlanSchema } from '../types/extractionPlan.js';
 import { validateCronFrequency } from '../utils/cronValidator.js';
 import { buildDiffSummary } from '../utils/diffHasher.js';
+import { getErrorMessage } from '../utils/errors.js';
+import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
+import { logger } from '../utils/logger.js';
+import { resolvePageResult } from '../utils/pagination.js';
 import { resolveSessionStorageState } from '../utils/sessionHelper.js';
 import { assertSafeUrl } from '../utils/ssrfValidator.js';
-import { resolvePageResult } from '../utils/pagination.js';
+import type { ICompilationControl } from './compilationControl.interface.js';
+import type { QuotaService } from './quotaService.js';
+import type { RealtimeService } from './realtimeService.js';
 
 export interface CreateScrapingJobRequest extends CreateJobRequest {
   userId: string;
 }
-export type UpdateScrapingJobRequest = UpdateJobRequest;
-
-import type { RealtimeService } from './realtimeService.js';
-import type { QuotaService } from './quotaService.js';
-import type { ICompilationControl } from './compilationControl.interface.js';
 
 export interface JobServiceDeps {
   jobRepository: IJobRepository;
@@ -55,35 +62,13 @@ export interface JobServiceDeps {
   sessionRepository: ISessionRepository;
   realtimeService: RealtimeService;
   quotaService: QuotaService;
-  presenter?: JobPresenter;
+  presenter: JobPresenter;
 }
 
 export class JobService {
-  private readonly jobRepository: IJobRepository;
-  private readonly jobScheduler: IJobScheduler;
-  private readonly scraperEngine: IScraperEngine;
-  private readonly sessionRepository: ISessionRepository;
-  private readonly realtimeService: RealtimeService;
-  private readonly quotaService: QuotaService;
-  private readonly compilationControl: ICompilationControl;
+  constructor(private readonly deps: JobServiceDeps) {}
 
-  private readonly presenter: JobPresenter;
-
-  constructor(deps: JobServiceDeps) {
-    this.jobRepository = deps.jobRepository;
-    this.jobScheduler = deps.jobScheduler;
-    this.compilationControl = deps.compilationControl;
-    this.scraperEngine = deps.scraperEngine;
-    this.sessionRepository = deps.sessionRepository;
-    this.realtimeService = deps.realtimeService;
-    this.presenter = deps.presenter ?? new JobPresenter(undefined, deps.jobRepository);
-    this.quotaService = deps.quotaService;
-  }
-
-  async probeUrl(
-    targetUrl: string,
-    userId?: string
-  ): Promise<{ accessible: boolean; reason?: string; hasSavedSession?: boolean }> {
+  async probeUrl(targetUrl: string, userId?: string): Promise<ProbeUrlDto> {
     let normalizedUrl: string;
     try {
       normalizedUrl = await assertSafeUrl(targetUrl, 'url');
@@ -96,19 +81,19 @@ export class JobService {
     }
 
     const storageState = await resolveSessionStorageState(
-      this.sessionRepository,
+      this.deps.sessionRepository,
       userId,
       normalizedUrl
     );
     const hasSavedSession = Boolean(storageState);
 
     try {
-      await this.scraperEngine.fetchHtml(normalizedUrl, { storageState });
+      await this.deps.scraperEngine.fetchHtml(normalizedUrl, { storageState });
       return { accessible: true, ...(hasSavedSession ? { hasSavedSession: true } : {}) };
     } catch (err) {
       logger.warn('URL accessibility verification failed during probe', {
         url: normalizedUrl,
-        internalError: err instanceof Error ? err.message : String(err),
+        internalError: getErrorMessage(err),
       });
 
       return {
@@ -126,19 +111,15 @@ export class JobService {
       : null;
     const cronExpression = this.assertValidCron(request.cronExpression ?? '0 */6 * * *');
 
-    const existingJobs = await this.jobRepository.findAll(undefined, request.userId);
-    const name = request.name?.trim() || this.nextMonitorName(existingJobs.map((job) => job.name));
-    this.assertUniqueMonitorName(
-      name,
-      existingJobs.map((job) => job.name)
-    );
+    const existingJobs = await this.deps.jobRepository.findAll(undefined, request.userId);
+    const existingNames = existingJobs.map((job) => job.name);
+    const name = request.name?.trim() || this.nextMonitorName(existingNames);
+    this.assertUniqueMonitorName(name, existingNames);
 
-    if (request.userId) {
-      await this.quotaService.assertCanActivateMonitor(request.userId);
-      await this.quotaService.assertCanCompile(request.userId);
-    }
+    await this.deps.quotaService.assertCanActivateMonitor(request.userId);
+    await this.deps.quotaService.assertCanCompile(request.userId);
 
-    const createdEntity = await this.jobRepository.createJob({
+    const createdEntity = await this.deps.jobRepository.createJob({
       userId: request.userId,
       name,
       url: normalizedUrl,
@@ -150,9 +131,8 @@ export class JobService {
       captureScreenshotOnChange: request.captureScreenshotOnChange ?? false,
     });
 
-    await this.jobScheduler.enqueueCompilation(createdEntity.id, CompilationReason.Initial);
-
-    await this.realtimeService.notifyJobCreated(
+    await this.deps.jobScheduler.enqueueCompilation(createdEntity.id, CompilationReason.Initial);
+    await this.deps.realtimeService.notifyJobCreated(
       createdEntity.userId,
       createdEntity.id,
       createdEntity.status
@@ -164,11 +144,11 @@ export class JobService {
       userId: createdEntity.userId,
     });
 
-    return await this.presenter.present(createdEntity);
+    return this.deps.presenter.present(createdEntity);
   }
 
   async listJobsPage(input: {
-    status?: JobStatus | 'recovering' | 'paused';
+    status?: JobStatusFilter;
     userId: string;
     page: number;
     pageSize: number;
@@ -177,32 +157,31 @@ export class JobService {
     const result = await resolvePageResult(
       input.page,
       input.pageSize,
-      await this.jobRepository.findPage(input),
-      (page) => this.jobRepository.findPage({ ...input, page })
+      await this.deps.jobRepository.findPage(input),
+      (page) => this.deps.jobRepository.findPage({ ...input, page })
     );
     return {
-      items: await this.presenter.presentMany(result.items),
+      items: await this.deps.presenter.presentMany(result.items),
       pagination: result.pagination,
     };
   }
 
   async getJobById(id: string, userId?: string): Promise<ScrapingJobDto> {
     const entity = await this.getOwnedJob(id, userId);
-    return this.presenter.present(entity);
+    return this.deps.presenter.present(entity);
   }
 
   async updateJob(
     id: string,
-    request: UpdateScrapingJobRequest,
+    request: UpdateJobRequest,
     userId?: string
   ): Promise<ScrapingJobDto> {
     const existing = await this.getOwnedJob(id, userId);
-
     const patch: UpdateJobPatch = {};
 
     if (request.name !== undefined) {
       const name = request.name.trim();
-      const existingNames = (await this.jobRepository.findAll(undefined, existing.userId))
+      const existingNames = (await this.deps.jobRepository.findAll(undefined, existing.userId))
         .filter((job) => job.id !== id)
         .map((job) => job.name);
       this.assertUniqueMonitorName(name, existingNames);
@@ -216,7 +195,7 @@ export class JobService {
       patch.userPrompt = request.userPrompt.trim();
     }
     if (request.notificationEmail !== undefined) {
-      patch.notificationEmail = request.notificationEmail?.trim() || null;
+      patch.notificationEmail = request.notificationEmail.trim() || null;
     }
     if (request.webhookUrl !== undefined) {
       patch.webhookUrl = request.webhookUrl?.trim()
@@ -233,28 +212,24 @@ export class JobService {
       patch.cronExpression = this.assertValidCron(request.cronExpression);
     }
 
-    if (request.triggerRules !== undefined || request.triggerMatchMode !== undefined) {
-      if (existing.extractionPlan) {
-        patch.extractionPlan = {
-          ...existing.extractionPlan,
-          intent: {
-            ...existing.extractionPlan.intent,
-            ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
-            ...(request.triggerMatchMode !== undefined
-              ? { triggerMatchMode: request.triggerMatchMode }
-              : {}),
-          },
-        };
+    if (
+      (request.triggerRules !== undefined || request.triggerMatchMode !== undefined) &&
+      existing.extractionPlan
+    ) {
+      const candidatePlan = {
+        ...existing.extractionPlan,
+        intent: {
+          ...existing.extractionPlan.intent,
+          ...(request.triggerRules !== undefined ? { triggerRules: request.triggerRules } : {}),
+          ...(request.triggerMatchMode !== undefined
+            ? { triggerMatchMode: request.triggerMatchMode }
+            : {}),
+        },
+      };
+      const validated = extractionPlanSchema.safeParse(candidatePlan);
+      if (!validated.success) {
+        throw new InvalidTriggerConfigurationError(validated.error.issues);
       }
-    }
-
-    if (patch.extractionPlan) {
-      const validated = extractionPlanSchema.safeParse(patch.extractionPlan);
-      if (!validated.success)
-        throw new ValidationError(
-          'Invalid trigger configuration.',
-          validated.error.issues.map((issue) => ({ field: 'triggerRules', message: issue.message }))
-        );
       patch.extractionPlan = validated.data;
       patch.contractRevision = existing.contractRevision ?? randomUUID();
     }
@@ -266,19 +241,12 @@ export class JobService {
 
     if (needsRecompile) {
       const isDomainChange = Boolean(
-        urlChanged &&
-          (() => {
-            try {
-              return new URL(patch.url!).origin !== new URL(existing.url).origin;
-            } catch {
-              return true;
-            }
-          })()
+        urlChanged && this.hasOriginChanged(existing.url, patch.url!)
       );
 
       if (isDomainChange || !existing.extractionPlan) {
         // Domain changed or no previous plan: old selectors cannot be used as fallback
-        await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+        await this.deps.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
         patch.bullmqRepeatableKey = null;
         patch.status = JobStatus.PendingCompilation;
         patch.extractionPlan = null;
@@ -289,43 +257,338 @@ export class JobService {
         patch.lastError = null;
       }
     } else if (patch.cronExpression !== undefined && existing.status === JobStatus.Active) {
-      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      patch.bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
+      await this.deps.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      patch.bullmqRepeatableKey = await this.deps.jobScheduler.scheduleRepeatableJob(
         existing.id,
         patch.cronExpression
       );
     }
 
-    const updated = await this.jobRepository.updateJob(id, patch);
-    if (!updated) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
-    }
+    const updated = await this.updateOrThrow(id, patch);
 
     if (needsRecompile) {
-      await this.jobScheduler.enqueueCompilation(id, CompilationReason.Manual);
+      await this.deps.jobScheduler.enqueueCompilation(id, CompilationReason.Manual);
     }
 
-    const resultDto = await this.presenter.present(updated);
-    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-    return resultDto;
+    return this.presentAndNotify(updated);
+  }
+
+  async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(id, userId);
+
+    if (paused) {
+      this.deps.compilationControl.cancelCompilation(existing.id, 'Monitor paused by user');
+      await this.deps.jobScheduler.removePendingCompilations(existing.id);
+      await this.deps.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      const updated = await this.updateOrThrow(id, {
+        status: JobStatus.Paused,
+        bullmqRepeatableKey: null,
+      });
+      return this.presentAndNotify(updated);
+    }
+
+    if (existing.status === JobStatus.Paused) {
+      await this.deps.quotaService.assertCanActivateMonitor(existing.userId);
+      if (!existing.extractionPlan) {
+        await this.deps.quotaService.assertCanCompile(existing.userId);
+      }
+    }
+
+    if (!existing.extractionPlan) {
+      const updated = await this.updateOrThrow(id, {
+        status: JobStatus.PendingCompilation,
+      });
+      await this.deps.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
+      return this.presentAndNotify(updated);
+    }
+
+    const repeatableKey = await this.deps.jobScheduler.scheduleRepeatableJob(
+      existing.id,
+      existing.cronExpression
+    );
+    const updated = await this.updateOrThrow(id, {
+      status: JobStatus.Active,
+      bullmqRepeatableKey: repeatableKey,
+    });
+    return this.presentAndNotify(updated);
+  }
+
+  async triggerManualScrape(id: string, userId?: string): Promise<TriggerJobDto> {
+    const existing = await this.getOwnedJob(id, userId);
+
+    if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
+      await this.deps.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
+      await this.deps.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
+      return { queued: true, mode: 'compile' };
+    }
+
+    await this.deps.jobScheduler.enqueueImmediateScrape(existing.id);
+    await this.deps.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
+    return { queued: true, mode: 'scrape' };
+  }
+
+  async triggerManualRecompile(id: string, userId?: string): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(id, userId);
+    await this.assertNoActiveWork(existing, 'recompile');
+
+    const updated = await this.updateOrThrow(id, {
+      status: JobStatus.Recovering,
+      lastError: null,
+    });
+
+    await this.deps.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
+    return this.presentAndNotify(updated);
+  }
+
+  async listPlanVersions(
+    jobId: string,
+    page = 1,
+    pageSize = 10,
+    userId?: string
+  ): Promise<JobPlanVersionsDto> {
+    const existing = await this.getOwnedJob(jobId, userId);
+    const [initialResult, activeEntity] = await Promise.all([
+      this.deps.jobRepository.findPaginatedPlanVersions(jobId, page, pageSize),
+      existing.planRevision
+        ? this.deps.jobRepository.findPlanVersionByRevision(jobId, existing.planRevision)
+        : Promise.resolve(null),
+    ]);
+
+    const versionPage = await resolvePageResult(page, pageSize, initialResult, (safePage) =>
+      this.deps.jobRepository.findPaginatedPlanVersions(jobId, safePage, pageSize)
+    );
+
+    return {
+      jobId: existing.id,
+      activeVersionNumber: activeEntity?.versionNumber ?? null,
+      versions: versionPage.items.map((item) =>
+        JobMapper.planVersionEntityToDto(item, existing.planRevision)
+      ),
+      pagination: versionPage.pagination,
+    };
+  }
+
+  async rollbackPlanVersion(
+    jobId: string,
+    versionNumber: number,
+    userId?: string
+  ): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(jobId, userId);
+    await this.assertNoActiveWork(existing, 'rollback');
+
+    const targetVersion = await this.deps.jobRepository.findPlanVersionByNumber(
+      jobId,
+      versionNumber
+    );
+    if (!targetVersion) {
+      throw new PlanVersionNotFoundError(versionNumber);
+    }
+
+    if (existing.planRevision && existing.planRevision === targetVersion.planRevision) {
+      return this.deps.presenter.present(existing);
+    }
+
+    const isPaused = existing.status === JobStatus.Paused;
+    let bullmqRepeatableKey: string | null = null;
+
+    if (!isPaused) {
+      await this.deps.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+      bullmqRepeatableKey = await this.deps.jobScheduler.scheduleRepeatableJob(
+        existing.id,
+        existing.cronExpression
+      );
+    }
+
+    const updated = await this.updateOrThrow(jobId, {
+      extractionPlan: targetVersion.extractionPlan,
+      planRevision: targetVersion.planRevision,
+      contractRevision: targetVersion.contractRevision,
+      userPrompt: targetVersion.userPrompt,
+      url: targetVersion.url,
+      status: isPaused ? JobStatus.Paused : JobStatus.Active,
+      lastError: null,
+      bullmqRepeatableKey,
+    });
+
+    return this.presentAndNotify(updated);
+  }
+
+  async cancelCompilation(id: string, userId?: string): Promise<ScrapingJobDto> {
+    const existing = await this.getOwnedJob(id, userId);
+
+    if (
+      existing.status !== JobStatus.PendingCompilation &&
+      existing.status !== JobStatus.Recovering
+    ) {
+      throw new NoCompilationInProgressError();
+    }
+
+    this.deps.compilationControl.cancelCompilation(existing.id, 'Compilation cancelled by user');
+    await this.deps.jobScheduler.removePendingCompilations(existing.id);
+
+    const targetStatus = existing.extractionPlan ? JobStatus.Active : JobStatus.Paused;
+    const updated = await this.updateOrThrow(id, {
+      status: targetStatus,
+      lastError: null,
+    });
+
+    return this.presentAndNotify(updated);
+  }
+
+  async deleteJob(id: string, userId?: string): Promise<void> {
+    const existing = await this.getOwnedJob(id, userId);
+
+    this.deps.compilationControl.cancelCompilation(existing.id, 'Monitor deleted by user');
+    await this.deps.jobScheduler.removePendingCompilations(existing.id);
+    await this.deps.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
+    await this.deps.jobRepository.deleteJob(id);
+    await this.deps.realtimeService.notifyJobDeleted(existing.userId, existing.id);
+  }
+
+  async getJobRuns(
+    jobId: string,
+    page = 1,
+    pageSize: number = PAGINATION_RUNS_PAGE_SIZE,
+    userId?: string
+  ): Promise<JobRunsDto> {
+    const existing = await this.getOwnedJob(jobId, userId);
+
+    const [paginatedResult, summaryStats, recentRuns, latestSuccessfulRun] = await Promise.all([
+      this.deps.jobRepository.findPaginatedRunsByJobId(jobId, page, pageSize),
+      this.deps.jobRepository.getJobRunsSummary(jobId),
+      this.deps.jobRepository.findRunsByJobId(jobId, 5),
+      this.deps.jobRepository.findLatestSuccessfulRun(jobId),
+    ]);
+
+    const runPage = await resolvePageResult(page, pageSize, paginatedResult, (safePage) =>
+      this.deps.jobRepository.findPaginatedRunsByJobId(jobId, safePage, pageSize)
+    );
+    const runEntities = runPage.items;
+    const identityFields = existing.extractionPlan?.intent.identityFields ?? [];
+
+    const successfulRuns = recentRuns.filter(
+      (run) =>
+        run.status === RunStatus.Success &&
+        run.extractedData &&
+        run.extractionReport &&
+        run.contractRevision === existing.contractRevision
+    );
+    let latestDiff: DiffSummary | null = null;
+    if (successfulRuns.length >= 2) {
+      const [current, previous] = successfulRuns;
+      latestDiff = buildDiffSummary(
+        comparisonPayload(previous!.extractedData!, identityFields),
+        comparisonPayload(current!.extractedData!, identityFields)
+      );
+    }
+
+    const oldestOnPage = runEntities.at(-1);
+    const previousCollectionRun =
+      existing.extractionPlan?.intent.scope === ExtractionScope.Collection && oldestOnPage
+        ? await this.deps.jobRepository.findPreviousCompleteCollectionRun(
+            jobId,
+            { executedAt: oldestOnPage.executedAt, id: oldestOnPage.id },
+            existing.contractRevision
+          )
+        : null;
+
+    return {
+      runs: runEntities.map(JobMapper.runEntityToDto),
+      previousCollectionRun: previousCollectionRun
+        ? JobMapper.runEntityToDto(previousCollectionRun)
+        : null,
+      latestSuccessfulRun: latestSuccessfulRun
+        ? JobMapper.runEntityToDto(latestSuccessfulRun)
+        : null,
+      latestDiff,
+      pagination: runPage.pagination,
+      summary: summaryStats,
+    };
+  }
+
+  async getDashboardStats(userId?: string): Promise<DashboardStatsDto> {
+    return this.deps.jobRepository.getStats(userId);
+  }
+
+  async getJobTimeseries(
+    jobId: string,
+    range: TimeseriesRange = 'all',
+    page = 1,
+    pageSize: number = PAGINATION_TIMESERIES_PAGE_SIZE,
+    userId?: string
+  ): Promise<JobTimeseriesDto> {
+    await this.getOwnedJob(jobId, userId);
+
+    const result = await resolvePageResult(
+      page,
+      pageSize,
+      await this.deps.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, page, pageSize),
+      (safePage) =>
+        this.deps.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, safePage, pageSize)
+    );
+
+    return {
+      jobId,
+      range,
+      points: result.items.map(JobMapper.timeseriesPointToDto),
+      previousPoint: result.previousItem
+        ? JobMapper.timeseriesPointToDto(result.previousItem)
+        : null,
+      pagination: result.pagination,
+    };
   }
 
   private async getOwnedJob(id: string, userId?: string): Promise<ScrapingJobEntity> {
-    const entity = await this.jobRepository.findById(id);
+    const entity = await this.deps.jobRepository.findById(id);
     if (!entity || (userId && entity.userId !== userId)) {
-      throw new NotFoundError(`Monitoring job not found: ${id}`);
+      throw new JobNotFoundError(id);
     }
     return entity;
   }
 
+  private async updateOrThrow(id: string, patch: UpdateJobPatch): Promise<ScrapingJobEntity> {
+    const updated = await this.deps.jobRepository.updateJob(id, patch);
+    if (!updated) {
+      throw new JobNotFoundError(id);
+    }
+    return updated;
+  }
+
+  private async presentAndNotify(job: ScrapingJobEntity): Promise<ScrapingJobDto> {
+    const dto = await this.deps.presenter.present(job);
+    await this.deps.realtimeService.notifyJobUpdated(job.userId, dto.id, dto.status);
+    return dto;
+  }
+
+  private async assertNoActiveWork(
+    job: ScrapingJobEntity,
+    action: 'recompile' | 'rollback'
+  ): Promise<void> {
+    if (job.status === JobStatus.Recovering || job.status === JobStatus.PendingCompilation) {
+      throw new CompilationAlreadyInProgressError(action);
+    }
+    const runningRun = await this.deps.jobRepository.findRunningRun(job.id);
+    if (runningRun) {
+      throw new ExtractionRunInProgressError(action);
+    }
+  }
+
+  private hasOriginChanged(previousUrl: string, nextUrl: string): boolean {
+    try {
+      return new URL(nextUrl).origin !== new URL(previousUrl).origin;
+    } catch {
+      return true;
+    }
+  }
+
   private assertValidCron(cronExpression: string): string {
     const trimmed = cronExpression.trim();
-    const cronCheck = validateCronFrequency(trimmed);
+    const cronCheck = validateCronFrequency(trimmed, env.MIN_CRON_INTERVAL_MINUTES);
     if (!cronCheck.valid) {
-      const msg =
+      throw new InvalidCronExpressionError(
         cronCheck.error ??
-        'Invalid cron expression or frequency lower than minimum allowed floor of 15 minutes.';
-      throw new ValidationError(msg, [{ field: 'cronExpression', message: msg }]);
+          `Invalid cron expression or frequency lower than minimum allowed floor of ${env.MIN_CRON_INTERVAL_MINUTES} minutes.`
+      );
     }
     return trimmed;
   }
@@ -343,330 +606,7 @@ export class JobService {
         (existing) => existing.trim().toLocaleLowerCase() === name.toLocaleLowerCase()
       )
     ) {
-      const message = 'A monitor with this name already exists. Choose a unique name.';
-      throw new ValidationError(message, [{ field: 'name', message }]);
+      throw new MonitorNameAlreadyExistsError();
     }
-  }
-
-  async setJobPauseState(id: string, paused: boolean, userId?: string): Promise<ScrapingJobDto> {
-    const existing = await this.getOwnedJob(id, userId);
-
-    if (paused) {
-      this.compilationControl.cancelCompilation(existing.id, 'Monitor paused by user');
-      await this.jobScheduler.removePendingCompilations(existing.id);
-      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      const updated = await this.jobRepository.updateJob(id, {
-        status: JobStatus.Paused,
-        bullmqRepeatableKey: null,
-      });
-      const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-      return resultDto;
-    }
-
-    if (this.quotaService && existing.userId && existing.status === JobStatus.Paused) {
-      await this.quotaService.assertCanActivateMonitor(existing.userId);
-      if (!existing.extractionPlan) {
-        await this.quotaService.assertCanCompile(existing.userId);
-      }
-    }
-
-    if (!existing.extractionPlan) {
-      const updated = await this.jobRepository.updateJob(id, {
-        status: JobStatus.PendingCompilation,
-      });
-      await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
-      const resultDto = await this.presenter.present(updated ?? existing);
-      await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-      return resultDto;
-    }
-
-    const repeatableKey = await this.jobScheduler.scheduleRepeatableJob(
-      existing.id,
-      existing.cronExpression
-    );
-    const updated = await this.jobRepository.updateJob(id, {
-      status: JobStatus.Active,
-      bullmqRepeatableKey: repeatableKey,
-    });
-    const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-    return resultDto;
-  }
-
-  async triggerManualScrape(
-    id: string,
-    userId?: string
-  ): Promise<{ queued: boolean; mode: 'scrape' | 'compile' }> {
-    const existing = await this.getOwnedJob(id, userId);
-
-    if (!existing.extractionPlan || existing.status === JobStatus.PendingCompilation) {
-      await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
-      await this.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
-      return { queued: true, mode: 'compile' };
-    }
-
-    await this.jobScheduler.enqueueImmediateScrape(existing.id);
-    await this.realtimeService.notifyJobUpdated(existing.userId, existing.id, existing.status);
-    return { queued: true, mode: 'scrape' };
-  }
-
-  async triggerManualRecompile(id: string, userId?: string): Promise<ScrapingJobDto> {
-    const existing = await this.getOwnedJob(id, userId);
-
-    if (
-      existing.status === JobStatus.Recovering ||
-      existing.status === JobStatus.PendingCompilation
-    ) {
-      throw new ConflictError('A compilation is already in progress for this monitor.');
-    }
-
-    const runningRun = await this.jobRepository.findRunningRun(existing.id);
-    if (runningRun) {
-      throw new ConflictError(
-        'Cannot recompile while an extraction is currently running. Please wait for the current run to finish.'
-      );
-    }
-
-    const updated = await this.jobRepository.updateJob(id, {
-      status: JobStatus.Recovering,
-      lastError: null,
-    });
-
-    await this.jobScheduler.enqueueCompilation(existing.id, CompilationReason.Manual);
-    const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-    return resultDto;
-  }
-
-  async listPlanVersions(
-    jobId: string,
-    page = 1,
-    pageSize = 10,
-    userId?: string
-  ): Promise<JobPlanVersionsDto> {
-    const existing = await this.getOwnedJob(jobId, userId);
-    const initialResult = await this.jobRepository.findPaginatedPlanVersions(
-      jobId,
-      page,
-      pageSize
-    );
-
-    const versionPage = await resolvePageResult(page, pageSize, initialResult, (safePage) =>
-      this.jobRepository.findPaginatedPlanVersions(jobId, safePage, pageSize)
-    );
-
-    const versions = versionPage.items.map((item) =>
-      JobMapper.planVersionEntityToDto(item, existing.planRevision)
-    );
-
-    let activeVersionNumber: number | null = null;
-    if (existing.planRevision) {
-      const activeEntity = await this.jobRepository.findPlanVersionByRevision(
-        jobId,
-        existing.planRevision
-      );
-      activeVersionNumber = activeEntity?.versionNumber ?? null;
-    }
-
-    return {
-      jobId: existing.id,
-      activeVersionNumber,
-      versions,
-      pagination: versionPage.pagination,
-    };
-  }
-
-  async rollbackPlanVersion(
-    jobId: string,
-    versionNumber: number,
-    userId?: string
-  ): Promise<ScrapingJobDto> {
-    const existing = await this.getOwnedJob(jobId, userId);
-
-    if (
-      existing.status === JobStatus.Recovering ||
-      existing.status === JobStatus.PendingCompilation
-    ) {
-      throw new ConflictError('Cannot restore a version while compilation is in progress.');
-    }
-
-    const runningRun = await this.jobRepository.findRunningRun(existing.id);
-    if (runningRun) {
-      throw new ConflictError(
-        'Cannot restore a version while an extraction is currently running.'
-      );
-    }
-
-    const targetVersion = await this.jobRepository.findPlanVersionByNumber(jobId, versionNumber);
-    if (!targetVersion) {
-      throw new NotFoundError(`Plan version ${versionNumber} not found for this monitor.`);
-    }
-
-    if (existing.planRevision && existing.planRevision === targetVersion.planRevision) {
-      return this.presenter.present(existing);
-    }
-
-    const isPaused = existing.status === JobStatus.Paused;
-    let bullmqRepeatableKey = existing.bullmqRepeatableKey;
-
-    if (!isPaused) {
-      await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-      bullmqRepeatableKey = await this.jobScheduler.scheduleRepeatableJob(
-        existing.id,
-        existing.cronExpression
-      );
-    }
-
-    const updated = await this.jobRepository.updateJob(jobId, {
-      extractionPlan: targetVersion.extractionPlan,
-      planRevision: targetVersion.planRevision,
-      contractRevision: targetVersion.contractRevision,
-      userPrompt: targetVersion.userPrompt,
-      url: targetVersion.url,
-      status: isPaused ? JobStatus.Paused : JobStatus.Active,
-      lastError: null,
-      bullmqRepeatableKey: isPaused ? null : bullmqRepeatableKey,
-    });
-
-    const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-    return resultDto;
-  }
-
-  async cancelCompilation(id: string, userId?: string): Promise<ScrapingJobDto> {
-    const existing = await this.getOwnedJob(id, userId);
-
-    if (
-      existing.status !== JobStatus.PendingCompilation &&
-      existing.status !== JobStatus.Recovering
-    ) {
-      throw new ValidationError('This monitor does not have a compilation in progress.');
-    }
-
-    this.compilationControl.cancelCompilation(existing.id, 'Compilation cancelled by user');
-    await this.jobScheduler.removePendingCompilations(existing.id);
-
-    // If job already had an extraction plan, revert to ACTIVE, otherwise set to PAUSED
-    const targetStatus = existing.extractionPlan ? JobStatus.Active : JobStatus.Paused;
-
-    const updated = await this.jobRepository.updateJob(id, {
-      status: targetStatus,
-      lastError: null,
-    });
-
-    const resultDto = await this.presenter.present(updated ?? existing);
-    await this.realtimeService.notifyJobUpdated(existing.userId, resultDto.id, resultDto.status);
-    return resultDto;
-  }
-
-  async deleteJob(id: string, userId?: string): Promise<void> {
-    const existing = await this.getOwnedJob(id, userId);
-
-    this.compilationControl.cancelCompilation(existing.id, 'Monitor deleted by user');
-    await this.jobScheduler.removePendingCompilations(existing.id);
-    await this.jobScheduler.removeRepeatableJob(existing.id, existing.bullmqRepeatableKey);
-    await this.jobRepository.deleteJob(id);
-    await this.realtimeService.notifyJobDeleted(existing.userId, existing.id);
-  }
-
-  async getJobRuns(
-    jobId: string,
-    page = 1,
-    pageSize: number = PAGINATION_RUNS_PAGE_SIZE,
-    userId?: string
-  ): Promise<JobRunsDto> {
-    const existing = await this.getOwnedJob(jobId, userId);
-
-    const [paginatedResult, summaryStats] = await Promise.all([
-      this.jobRepository.findPaginatedRunsByJobId(jobId, page, pageSize),
-      this.jobRepository.getJobRunsSummary(jobId),
-    ]);
-
-    const runPage = await resolvePageResult(page, pageSize, paginatedResult, (safePage) =>
-      this.jobRepository.findPaginatedRunsByJobId(jobId, safePage, pageSize)
-    );
-    const runEntities = runPage.items;
-    const runs = runEntities.map(JobMapper.runEntityToDto);
-
-    const recentRuns = await this.jobRepository.findRunsByJobId(jobId, 5);
-    const successfulRuns = recentRuns.filter(
-      (r) =>
-        r.status === RunStatus.Success &&
-        r.extractedData &&
-        r.extractionReport &&
-        r.contractRevision === existing.contractRevision
-    );
-    let latestDiff: DiffSummary | null = null;
-
-    if (successfulRuns.length >= 2) {
-      const current = successfulRuns[0]!;
-      const previous = successfulRuns[1]!;
-      latestDiff = buildDiffSummary(
-        comparisonPayload(
-          previous.extractedData!,
-          existing.extractionPlan?.intent.identityFields ?? []
-        ),
-        comparisonPayload(
-          current.extractedData!,
-          existing.extractionPlan?.intent.identityFields ?? []
-        )
-      );
-    }
-
-    const previousCollectionRun =
-      existing.extractionPlan?.intent.scope === ExtractionScope.Collection && runEntities.at(-1)
-        ? await this.jobRepository.findPreviousCompleteCollectionRun(
-            jobId,
-            { executedAt: runEntities.at(-1)!.executedAt, id: runEntities.at(-1)!.id },
-            existing.contractRevision ?? null
-          )
-        : null;
-
-    return {
-      runs,
-      previousCollectionRun: previousCollectionRun
-        ? JobMapper.runEntityToDto(previousCollectionRun)
-        : null,
-      latestSuccessfulRun: await this.jobRepository
-        .findLatestSuccessfulRun(jobId)
-        .then((run) => (run ? JobMapper.runEntityToDto(run) : null)),
-      latestDiff,
-      pagination: runPage.pagination,
-      summary: summaryStats,
-    };
-  }
-
-  async getDashboardStats(userId?: string): Promise<DashboardStats> {
-    return DashboardMapper.toDto(await this.jobRepository.getStats(userId));
-  }
-
-  async getJobTimeseries(
-    jobId: string,
-    range: TimeseriesRange = 'all',
-    page = 1,
-    pageSize: number = PAGINATION_TIMESERIES_PAGE_SIZE,
-    userId?: string
-  ): Promise<JobTimeseriesDto> {
-    await this.getOwnedJob(jobId, userId);
-
-    const result = await resolvePageResult(
-      page,
-      pageSize,
-      await this.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, page, pageSize),
-      (safePage) =>
-        this.jobRepository.findPaginatedTimeseriesByJobId(jobId, range, safePage, pageSize)
-    );
-    const points = result.items.map(JobMapper.timeseriesPointToDto);
-
-    return {
-      jobId,
-      range,
-      points,
-      previousPoint: result.previousItem
-        ? JobMapper.timeseriesPointToDto(result.previousItem)
-        : null,
-      pagination: result.pagination,
-    };
   }
 }

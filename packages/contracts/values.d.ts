@@ -8,11 +8,12 @@ export function finiteNumber(value: unknown): number | null;
 export function recordIdentity(record: Record<string, Scalar>, fields: string[]): string;
 export function sameRecord(left: Record<string, Scalar>, right: Record<string, Scalar>): boolean;
 export const Coverage: Readonly<{
-  Complete: 'COMPLETE';
-  Empty: 'EMPTY';
-  Partial: 'PARTIAL';
-  Unknown: 'UNKNOWN';
+  readonly Complete: 'COMPLETE';
+  readonly Empty: 'EMPTY';
+  readonly Partial: 'PARTIAL';
+  readonly Unknown: 'UNKNOWN';
 }>;
+export type Coverage = (typeof Coverage)[keyof typeof Coverage];
 
 export function triggerOperatorsForType(
   type: import('./vocabulary.js').FieldType

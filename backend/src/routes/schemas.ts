@@ -1,19 +1,19 @@
-import { z } from 'zod';
-import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js';
-import { env } from '../config/env.js';
-import { validateCronFrequency } from '../utils/cronValidator.js';
-import { createPaginationQuerySchema } from '../utils/pagination.js';
 import {
   PAGINATION_DEFAULT_PAGE_SIZE,
   PAGINATION_RUNS_PAGE_SIZE,
   PAGINATION_TIMESERIES_PAGE_SIZE,
 } from '@specter/contracts';
+import { z } from 'zod';
+import { env } from '../config/env.js';
+import { JobStatus, TriggerMatchMode, TriggerOperator } from '../types/enums.js';
+import { validateCronFrequency } from '../utils/cronValidator.js';
+import { createPaginationQuerySchema } from '../utils/pagination.js';
 
 // ============================================================================
 // Shared Primitive Schemas
 // ============================================================================
 
-export const cronExpressionSchema = z
+const cronExpressionSchema = z
   .string({
     error: (issue) => (issue.input === undefined ? 'Cron expression is required' : undefined),
   })
@@ -31,7 +31,7 @@ export const cronExpressionSchema = z
     }
   });
 
-export const targetUrlSchema = z
+const targetUrlSchema = z
   .string({ error: (issue) => (issue.input === undefined ? 'Target URL is required' : undefined) })
   .trim()
   .min(1, 'Target URL is required')
@@ -40,7 +40,7 @@ export const targetUrlSchema = z
     message: 'Target URL must start with http:// or https://',
   });
 
-export const webhookUrlStringSchema = z
+const webhookUrlStringSchema = z
   .string({ error: (issue) => (issue.input === undefined ? 'Webhook URL is required' : undefined) })
   .trim()
   .url('Webhook URL must be a valid HTTP or HTTPS URL')
@@ -48,23 +48,20 @@ export const webhookUrlStringSchema = z
     message: 'Webhook URL must start with http:// or https://',
   });
 
-export const optionalWebhookUrlSchema = webhookUrlStringSchema
-  .optional()
-  .or(z.literal(''))
-  .nullable();
+const optionalWebhookUrlSchema = webhookUrlStringSchema.optional().or(z.literal('')).nullable();
 
-export const webhookSecretSchema = z
+const webhookSecretSchema = z
   .string()
   .trim()
   .max(256, 'Webhook secret must not exceed 256 characters');
 
-export const monitorNameSchema = z
+const monitorNameSchema = z
   .string()
   .trim()
   .min(1, 'Monitor name is required')
   .max(80, 'Monitor name must be 80 characters or fewer');
 
-export const userPromptSchema = z
+const userPromptSchema = z
   .string({
     error: (issue) =>
       issue.input === undefined ? 'Extraction instructions are required' : undefined,
@@ -72,28 +69,54 @@ export const userPromptSchema = z
   .trim()
   .min(5, 'Extraction instructions must contain at least 5 characters');
 
-export const emailAddressSchema = z
+const emailAddressSchema = z
   .string({ error: (issue) => (issue.input === undefined ? 'Email is required' : undefined) })
   .trim()
   .min(1, 'Email is required')
   .email('Please enter a valid email address');
 
-export const alertNotificationEmailSchema = z
+const alertNotificationEmailSchema = z
   .string()
   .trim()
   .email('Please enter a valid alert email address (e.g. alerts@company.com)');
 
-// ============================================================================
-// Trigger Rule Schemas
-// ============================================================================
-
-export const triggerRuleSchema = z.object({
+const triggerRuleSchema = z.object({
   field: z.string().trim().min(1, 'Field is required'),
   operator: z.nativeEnum(TriggerOperator),
   value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
-export const triggerMatchModeSchema = z.nativeEnum(TriggerMatchMode);
+const triggerMatchModeSchema = z.nativeEnum(TriggerMatchMode);
+
+const ianaTimezoneSchema = z
+  .string()
+  .trim()
+  .refine(
+    (tz) => {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    {
+      message: 'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
+    }
+  );
+
+const pageLanguageSchema = z
+  .string()
+  .trim()
+  .max(64)
+  .transform((value, ctx) => {
+    try {
+      return new Intl.Locale(value).baseName;
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'Invalid language tag (e.g. en-US or pt-BR)' });
+      return z.NEVER;
+    }
+  });
 
 // ============================================================================
 // Job Schemas
@@ -105,7 +128,6 @@ export const jobProbeSchema = z.object({
 
 export const jobInputSchema = z.object({
   name: monitorNameSchema.optional(),
-  userId: z.string().trim().min(1).optional(),
   url: targetUrlSchema,
   userPrompt: userPromptSchema,
   notificationEmail: alertNotificationEmailSchema.optional().or(z.literal('')).default(''),
@@ -134,14 +156,13 @@ export const jobPauseSchema = z.object({
   }),
 });
 
-const pageQuerySchema = createPaginationQuerySchema(PAGINATION_DEFAULT_PAGE_SIZE);
+export const paginationQuerySchema = createPaginationQuerySchema(PAGINATION_DEFAULT_PAGE_SIZE);
 
-export const listQuerySchema = pageQuerySchema.extend({
+export const listQuerySchema = paginationQuerySchema.extend({
   status: z.union([z.nativeEnum(JobStatus), z.enum(['recovering', 'paused'])]).optional(),
   search: z.string().trim().max(200).optional(),
 });
 
-export const paginationQuerySchema = pageQuerySchema;
 export const jobRunsQuerySchema = createPaginationQuerySchema(PAGINATION_RUNS_PAGE_SIZE);
 export const jobPlanVersionsQuerySchema = createPaginationQuerySchema(10);
 export const rollbackJobSchema = z.object({
@@ -157,23 +178,6 @@ export const jobTimeseriesQuerySchema = createPaginationQuerySchema(
 // Auth & Profile Schemas
 // ============================================================================
 
-export const ianaTimezoneSchema = z
-  .string()
-  .trim()
-  .refine(
-    (tz) => {
-      try {
-        Intl.DateTimeFormat(undefined, { timeZone: tz });
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    {
-      message: 'Invalid IANA timezone format (e.g. "America/Sao_Paulo", "UTC", "America/New_York")',
-    }
-  );
-
 export const authRegisterSchema = z.object({
   email: emailAddressSchema,
   password: z
@@ -188,15 +192,6 @@ export const authLoginSchema = z.object({
   password: z
     .string({ error: (issue) => (issue.input === undefined ? 'Password is required' : undefined) })
     .min(1, 'Password is required'),
-});
-
-const pageLanguageSchema = z.string().trim().max(64).transform((value, ctx) => {
-  try {
-    return new Intl.Locale(value).baseName;
-  } catch {
-    ctx.addIssue({ code: 'custom', message: 'Invalid language tag (e.g. en-US or pt-BR)' });
-    return z.NEVER;
-  }
 });
 
 export const authProfileUpdateSchema = z.object({

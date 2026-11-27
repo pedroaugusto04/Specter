@@ -1,5 +1,10 @@
 'use client';
-import { DEFAULT_JOB_CRON, emptyJobForm, formToCreateJob } from '@/forms/jobForm';
+import {
+  emptyJobForm,
+  formToCreateJob,
+  isCreateJobFormDirty,
+  savePendingJobDraft,
+} from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
 import { useJobFormFeedback } from '@/hooks/useJobFormFeedback';
 import { JobScheduleFields } from './JobScheduleFields';
@@ -21,7 +26,7 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { api, ApiError, type SessionDto, type UserDto } from '@/lib/api';
 import { useModal } from '@/components/ui/modal-dialog';
-import { validateUrl, type JobFormField } from '@/lib/validation';
+import { validateUrl } from '@/lib/validation';
 import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
 import { PAGINATION_MAX_PAGE_SIZE } from '@specter/contracts';
@@ -72,13 +77,9 @@ export function CreateJobForm({
     webhookUrl,
     webhookSecret,
     captureScreenshotOnChange,
-    cronPreset,
-    customCron,
-    useCustomCron,
   } = values;
   const [step, setStep] = React.useState<'form' | 'auth'>('form');
   const [showTriggerInfo, setShowTriggerInfo] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
 
   // If user loads asynchronously and email alerts haven't been touched yet, populate default email and check alerts
   const initialEmailSetRef = React.useRef(Boolean(userEmail));
@@ -117,9 +118,10 @@ export function CreateJobForm({
     globalError,
     setGlobalError,
     clearFieldError,
-    focusFirstInvalidField,
     validateFields,
+    applyApiError,
   } = useJobFormFeedback(values, user?.email);
+  const loading = createJobMutation.isPending;
 
   const [probeState, setProbeState] = React.useState<{
     status: 'idle' | 'probing' | 'accessible' | 'blocked';
@@ -127,8 +129,6 @@ export function CreateJobForm({
     reason?: string;
   }>({ status: 'idle' });
   const [detectedSession, setDetectedSession] = React.useState<SessionDto | null>(null);
-
-  const effectiveCron = useCustomCron ? customCron : cronPreset;
 
   const suggestedName = React.useMemo(() => {
     const names = new Set(jobs.map((job) => job.name.trim().toLocaleLowerCase()));
@@ -142,19 +142,10 @@ export function CreateJobForm({
     setName(suggestedName);
   }, [jobsLoaded, name, setName, suggestedName]);
 
-  const defaultEmailAlerts = Boolean(user?.email?.trim());
-  const defaultNotificationEmail = user?.email?.trim() || '';
-
-  const isDirty = Boolean(
-    (name.trim().length > 0 && name.trim() !== suggestedName) ||
-    url.trim().length > 0 ||
-    userPrompt.trim().length > 0 ||
-    sendEmailAlerts !== defaultEmailAlerts ||
-    notificationEmail.trim() !== defaultNotificationEmail ||
-    (showCustomWebhook && (webhookUrl.trim().length > 0 || webhookSecret.trim().length > 0)) ||
-    captureScreenshotOnChange ||
-    (useCustomCron && customCron !== DEFAULT_JOB_CRON)
-  );
+  const isDirty = isCreateJobFormDirty(values, {
+    suggestedName,
+    defaultEmail: user?.email?.trim() || '',
+  });
 
   React.useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -219,7 +210,6 @@ export function CreateJobForm({
   };
 
   const executeCreateJob = async (activeUser?: UserDto | null) => {
-    setLoading(true);
     setGlobalError(null);
     try {
       await createJobMutation.mutateAsync(formToCreateJob(values, activeUser?.email));
@@ -230,27 +220,19 @@ export function CreateJobForm({
       onStepChange?.('form');
       onCreated();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 401) {
-          setStep('auth');
-          onStepChange?.('auth');
-          return;
-        }
-        if (Object.keys(err.fieldErrors).length > 0) {
-          setStep('form');
-          onStepChange?.('form');
-          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          return;
-        }
-        setGlobalError(err.message);
-      } else if (err instanceof Error) {
-        setGlobalError(err.message);
-      } else {
-        setGlobalError('An unexpected error occurred while creating the monitor.');
+      if (err instanceof ApiError && err.status === 401) {
+        setStep('auth');
+        onStepChange?.('auth');
+        return;
       }
-    } finally {
-      setLoading(false);
+      const hasFieldErrors = applyApiError(
+        err,
+        'An unexpected error occurred while creating the monitor.'
+      );
+      if (hasFieldErrors) {
+        setStep('form');
+        onStepChange?.('form');
+      }
     }
   };
 
@@ -304,24 +286,7 @@ export function CreateJobForm({
             setStep('form');
             onStepChange?.('form');
           }}
-          onGoogleBeforeRedirect={() => {
-            try {
-              sessionStorage.setItem(
-                PENDING_JOB_STORAGE_KEY,
-                JSON.stringify({
-                  name: name.trim(),
-                  url: url.trim(),
-                  userPrompt: userPrompt.trim(),
-                  notificationEmail: sendEmailAlerts ? notificationEmail.trim() : '',
-                  webhookUrl: showCustomWebhook ? webhookUrl.trim() || null : null,
-                  webhookSecret: showCustomWebhook ? webhookSecret.trim() || null : null,
-                  cronExpression: effectiveCron.trim(),
-                })
-              );
-            } catch {
-              // ignore storage errors
-            }
-          }}
+          onGoogleBeforeRedirect={() => savePendingJobDraft(values)}
           onSuccess={async (authenticatedUser) => {
             onAuthenticated?.(authenticatedUser);
 

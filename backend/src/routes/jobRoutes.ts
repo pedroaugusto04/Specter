@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { env } from '../config/env.js';
+import { DashboardMapper } from '../mappers/dashboardMapper.js';
 import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { JobService } from '../services/jobService.js';
@@ -12,8 +13,8 @@ import {
   jobProbeSchema,
   jobRunsQuerySchema,
   jobTimeseriesQuerySchema,
-  listQuerySchema,
   jobUpdateSchema,
+  listQuerySchema,
   rollbackJobSchema,
 } from './schemas.js';
 
@@ -33,26 +34,15 @@ export function registerJobRoutes(
 
   app.get('/api/quotas', { preHandler: [withAuth] }, async (request) => {
     const user = requireUser(request);
-    const summary = await quotaService.getQuotaSummary(user.id);
-    return { data: summary };
+    return { data: await quotaService.getQuotaSummary(user.id) };
   });
 
   app.get('/api/stats', { preHandler: [withOptionalAuth] }, async (request) => {
     const user = request.user;
     if (!user) {
-      return {
-        data: {
-          totalJobs: 0,
-          activeJobs: 0,
-          recoveringOrCompilingJobs: 0,
-          failedOrPausedJobs: 0,
-          totalRuns: 0,
-          DetectedChangesCount: 0,
-        },
-      };
+      return { data: DashboardMapper.emptyDto() };
     }
-    const stats = await jobService.getDashboardStats(user.id);
-    return { data: stats };
+    return { data: await jobService.getDashboardStats(user.id) };
   });
 
   app.get('/api/jobs', { preHandler: [withOptionalAuth] }, async (request) => {
@@ -63,8 +53,7 @@ export function registerJobRoutes(
         data: { items: [], pagination: createPaginationMeta(query.page, query.pageSize, 0) },
       };
     }
-    const result = await jobService.listJobsPage({ ...query, userId: user.id });
-    return { data: result };
+    return { data: await jobService.listJobsPage({ ...query, userId: user.id }) };
   });
 
   app.post(
@@ -81,9 +70,8 @@ export function registerJobRoutes(
       },
     },
     async (request, reply) => {
-      const user = request.user;
       const { url } = jobProbeSchema.parse(request.body);
-      const result = await jobService.probeUrl(url, user?.id);
+      const result = await jobService.probeUrl(url, request.user?.id);
       return reply.status(200).send({ data: result });
     }
   );
@@ -93,18 +81,14 @@ export function registerJobRoutes(
     { preHandler: [withAuth] },
     async (request) => {
       const user = requireUser(request);
-      const job = await jobService.getJobById(request.params.id, user.id);
-      return { data: job };
+      return { data: await jobService.getJobById(request.params.id, user.id) };
     }
   );
 
   app.post('/api/jobs', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
     const input = jobInputSchema.parse(request.body);
-    const created = await jobService.createJob({
-      ...input,
-      userId: user.id,
-    });
+    const created = await jobService.createJob({ ...input, userId: user.id });
     return reply.status(201).send({ data: created });
   });
 
@@ -114,8 +98,7 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const input = jobUpdateSchema.parse(request.body);
-      const updated = await jobService.updateJob(request.params.id, input, user.id);
-      return { data: updated };
+      return { data: await jobService.updateJob(request.params.id, input, user.id) };
     }
   );
 
@@ -125,8 +108,7 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const { paused } = jobPauseSchema.parse(request.body);
-      const updated = await jobService.setJobPauseState(request.params.id, paused, user.id);
-      return { data: updated };
+      return { data: await jobService.setJobPauseState(request.params.id, paused, user.id) };
     }
   );
 
@@ -135,8 +117,7 @@ export function registerJobRoutes(
     { preHandler: [withAuth] },
     async (request) => {
       const user = requireUser(request);
-      const result = await jobService.triggerManualScrape(request.params.id, user.id);
-      return { data: result };
+      return { data: await jobService.triggerManualScrape(request.params.id, user.id) };
     }
   );
 
@@ -145,8 +126,7 @@ export function registerJobRoutes(
     { preHandler: [withAuth] },
     async (request) => {
       const user = requireUser(request);
-      const updated = await jobService.triggerManualRecompile(request.params.id, user.id);
-      return { data: updated };
+      return { data: await jobService.triggerManualRecompile(request.params.id, user.id) };
     }
   );
 
@@ -155,8 +135,7 @@ export function registerJobRoutes(
     { preHandler: [withAuth] },
     async (request) => {
       const user = requireUser(request);
-      const updated = await jobService.cancelCompilation(request.params.id, user.id);
-      return { data: updated };
+      return { data: await jobService.cancelCompilation(request.params.id, user.id) };
     }
   );
 
@@ -166,13 +145,9 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobRunsQuerySchema.parse(request.query);
-      const result = await jobService.getJobRuns(
-        request.params.id,
-        query.page,
-        query.pageSize,
-        user.id
-      );
-      return { data: result };
+      return {
+        data: await jobService.getJobRuns(request.params.id, query.page, query.pageSize, user.id),
+      };
     }
   );
 
@@ -182,14 +157,15 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobTimeseriesQuerySchema.parse(request.query);
-      const result = await jobService.getJobTimeseries(
-        request.params.id,
-        query.range,
-        query.page,
-        query.pageSize,
-        user.id
-      );
-      return { data: result };
+      return {
+        data: await jobService.getJobTimeseries(
+          request.params.id,
+          query.range,
+          query.page,
+          query.pageSize,
+          user.id
+        ),
+      };
     }
   );
 
@@ -199,28 +175,26 @@ export function registerJobRoutes(
     async (request) => {
       const user = requireUser(request);
       const query = jobPlanVersionsQuerySchema.parse(request.query);
-      const result = await jobService.listPlanVersions(
-        request.params.id,
-        query.page,
-        query.pageSize,
-        user.id
-      );
-      return { data: result };
+      return {
+        data: await jobService.listPlanVersions(
+          request.params.id,
+          query.page,
+          query.pageSize,
+          user.id
+        ),
+      };
     }
   );
 
-  app.post<{ Params: { id: string }; Body: { versionNumber: number } }>(
+  app.post<{ Params: { id: string } }>(
     '/api/jobs/:id/rollback',
     { preHandler: [withAuth] },
     async (request) => {
       const user = requireUser(request);
       const body = rollbackJobSchema.parse(request.body);
-      const updated = await jobService.rollbackPlanVersion(
-        request.params.id,
-        body.versionNumber,
-        user.id
-      );
-      return { data: updated };
+      return {
+        data: await jobService.rollbackPlanVersion(request.params.id, body.versionNumber, user.id),
+      };
     }
   );
 

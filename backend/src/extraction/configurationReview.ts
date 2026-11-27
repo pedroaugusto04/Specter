@@ -1,3 +1,4 @@
+import { isCollectionPayload } from '@specter/contracts';
 import { DomainError } from '../errors/domainErrors.js';
 import type { ConfigurationModel, StageInput } from './model.js';
 import type { ExtractionIntent, SemanticReview, StageTrace } from './contracts.js';
@@ -13,9 +14,7 @@ const MAX_REVIEW_PROVENANCE = 40;
 
 export function buildSemanticReviewPayload(execution: ExecutionResult): Record<string, unknown> {
   const data =
-    'items' in execution.data &&
-    Array.isArray(execution.data.items) &&
-    execution.data.items.length > MAX_REVIEW_ITEMS
+    isCollectionPayload(execution.data) && execution.data.items.length > MAX_REVIEW_ITEMS
       ? {
           items: execution.data.items.slice(0, MAX_REVIEW_ITEMS),
           count: execution.data.count,

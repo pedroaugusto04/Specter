@@ -15,6 +15,12 @@ import {
   Shield,
   User,
 } from 'lucide-react';
+import {
+  formToProfileUpdate,
+  isProfileFormDirty,
+  resolveUserLanguage,
+  resolveUserTimezone,
+} from '@/forms/profileForm';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +29,7 @@ import { PageLanguageSelect, describeLanguage } from '@/components/ui/PageLangua
 import { DEFAULT_PAGE_LANGUAGE, getBrowserPageLanguage } from '@/lib/pageLanguage';
 import { TimezoneSelect } from '@/components/ui/TimezoneSelect';
 import { useUpdateProfileMutation, useUserQuotasQuery } from '@/hooks/useDashboardQueries';
-import { getBrowserTimezone } from '@/lib/utils';
+import { formatDateTime, getBrowserTimezone } from '@/lib/utils';
 import type { UserDto } from '@/lib/api';
 import { QuotaBar } from '@/components/dashboard/QuotaBar';
 
@@ -46,82 +52,70 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const updateProfileMutation = useUpdateProfileMutation();
   const { data: quotas, isLoading: isLoadingQuotas } = useUserQuotasQuery(isOpen && Boolean(user));
-  const browserPageLanguage = React.useMemo(() => getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE, []);
+  const browserPageLanguage = React.useMemo(
+    () => getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE,
+    []
+  );
+  const browserTimezone = React.useMemo(() => getBrowserTimezone(), []);
+  const defaults = React.useMemo(
+    () => ({ language: browserPageLanguage, timezone: browserTimezone }),
+    [browserPageLanguage, browserTimezone]
+  );
+
   const [name, setName] = React.useState('');
   const [pageLanguage, setPageLanguage] = React.useState(browserPageLanguage);
-  const [timezone, setTimezone] = React.useState(getBrowserTimezone());
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [timezone, setTimezone] = React.useState(browserTimezone);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (user) {
-      setName(user.name || '');
-      setPageLanguage(user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE));
-      setTimezone(user.timezone || getBrowserTimezone());
+      setName(user.name ?? '');
+      setPageLanguage(resolveUserLanguage(user, browserPageLanguage));
+      setTimezone(resolveUserTimezone(user, browserTimezone));
       setErrorMessage(null);
       setSaveSuccess(false);
     }
-  }, [user, isOpen]);
+  }, [user, isOpen, browserPageLanguage, browserTimezone]);
 
   if (!user) return null;
 
-  const currentEffectiveLanguage =
-    user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE);
+  const isSaving = updateProfileMutation.isPending;
+  const effectiveTimezone = resolveUserTimezone(user, browserTimezone);
+  const effectiveLanguage = resolveUserLanguage(user, browserPageLanguage);
+  const formValues = { name, timezone, pageLanguage };
+  const isDirty = isProfileFormDirty(formValues, user, defaults);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
     setErrorMessage(null);
     setSaveSuccess(false);
 
     try {
-      const updated = await updateProfileMutation.mutateAsync({
-        name: name.trim() || null,
-        ...(timezone !== (user.timezone || getBrowserTimezone()) ? { timezone } : {}),
-        ...(pageLanguage !== currentEffectiveLanguage ? { pageLanguage } : {}),
-      });
+      const updated = await updateProfileMutation.mutateAsync(
+        formToProfileUpdate(formValues, user, defaults)
+      );
       onUserUpdated(updated);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to update profile';
-      setErrorMessage(msg);
-    } finally {
-      setIsSaving(false);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to update profile');
     }
   };
 
-  const formattedCreatedDate = (() => {
-    try {
-      const d = new Date(user.createdAt);
-      return new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: user.timezone || getBrowserTimezone(),
-      }).format(d);
-    } catch {
-      return user.createdAt;
-    }
-  })();
-
-  const isDirty =
-    (user.name || '') !== name.trim() ||
-    (user.timezone || getBrowserTimezone()) !== timezone ||
-    currentEffectiveLanguage !== pageLanguage;
+  const formattedCreatedDate = formatDateTime(user.createdAt, effectiveTimezone);
 
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
+      isDirty={isDirty}
       title="User Profile"
       description="Manage your account details and view system access status."
       maxWidthClass="max-w-xl sm:max-w-2xl"
     >
       <div className="space-y-6 py-1">
-        {/* Profile Card Header */}
         <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-muted/30 p-4">
-          {/* Default User Logo / Avatar */}
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-border bg-card shadow-sm">
             <User className="h-7 w-7 text-foreground/80" />
             <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-emerald-500" />
@@ -154,7 +148,6 @@ export function ProfileModal({
           </div>
         )}
 
-        {/* Edit Profile Form */}
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <FormField
             label="Display Name"
@@ -209,7 +202,6 @@ export function ProfileModal({
           </div>
         </form>
 
-        {/* Usage & Monthly Quotas */}
         <div className="space-y-3.5 rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -228,7 +220,6 @@ export function ProfileModal({
             </div>
           ) : quotas ? (
             <div className="space-y-3.5 pt-0.5">
-              {/* Active Monitors */}
               <QuotaBar
                 icon={Layers}
                 label="Active Monitors"
@@ -237,7 +228,6 @@ export function ProfileModal({
                 helper="Running, recovering, or pending monitors"
               />
 
-              {/* Compilations */}
               <QuotaBar
                 icon={Cpu}
                 label="Compilations"
@@ -247,7 +237,6 @@ export function ProfileModal({
                 helper="Initial monitor configurations and automatic recovery runs"
               />
 
-              {/* Scrape Executions */}
               <QuotaBar
                 icon={Play}
                 label="Scrape Executions"
@@ -264,14 +253,12 @@ export function ProfileModal({
           )}
         </div>
 
-        {/* Account Details Overview */}
         <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Account Specifications
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
-            {/* Email */}
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Mail className="h-3.5 w-3.5" />
@@ -285,29 +272,24 @@ export function ProfileModal({
               </span>
             </div>
 
-            {/* Timezone */}
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Globe className="h-3.5 w-3.5" />
                 <span>Active Timezone</span>
               </div>
-              <span className="font-mono text-foreground">
-                {user.timezone || getBrowserTimezone()}
-              </span>
+              <span className="font-mono text-foreground">{effectiveTimezone}</span>
             </div>
 
-            {/* Scraper Language */}
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Globe className="h-3.5 w-3.5" />
                 <span>Scraper Language</span>
               </div>
               <span className="font-mono text-foreground">
-                {describeLanguage(user.pageLanguage || user.browserPageLanguage || (getBrowserPageLanguage() ?? DEFAULT_PAGE_LANGUAGE)).label}
+                {describeLanguage(effectiveLanguage).label}
               </span>
             </div>
 
-            {/* Monitors count */}
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Layers className="h-3.5 w-3.5" />
@@ -318,7 +300,6 @@ export function ProfileModal({
               </span>
             </div>
 
-            {/* Member Since */}
             <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
@@ -329,7 +310,6 @@ export function ProfileModal({
           </div>
         </div>
 
-        {/* Actions Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <Button
             type="button"

@@ -1,7 +1,7 @@
 import { env } from '../../../config/env.js';
+import { getErrorMessage } from '../../../utils/errors.js';
 import { logger } from '../../../utils/logger.js';
 import { parseProxyConfig } from '../../../utils/proxyParser.js';
-import { getErrorMessage } from '../../../utils/htmlEscape.js';
 
 export interface ProviderQuotaInfo {
   provider: string;
@@ -188,9 +188,26 @@ export async function checkCrawlbaseQuota(
     return {
       provider,
       enabled: true,
-      error: err instanceof Error ? err.message : String(err),
+      error: getErrorMessage(err),
     };
   }
+}
+
+function buildProxyQuotaInfo(
+  provider: string,
+  proxyUrl: string,
+  label: string,
+  fallback: string
+): ProviderQuotaInfo {
+  const parsed = parseProxyConfig(proxyUrl);
+  const masked = parsed
+    ? `${parsed.server}${parsed.username ? ` (user: ${parsed.username})` : ''}`
+    : fallback;
+  return {
+    provider,
+    enabled: true,
+    details: `${label}: ${masked}`,
+  };
 }
 
 export async function checkAllProviderQuotas(
@@ -227,27 +244,25 @@ export async function checkAllProviderQuotas(
   }
 
   if (env.HTTP_PROXY) {
-    const parsed = parseProxyConfig(env.HTTP_PROXY);
-    const masked = parsed
-      ? `${parsed.server}${parsed.username ? ` (user: ${parsed.username})` : ''}`
-      : 'HTTP/HTTPS proxy configured';
-    results.push({
-      provider: 'http_proxy',
-      enabled: true,
-      details: `Active primary proxy tunnel: ${masked}`,
-    });
+    results.push(
+      buildProxyQuotaInfo(
+        'http_proxy',
+        env.HTTP_PROXY,
+        'Active primary proxy tunnel',
+        'HTTP/HTTPS proxy configured'
+      )
+    );
   }
 
   if (env.HTTP_FALLBACK_PROXY) {
-    const parsed = parseProxyConfig(env.HTTP_FALLBACK_PROXY);
-    const masked = parsed
-      ? `${parsed.server}${parsed.username ? ` (user: ${parsed.username})` : ''}`
-      : 'HTTP/HTTPS fallback proxy configured';
-    results.push({
-      provider: 'http_fallback_proxy',
-      enabled: true,
-      details: `Active fallback proxy tunnel: ${masked}`,
-    });
+    results.push(
+      buildProxyQuotaInfo(
+        'http_fallback_proxy',
+        env.HTTP_FALLBACK_PROXY,
+        'Active fallback proxy tunnel',
+        'HTTP/HTTPS fallback proxy configured'
+      )
+    );
   }
 
   return results;

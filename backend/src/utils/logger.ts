@@ -47,7 +47,7 @@ function formatLog(
     ...(redactObject(context, 0, stringLimit) as LogContext),
   };
   const pretty = env.LOG_PRETTY_CONSOLE;
-  if (process.env.NODE_ENV === 'production' && !pretty) return JSON.stringify(entry);
+  if (env.NODE_ENV === 'production' && !pretty) return JSON.stringify(entry);
 
   const colorEnabled = pretty && process.env.NO_COLOR === undefined;
   const levelColor =

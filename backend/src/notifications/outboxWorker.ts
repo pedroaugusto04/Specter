@@ -1,15 +1,19 @@
 import { logger } from '../utils/logger.js';
 import type { IAlertSender, IOutboxRepository } from './contracts.js';
 import { redactText } from '../extraction/evidence.js';
+import { getErrorMessage } from '../utils/errors.js';
+
 export class OutboxWorker {
   private timer?: ReturnType<typeof setInterval>;
   private running?: Promise<void>;
+
   constructor(
     private readonly repository: IOutboxRepository,
     private readonly sender: IAlertSender,
     private readonly maxAttempts: number,
     private readonly deliveryTimeoutMs = 30000
   ) {}
+
   start(): void {
     this.timer = setInterval(() => this.scheduleTick(), 5000);
     this.scheduleTick();
@@ -18,7 +22,7 @@ export class OutboxWorker {
   private scheduleTick(): void {
     void this.tick().catch((error) =>
       logger.error('Outbox processing failed', {
-        error: redactText(error instanceof Error ? error.message : String(error)),
+        error: redactText(getErrorMessage(error)),
       })
     );
   }
@@ -30,6 +34,7 @@ export class OutboxWorker {
     });
     return this.running;
   }
+
   private async process(): Promise<void> {
     const batch = await this.repository.claim(10, this.maxAttempts);
     await Promise.all(
@@ -50,7 +55,7 @@ export class OutboxWorker {
           await this.repository.fail(
             delivery.id,
             delivery.claimToken,
-            redactText(error instanceof Error ? error.message : String(error)),
+            redactText(getErrorMessage(error)),
             this.maxAttempts
           );
         } finally {
@@ -59,6 +64,7 @@ export class OutboxWorker {
       })
     );
   }
+
   async close(): Promise<void> {
     clearInterval(this.timer);
     await this.running;

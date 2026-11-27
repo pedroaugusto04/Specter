@@ -1,7 +1,23 @@
-import type { ExtractionIntent, ExtractionReport, IntentField } from './extraction.js';
-import type { JobStatus, RunStatus, RunPhase, ChangeStatus, AccessFailure } from './vocabulary.js';
+import type {
+  ExtractionIntent,
+  ExtractionReport,
+  IntentField,
+  Scalar,
+  TriggerRule,
+} from './extraction.js';
+import type {
+  JobStatus,
+  RunStatus,
+  RunPhase,
+  ChangeStatus,
+  AccessFailure,
+  TriggerMatchMode,
+} from './vocabulary.js';
 import type { ExtractedPayload } from './payload.js';
 import type { DiffSummary } from './diff.js';
+
+export type FieldDefinitionDto = Pick<IntentField, 'displayName' | 'type' | 'locale'>;
+export type JobStatusFilter = JobStatus | 'recovering' | 'paused';
 export interface AccessState {
   reason: typeof AccessFailure.Blocked;
   retryAt: string;
@@ -53,7 +69,7 @@ export interface ScrapingJobDto {
       ExtractionIntent,
       'scope' | 'identityFields' | 'triggerRules' | 'triggerMatchMode'
     > & {
-      fields: Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
+      fields: Record<string, FieldDefinitionDto>;
     };
   } | null;
   contractRevision: string | null;
@@ -110,15 +126,15 @@ export interface CreateJobRequest {
   name?: string;
   url: string;
   userPrompt: string;
-  notificationEmail?: string | null;
+  notificationEmail?: string;
   webhookUrl?: string | null;
   webhookSecret?: string | null;
   cronExpression?: string;
   captureScreenshotOnChange?: boolean;
 }
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {
-  triggerRules?: import('./extraction.js').TriggerRule[];
-  triggerMatchMode?: import('./vocabulary.js').TriggerMatchMode;
+  triggerRules?: TriggerRule[];
+  triggerMatchMode?: TriggerMatchMode;
 }
 export interface UpdateIntegrationsRequest {
   telegramEnabled: boolean;
@@ -171,7 +187,7 @@ export interface JobTimeseriesPointDto {
   durationMs: number | null;
   contractRevision: string | null;
   errorMessage: string | null;
-  values: Record<string, string | number | boolean | null>;
+  values: Record<string, Scalar>;
 }
 export interface JobTimeseriesDto {
   jobId: string;
@@ -199,7 +215,7 @@ export interface JobPlanVersionDto {
   userPrompt: string;
   triggerReason: string;
   isActive: boolean;
-  fields: Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
+  fields: Record<string, FieldDefinitionDto>;
   createdAt: string;
 }
 
@@ -224,9 +240,9 @@ export interface RealtimeEventDto {
   type: RealtimeEventType;
   userId: string;
   jobId: string;
-  status?: string;
+  status?: JobStatus | RunStatus;
   runId?: string;
-  hasChanges?: string;
+  hasChanges?: ChangeStatus;
   message?: string;
   fallbackToPrevious?: boolean;
   timestamp: string;

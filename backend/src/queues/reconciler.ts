@@ -1,6 +1,6 @@
 import type { Queue } from 'bullmq';
 import { logger } from '../utils/logger.js';
-import { buildRepeatableJobId } from './queues.js';
+import { buildRepeatableJobId, buildScrapeRepeatJob } from './queues.js';
 
 /** Recover missing pending jobs without bypassing existing delayed retries. */
 export async function reconcilePendingCompilations(
@@ -72,17 +72,8 @@ export async function reconcileRepeatableJobs(
 
   for (const [repId, dbJob] of expectedMap.entries()) {
     if (!presentRepeatableIds.has(repId)) {
-      await queue.add(
-        'scrape-job',
-        { jobId: dbJob.id, trigger: 'cron' },
-        {
-          jobId: repId,
-          repeat: {
-            pattern: dbJob.cronExpression,
-            ...(dbJob.timezone ? { tz: dbJob.timezone } : {}),
-          },
-        }
-      );
+      const repeatJob = buildScrapeRepeatJob(dbJob.id, dbJob.cronExpression, dbJob.timezone);
+      await queue.add(repeatJob.name, repeatJob.data, repeatJob.opts);
       scheduledMissingJobIds.push(dbJob.id);
     }
   }

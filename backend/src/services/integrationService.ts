@@ -1,57 +1,49 @@
-import {
-  type IIntegrationRepository,
-  type UpsertIntegrationInput,
-} from '../repositories/integrationRepository.js';
+import type { UserIntegrationsDto } from '@specter/contracts';
+import { TelegramTestFailedError, WebhookTestFailedError } from '../errors/domainErrors.js';
+import { IntegrationMapper } from '../mappers/integrationMapper.js';
 import type {
   ITelegramNotificationProvider,
   IWebhookNotificationProvider,
-  TelegramTestResult,
-  WebhookTestResult,
 } from '../providers/notifications/notification.interface.js';
-import { IntegrationMapper } from '../mappers/integrationMapper.js';
-import type { UserIntegrationsDto } from '@specter/contracts';
+import type {
+  IIntegrationRepository,
+  UpsertIntegrationInput,
+} from '../repositories/integrationRepository.js';
 
 export class IntegrationService {
-  private readonly integrationRepository: IIntegrationRepository;
-  private readonly telegramProvider: ITelegramNotificationProvider;
-  private readonly webhookProvider: IWebhookNotificationProvider;
-
   constructor(
-    integrationRepository: IIntegrationRepository,
-    telegramProvider: ITelegramNotificationProvider,
-    webhookProvider: IWebhookNotificationProvider
-  ) {
-    this.integrationRepository = integrationRepository;
-    this.telegramProvider = telegramProvider;
-    this.webhookProvider = webhookProvider;
-  }
+    private readonly integrationRepository: IIntegrationRepository,
+    private readonly telegramProvider: ITelegramNotificationProvider,
+    private readonly webhookProvider: IWebhookNotificationProvider
+  ) {}
 
   async getIntegrations(userId: string): Promise<UserIntegrationsDto> {
-    const existing = await this.integrationRepository.findByUserId(userId);
-    const botUsername = await this.getBotUsername();
+    const [existing, botUsername] = await Promise.all([
+      this.integrationRepository.findByUserId(userId),
+      this.getBotUsername(),
+    ]);
 
-    if (existing) {
-      const dto = IntegrationMapper.entityToDto(existing);
-      return { ...dto, botUsername };
-    }
-
-    const defaultDto = IntegrationMapper.emptyDto(userId);
-
-    return { ...defaultDto, botUsername };
+    return existing
+      ? IntegrationMapper.entityToDto(existing, botUsername)
+      : IntegrationMapper.emptyDto(userId, botUsername);
   }
 
   async updateIntegrations(
     userId: string,
     input: UpsertIntegrationInput
   ): Promise<UserIntegrationsDto> {
-    const updated = await this.integrationRepository.upsert(userId, input);
-    const botUsername = await this.getBotUsername();
-    const dto = IntegrationMapper.entityToDto(updated);
-    return { ...dto, botUsername };
+    const [updated, botUsername] = await Promise.all([
+      this.integrationRepository.upsert(userId, input),
+      this.getBotUsername(),
+    ]);
+    return IntegrationMapper.entityToDto(updated, botUsername);
   }
 
-  async testTelegram(input: { chatId: string; timezone?: string }): Promise<TelegramTestResult> {
-    return this.telegramProvider.sendTestMessage(input);
+  async testTelegram(input: { chatId: string; timezone?: string }): Promise<void> {
+    const result = await this.telegramProvider.sendTestMessage(input);
+    if (!result.ok) {
+      throw new TelegramTestFailedError(result.error);
+    }
   }
 
   async testWebhook(
@@ -59,21 +51,27 @@ export class IntegrationService {
       webhookUrl: string;
       secret?: string | null;
     },
-    userId?: string
-  ): Promise<WebhookTestResult> {
+    userId: string
+  ): Promise<void> {
     const stored =
-      userId && input.secret === undefined
-        ? await this.integrationRepository.findByUserId(userId)
-        : null;
-    const secret =
-      stored?.webhookUrl?.trim() === input.webhookUrl.trim() ? stored.webhookSecret : undefined;
-    return this.webhookProvider.sendTestEvent({
-      ...input,
-      secret: input.secret === undefined ? secret : input.secret,
+      input.secret === undefined ? await this.integrationRepository.findByUserId(userId) : null;
+    const resolvedSecret =
+      input.secret !== undefined
+        ? input.secret
+        : stored?.webhookUrl?.trim() === input.webhookUrl.trim()
+          ? stored.webhookSecret
+          : undefined;
+
+    const result = await this.webhookProvider.sendTestEvent({
+      webhookUrl: input.webhookUrl,
+      secret: resolvedSecret,
     });
+    if (!result.ok) {
+      throw new WebhookTestFailedError(result.error, result.status);
+    }
   }
 
   async getBotUsername(): Promise<string | null> {
-    return (await this.telegramProvider.getBotUsername?.()) ?? null;
+    return this.telegramProvider.getBotUsername();
   }
 }

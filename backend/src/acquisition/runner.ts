@@ -1,5 +1,7 @@
 import type { ExecutionContext, StageTrace } from '../extraction/contracts.js';
 import { env } from '../config/env.js';
+import { DomainError } from '../errors/domainErrors.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { AccessFailure, AcquisitionFailureError, classifyAccessFailure } from './failure.js';
 import { AcquisitionOutcome } from '../types/access.js';
@@ -10,6 +12,16 @@ export interface AcquisitionCandidate<T> {
   external: boolean;
   run(context: ExecutionContext): Promise<T>;
 }
+
+function resolveErrorCode(error: unknown): string {
+  if (error instanceof DomainError) return error.code;
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return typeof code === 'string' ? code : error.name;
+  }
+  return 'UNKNOWN_ERROR';
+}
+
 /** Shared sequential policy for documents and validated plan executions. */
 export async function acquire<T>(
   candidates: AcquisitionCandidate<T>[],
@@ -31,7 +43,7 @@ export async function acquire<T>(
       context.check();
       const valid = accepted(result);
       trace.push({
-        stage: 'acquisition:' + candidate.name,
+        stage: `acquisition:${candidate.name}`,
         durationMs: Date.now() - started,
         status: valid ? TraceStatus.Success : TraceStatus.Failed,
         code: valid ? AcquisitionOutcome.Accepted : AcquisitionOutcome.Rejected,
@@ -44,8 +56,8 @@ export async function acquire<T>(
         runId: context.runId,
         provider: candidate.name,
         category: category ?? AccessFailure.Provider,
-        errorCode: (error as any)?.code ?? (error instanceof Error ? error.name : 'UNKNOWN_ERROR'),
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCode: resolveErrorCode(error),
+        errorMessage: getErrorMessage(error),
         causeMessage:
           error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
         durationMs: Date.now() - started,
@@ -58,7 +70,7 @@ export async function acquire<T>(
           : (category ?? AccessFailure.Provider);
       cause = error;
       trace.push({
-        stage: 'acquisition:' + candidate.name,
+        stage: `acquisition:${candidate.name}`,
         durationMs: Date.now() - started,
         status: TraceStatus.Failed,
         code: category ?? AccessFailure.Provider,

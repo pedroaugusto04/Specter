@@ -1,18 +1,20 @@
-import { env } from '../config/env.js';
-import { CompilerValidationError } from '../errors/domainErrors.js';
 import { z } from 'zod';
-import type { ConfigurationModel, IModelProvider, ModelInput, StageInput } from './model.js';
-import { configurationInstructions, semanticInstructions } from './prompts.js';
+import { env } from '../config/env.js';
+import { CompilerOutputTooLargeError, DomainError } from '../errors/domainErrors.js';
+import { getManagedPrompt } from '../providers/langfuse.js';
+import { getErrorMessage } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
+import { ModelTask } from './configurationConstants.js';
 import {
   configurationDecisionSchema,
   modelConfigurationDecisionSchema,
   semanticVerdictSchema,
 } from './configurationSchemas.js';
-import { fitEvidenceText } from './evidenceBudget.js';
-import { ModelTask } from './configurationConstants.js';
 import { redactObject, redactText } from './evidence.js';
-import { logger } from '../utils/logger.js';
-import { getManagedPrompt } from '../providers/langfuse.js';
+import { fitEvidenceText } from './evidenceBudget.js';
+import type { ConfigurationModel, IModelProvider, ModelInput, StageInput } from './model.js';
+import { configurationInstructions, semanticInstructions } from './prompts.js';
+
 function outputContract(schema: z.ZodType, instructions: string) {
   const { $schema: _schemaVersion, ...outputSchema } = z.toJSONSchema(schema, {
     target: 'draft-07',
@@ -23,6 +25,16 @@ function outputContract(schema: z.ZodType, instructions: string) {
     outputSchema: outputSchema as Record<string, unknown>,
   };
 }
+
+function extractErrorCode(error: unknown): string | undefined {
+  if (error instanceof DomainError) return error.code;
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
+
 async function task(
   model: IModelProvider,
   input: StageInput,
@@ -86,8 +98,9 @@ async function task(
   });
   try {
     const result = await model.generate(request);
-    if (JSON.stringify(result)?.length > env.COMPILER_MAX_OUTPUT_CHARS)
-      throw new CompilerValidationError('Model output exceeds the configured size limit.');
+    if (JSON.stringify(result)?.length > env.COMPILER_MAX_OUTPUT_CHARS) {
+      throw new CompilerOutputTooLargeError();
+    }
     logger.diagnostic('Model task response', {
       jobId: input.jobId,
       provider: model.name,
@@ -104,14 +117,15 @@ async function task(
     });
     return result;
   } catch (error) {
+    const errorCode = extractErrorCode(error);
     logger.diagnostic('Model task error details', {
       jobId: input.jobId,
       provider: model.name,
       task: kind,
       durationMs: Date.now() - started,
       errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : String(error),
-      errorCode: (error as any)?.code,
+      errorMessage: getErrorMessage(error),
+      errorCode,
     });
     logger.warn('Model task failed', {
       jobId: input.jobId,
@@ -119,11 +133,12 @@ async function task(
       task: kind,
       durationMs: Date.now() - started,
       status: 'FAILED',
-      errorCode: (error as any)?.code ?? 'MODEL_TASK_FAILED',
+      errorCode: errorCode ?? 'MODEL_TASK_FAILED',
     });
     throw error;
   }
 }
+
 function validateOutput<T>(
   input: StageInput,
   kind: ModelInput['task'],
@@ -143,12 +158,13 @@ function validateOutput<T>(
       jobId: input.jobId,
       task: kind,
       output,
-      validationError: error instanceof Error ? error.message : String(error),
+      validationError: getErrorMessage(error),
       validationIssues: error instanceof z.ZodError ? error.issues : undefined,
     });
     throw error;
   }
 }
+
 export function createConfigurationModel(model: IModelProvider): ConfigurationModel {
   return {
     decide: async (input, intent) => {

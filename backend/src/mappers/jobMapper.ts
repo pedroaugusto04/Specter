@@ -1,11 +1,14 @@
 import { presentStoredError } from '../utils/errorSanitizer.js';
 import { decryptText } from '../utils/crypto.js';
 import type {
-  ScrapingJobDto,
+  ExtractedPayload,
+  FieldDefinitionDto,
+  IntentField,
+  JobPlanVersionDto,
   JobRunDto,
   JobTimeseriesPointDto,
-  JobPlanVersionDto,
-  ExtractedPayload,
+  Scalar,
+  ScrapingJobDto,
 } from '@specter/contracts';
 import type { AccessState } from '../acquisition/cooldown.js';
 import type { JobPlanVersionRow, JobRunRow, ScrapingJobRow } from '../db/schema.js';
@@ -16,6 +19,28 @@ import type {
   TimeseriesRowEntity,
 } from '../types/domain.js';
 import { ChangeStatus, JobStatus, RunStatus, parseEnumValue } from '../types/enums.js';
+
+function projectIntentFields(
+  fields: Record<string, IntentField>
+): Record<string, FieldDefinitionDto> {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, field]) => [
+      key,
+      { displayName: field.displayName, type: field.type, locale: field.locale },
+    ])
+  );
+}
+
+export interface TimeseriesRowRaw {
+  id: string;
+  executedAt: Date;
+  status: string;
+  hasChanges: string;
+  durationMs: number | null;
+  contractRevision: string | null;
+  errorMessage: string | null;
+  extractedData: ExtractedPayload | null;
+}
 
 export const JobMapper = {
   rowToEntity(row: ScrapingJobRow): ScrapingJobEntity {
@@ -45,7 +70,7 @@ export const JobMapper = {
 
   entityToDto(
     entity: ScrapingJobEntity,
-    context: { accessState: AccessState | null }
+    context: { accessState: AccessState | null; currentRun: JobRunEntity | null }
   ): ScrapingJobDto {
     return {
       id: entity.id,
@@ -53,7 +78,7 @@ export const JobMapper = {
       url: entity.url,
       userPrompt: entity.userPrompt,
       notificationEmail: entity.notificationEmail ?? '',
-      webhookUrl: entity.webhookUrl ?? null,
+      webhookUrl: entity.webhookUrl,
       hasWebhookSecret: Boolean(entity.webhookSecret),
       cronExpression: entity.cronExpression,
       extractionPlan: entity.extractionPlan
@@ -61,20 +86,16 @@ export const JobMapper = {
             intent: {
               scope: entity.extractionPlan.intent.scope,
               identityFields: entity.extractionPlan.intent.identityFields,
-              fields: Object.fromEntries(
-                Object.entries(entity.extractionPlan.intent.fields).map(([key, field]) => [
-                  key,
-                  { displayName: field.displayName, type: field.type, locale: field.locale },
-                ])
-              ),
+              fields: projectIntentFields(entity.extractionPlan.intent.fields),
               triggerRules: entity.extractionPlan.intent.triggerRules,
               triggerMatchMode: entity.extractionPlan.intent.triggerMatchMode,
             },
           }
         : null,
-      contractRevision: entity.contractRevision ?? null,
+      contractRevision: entity.contractRevision,
       status: entity.status,
       accessState: context.accessState,
+      currentRun: context.currentRun ? JobMapper.runEntityToDto(context.currentRun) : null,
       lastError: presentStoredError(entity.lastError),
       captureScreenshotOnChange: entity.captureScreenshotOnChange,
       createdAt: entity.createdAt.toISOString(),
@@ -112,17 +133,17 @@ export const JobMapper = {
     return {
       id: entity.id,
       jobId: entity.jobId,
-      phase: entity.phase ?? null,
+      phase: entity.phase,
       startedAt: entity.startedAt?.toISOString() ?? null,
       completedAt: entity.completedAt?.toISOString() ?? null,
       nextAttemptAt: entity.nextAttemptAt?.toISOString() ?? null,
-      recoveredAutomatically: entity.recoveredAutomatically ?? false,
+      recoveredAutomatically: entity.recoveredAutomatically,
       extractionReport: entity.extractionReport
         ? { quality: entity.extractionReport.quality, coverage: entity.extractionReport.coverage }
-        : entity.extractionReport,
+        : null,
       extractedData: entity.extractedData,
       hasChanges: entity.hasChanges,
-      contractRevision: entity.contractRevision ?? null,
+      contractRevision: entity.contractRevision,
       status: entity.status,
       errorMessage: presentStoredError(entity.errorMessage),
       httpStatus: entity.httpStatus,
@@ -132,16 +153,27 @@ export const JobMapper = {
     };
   },
 
-  extractScalarValues(
-    payload: ExtractedPayload | null
-  ): Record<string, string | number | boolean | null> {
+  timeseriesRowToEntity(row: TimeseriesRowRaw): TimeseriesRowEntity {
+    return {
+      id: row.id,
+      executedAt: row.executedAt,
+      status: parseEnumValue(RunStatus, row.status, 'run status'),
+      hasChanges: parseEnumValue(ChangeStatus, row.hasChanges, 'change status'),
+      durationMs: row.durationMs,
+      contractRevision: row.contractRevision,
+      errorMessage: row.errorMessage,
+      extractedData: row.extractedData,
+    };
+  },
+
+  extractScalarValues(payload: ExtractedPayload | null): Record<string, Scalar> {
     if (!payload) return {};
 
     if ('items' in payload && Array.isArray(payload.items)) {
       return { itemCount: payload.items.length };
     }
 
-    const result: Record<string, string | number | boolean | null> = {};
+    const result: Record<string, Scalar> = {};
     for (const [key, val] of Object.entries(payload)) {
       if (
         typeof val === 'number' ||
@@ -162,7 +194,7 @@ export const JobMapper = {
       status: entity.status,
       hasChanges: entity.hasChanges,
       durationMs: entity.durationMs,
-      contractRevision: entity.contractRevision ?? null,
+      contractRevision: entity.contractRevision,
       errorMessage: presentStoredError(entity.errorMessage),
       values: JobMapper.extractScalarValues(entity.extractedData),
     };
@@ -186,7 +218,7 @@ export const JobMapper = {
 
   planVersionEntityToDto(
     entity: JobPlanVersionEntity,
-    activePlanRevision?: string | null
+    activePlanRevision: string | null
   ): JobPlanVersionDto {
     return {
       id: entity.id,
@@ -198,12 +230,7 @@ export const JobMapper = {
       userPrompt: entity.userPrompt,
       triggerReason: entity.triggerReason,
       isActive: Boolean(activePlanRevision && entity.planRevision === activePlanRevision),
-      fields: Object.fromEntries(
-        Object.entries(entity.extractionPlan?.intent?.fields ?? {}).map(([key, field]) => [
-          key,
-          { displayName: field.displayName, type: field.type, locale: field.locale },
-        ])
-      ),
+      fields: projectIntentFields(entity.extractionPlan.intent.fields),
       createdAt: entity.createdAt.toISOString(),
     };
   },

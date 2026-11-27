@@ -63,7 +63,6 @@ describe('Session domain behavior', () => {
           return null;
         },
         listPageByUserId: async () => ({ items: [], totalItems: 0 }),
-        findById: async () => null,
         upsert: async () => ({}) as UserWebSessionEntity,
         delete: async () => true,
       };

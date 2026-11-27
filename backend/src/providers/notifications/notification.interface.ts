@@ -17,8 +17,6 @@ export interface AlertPayload {
   webhookUrl?: string | null;
   webhookSecret?: string | null;
   triggerReasons?: string[];
-  screenshotUrl?: string;
-  specterUrl?: string;
 }
 
 export interface INotificationProvider {
@@ -40,7 +38,7 @@ export interface ITelegramNotificationProvider {
   readonly name: string;
   sendAlert(payload: AlertPayload, options: TelegramSendOptions): Promise<void>;
   sendTestMessage(input: TelegramSendOptions): Promise<TelegramTestResult>;
-  getBotUsername?(): Promise<string | null>;
+  getBotUsername(): Promise<string | null>;
 }
 
 export interface WebhookSendOptions {
@@ -57,5 +55,5 @@ export interface WebhookTestResult {
 export interface IWebhookNotificationProvider {
   readonly name: string;
   sendAlert(payload: AlertPayload, options: WebhookSendOptions): Promise<void>;
-  sendTestEvent(input: { webhookUrl: string; secret?: string | null }): Promise<WebhookTestResult>;
+  sendTestEvent(input: WebhookSendOptions): Promise<WebhookTestResult>;
 }

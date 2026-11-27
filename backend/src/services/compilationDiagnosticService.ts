@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { IModelProvider } from '../extraction/model.js';
 import { ModelTask } from '../extraction/configurationConstants.js';
 import { logger } from '../utils/logger.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { getManagedPrompt } from '../providers/langfuse.js';
 
 export interface DiagnosticInput {
@@ -17,7 +18,7 @@ export interface DiagnosticResult {
   nextSteps: string;
 }
 
-export const diagnosticOutputSchema = z.object({
+const diagnosticOutputSchema = z.object({
   issue: z.string().trim().min(5),
   nextSteps: z.string().trim().min(5),
 });
@@ -89,7 +90,7 @@ export class CompilationDiagnosticService {
       logger.warn('Diagnostic generation skipped or failed', {
         jobId: input.jobId,
         durationMs: Date.now() - started,
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error),
       });
       return null;
     }

@@ -1,8 +1,25 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
-import { DomainError, ValidationError } from '../errors/domainErrors.js';
+import {
+  ConflictError,
+  DomainError,
+  RealtimeUnavailableError,
+  TelegramTestFailedError,
+  ValidationError,
+  WebhookTestFailedError,
+} from '../errors/domainErrors.js';
 import { logger } from '../utils/logger.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
+
+function buildFieldErrorMap(details: Array<{ field: string; message: string }>): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const item of details) {
+    if (!fields[item.field]) {
+      fields[item.field] = item.message;
+    }
+  }
+  return fields;
+}
 
 export function centralErrorHandler(
   error: FastifyError | Error,
@@ -10,21 +27,15 @@ export function centralErrorHandler(
   reply: FastifyReply
 ): FastifyReply {
   if (error instanceof ZodError) {
-    const details = error.issues.map((i) => ({
-      field: i.path.join('.') || 'root',
-      message: i.message,
+    const details = error.issues.map((issue) => ({
+      field: issue.path.join('.') || 'root',
+      message: issue.message,
     }));
-    const fields: Record<string, string> = {};
-    for (const item of details) {
-      if (!fields[item.field]) {
-        fields[item.field] = item.message;
-      }
-    }
     return reply.status(400).send({
       error: 'VALIDATION_ERROR',
       message: details[0]?.message ?? 'Invalid input data.',
       details,
-      fields,
+      fields: buildFieldErrorMap(details),
     });
   }
 
@@ -34,6 +45,25 @@ export function centralErrorHandler(
       message: error.message,
       details: error.details,
       fields: error.fields,
+    });
+  }
+
+  if (error instanceof WebhookTestFailedError) {
+    return reply.status(error.statusCode).send({
+      error: error.code,
+      message: error.message,
+      ...(error.upstreamStatus !== undefined ? { status: error.upstreamStatus } : {}),
+    });
+  }
+
+  if (
+    error instanceof ConflictError ||
+    error instanceof TelegramTestFailedError ||
+    error instanceof RealtimeUnavailableError
+  ) {
+    return reply.status(error.statusCode).send({
+      error: error.code,
+      message: error.message,
     });
   }
 
@@ -49,7 +79,6 @@ export function centralErrorHandler(
     retryAfterSeconds?: number;
   };
 
-  // Fastify schema validation error (if using fastify internal schemas)
   if (Array.isArray(fastifyError.validation)) {
     return reply.status(400).send({
       error: 'VALIDATION_ERROR',
@@ -57,7 +86,6 @@ export function centralErrorHandler(
     });
   }
 
-  // Rate-limit error (HTTP 429)
   if (fastifyError.statusCode === 429 || fastifyError.code === 'FST_ERR_RATE_LIMIT_EXCEEDED') {
     return reply.status(429).send({
       error: fastifyError.error || 'TOO_MANY_REQUESTS',

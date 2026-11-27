@@ -1,11 +1,12 @@
-import * as cheerio from 'cheerio';
 import type { DocumentSnapshot, ExtractionPlan } from './contracts.js';
 import type { ExecutionResult } from './executor.js';
-import { redactObject, redactText } from './evidence.js';
-import { observationPacket } from './configurationTools.js';
+import { getCheerioRoot } from './conditions.js';
 import { ConfigurationToolKind } from './configurationConstants.js';
+import { observationPacket } from './configurationTools.js';
+import { redactObject, redactText } from './evidence.js';
+import { inspectDomFieldTargets, selectDomTargets } from './sources.js';
 
-export function isToolHistoryEntry(h: unknown): boolean {
+function isToolHistoryEntry(h: unknown): boolean {
   return Boolean(h && typeof h === 'object' && 'tool' in h);
 }
 
@@ -46,81 +47,48 @@ export function precheckCandidatePlanInSnapshot(
   snapshot: DocumentSnapshot | undefined
 ): { valid: boolean; rejection?: string } {
   const hasSetup = (plan.strategy.setup?.length ?? 0) > 0;
-  if (!hasSetup && plan.strategy.records.kind === 'dom' && snapshot?.html) {
-    const $ = cheerio.load(snapshot.html);
-    const records = $(plan.strategy.records.selector);
-    const recordCount = records.length;
-    if (recordCount === 0) {
-      return {
-        valid: false,
-        rejection: `Candidate record selector '${plan.strategy.records.selector}' matched 0 elements in observed DOM. Select an existing container.`,
-      };
-    }
-    const firstRecord = records.first();
-    for (const [name, sources] of Object.entries(plan.strategy.fields)) {
-      for (const source of sources) {
-        if (source.kind === 'dom' && source.selector !== ':scope') {
-          let targets;
-          try {
-            targets = firstRecord.find(source.selector);
-            if (
-              targets.length === 0 &&
-              (source.selector.startsWith('meta') || source.selector.startsWith('head'))
-            ) {
-              const root = firstRecord.parents().length
-                ? firstRecord.parents().last()
-                : firstRecord;
-              targets = root.find(source.selector);
-            }
-          } catch {
-            return {
-              valid: false,
-              rejection: `Field '${name}' has invalid CSS selector '${source.selector}'. Provide a valid CSS selector.`,
-            };
-          }
-          if (targets.length > 1) {
-            const distinctValues = new Set<string>();
-            targets.each((_, el) => {
-              const text = (
-                source.attribute === 'text' ? $(el).text() : $(el).attr(source.attribute)
-              )?.trim();
-              if (text) distinctValues.add(text);
-            });
-            if (distinctValues.size > 1) {
-              if (source.pattern) {
-                try {
-                  const regex = new RegExp(source.pattern, 'u');
-                  const patternMatches = new Set<string>();
-                  targets.each((_, el) => {
-                    const text = (
-                      source.attribute === 'text' ? $(el).text() : $(el).attr(source.attribute)
-                    )?.trim();
-                    if (text) {
-                      const m = text.match(regex);
-                      if (m) patternMatches.add(m[1] !== undefined ? m[1] : m[0]);
-                    }
-                  });
-                  if (patternMatches.size === 1) {
-                    continue;
-                  }
-                } catch {
-                  // invalid regex falls through to ambiguity rejection
-                }
-              }
-              const samples = Array.from(distinctValues)
-                .slice(0, 3)
-                .map((v) => JSON.stringify(v.length > 40 ? v.slice(0, 37) + '...' : v))
-                .join(', ');
-              return {
-                valid: false,
-                rejection: `Ambiguous DOM field source: field '${name}' selector '${source.selector}' matched ${targets.length} elements with ${distinctValues.size} distinct values in record (${samples}). Narrow the selector or provide a pattern to isolate a single value.`,
-              };
-            }
-          }
-        }
+  if (hasSetup || plan.strategy.records.kind !== 'dom' || !snapshot?.html) {
+    return { valid: true };
+  }
+
+  const $ = getCheerioRoot(snapshot);
+  const records = $(plan.strategy.records.selector);
+  if (records.length === 0) {
+    return {
+      valid: false,
+      rejection: `Candidate record selector '${plan.strategy.records.selector}' matched 0 elements in observed DOM. Select an existing container.`,
+    };
+  }
+
+  const firstRecord = records.first();
+  for (const [name, sources] of Object.entries(plan.strategy.fields)) {
+    for (const source of sources) {
+      if (source.kind !== 'dom' || source.selector === ':scope') continue;
+
+      let targets;
+      try {
+        targets = selectDomTargets(firstRecord, source.selector);
+      } catch {
+        return {
+          valid: false,
+          rejection: `Field '${name}' has invalid CSS selector '${source.selector}'. Provide a valid CSS selector.`,
+        };
+      }
+
+      const inspected = inspectDomFieldTargets(targets, source);
+      if (inspected.ambiguous) {
+        const samples = inspected.distinctValues
+          .slice(0, 3)
+          .map((value) => JSON.stringify(value.length > 40 ? `${value.slice(0, 37)}...` : value))
+          .join(', ');
+        return {
+          valid: false,
+          rejection: `Ambiguous DOM field source: field '${name}' selector '${source.selector}' matched ${inspected.matchCount} elements with ${inspected.distinctValues.length} distinct values in record (${samples}). Narrow the selector or provide a pattern to isolate a single value.`,
+        };
       }
     }
   }
+
   return { valid: true };
 }
 

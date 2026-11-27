@@ -14,8 +14,6 @@ import type {
 /** Domain contracts: no browser, database, queue or model dependencies. */
 export type Scalar = string | number | boolean | null;
 
-export type { FieldType, TriggerOperator } from './vocabulary.js';
-
 export interface TriggerRule {
   field: string;
   operator: TriggerOperator;

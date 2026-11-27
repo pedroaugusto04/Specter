@@ -26,9 +26,9 @@ export class SupabaseStorageProvider implements IStorageProvider {
         },
       })
   ) {
-    const url = (config?.url ?? env.SUPABASE_URL ?? '').trim().replace(/\/$/, '');
-    const serviceRoleKey = (config?.serviceRoleKey ?? env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
-    this.bucket = (config?.bucket ?? env.SUPABASE_STORAGE_BUCKET ?? 'specter-screenshots').trim();
+    const url = (config?.url ?? env.SUPABASE_URL).trim().replace(/\/$/, '');
+    const serviceRoleKey = (config?.serviceRoleKey ?? env.SUPABASE_SERVICE_ROLE_KEY).trim();
+    this.bucket = (config?.bucket ?? env.SUPABASE_STORAGE_BUCKET).trim();
 
     if (url && serviceRoleKey) {
       try {

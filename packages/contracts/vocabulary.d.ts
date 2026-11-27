@@ -93,8 +93,8 @@ export const JobStatus: Readonly<{
 }>;
 export const RunStatus: Readonly<{
   readonly Running: 'RUNNING';
-  Cancelled: 'CANCELLED';
-  Success: 'SUCCESS';
+  readonly Cancelled: 'CANCELLED';
+  readonly Success: 'SUCCESS';
   readonly Failed: 'FAILED';
 }>;
 export const RunPhase: Readonly<{

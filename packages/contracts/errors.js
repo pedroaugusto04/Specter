@@ -5,6 +5,11 @@ export const USER_FAILURES = Object.freeze({
     description: 'We are handling many checks right now. Please try again later.',
     nextStep: 'Wait a few minutes, then try again.',
   },
+  responseTooLarge: {
+    title: 'Page Response Too Large',
+    description: 'The website response is too large to process safely.',
+    nextStep: 'Monitor a more specific page or section with less content.',
+  },
   accessBlocked: {
     title: 'Website Access Blocked',
     description:
@@ -76,6 +81,14 @@ export const USER_FAILURES = Object.freeze({
     nextStep: 'Try again later. If the problem continues, contact support.',
   },
 });
+
+export function formatStructuredUserFailure(failure) {
+  return JSON.stringify({
+    title: failure.title,
+    description: failure.description,
+    nextStep: failure.nextStep,
+  });
+}
 
 export function parseStructuredUserFailure(message) {
   if (typeof message === 'string' && message.startsWith('{') && message.endsWith('}')) {

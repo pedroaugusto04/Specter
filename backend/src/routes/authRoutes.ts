@@ -1,15 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { env } from '../config/env.js';
-import { UnauthorizedError } from '../errors/domainErrors.js';
-import { isAllowedCorsOrigin } from '../utils/corsHelper.js';
+import { MissingRefreshTokenError, OAuthCallbackHostError } from '../errors/domainErrors.js';
 import { optionalAuth, requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
-import {
-  OAUTH_STATE_COOKIE_NAME,
-  parseCookies,
-  REFRESH_COOKIE_NAME,
-  serializeCookie,
-} from '../utils/cookies.js';
+import { OAUTH_STATE_COOKIE_NAME, parseCookies, REFRESH_COOKIE_NAME } from '../utils/cookies.js';
+import { isAllowedCorsOrigin } from '../utils/corsHelper.js';
+import { getErrorMessage } from '../utils/errors.js';
+import { escapeHtml } from '../utils/htmlEscape.js';
+import { logger } from '../utils/logger.js';
 import { authLoginSchema, authProfileUpdateSchema, authRegisterSchema } from './schemas.js';
 
 function resolveDynamicCallbackUrl(request: FastifyRequest): string {
@@ -19,17 +17,17 @@ function resolveDynamicCallbackUrl(request: FastifyRequest): string {
   const proto =
     env.NODE_ENV === 'production' ? 'https' : forwardedProto || request.protocol || 'http';
   const host =
-    (request.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() ||
+    (request.headers['x-forwarded-host'] as string | undefined)?.split(',')[0]?.trim() ||
     request.headers.host ||
     'localhost:3001';
   let origin: string;
   try {
     origin = new URL(`${proto}://${host}`).origin;
   } catch {
-    throw new UnauthorizedError('Invalid OAuth callback host.');
+    throw new OAuthCallbackHostError('invalid');
   }
   if (env.NODE_ENV === 'production' && !isAllowedCorsOrigin(origin)) {
-    throw new UnauthorizedError('OAuth callback host is not allowed.');
+    throw new OAuthCallbackHostError('disallowed');
   }
   return `${origin}/api/auth/google/callback`;
 }
@@ -38,14 +36,12 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
   const withAuth = requireAuth(authService);
   const withOptionalAuth = optionalAuth(authService);
 
-  app.get('/api/auth/me', { preHandler: [withOptionalAuth] }, async (request) => {
-    return {
-      data: request.user,
-      meta: {
-        googleEnabled: authService.isGoogleConfigured(),
-      },
-    };
-  });
+  app.get('/api/auth/me', { preHandler: [withOptionalAuth] }, async (request) => ({
+    data: request.user,
+    meta: {
+      googleEnabled: authService.isGoogleConfigured(),
+    },
+  }));
 
   app.patch('/api/auth/profile', { preHandler: [withAuth] }, async (request, reply) => {
     const user = requireUser(request);
@@ -104,7 +100,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
       const cookies = parseCookies(request.headers.cookie);
       const refreshToken = cookies[REFRESH_COOKIE_NAME];
       if (!refreshToken) {
-        throw new UnauthorizedError('No refresh token provided.');
+        throw new MissingRefreshTokenError();
       }
 
       const { user, tokens } = await authService.refresh(refreshToken);
@@ -166,18 +162,12 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
           resolvedCallbackUrl: fallbackCallback,
         });
 
-        const clearStateCookie = serializeCookie(OAUTH_STATE_COOKIE_NAME, '', {
-          httpOnly: true,
-          sameSite: 'Lax',
-          path: '/',
-          maxAge: 0,
-        });
+        reply.header('Set-Cookie', [
+          ...authService.buildAuthCookies(tokens),
+          authService.buildClearOAuthStateCookie(),
+        ]);
 
-        reply.header('Set-Cookie', [...authService.buildAuthCookies(tokens), clearStateCookie]);
-
-        const isExtension =
-          (statePayload as unknown as Record<string, unknown>)?.source === 'extension';
-        if (isExtension) {
+        if (statePayload.source === 'extension') {
           return reply.type('text/html').send(`
             <!doctype html>
             <html lang="en">
@@ -224,7 +214,7 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
                 <div class="card">
                   <div class="check">✅</div>
                   <h2>Connected to Specter</h2>
-                  <p>Authenticated as <strong>${user.email}</strong>.<br />Closing window...</p>
+                  <p>Authenticated as <strong>${escapeHtml(user.email)}</strong>.<br />Closing window...</p>
                 </div>
                 <script>
                   setTimeout(() => {
@@ -237,7 +227,10 @@ export function registerAuthRoutes(app: FastifyInstance, authService: AuthServic
         }
 
         return reply.redirect(`${frontendBase}/`);
-      } catch {
+      } catch (err) {
+        logger.warn('Google OAuth callback authentication failed', {
+          errorMessage: getErrorMessage(err),
+        });
         return reply.redirect(`${frontendBase}/?auth_error=google_failed`);
       }
     }

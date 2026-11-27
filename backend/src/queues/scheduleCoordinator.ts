@@ -1,3 +1,4 @@
+import { JobNotFoundError, UserNotFoundError } from '../errors/domainErrors.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { IUserRepository } from '../repositories/userRepository.js';
 import { JobStatus } from '../types/enums.js';
@@ -12,29 +13,28 @@ export class ScheduleCoordinator {
 
   async timezoneForJob(jobId: string): Promise<string> {
     const job = await this.jobs.findById(jobId);
-    if (!job) throw new Error(`Job not found: ${jobId}`);
+    if (!job) throw new JobNotFoundError(jobId);
     return this.timezoneForUser(job.userId);
   }
 
   private async timezoneForUser(userId: string): Promise<string> {
     const user = await this.users.findById(userId);
-    if (!user) throw new Error(`User not found: ${userId}`);
+    if (!user) throw new UserNotFoundError(userId);
     return user.timezone;
   }
 
   async activeSchedules(): Promise<ReconcilableJob[]> {
     const jobs = await this.jobs.findActiveJobs();
-    const timezones = new Map<string, string>();
-    const schedules: ReconcilableJob[] = [];
-    for (const job of jobs) {
-      let timezone = timezones.get(job.userId);
-      if (!timezone) {
-        timezone = await this.timezoneForUser(job.userId);
-        timezones.set(job.userId, timezone);
-      }
-      schedules.push({ id: job.id, cronExpression: job.cronExpression, timezone });
-    }
-    return schedules;
+    const uniqueUserIds = [...new Set(jobs.map((job) => job.userId))];
+    const timezoneEntries = await Promise.all(
+      uniqueUserIds.map(async (userId) => [userId, await this.timezoneForUser(userId)] as const)
+    );
+    const timezones = new Map(timezoneEntries);
+    return jobs.map((job) => ({
+      id: job.id,
+      cronExpression: job.cronExpression,
+      timezone: timezones.get(job.userId)!,
+    }));
   }
 
   async refreshUserSchedules(userId: string, scheduler: IJobScheduler): Promise<void> {

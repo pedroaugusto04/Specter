@@ -1,13 +1,13 @@
 'use client';
 
 import { getApiBaseUrl } from '@/lib/api';
-import * as React from 'react';
-
-import type { RealtimeEventDto as RealtimeEventPayload } from '@specter/contracts';
-export type {
+import type {
   RealtimeEventDto as RealtimeEventPayload,
   RealtimeEventType,
 } from '@specter/contracts';
+import * as React from 'react';
+
+export type { RealtimeEventPayload, RealtimeEventType };
 
 export type ConnectionMode = 'realtime' | 'polling' | 'connecting' | 'disconnected';
 
@@ -20,9 +20,15 @@ export interface UseRealtimeEventsOptions {
 
 export interface UseRealtimeEventsResult {
   connectionMode: ConnectionMode;
-  lastEventAt: Date | null;
-  reconnectCount: number;
 }
+
+const REALTIME_EVENT_TYPES: readonly RealtimeEventType[] = [
+  'JOB_CREATED',
+  'JOB_UPDATED',
+  'JOB_DELETED',
+  'JOB_RUN_COMPLETED',
+  'JOB_COMPILATION_FAILED',
+];
 
 export function useRealtimeEvents({
   enabled = true,
@@ -31,8 +37,6 @@ export function useRealtimeEvents({
   fallbackPollIntervalMs = 45_000,
 }: UseRealtimeEventsOptions): UseRealtimeEventsResult {
   const [connectionMode, setConnectionMode] = React.useState<ConnectionMode>('connecting');
-  const [lastEventAt, setLastEventAt] = React.useState<Date | null>(null);
-  const [reconnectCount, setReconnectCount] = React.useState(0);
 
   const onJobEventRef = React.useRef(onJobEvent);
   const onReconnectRef = React.useRef(onReconnect);
@@ -58,10 +62,7 @@ export function useRealtimeEvents({
     const startFallbackPolling = () => {
       if (fallbackTimer) return;
       fallbackTimer = setInterval(() => {
-        // Only poll if window/tab is visible
-        if (document.visibilityState === 'hidden') {
-          return;
-        }
+        if (document.visibilityState === 'hidden') return;
         onReconnectRef.current?.();
       }, fallbackPollIntervalMs);
     };
@@ -76,39 +77,30 @@ export function useRealtimeEvents({
     const handleIncomingEvent = (event: MessageEvent) => {
       try {
         const payload = JSON.parse(event.data) as RealtimeEventPayload;
-        setLastEventAt(new Date());
         onJobEventRef.current?.(payload);
       } catch {
-        // ignore malformed event payload
+        // Ignore malformed event payload
       }
     };
 
     const connectSse = () => {
       try {
-        const baseUrl = getApiBaseUrl();
-        const url = `${baseUrl}/api/events`;
-
+        const url = `${getApiBaseUrl()}/api/events`;
         eventSource = new EventSource(url, { withCredentials: true });
 
         eventSource.onopen = () => {
           if (isDisposed) return;
           setConnectionMode('realtime');
           stopFallbackPolling();
-          setReconnectCount((prev) => prev + 1);
-          // Resync on every connection, including changes made before the first subscription.
           onReconnectRef.current?.();
         };
 
-        // Listen for specific domain event types
-        eventSource.addEventListener('JOB_CREATED', handleIncomingEvent);
-        eventSource.addEventListener('JOB_UPDATED', handleIncomingEvent);
-        eventSource.addEventListener('JOB_DELETED', handleIncomingEvent);
-        eventSource.addEventListener('JOB_RUN_COMPLETED', handleIncomingEvent);
+        for (const eventType of REALTIME_EVENT_TYPES) {
+          eventSource.addEventListener(eventType, handleIncomingEvent);
+        }
 
         eventSource.onerror = () => {
           if (isDisposed) return;
-          // EventSource will automatically retry with backoff;
-          // reflect degraded status and enable fallback polling
           setConnectionMode('polling');
           startFallbackPolling();
         };
@@ -125,7 +117,6 @@ export function useRealtimeEvents({
       connectSse();
     }
 
-    // Page Visibility API handler: when user returns to tab, refresh data
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         onReconnectRef.current?.();
@@ -139,19 +130,14 @@ export function useRealtimeEvents({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       stopFallbackPolling();
       if (eventSource) {
-        eventSource.removeEventListener('JOB_CREATED', handleIncomingEvent);
-        eventSource.removeEventListener('JOB_UPDATED', handleIncomingEvent);
-        eventSource.removeEventListener('JOB_DELETED', handleIncomingEvent);
-        eventSource.removeEventListener('JOB_RUN_COMPLETED', handleIncomingEvent);
+        for (const eventType of REALTIME_EVENT_TYPES) {
+          eventSource.removeEventListener(eventType, handleIncomingEvent);
+        }
         eventSource.close();
         eventSource = null;
       }
     };
   }, [enabled, fallbackPollIntervalMs]);
 
-  return {
-    connectionMode,
-    lastEventAt,
-    reconnectCount,
-  };
+  return { connectionMode };
 }

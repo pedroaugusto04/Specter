@@ -19,6 +19,20 @@
     "./vocabulary": {
       "types": "./vocabulary.d.ts",
       "default": "./vocabulary.js"
+    },
+    "./values": {
+      "types": "./values.d.ts",
+      "default": "./values.js"
+    },
+    "./errors": {
+      "types": "./errors.d.ts",
+      "default": "./errors.js"
+    },
+    "./payload": {
+      "types": "./payload.d.ts"
+    },
+    "./diff": {
+      "types": "./diff.d.ts"
     }
   }
 }

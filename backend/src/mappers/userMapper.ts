@@ -7,12 +7,12 @@ export const UserMapper = {
     return {
       id: row.id,
       email: row.email,
-      name: row.name ?? null,
-      passwordHash: row.passwordHash ?? null,
-      googleId: row.googleId ?? null,
+      name: row.name,
+      passwordHash: row.passwordHash,
+      googleId: row.googleId,
       pageLanguage: row.pageLanguage,
       browserPageLanguage: row.browserPageLanguage,
-      timezone: row.timezone ?? 'America/Sao_Paulo',
+      timezone: row.timezone,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -25,7 +25,7 @@ export const UserMapper = {
       name: entity.name,
       pageLanguage: entity.pageLanguage,
       browserPageLanguage: entity.browserPageLanguage,
-      timezone: entity.timezone || 'America/Sao_Paulo',
+      timezone: entity.timezone,
       createdAt: entity.createdAt.toISOString(),
     };
   },

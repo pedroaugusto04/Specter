@@ -8,7 +8,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useLoginMutation, useRegisterMutation } from '@/hooks/useDashboardQueries';
-import { ApiError, api, type UserDto } from '@/lib/api';
+import { api, extractFormError, type UserDto } from '@/lib/api';
 import { getBrowserTimezone } from '@/lib/utils';
 
 export interface AuthFormProps {
@@ -34,7 +34,7 @@ export function AuthForm({
   const [termsAccepted, setTermsAccepted] = React.useState(false);
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
-  const [loading, setLoading] = React.useState(false);
+  const loading = loginMutation.isPending || registerMutation.isPending;
   const [fieldErrors, setFieldErrors] = React.useState<{
     email?: string;
     password?: string;
@@ -86,7 +86,6 @@ export function AuthForm({
       return;
     }
 
-    setLoading(true);
     try {
       const user =
         mode === 'register'
@@ -98,19 +97,11 @@ export function AuthForm({
           : await loginMutation.mutateAsync({ email: trimmedEmail, password });
       await onSuccess(user);
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (Object.keys(err.fieldErrors).length > 0) {
-          setFieldErrors((prev) => ({ ...prev, ...err.fieldErrors }));
-          return;
-        }
-        setGlobalError(err.message);
-      } else if (err instanceof Error) {
-        setGlobalError(err.message);
-      } else {
-        setGlobalError('Authentication failed.');
+      const extracted = extractFormError(err, ['email', 'password'], 'Authentication failed.');
+      if (Object.keys(extracted.fieldErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...extracted.fieldErrors }));
       }
-    } finally {
-      setLoading(false);
+      setGlobalError(extracted.globalError);
     }
   };
 

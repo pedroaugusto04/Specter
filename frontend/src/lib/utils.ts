@@ -7,8 +7,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 export function validateClientCron(cronExpression: string): { valid: boolean; error?: string } {
-  const trimmed = cronExpression.trim();
-  const parts = trimmed.split(/\s+/);
+  const parts = cronExpression.trim().split(/\s+/);
 
   if (parts.length !== 5) {
     return {
@@ -17,7 +16,7 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
     };
   }
 
-  const minuteField = parts[0] ?? '';
+  const minuteField = parts[0]!;
 
   if (minuteField === '*') {
     return {
@@ -44,7 +43,7 @@ export function validateClientCron(cronExpression: string): { valid: boolean; er
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
     for (let i = 1; i < nums.length; i++) {
-      if ((nums[i] ?? 0) - (nums[i - 1] ?? 0) < 15) {
+      if (nums[i]! - nums[i - 1]! < 15) {
         return {
           valid: false,
           error: 'Specified minutes contain gaps smaller than the 15-minute floor.',
@@ -108,7 +107,7 @@ export function getAllIanaTimezones(): TimezoneOption[] {
     }
   }
 
-  if (!timezones || timezones.length === 0) {
+  if (timezones.length === 0) {
     timezones = COMMON_TIMEZONES.map((t) => t.value);
   }
 
@@ -134,7 +133,7 @@ export function getAllIanaTimezones(): TimezoneOption[] {
         city,
       });
     } catch {
-      // unsupported timezone in host environment, skip
+      // Unsupported timezone in host environment, skip
     }
   }
 
@@ -147,16 +146,12 @@ function formatWithTimezone(
   options: Intl.DateTimeFormatOptions,
   timeZone: string
 ): string {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return isoString;
   try {
-    const d = new Date(isoString);
-    if (Number.isNaN(d.getTime())) return isoString;
-    return new Intl.DateTimeFormat('en-US', { ...options, timeZone }).format(d);
+    return new Intl.DateTimeFormat('en-US', { ...options, timeZone }).format(date);
   } catch {
-    try {
-      return new Intl.DateTimeFormat('en-US', options).format(new Date(isoString));
-    } catch {
-      return isoString;
-    }
+    return new Intl.DateTimeFormat('en-US', options).format(date);
   }
 }
 

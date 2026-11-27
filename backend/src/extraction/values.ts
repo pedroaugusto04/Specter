@@ -3,6 +3,26 @@ import { parseLocalizedNumber } from './localizedNumber.js';
 import type { IntentField, Scalar } from './contracts.js';
 import { sanitizeVolatileString } from '../utils/diffHasher.js';
 
+function buildUtcIsoDate(
+  year: number,
+  month: number,
+  day: number,
+  hours: number,
+  minutes: number,
+  seconds: number
+): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+  if (
+    utcDate.getUTCFullYear() !== year ||
+    utcDate.getUTCMonth() !== month - 1 ||
+    utcDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return utcDate.toISOString();
+}
+
 function parseDateValue(text: string, locale?: string): string | null {
   // 1. ISO-8601 formats (e.g. 2024-05-10, 2024-05-10T12:00:00Z, 2024-05-10 12:00:00)
   if (
@@ -32,29 +52,13 @@ function parseDateValue(text: string, locale?: string): string | null {
 
     if (first <= 12 && second <= 12 && first !== second && !locale) return null;
 
-    let day = first;
-    let month = second;
-    if (first > 12) {
-      day = first;
-      month = second;
-    } else if (second > 12) {
-      month = first;
-      day = second;
-    } else if (locale && /^en-(US|CA)/i.test(locale)) {
-      month = first;
-      day = second;
-    }
+    const monthFirst =
+      second > 12 || (first <= 12 && Boolean(locale && /^en-(US|CA)/i.test(locale)));
+    const month = monthFirst ? first : second;
+    const day = monthFirst ? second : first;
 
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-      if (
-        utcDate.getUTCFullYear() === year &&
-        utcDate.getUTCMonth() === month - 1 &&
-        utcDate.getUTCDate() === day
-      ) {
-        return utcDate.toISOString();
-      }
-    }
+    const iso = buildUtcIsoDate(year, month, day, hours, minutes, seconds);
+    if (iso) return iso;
   }
 
   // 3. Delimited formats: YYYY/MM/DD, YYYY.MM.DD
@@ -62,23 +66,14 @@ function parseDateValue(text: string, locale?: string): string | null {
     /^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
   );
   if (ymdMatch) {
-    const year = Number(ymdMatch[1]);
-    const month = Number(ymdMatch[2]);
-    const day = Number(ymdMatch[3]);
-    const hours = Number(ymdMatch[4] ?? 0);
-    const minutes = Number(ymdMatch[5] ?? 0);
-    const seconds = Number(ymdMatch[6] ?? 0);
-
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-      if (
-        utcDate.getUTCFullYear() === year &&
-        utcDate.getUTCMonth() === month - 1 &&
-        utcDate.getUTCDate() === day
-      ) {
-        return utcDate.toISOString();
-      }
-    }
+    return buildUtcIsoDate(
+      Number(ymdMatch[1]),
+      Number(ymdMatch[2]),
+      Number(ymdMatch[3]),
+      Number(ymdMatch[4] ?? 0),
+      Number(ymdMatch[5] ?? 0),
+      Number(ymdMatch[6] ?? 0)
+    );
   }
 
   return null;

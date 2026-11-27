@@ -1,3 +1,4 @@
+import { EntityChangeKind } from '@specter/contracts';
 import type { AlertPayload } from './notification.interface.js';
 import { env } from '../../config/env.js';
 import { formatEmailDateTime } from '../../utils/dateFormatter.js';
@@ -18,12 +19,10 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     ...payload.diffSummary.removed,
   ];
 
-  const specterBaseUrl = (env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const specterUrl =
-    payload.specterUrl ??
-    (payload.jobId
-      ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}`
-      : specterBaseUrl);
+  const specterBaseUrl = env.FRONTEND_URL.replace(/\/$/, '');
+  const specterUrl = payload.jobId
+    ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}`
+    : specterBaseUrl;
 
   const diffRowsHtml = allChanges
     .map((change) => {
@@ -31,11 +30,11 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
       let prevValueHtml: string;
       let currValueHtml: string;
 
-      if (change.changeType === 'MODIFIED') {
+      if (change.changeType === EntityChangeKind.Modified) {
         badgeHtml = `<span style="display:inline-block;background-color:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">Modified</span>`;
         prevValueHtml = `<span style="color:#71717a;text-decoration:line-through;font-size:13px;word-break:break-all;">${escapeHtml(change.previousValue)}</span>`;
         currValueHtml = `<span style="color:#09090b;font-weight:600;font-size:13px;background-color:#fef9c3;padding:2px 6px;border-radius:4px;word-break:break-all;">${escapeHtml(change.currentValue)}</span>`;
-      } else if (change.changeType === 'ADDED') {
+      } else if (change.changeType === EntityChangeKind.Added) {
         badgeHtml = `<span style="display:inline-block;background-color:#dcfce7;color:#166534;border:1px solid #bbf7d0;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.3px;">New</span>`;
         prevValueHtml = `<span style="color:#a1a1aa;font-size:13px;">—</span>`;
         currValueHtml = `<span style="color:#15803d;font-weight:600;font-size:13px;background-color:#dcfce7;padding:2px 6px;border-radius:4px;word-break:break-all;">${escapeHtml(change.currentValue)}</span>`;

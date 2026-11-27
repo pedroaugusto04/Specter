@@ -10,11 +10,7 @@ export interface CodexCompilerOptions extends CliCompilerOptions {
 export class CodexCompilerProvider extends CliCompilerProvider {
   constructor(options: CodexCompilerOptions = {}) {
     const model = options.model ?? env.COMPILER_CODEX_MODEL;
-    const sandbox =
-      options.sandbox ??
-      process.env.COMPILER_CODEX_SANDBOX ??
-      process.env.CODEX_SANDBOX ??
-      env.COMPILER_CODEX_SANDBOX;
+    const sandbox = options.sandbox ?? env.COMPILER_CODEX_SANDBOX;
     super({
       ...options,
       providerName: 'codex',

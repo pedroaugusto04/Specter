@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
-import { getDb, type Database } from '../db/index.js';
+import type { Database } from '../db/index.js';
 import { userWebSessions } from '../db/schema.js';
+import { PersistenceError } from '../errors/domainErrors.js';
 import type { PlaywrightStorageState } from '../types/session.js';
 import { SessionMapper } from '../mappers/sessionMapper.js';
 import type { UserWebSessionEntity } from '../types/domain.js';
@@ -20,17 +21,12 @@ export interface ISessionRepository {
     page: number,
     pageSize: number
   ): Promise<{ items: UserWebSessionEntity[]; totalItems: number }>;
-  findById(id: string): Promise<UserWebSessionEntity | null>;
   upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity>;
   delete(userId: string, id: string): Promise<boolean>;
 }
 
 export class DrizzleSessionRepository implements ISessionRepository {
-  private readonly db: Database;
-
-  constructor(db?: Database) {
-    this.db = db ?? getDb();
-  }
+  constructor(private readonly db: Database) {}
 
   async findByUserAndDomain(
     userId: string,
@@ -47,11 +43,8 @@ export class DrizzleSessionRepository implements ISessionRepository {
 
     if (rows.length === 0) return null;
 
-    // Prefer exact match, then parent domain match
-    const firstCandidate = candidates[0] ?? '';
-    const exact = rows.find((r) => r.domain.toLowerCase() === firstCandidate);
-    const chosen = exact ?? rows[0];
-    return chosen ? SessionMapper.rowToEntity(chosen) : null;
+    const exact = rows.find((row) => row.domain.toLowerCase() === candidates[0]);
+    return SessionMapper.rowToEntity(exact ?? rows[0]!);
   }
 
   async listPageByUserId(
@@ -73,25 +66,15 @@ export class DrizzleSessionRepository implements ISessionRepository {
         .where(eq(userWebSessions.userId, userId)),
     ]);
     return {
-      items: rows.map((row) => SessionMapper.rowToEntity(row)),
+      items: rows.map(SessionMapper.rowToEntity),
       totalItems: total?.value ?? 0,
     };
-  }
-
-  async findById(id: string): Promise<UserWebSessionEntity | null> {
-    const [row] = await this.db
-      .select()
-      .from(userWebSessions)
-      .where(eq(userWebSessions.id, id))
-      .limit(1);
-
-    return row ? SessionMapper.rowToEntity(row) : null;
   }
 
   async upsert(userId: string, input: UpsertSessionInput): Promise<UserWebSessionEntity> {
     const candidates = extractDomainCandidates(input.domain);
     const normalizedDomain = candidates[0] ?? input.domain.trim().toLowerCase();
-    const cookieCount = input.storageState.cookies?.length ?? 0;
+    const cookieCount = input.storageState.cookies.length;
     const encryptedState = encryptJson(input.storageState);
 
     const existing = await this.findByUserAndDomain(userId, normalizedDomain);
@@ -108,7 +91,8 @@ export class DrizzleSessionRepository implements ISessionRepository {
         .where(eq(userWebSessions.id, existing.id))
         .returning();
 
-      return SessionMapper.rowToEntity(updated!);
+      if (!updated) throw new PersistenceError('update web session');
+      return SessionMapper.rowToEntity(updated);
     }
 
     const [inserted] = await this.db
@@ -122,14 +106,15 @@ export class DrizzleSessionRepository implements ISessionRepository {
       })
       .returning();
 
-    return SessionMapper.rowToEntity(inserted!);
+    if (!inserted) throw new PersistenceError('insert web session');
+    return SessionMapper.rowToEntity(inserted);
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
     const deleted = await this.db
       .delete(userWebSessions)
       .where(and(eq(userWebSessions.id, id), eq(userWebSessions.userId, userId)))
-      .returning();
+      .returning({ id: userWebSessions.id });
 
     return deleted.length > 0;
   }

@@ -1,16 +1,19 @@
-import { USER_FAILURES, getUserFailure, parseStructuredUserFailure } from '@specter/contracts';
+import {
+  USER_FAILURES,
+  formatStructuredUserFailure,
+  getUserFailure,
+  parseStructuredUserFailure,
+} from '@specter/contracts';
 import { AccessFailure } from '../types/access.js';
 import { ExtractionQuality, FailureCode } from '../extraction/constants.js';
 import { classifyAccessFailure } from '../acquisition/failure.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import {
-  AntiBotBlockedError,
   BrowserCapacityError,
-  CompilerTimeoutError,
   CompilerApiRequestError,
+  CompilerTimeoutError,
   CompilerValidationError,
   DomainError,
-  NavigationTimeoutError,
   NotFoundError,
   QuotaExceededError,
   SelectorMismatchError,
@@ -18,15 +21,19 @@ import {
 } from '../errors/domainErrors.js';
 import { ConfigurationFailure } from '../extraction/configurationFailure.js';
 
-const USER_ERROR_MESSAGES = Object.fromEntries(
-  Object.entries(USER_FAILURES).map(([key, failure]) => [key, failure.description])
-) as Record<keyof typeof USER_FAILURES, string>;
+const DOMAIN_CODE_TO_FAILURE: Partial<Record<string, keyof typeof USER_FAILURES>> = {
+  RESPONSE_TOO_LARGE: 'responseTooLarge',
+  UPSTREAM_HTTP_ERROR: 'websiteUnavailable',
+  DECRYPTION_FAILED: 'sessionUnavailable',
+  UNSUPPORTED_CAPABILITY: 'unsupported',
+  RESOURCE_LEASE_LOST: 'executionInterrupted',
+};
 
 function formatConfigurationFailure(error: DomainError): string {
   if (error instanceof ConfigurationFailure && error.semanticReview?.reasons?.length) {
     const reasons = error.semanticReview.reasons.filter(Boolean);
     if (reasons.length > 0) {
-      return JSON.stringify({
+      return formatStructuredUserFailure({
         title: 'Extraction Review Not Confirmed',
         description: reasons.join(' '),
         nextStep: 'Clarify your instructions or verify that the target information is shown as expected.',
@@ -39,7 +46,7 @@ function formatConfigurationFailure(error: DomainError): string {
   const fieldMatch = message.match(/Required field '([^']+)' is missing or invalid/i);
   if (fieldMatch) {
     const field = fieldMatch[1];
-    return JSON.stringify({
+    return formatStructuredUserFailure({
       title: 'Required Field Not Found',
       description: `We could not find the '${field}' field on the page with the provided instructions.`,
       nextStep: `Check that '${field}' is visible on the page and clarify your monitoring instructions.`,
@@ -47,7 +54,7 @@ function formatConfigurationFailure(error: DomainError): string {
   }
 
   if (/no valid records could be extracted|could not locate target record/i.test(message)) {
-    return JSON.stringify({
+    return formatStructuredUserFailure({
       title: 'Target Content Not Found',
       description: 'We could not locate the main content or item container on this page.',
       nextStep: 'Check that the page loads the expected content and verify the target URL.',
@@ -55,7 +62,7 @@ function formatConfigurationFailure(error: DomainError): string {
   }
 
   if (/ambiguous DOM field source|must be selected unambiguously/i.test(message)) {
-    return JSON.stringify({
+    return formatStructuredUserFailure({
       title: 'Ambiguous Content Selection',
       description: 'Multiple matching items were found on the page, but single-item monitoring was requested.',
       nextStep: 'Clarify your instructions to specify exactly which item on the page to track.',
@@ -63,54 +70,51 @@ function formatConfigurationFailure(error: DomainError): string {
   }
 
   if (/duplicate collection identity/i.test(message)) {
-    return JSON.stringify({
+    return formatStructuredUserFailure({
       title: 'Duplicate Collection Items',
       description: 'Multiple collection items share identical identifiers on the page.',
       nextStep: 'Ensure the target collection items have distinct visible identifiers or links.',
     });
   }
 
-  return USER_ERROR_MESSAGES.configurationRejected;
+  return USER_FAILURES.configurationRejected.description;
 }
 
 /** Maps internal exceptions to short user-facing messages without exposing technical details. */
 export function formatUserErrorMessage(error: unknown): string {
-  if (error instanceof BrowserCapacityError) return USER_ERROR_MESSAGES.resourceUnavailable;
-  if (error instanceof QuotaExceededError) return error.message;
-  if (error instanceof UnauthorizedError) return error.message;
+  if (error instanceof BrowserCapacityError) return USER_FAILURES.resourceUnavailable.description;
+  if (error instanceof QuotaExceededError || error instanceof UnauthorizedError) {
+    return error.message;
+  }
   if (error instanceof NotFoundError) return 'The requested resource was not found.';
   // Setup deadlines must not be mistaken for website navigation timeouts.
-  if (error instanceof CompilerTimeoutError) return USER_ERROR_MESSAGES.setupTimedOut;
-  if (error instanceof CompilerApiRequestError)
+  if (error instanceof CompilerTimeoutError) return USER_FAILURES.setupTimedOut.description;
+  if (error instanceof CompilerApiRequestError) {
     return error.statusCode === 429
-      ? USER_ERROR_MESSAGES.compilerRateLimited
-      : USER_ERROR_MESSAGES.setupUnavailable;
-  const accessFailure = classifyAccessFailure(error);
-  if (accessFailure === AccessFailure.Blocked || error instanceof AntiBotBlockedError)
-    return USER_ERROR_MESSAGES.accessBlocked;
-  if (accessFailure === AccessFailure.Timeout || error instanceof NavigationTimeoutError)
-    return USER_ERROR_MESSAGES.requestTimedOut;
-  if (error instanceof SelectorMismatchError || error instanceof CompilerValidationError)
-    return USER_ERROR_MESSAGES.requestedDataUnavailable;
-  if (accessFailure === AccessFailure.Transient) return USER_ERROR_MESSAGES.websiteUnavailable;
-  if (error instanceof DomainError) {
-    switch (error.code) {
-      case 'RESPONSE_TOO_LARGE':
-        return 'The website response is too large to process safely.';
-      case 'UPSTREAM_HTTP_ERROR':
-        return USER_ERROR_MESSAGES.websiteUnavailable;
-      case 'CONFIGURATION_REJECTED':
-      case 'CONFIGURATION_OPERATION_FAILED':
-        return formatConfigurationFailure(error);
-      case 'DECRYPTION_FAILED':
-        return USER_ERROR_MESSAGES.sessionUnavailable;
-      case 'UNSUPPORTED_CAPABILITY':
-        return USER_ERROR_MESSAGES.unsupported;
-      case 'RESOURCE_LEASE_LOST':
-        return USER_ERROR_MESSAGES.executionInterrupted;
-    }
+      ? USER_FAILURES.compilerRateLimited.description
+      : USER_FAILURES.setupUnavailable.description;
   }
-  return USER_ERROR_MESSAGES.requestFailed;
+
+  const accessFailure = classifyAccessFailure(error);
+  if (accessFailure === AccessFailure.Blocked) return USER_FAILURES.accessBlocked.description;
+  if (accessFailure === AccessFailure.Timeout) return USER_FAILURES.requestTimedOut.description;
+  if (error instanceof SelectorMismatchError || error instanceof CompilerValidationError) {
+    return USER_FAILURES.requestedDataUnavailable.description;
+  }
+  if (accessFailure === AccessFailure.Transient) return USER_FAILURES.websiteUnavailable.description;
+
+  if (error instanceof DomainError) {
+    if (
+      error.code === 'CONFIGURATION_REJECTED' ||
+      error.code === 'CONFIGURATION_OPERATION_FAILED'
+    ) {
+      return formatConfigurationFailure(error);
+    }
+    const mapped = DOMAIN_CODE_TO_FAILURE[error.code];
+    if (mapped) return USER_FAILURES[mapped].description;
+  }
+
+  return USER_FAILURES.requestFailed.description;
 }
 
 export function presentExtractionReport(report: ExtractionReport): ExtractionReport {
@@ -133,13 +137,13 @@ export function presentExtractionReport(report: ExtractionReport): ExtractionRep
     issues: report.issues.length
       ? [
           report.quality === ExtractionQuality.Blocked
-            ? USER_ERROR_MESSAGES.accessBlocked
+            ? USER_FAILURES.accessBlocked.description
             : report.failureCode === FailureCode.Timeout
-              ? USER_ERROR_MESSAGES.requestTimedOut
+              ? USER_FAILURES.requestTimedOut.description
               : report.quality === ExtractionQuality.Complete ||
                   report.quality === ExtractionQuality.Empty
                 ? 'Optional extraction evidence unavailable.'
-                : USER_ERROR_MESSAGES.requestedDataUnavailable,
+                : USER_FAILURES.requestedDataUnavailable.description,
         ]
       : [],
     semanticReview: report.semanticReview
@@ -148,7 +152,7 @@ export function presentExtractionReport(report: ExtractionReport): ExtractionRep
           score: report.semanticReview.score,
           evidenceRefs: report.semanticReview.evidenceRefs,
           reasons: report.semanticReview.reasons.length
-            ? ['Semantic review ' + report.semanticReview.status.toLowerCase() + '.']
+            ? [`Semantic review ${report.semanticReview.status.toLowerCase()}.`]
             : [],
         }
       : undefined,

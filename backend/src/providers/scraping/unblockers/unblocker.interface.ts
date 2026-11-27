@@ -1,16 +1,23 @@
+import { DomainError } from '../../../errors/domainErrors.js';
 import type { ScrapeOptions, ScrapeResult } from '../scraper.interface.js';
 
-export class UnblockerError extends Error {
+export class UnblockerError extends DomainError {
   public readonly providerName: string;
   public readonly httpStatus?: number;
 
-  get statusCode(): number | undefined {
-    return this.httpStatus;
-  }
-
-  constructor(providerName: string, message: string, httpStatus?: number, cause?: unknown) {
-    super(`[${providerName}] ${message}`, { cause });
-    this.name = 'UnblockerError';
+  constructor(
+    providerName: string,
+    message: string,
+    httpStatus?: number,
+    cause?: unknown,
+    code = 'UNBLOCKER_ERROR'
+  ) {
+    super(`[${providerName}] ${message}`, {
+      code,
+      statusCode: 502,
+      isRetryable: true,
+      cause,
+    });
     this.providerName = providerName;
     this.httpStatus = httpStatus;
   }
@@ -27,8 +34,7 @@ export class UnblockerQuotaExhaustedError extends UnblockerError {
     httpStatus = 429,
     cause?: unknown
   ) {
-    super(providerName, message, httpStatus, cause);
-    this.name = 'UnblockerQuotaExhaustedError';
+    super(providerName, message, httpStatus, cause, 'UNBLOCKER_QUOTA_EXHAUSTED');
   }
 }
 

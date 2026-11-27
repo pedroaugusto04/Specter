@@ -16,7 +16,7 @@ export abstract class BaseUnblockerProvider implements IUnblockerProvider {
   }
 
   isEnabled(): boolean {
-    return Boolean(this.apiKey && this.apiKey.length > 0);
+    return this.apiKey.length > 0;
   }
 
   protected abstract executeAttempt(

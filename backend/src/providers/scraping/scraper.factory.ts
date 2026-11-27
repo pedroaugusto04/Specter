@@ -1,7 +1,7 @@
-import type { IBrowserCapacity } from '../../resources/browserCapacity.js';
+import { env } from '../../config/env.js';
 import { BrowserDocumentAdapter } from '../../extraction/adapters/browserDocument.adapter.js';
 import { executionPolicy } from '../../extraction/policy.js';
-import { env } from '../../config/env.js';
+import type { IBrowserCapacity } from '../../resources/browserCapacity.js';
 import { AccessScraperEngine } from './accessScraper.provider.js';
 import { CheerioScraperEngine } from './cheerioHttpScraper.provider.js';
 import { PlaywrightScraperEngine } from './playwrightScraper.provider.js';
@@ -23,33 +23,18 @@ export function createScraperEngine(
   if (engineName === 'cheerio') {
     localEngines.push(new CheerioScraperEngine());
   } else {
-    if (env.HTTP_PROXY) {
-      localEngines.push(
-        new PlaywrightScraperEngine(
-          new BrowserDocumentAdapter(executionPolicy(), capacity, env.HTTP_PROXY),
-          executionPolicy()
-        )
-      );
-    }
-    if (env.HTTP_FALLBACK_PROXY) {
-      localEngines.push(
-        new PlaywrightScraperEngine(
-          new BrowserDocumentAdapter(executionPolicy(), capacity, env.HTTP_FALLBACK_PROXY),
-          executionPolicy()
-        )
-      );
-    }
-    localEngines.push(
-      new PlaywrightScraperEngine(
-        new BrowserDocumentAdapter(executionPolicy(), capacity),
-        executionPolicy()
-      )
+    const policy = executionPolicy();
+    const proxyCascade = [env.HTTP_PROXY, env.HTTP_FALLBACK_PROXY, undefined].filter(
+      (proxy, idx) => idx === 2 || Boolean(proxy)
     );
+    for (const proxy of proxyCascade) {
+      localEngines.push(
+        new PlaywrightScraperEngine(new BrowserDocumentAdapter(policy, capacity, proxy), policy)
+      );
+    }
   }
 
-  const unblockers = createUnblockers();
-
-  return new AccessScraperEngine(localEngines, unblockers);
+  return new AccessScraperEngine(localEngines, createUnblockers());
 }
 
 export function createUnblockers() {
@@ -61,6 +46,7 @@ export function createUnblockers() {
     new ScrapingBeeUnblockerProvider(),
   ];
 }
+
 export function createHttpCandidates() {
   return [
     { engine: new CheerioScraperEngine(), external: false },

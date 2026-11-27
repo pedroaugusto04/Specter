@@ -1,7 +1,7 @@
 import { parseRetryAfter } from '../../utils/retryAfter.js';
 import { isTimeoutError } from '../../utils/networkErrors.js';
 import { env } from '../../config/env.js';
-import { AntiBotBlockedError, NavigationTimeoutError } from '../../errors/domainErrors.js';
+import { NavigationTimeoutError } from '../../errors/domainErrors.js';
 import { detectAntiBotBlock } from '../../utils/antiBotDetector.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
 import { readBoundedResponseText } from '../../utils/responseBody.js';
@@ -89,9 +89,6 @@ export class CheerioScraperEngine implements IScraperEngine {
         durationMs: Date.now() - startTime,
       };
     } catch (err) {
-      if (err instanceof AntiBotBlockedError) {
-        throw err;
-      }
       if (isTimeoutError(err)) {
         throw new NavigationTimeoutError(
           `HTTP request timed out after ${timeoutMs}ms for URL: ${targetUrl}`,

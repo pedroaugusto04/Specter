@@ -1,5 +1,5 @@
 import { DomainError } from '../errors/domainErrors.js';
-import { ExecutionLease } from '../queues/executionLease.js';
+import type { ExecutionLease } from '../queues/executionLease.js';
 import { compilationBackoff } from '../queues/compilationBackoff.js';
 import { Worker, UnrecoverableError, type Job } from 'bullmq';
 import { env } from '../config/env.js';
@@ -16,22 +16,19 @@ import { logger } from '../utils/logger.js';
 import type { CompilationReason } from '../queues/scheduler.interface.js';
 
 export interface WorkerManagerDeps {
-  reconcileRuns?: () => Promise<void>;
+  executionLease: ExecutionLease;
+  reconcileRuns: () => Promise<void>;
   compilationService: CompilationService;
   scrapeExecutionService: ScrapeExecutionService;
   retentionService: RetentionService;
 }
 
 export class WorkerManager {
-  private readonly executionLease = new ExecutionLease();
   private compilationWorker: Worker | null = null;
   private scrapeWorker: Worker | null = null;
   private maintenanceWorker: Worker | null = null;
-  private readonly deps: WorkerManagerDeps;
 
-  constructor(deps: WorkerManagerDeps) {
-    this.deps = deps;
-  }
+  constructor(private readonly deps: WorkerManagerDeps) {}
 
   start(): void {
     const connection = getRedisConnectionOptions();
@@ -71,7 +68,7 @@ export class WorkerManager {
       {
         concurrency: env.SCRAPER_CONCURRENCY,
         connection,
-        lockDuration: env.COMPILER_TIMEOUT_MS,
+        lockDuration: env.EXTRACTION_TIMEOUT_MS + env.PLAYWRIGHT_TIMEOUT_MS,
       }
     );
 
@@ -79,11 +76,11 @@ export class WorkerManager {
       MAINTENANCE_QUEUE_NAME,
       async (job: Job) => {
         if (job.name === 'reconcile-runs') {
-          await this.deps.reconcileRuns?.();
+          await this.deps.reconcileRuns();
         } else if (job.name === 'prune-unchanged-runs') {
           await this.deps.retentionService.pruneUnchangedSnapshots();
         } else {
-          await this.deps.reconcileRuns?.();
+          await this.deps.reconcileRuns();
           await this.deps.retentionService.pruneUnchangedSnapshots();
         }
       },
@@ -93,37 +90,9 @@ export class WorkerManager {
       }
     );
 
-    this.compilationWorker.on('failed', (job, err) => {
-      logger.error('Compilation worker job failed', {
-        jobId: job?.data?.jobId,
-        errorMessage: err.message,
-      });
-    });
-
-    this.compilationWorker.on('error', (err) => {
-      logger.error('Compilation worker Redis connection error', {
-        errorMessage: err.message,
-      });
-    });
-
-    this.scrapeWorker.on('failed', (job, err) => {
-      logger.error('Scrape worker job failed', {
-        jobId: job?.data?.jobId,
-        errorMessage: err.message,
-      });
-    });
-
-    this.scrapeWorker.on('error', (err) => {
-      logger.error('Scrape worker Redis connection error', {
-        errorMessage: err.message,
-      });
-    });
-
-    this.maintenanceWorker.on('error', (err) => {
-      logger.error('Maintenance worker Redis connection error', {
-        errorMessage: err.message,
-      });
-    });
+    this.attachWorkerListeners(this.compilationWorker, 'Compilation');
+    this.attachWorkerListeners(this.scrapeWorker, 'Scrape');
+    this.attachWorkerListeners(this.maintenanceWorker, 'Maintenance');
 
     logger.info('BullMQ background workers started', {
       compilerConcurrency: env.COMPILER_CONCURRENCY,
@@ -131,16 +100,28 @@ export class WorkerManager {
     });
   }
 
-  private async runMonitor<T>(
-    jobId: string,
-    action: () => Promise<T>,
-    shouldSkip?: () => Promise<boolean>
-  ) {
+  private attachWorkerListeners(worker: Worker, label: string): void {
+    worker.on('failed', (job, err) => {
+      logger.error(`${label} worker job failed`, {
+        jobId: (job?.data as { jobId?: string } | undefined)?.jobId,
+        errorMessage: err.message,
+      });
+    });
+
+    worker.on('error', (err) => {
+      logger.error(`${label} worker Redis connection error`, {
+        errorMessage: err.message,
+      });
+    });
+  }
+
+  private async runMonitor<T>(jobId: string, action: () => Promise<T>): Promise<T> {
     try {
-      return await this.executionLease.run(jobId, action, shouldSkip);
+      return await this.deps.executionLease.run(jobId, action);
     } catch (error) {
-      if (error instanceof DomainError && !error.isRetryable)
+      if (error instanceof DomainError && !error.isRetryable) {
         throw new UnrecoverableError(error.message);
+      }
       throw error;
     }
   }
@@ -151,7 +132,6 @@ export class WorkerManager {
       this.scrapeWorker?.close(),
       this.maintenanceWorker?.close(),
     ]);
-    await this.executionLease.close();
     logger.info('BullMQ background workers stopped');
   }
 }

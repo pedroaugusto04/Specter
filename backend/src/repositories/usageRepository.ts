@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { getDb, type Database } from '../db/index.js';
+import type { Database } from '../db/index.js';
 import { userMonthlyUsage } from '../db/schema.js';
 
 export interface MonthlyUsage {
@@ -16,11 +16,7 @@ function getCurrentYearMonth(date = new Date()): string {
 }
 
 export class DrizzleUsageRepository implements IUsageRepository {
-  private readonly db: Database;
-
-  constructor(db?: Database) {
-    this.db = db ?? getDb();
-  }
+  constructor(private readonly db: Database) {}
 
   async getUsage(userId: string, period?: string): Promise<MonthlyUsage> {
     const currentPeriod = period ?? getCurrentYearMonth();

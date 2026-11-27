@@ -1,20 +1,21 @@
+import { Redis } from 'ioredis';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { reconcileRuns } from './queues/runReconciler.js';
 import { ScheduleCoordinator } from './queues/scheduleCoordinator.js';
+import { ExecutionLease } from './queues/executionLease.js';
 import { JobPresenter } from './presentation/jobPresenter.js';
 import { BrowserCapacity } from './resources/browserCapacity.js';
 import { RedisLeaseStore } from './resources/redisLeaseStore.js';
-import { Redis } from 'ioredis';
 import { AccessCooldownService } from './acquisition/cooldown.js';
 import { RedisAccessCooldownStore } from './acquisition/redisCooldownStore.js';
 import { createConfigurationModel } from './extraction/configurationModel.js';
 import { composeExtraction } from './extraction/composition.js';
 import { ConfigurationPipeline } from './extraction/configuration.js';
-
 import { DrizzleOutboxRepository } from './repositories/outboxRepository.js';
 import { OutboxWorker } from './notifications/outboxWorker.js';
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
-import { closeDb } from './db/index.js';
+import { closeDb, getDb } from './db/index.js';
 import { createCompilerProvider } from './providers/compilers/compiler.factory.js';
 import { createNotificationProvider } from './providers/notifications/notification.factory.js';
 import { NotificationDispatcher } from './providers/notifications/notificationDispatcher.js';
@@ -43,33 +44,41 @@ import { RealtimeService } from './services/realtimeService.js';
 import { RetentionService } from './services/retentionService.js';
 import { ScrapeExecutionService } from './services/scrapeExecutionService.js';
 import { SessionService } from './services/sessionService.js';
+import { SuccessfulRunService } from './services/successfulRunService.js';
+import { getErrorMessage } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import { JobStatus } from './types/enums.js';
 import { WorkerManager } from './workers/workers.js';
 
 async function bootstrap(): Promise<void> {
+  const db = getDb();
   const accessRedis = new Redis(env.REDIS_URL);
-  const jobRepository = new DrizzleJobRepository();
-  const userRepository = new DrizzleUserRepository();
-  const usageRepository = new DrizzleUsageRepository();
+  const leaseStore = new RedisLeaseStore(accessRedis);
+
+  const jobRepository = new DrizzleJobRepository(db);
+  const userRepository = new DrizzleUserRepository(db);
+  const usageRepository = new DrizzleUsageRepository(db);
+  const integrationRepository = new DrizzleIntegrationRepository(db);
+  const sessionRepository = new DrizzleSessionRepository(db);
+  const outboxRepository = new DrizzleOutboxRepository(db);
+
   const planLimitResolver = new EnvPlanLimitResolver();
   const quotaService = new QuotaService({
     jobRepository,
     usageRepository,
     planLimitResolver,
   });
-  const integrationRepository = new DrizzleIntegrationRepository();
-  const sessionRepository = new DrizzleSessionRepository();
+
   const schedules = new ScheduleCoordinator(jobRepository, userRepository);
-  const jobScheduler = new BullMqJobScheduler(undefined, (jobId) =>
-    schedules.timezoneForJob(jobId)
-  );
+  const jobScheduler = new BullMqJobScheduler({
+    resolveTimezone: (jobId) => schedules.timezoneForJob(jobId),
+  });
   const accessCooldown = new AccessCooldownService(
     new RedisAccessCooldownStore(accessRedis),
     sessionRepository
   );
   const compilerProvider = createCompilerProvider();
-  const browserCapacity = new BrowserCapacity(new RedisLeaseStore(accessRedis));
+  const browserCapacity = new BrowserCapacity(leaseStore);
   const extraction = composeExtraction(createHttpCandidates(), browserCapacity);
   const configurationPipeline = new ConfigurationPipeline(
     createConfigurationModel(compilerProvider),
@@ -102,13 +111,18 @@ async function bootstrap(): Promise<void> {
     userRepository,
   });
 
+  const successfulRunService = new SuccessfulRunService({
+    jobRepository,
+    storageProvider,
+    alertRouter: notificationDispatcher,
+  });
+
   const compilationService = new CompilationService({
     userRepository,
     jobRepository,
     configurationPipeline,
-    alertRouter: notificationDispatcher,
+    successfulRunService,
     jobScheduler,
-    storageProvider,
     sessionRepository,
     realtimeService,
     quotaService,
@@ -120,9 +134,8 @@ async function bootstrap(): Promise<void> {
     accessCooldown,
     jobRepository,
     planExecutor: extraction.planExecutor,
-    alertRouter: notificationDispatcher,
+    successfulRunService,
     jobScheduler,
-    storageProvider,
     sessionRepository,
     realtimeService,
     quotaService,
@@ -151,13 +164,11 @@ async function bootstrap(): Promise<void> {
 
   // Run migrations automatically on startup
   try {
-    const { migrate } = await import('drizzle-orm/postgres-js/migrator');
-    const { getDb } = await import('./db/index.js');
-    await migrate(getDb(), { migrationsFolder: 'drizzle/migrations' });
+    await migrate(db, { migrationsFolder: 'drizzle/migrations' });
     logger.info('Database migrations applied successfully.');
   } catch (err) {
     logger.error('Database migration failed', {
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorMessage: getErrorMessage(err),
     });
     throw err;
   }
@@ -177,20 +188,22 @@ async function bootstrap(): Promise<void> {
     logger.warn(
       'Startup job reconciliation skipped or failed (database/redis may still be starting)',
       {
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage: getErrorMessage(err),
       }
     );
   }
 
   const workerManager = new WorkerManager({
+    executionLease: new ExecutionLease(leaseStore),
     reconcileRuns: () => reconcileRuns(jobRepository, jobScheduler, realtimeService),
     compilationService,
     scrapeExecutionService,
     retentionService,
   });
   workerManager.start();
+
   const outboxWorker = new OutboxWorker(
-    new DrizzleOutboxRepository(),
+    outboxRepository,
     notificationDispatcher,
     env.NOTIFICATION_MAX_ATTEMPTS,
     env.NOTIFICATION_TIMEOUT_MS
@@ -223,7 +236,7 @@ async function bootstrap(): Promise<void> {
 
   process.on('unhandledRejection', (reason) => {
     logger.error('Unhandled Promise Rejection in Node process', {
-      errorMessage: reason instanceof Error ? reason.message : String(reason),
+      errorMessage: getErrorMessage(reason),
       stack: reason instanceof Error ? reason.stack : undefined,
     });
   });
@@ -245,12 +258,12 @@ async function bootstrap(): Promise<void> {
     });
     void logProviderQuotasOnStartup().catch((quotaErr) => {
       logger.warn('Failed to verify unblocker provider quotas on startup', {
-        errorMessage: quotaErr instanceof Error ? quotaErr.message : String(quotaErr),
+        errorMessage: getErrorMessage(quotaErr),
       });
     });
   } catch (error) {
     logger.error('Failed to bind server port', {
-      errorMessage: error instanceof Error ? error.message : String(error),
+      errorMessage: getErrorMessage(error),
     });
     process.exit(1);
   }
@@ -258,7 +271,7 @@ async function bootstrap(): Promise<void> {
 
 bootstrap().catch((error) => {
   logger.error('Fatal startup bootstrap crash', {
-    errorMessage: error instanceof Error ? error.message : String(error),
+    errorMessage: getErrorMessage(error),
   });
   process.exit(1);
 });

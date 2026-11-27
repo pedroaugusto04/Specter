@@ -4,8 +4,8 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { ProfileModal } from '@/components/auth/ProfileModal';
 import { UserAvatarMenu } from '@/components/auth/UserAvatarMenu';
 import { SpecterLogo } from '@/components/brand/SpecterLogo';
-import { PENDING_JOB_STORAGE_KEY } from '@/components/dashboard/CreateJobForm';
 import { CreateJobModal } from '@/components/dashboard/CreateJobModal';
+import { consumePendingJobDraft } from '@/forms/jobForm';
 import { EditJobModal } from '@/components/dashboard/EditJobModal';
 import { IntegrationsModal } from '@/components/dashboard/IntegrationsModal';
 import { JobRunsDrawer } from '@/components/dashboard/JobRunsDrawer';
@@ -24,7 +24,7 @@ import {
 } from '@/hooks/useDashboardQueries';
 import { useRealtimeEvents, type RealtimeEventPayload } from '@/hooks/useRealtimeEvents';
 import { api, type UserDto } from '@/lib/api';
-import { PAGINATION_DEFAULT_PAGE_SIZE, type JobStatus } from '@specter/contracts';
+import { PAGINATION_DEFAULT_PAGE_SIZE, type JobStatusFilter } from '@specter/contracts';
 import { getBrowserTimezone } from '@/lib/utils';
 import { ToastContainer, useToast } from '@/components/ui/Toast';
 import { Plus, Radio } from 'lucide-react';
@@ -34,9 +34,7 @@ import * as React from 'react';
 export default function DashboardPage() {
   const [jobsPage, setJobsPage] = React.useState(1);
   const [jobsPageSize, setJobsPageSize] = React.useState<number>(PAGINATION_DEFAULT_PAGE_SIZE);
-  const [jobsStatus, setJobsStatus] = React.useState<
-    JobStatus | 'recovering' | 'paused' | undefined
-  >();
+  const [jobsStatus, setJobsStatus] = React.useState<JobStatusFilter | undefined>();
   const [jobsSearch, setJobsSearch] = React.useState('');
   const { data: user = null, error: userError, refetch: refetchUser } = useCurrentUserQuery();
   const {
@@ -114,33 +112,17 @@ export default function DashboardPage() {
 
   // Automatically submit pending draft if user just signed in
   React.useEffect(() => {
-    if (user) {
-      const rawPending = sessionStorage.getItem(PENDING_JOB_STORAGE_KEY);
-      if (rawPending) {
-        sessionStorage.removeItem(PENDING_JOB_STORAGE_KEY);
-        try {
-          const draft = JSON.parse(rawPending) as {
-            name?: string;
-            url: string;
-            userPrompt: string;
-            notificationEmail?: string;
-            cronExpression: string;
-          };
-          void (async () => {
-            await api.createJob({
-              name: draft.name,
-              url: draft.url,
-              userPrompt: draft.userPrompt,
-              notificationEmail: draft.notificationEmail || user.email,
-              cronExpression: draft.cronExpression,
-            });
-            await invalidateJobsAndStats();
-          })();
-        } catch {
-          // Ignore malformed pending draft
-        }
+    if (!user) return;
+    const draft = consumePendingJobDraft(user.email);
+    if (!draft) return;
+    void (async () => {
+      try {
+        await api.createJob(draft);
+        await invalidateJobsAndStats();
+      } catch {
+        // Draft creation failure will surface if user retries manually
       }
-    }
+    })();
   }, [user, invalidateJobsAndStats]);
 
   // Automatically open job drawer if redirected via email alert with ?jobId=...
@@ -339,7 +321,7 @@ export default function DashboardPage() {
         user={user}
         onUserUpdated={handleUserAuthenticated}
         onLogout={handleLogout}
-        monitorsCount={jobs.length}
+        monitorsCount={stats?.totalJobs ?? jobs.length}
       />
 
       {/* Edit Modal */}

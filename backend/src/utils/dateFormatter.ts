@@ -4,8 +4,7 @@ export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
  * Validates and normalizes an IANA timezone identifier, falling back to America/Sao_Paulo.
  */
 export function resolveTimezone(tz?: string | null): string {
-  if (!tz || typeof tz !== 'string') return DEFAULT_TIMEZONE;
-  const trimmed = tz.trim();
+  const trimmed = tz?.trim();
   if (!trimmed) return DEFAULT_TIMEZONE;
   try {
     Intl.DateTimeFormat(undefined, { timeZone: trimmed });
@@ -15,52 +14,41 @@ export function resolveTimezone(tz?: string | null): string {
   }
 }
 
+function formatDateTimeWithZone(
+  date: Date | string | undefined | null,
+  timeZone: string | null | undefined,
+  dateStyle: 'medium' | 'long',
+  includeTzSuffix: boolean
+): string {
+  const parsed = date ? (date instanceof Date ? date : new Date(date)) : new Date();
+  if (Number.isNaN(parsed.getTime())) return String(date ?? '—');
+
+  const tz = resolveTimezone(timeZone);
+  const formatted = new Intl.DateTimeFormat('en-US', {
+    dateStyle,
+    timeStyle: 'medium',
+    timeZone: tz,
+  }).format(parsed);
+  return includeTzSuffix ? `${formatted} (${tz})` : formatted;
+}
+
 /**
- * Formats a Date/string for human-readable notification displays (e.g. Telegram alerts and test messages),
- * using the provided timezone with automatic fallback to America/Sao_Paulo.
+ * Formats a Date/string for human-readable notification displays (e.g. Telegram alerts).
  */
 export function formatNotificationDateTime(
   date: Date | string | undefined | null,
   timeZone?: string | null,
   options: { includeTzSuffix?: boolean } = { includeTzSuffix: true }
 ): string {
-  const d = date ? (date instanceof Date ? date : new Date(date)) : new Date();
-  if (Number.isNaN(d.getTime())) return String(date ?? '—');
-
-  const tz = resolveTimezone(timeZone);
-  try {
-    const formatted = new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-      timeZone: tz,
-    }).format(d);
-    return options.includeTzSuffix ? `${formatted} (${tz})` : formatted;
-  } catch {
-    return d.toISOString();
-  }
+  return formatDateTimeWithZone(date, timeZone, 'medium', options.includeTzSuffix ?? true);
 }
 
 /**
- * Formats a Date/string for transactional email alerts,
- * using the provided timezone with automatic fallback to America/Sao_Paulo.
+ * Formats a Date/string for transactional email alerts.
  */
 export function formatEmailDateTime(
   date: Date | string | undefined | null,
   timeZone?: string | null
 ): string {
-  const d = date ? (date instanceof Date ? date : new Date(date)) : new Date();
-  if (Number.isNaN(d.getTime())) return String(date ?? '—');
-
-  const tz = resolveTimezone(timeZone);
-  try {
-    return (
-      new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'medium',
-        timeZone: tz,
-      }).format(d) + ` (${tz})`
-    );
-  } catch {
-    return d.toISOString();
-  }
+  return formatDateTimeWithZone(date, timeZone, 'long', true);
 }

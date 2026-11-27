@@ -1,15 +1,14 @@
-import { ValidationError } from '../errors/domainErrors.js';
+import type { PaginatedResponse, SessionDto } from '@specter/contracts';
+import { EmptySessionCookiesError, SessionNotFoundError } from '../errors/domainErrors.js';
+import { SessionMapper } from '../mappers/sessionMapper.js';
+import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type {
   PlaywrightStorageCookie,
   PlaywrightStorageOrigin,
   PlaywrightStorageState,
 } from '../types/session.js';
-import { SessionMapper } from '../mappers/sessionMapper.js';
-import type { SessionDto } from '@specter/contracts';
-import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import { normalizeDomain } from '../utils/urlNormalizer.js';
-import type { PaginatedResponse } from '@specter/contracts';
 import { resolvePageResult } from '../utils/pagination.js';
+import { normalizeDomain } from '../utils/urlNormalizer.js';
 
 export interface SyncSessionInput {
   domain: string;
@@ -50,7 +49,7 @@ export class SessionService {
       (safePage) => this.sessionRepository.listPageByUserId(userId, safePage, pageSize)
     );
     return {
-      items: result.items.map((entity) => SessionMapper.entityToDto(entity)),
+      items: result.items.map(SessionMapper.entityToDto),
       pagination: result.pagination,
     };
   }
@@ -64,21 +63,19 @@ export class SessionService {
   async syncSession(userId: string, input: SyncSessionInput): Promise<SessionDto> {
     const domain = normalizeDomain(input.domain);
 
-    if (!input.cookies?.length) {
-      throw new ValidationError('At least one cookie is required to sync a session.', [
-        { field: 'cookies', message: 'Cookies array cannot be empty.' },
-      ]);
+    if (input.cookies.length === 0) {
+      throw new EmptySessionCookiesError();
     }
 
-    const sanitizedCookies: PlaywrightStorageCookie[] = input.cookies.map((c) => ({
-      name: (c.name || '').trim(),
-      value: c.value || '',
-      domain: (c.domain || domain).trim(),
-      path: c.path || '/',
-      expires: typeof c.expires === 'number' && c.expires > 0 ? c.expires : -1,
-      httpOnly: Boolean(c.httpOnly),
-      secure: Boolean(c.secure),
-      sameSite: this.normalizeSameSite(c.sameSite),
+    const sanitizedCookies: PlaywrightStorageCookie[] = input.cookies.map((cookie) => ({
+      name: cookie.name.trim(),
+      value: cookie.value,
+      domain: (cookie.domain || domain).trim(),
+      path: cookie.path || '/',
+      expires: typeof cookie.expires === 'number' && cookie.expires > 0 ? cookie.expires : -1,
+      httpOnly: Boolean(cookie.httpOnly),
+      secure: Boolean(cookie.secure),
+      sameSite: this.normalizeSameSite(cookie.sameSite),
     }));
 
     const storageState: PlaywrightStorageState = {
@@ -95,7 +92,10 @@ export class SessionService {
     return SessionMapper.entityToDto(entity);
   }
 
-  async deleteSession(userId: string, id: string): Promise<boolean> {
-    return this.sessionRepository.delete(userId, id);
+  async deleteSession(userId: string, id: string): Promise<void> {
+    const deleted = await this.sessionRepository.delete(userId, id);
+    if (!deleted) {
+      throw new SessionNotFoundError();
+    }
   }
 }

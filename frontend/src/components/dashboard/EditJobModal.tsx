@@ -1,6 +1,6 @@
 'use client';
 
-import { formToUpdateJob, jobToForm } from '@/forms/jobForm';
+import { formToUpdateJob, isEditJobFormDirty, jobToForm } from '@/forms/jobForm';
 import { useJobForm } from '@/hooks/useJobForm';
 import { useJobFormFeedback } from '@/hooks/useJobFormFeedback';
 import { JobScheduleFields } from './JobScheduleFields';
@@ -13,9 +13,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input, Textarea } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useUpdateJobMutation } from '@/hooks/useDashboardQueries';
-import { ApiError, type ScrapingJobDto, type UserDto } from '@/lib/api';
-import { TriggerMatchMode } from '@specter/contracts';
-import { type JobFormField } from '@/lib/validation';
+import type { ScrapingJobDto, UserDto } from '@/lib/api';
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react';
 import * as React from 'react';
 
@@ -53,15 +51,12 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     webhookUrl,
     webhookSecret,
     captureScreenshotOnChange,
-    cronPreset,
-    customCron,
-    useCustomCron,
     triggerRules,
     triggerMatchMode,
   } = values;
   const updateJobMutation = useUpdateJobMutation();
   const [clearWebhookSecret, setClearWebhookSecret] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  const loading = updateJobMutation.isPending;
 
   const {
     fieldErrors,
@@ -69,8 +64,8 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     globalError,
     setGlobalError,
     clearFieldError,
-    focusFirstInvalidField,
     validateFields,
+    applyApiError,
   } = useJobFormFeedback(values, user?.email, 'edit-');
 
   React.useEffect(() => {
@@ -82,46 +77,19 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     }
   }, [job, isOpen]);
 
-  const effectiveCron = useCustomCron ? customCron : cronPreset;
-
   const willRecompile = Boolean(
     job && (url.trim() !== job.url || userPrompt.trim() !== job.userPrompt)
   );
 
-  const rulesChanged = React.useMemo(() => {
-    const origRules = job?.extractionPlan?.intent.triggerRules || [];
-    const origMode = job?.extractionPlan?.intent.triggerMatchMode ?? TriggerMatchMode.All;
-    if (triggerMatchMode !== origMode) return true;
-    if (triggerRules.length !== origRules.length) return true;
-    return JSON.stringify(triggerRules) !== JSON.stringify(origRules);
-  }, [job, triggerRules, triggerMatchMode]);
-
-  const isDirty = Boolean(
-    job &&
-    (name.trim() !== job.name ||
-      url.trim() !== job.url ||
-      userPrompt.trim() !== job.userPrompt ||
-      (sendEmailAlerts ? notificationEmail.trim() : '') !== (job.notificationEmail || '') ||
-      sendEmailAlerts !==
-        Boolean(job.notificationEmail && job.notificationEmail.trim().length > 0) ||
-      (showCustomWebhook ? webhookUrl.trim() : '') !== (job.webhookUrl || '') ||
-      showCustomWebhook !== Boolean(job.webhookUrl && job.webhookUrl.trim().length > 0) ||
-      Boolean(webhookSecret.trim()) ||
-      clearWebhookSecret ||
-      captureScreenshotOnChange !== Boolean(job.captureScreenshotOnChange) ||
-      effectiveCron.trim() !== job.cronExpression ||
-      rulesChanged)
-  );
+  const isDirty = isEditJobFormDirty(values, job, clearWebhookSecret);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!job) return;
 
     setGlobalError(null);
-
     if (!validateFields()) return;
 
-    setLoading(true);
     try {
       await updateJobMutation.mutateAsync({
         id: job.id,
@@ -131,20 +99,7 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
       onUpdated();
       onClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (Object.keys(err.fieldErrors).length > 0) {
-          setFieldErrors(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          focusFirstInvalidField(err.fieldErrors as Partial<Record<JobFormField, string>>);
-          return;
-        }
-        setGlobalError(err.message);
-      } else if (err instanceof Error) {
-        setGlobalError(err.message);
-      } else {
-        setGlobalError('An unexpected error occurred while updating the monitor.');
-      }
-    } finally {
-      setLoading(false);
+      applyApiError(err, 'An unexpected error occurred while updating the monitor.');
     }
   };
 
@@ -166,7 +121,6 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
           htmlFor="edit-monitor-name"
           required
           error={fieldErrors.name}
-          hint=""
         >
           <Input
             id="edit-monitor-name"

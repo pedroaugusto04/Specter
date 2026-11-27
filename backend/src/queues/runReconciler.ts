@@ -1,29 +1,30 @@
+import { RunPhase, USER_FAILURES } from '@specter/contracts';
 import type { BullMqJobScheduler } from './queues.js';
 import type { IJobRepository } from '../repositories/jobRepository.js';
 import type { RealtimeService } from '../services/realtimeService.js';
 import { CompilationReason } from './scheduler.interface.js';
-import { JobStatus, RunStatus } from '../types/enums.js';
+import { JobStatus } from '../types/enums.js';
 import { env } from '../config/env.js';
-import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
-import { CompilerValidationError } from '../errors/domainErrors.js';
-import { RunPhase } from '@specter/contracts';
+import { buildFailedRunUpdate } from '../mappers/runBuilder.js';
 
 export async function reconcileRuns(
   repo: IJobRepository,
   scheduler: BullMqJobScheduler,
-  realtime?: RealtimeService
+  realtime: RealtimeService
 ): Promise<void> {
   for (const run of await repo.findRunningRuns()) {
     const job = await repo.findById(run.jobId);
     if (!job) continue;
+
     if (
       job.updatedAt.getTime() !== run.monitorUpdatedAt?.getTime() ||
-      ![JobStatus.Active, JobStatus.Recovering].some((status) => status === job.status)
+      (job.status !== JobStatus.Active && job.status !== JobStatus.Recovering)
     ) {
       await repo.cancelRuns(job.id);
-      await realtime?.notifyJobRunCompleted(job.userId, job.id, run.id, run.hasChanges);
+      await realtime.notifyJobRunCompleted(job.userId, job.id, run.id, run.hasChanges);
       continue;
     }
+
     const recovering = run.phase === RunPhase.Recovering;
     const queue = recovering ? scheduler.compilationQueue : scheduler.scrapeQueue;
     const taskId = recovering
@@ -36,15 +37,16 @@ export async function reconcileRuns(
     const inFlight = (await Promise.all(knownTasks.map((task) => task?.getState()))).some(
       (state) => state !== undefined && inFlightStates.has(state)
     );
+
     if (
       Date.now() - run.startedAt!.getTime() >= env.RUN_MAX_DURATION_MS ||
       (!inFlight &&
         recovering &&
         run.metadata!.compilationAttempts >= env.COMPILATION_QUEUE_MAX_ATTEMPTS)
     ) {
-      const message = formatUserErrorMessage(new CompilerValidationError('Execution exhausted.'));
+      const message = USER_FAILURES.requestedDataUnavailable.description;
       const completed = await repo.commitRun(
-        { ...run, status: RunStatus.Failed, errorMessage: message },
+        buildFailedRunUpdate(run, message),
         [],
         {
           status: recovering ? JobStatus.Failed : JobStatus.Active,
@@ -53,24 +55,29 @@ export async function reconcileRuns(
         job.updatedAt
       );
       if (recovering) await scheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);
-      await realtime?.notifyJobRunCompleted(job.userId, job.id, completed.id, completed.hasChanges);
-      await realtime?.notifyJobUpdated(job.userId, job.id);
+      await realtime.notifyJobRunCompleted(job.userId, job.id, completed.id, completed.hasChanges);
+      await realtime.notifyJobUpdated(job.userId, job.id);
       continue;
     }
+
     if (inFlight) continue;
+
     const old = knownTasks[taskIds.indexOf(taskId)];
     if (old) {
       const state = await old.getState();
       if (state !== 'failed' && state !== 'completed') continue;
       await old.remove();
     }
-    if (recovering) await scheduler.enqueueCompilation(job.id, CompilationReason.Recovery, run.id);
-    else
+
+    if (recovering) {
+      await scheduler.enqueueCompilation(job.id, CompilationReason.Recovery, run.id);
+    } else {
       await scheduler.enqueueRunAttempt(
         job.id,
         run.id,
         run.metadata!.accessAttempts,
         run.nextAttemptAt ?? new Date()
       );
+    }
   }
 }

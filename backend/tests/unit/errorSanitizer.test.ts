@@ -4,6 +4,7 @@ import {
   CompilerApiRequestError,
   UpstreamHttpError,
   DecryptionError,
+  ResponseTooLargeError,
   ResourceLeaseLostError,
   UnsupportedCapabilityError,
   CompilerTimeoutError,
@@ -85,6 +86,7 @@ describe('public failure details', () => {
     [new UpstreamHttpError(404), USER_FAILURES.websiteUnavailable],
     [new DecryptionError(), USER_FAILURES.sessionUnavailable],
     [new ResourceLeaseLostError(), USER_FAILURES.executionInterrupted],
+    [new ResponseTooLargeError(), USER_FAILURES.responseTooLarge],
     [new UnsupportedCapabilityError('internal capability'), USER_FAILURES.unsupported],
     [new ConfigurationFailure('private model response', []), USER_FAILURES.configurationRejected],
   ])('maps %s to approved copy and actionable details', (error, expected) => {

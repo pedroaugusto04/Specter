@@ -1,48 +1,45 @@
+import { randomUUID } from 'node:crypto';
+import { USER_FAILURES, formatStructuredUserFailure } from '@specter/contracts';
+import { classifyAccessFailure } from '../acquisition/failure.js';
 import { env } from '../config/env.js';
-import type { JobRunEntity } from '../types/domain.js';
-import { SuccessfulRunService } from './successfulRunService.js';
-import { snapshotToScrapeResult } from '../extraction/scrapeResultMapper.js';
-import { ConfigurationFailure } from '../extraction/configurationFailure.js';
-import { sameIntent } from '../extraction/configurationPolicy.js';
-import type { IAlertRouter } from '../notifications/contracts.js';
-import type { IConfigurationPipeline } from '../extraction/configuration.js';
-import { assertExecutionLease } from '../queues/executionLease.js';
-import { randomUUID } from 'crypto';
 import {
   AntiBotBlockedError,
   BrowserCapacityError,
   CompilerApiRequestError,
   CompilerTimeoutError,
-  DomainError,
-  NavigationTimeoutError,
-  NotFoundError,
   CompilerValidationError,
+  DomainError,
+  InvalidRecoveryStateError,
+  JobNotFoundError,
+  NavigationTimeoutError,
   QuotaExceededError,
   SelectorMismatchError,
   UnauthorizedError,
 } from '../errors/domainErrors.js';
-import { classifyAccessFailure } from '../acquisition/failure.js';
-import type { CompilationDiagnosticService } from './compilationDiagnosticService.js';
-import type { IStorageProvider } from '../providers/storage/index.js';
-import type { IJobScheduler } from '../queues/scheduler.interface.js';
-import { CompilationReason } from '../queues/scheduler.interface.js';
-import type { IJobRepository } from '../repositories/jobRepository.js';
-import type { ISessionRepository } from '../repositories/sessionRepository.js';
-import type { ScrapingJobEntity } from '../types/domain.js';
+import type { IConfigurationPipeline } from '../extraction/configuration.js';
+import { ConfigurationFailure } from '../extraction/configurationFailure.js';
+import { sameIntent } from '../extraction/configurationPolicy.js';
+import { toPlanExecutionResult } from '../extraction/scrapeResultMapper.js';
 import {
-  ChangeStatus,
-  ExtractionQuality,
-  JobStatus,
-  RunStatus,
-  isAcceptedExtractionQuality,
-} from '../types/enums.js';
+  buildFailedCompilationRun,
+  buildFailedRunUpdate,
+  buildRecoveryCompilationAttemptRun,
+} from '../mappers/runBuilder.js';
+import { assertExecutionLease } from '../queues/executionLease.js';
+import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
+import type { IJobRepository, UpdateJobPatch } from '../repositories/jobRepository.js';
+import type { ISessionRepository } from '../repositories/sessionRepository.js';
+import type { IUserRepository } from '../repositories/userRepository.js';
+import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
+import { JobStatus, RunStatus, isAcceptedExtractionQuality } from '../types/enums.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
 import { logger } from '../utils/logger.js';
-import { resolveSessionStorageState } from '../utils/sessionHelper.js';
-import type { RealtimeService } from './realtimeService.js';
-import type { IUserRepository } from '../repositories/userRepository.js';
-import type { QuotaService } from './quotaService.js';
 import type { ICompilationControl } from './compilationControl.interface.js';
+import type { CompilationDiagnosticService } from './compilationDiagnosticService.js';
+import { resolveJobExecutionContext } from './executionContext.js';
+import type { QuotaService } from './quotaService.js';
+import type { RealtimeService } from './realtimeService.js';
+import type { SuccessfulRunService } from './successfulRunService.js';
 
 function compilationFailureStatus(input: {
   willRetry: boolean;
@@ -50,8 +47,9 @@ function compilationFailureStatus(input: {
   error: unknown;
 }): JobStatus {
   const { willRetry, hasExistingPlan, error } = input;
-  if (willRetry && error instanceof CompilerApiRequestError && error.statusCode === 429)
+  if (willRetry && error instanceof CompilerApiRequestError && error.statusCode === 429) {
     return JobStatus.PendingCompilation;
+  }
   return hasExistingPlan ? JobStatus.Active : JobStatus.Failed;
 }
 
@@ -67,8 +65,7 @@ function isActionableCompilationError(error: unknown): boolean {
   ) {
     return false;
   }
-  const accessFailure = classifyAccessFailure(error);
-  if (accessFailure !== undefined) return false;
+  if (classifyAccessFailure(error) !== undefined) return false;
   return (
     error instanceof ConfigurationFailure ||
     error instanceof CompilerValidationError ||
@@ -77,17 +74,31 @@ function isActionableCompilationError(error: unknown): boolean {
   );
 }
 
+function shouldSkipCompilation(job: ScrapingJobEntity, reason?: CompilationReason): boolean {
+  return (
+    job.status === JobStatus.Paused ||
+    (reason !== undefined && job.status === JobStatus.Active && Boolean(job.extractionPlan))
+  );
+}
+
+function isMonitorStale(latest: ScrapingJobEntity | null, expected: ScrapingJobEntity): boolean {
+  return (
+    !latest ||
+    latest.status === JobStatus.Paused ||
+    latest.updatedAt.getTime() !== expected.updatedAt.getTime()
+  );
+}
+
 export interface CompilationServiceDeps {
   jobRepository: IJobRepository;
   userRepository: Pick<IUserRepository, 'findById'>;
   configurationPipeline: IConfigurationPipeline;
-  alertRouter: IAlertRouter;
+  successfulRunService: SuccessfulRunService;
   jobScheduler: IJobScheduler;
-  storageProvider: IStorageProvider;
   sessionRepository: ISessionRepository;
   realtimeService: RealtimeService;
   quotaService: QuotaService;
-  diagnosticService?: CompilationDiagnosticService;
+  diagnosticService: CompilationDiagnosticService;
 }
 
 export class CompilationService implements ICompilationControl {
@@ -114,7 +125,7 @@ export class CompilationService implements ICompilationControl {
     const existingController = this.activeCompilations.get(jobId);
     if (existingController && !existingController.signal.aborted) {
       const current = await this.deps.jobRepository.findById(jobId);
-      if (!current) throw new NotFoundError(`Scraping job not found: ${jobId}`);
+      if (!current) throw new JobNotFoundError(jobId);
       return current;
     }
 
@@ -138,15 +149,14 @@ export class CompilationService implements ICompilationControl {
   ): Promise<ScrapingJobEntity> {
     const startTime = Date.now();
     const job = await this.deps.jobRepository.findById(jobId);
+    if (!job) throw new JobNotFoundError(jobId);
 
-    if (!job) {
-      throw new NotFoundError(`Scraping job not found: ${jobId}`);
+    if (reason === CompilationReason.Recovery && !runId) {
+      throw new InvalidRecoveryStateError('Recovery compilation must be attached to an execution run.');
     }
-
-    if (reason === CompilationReason.Recovery && !runId)
-      throw new Error('Recovery compilation must be attached to an execution run.');
-    if (runId && reason !== CompilationReason.Recovery)
-      throw new Error('Execution run IDs are only valid for recovery compilations.');
+    if (runId && reason !== CompilationReason.Recovery) {
+      throw new InvalidRecoveryStateError('Execution run IDs are only valid for recovery compilations.');
+    }
 
     let run = runId ? await this.deps.jobRepository.findRun(runId) : null;
     if (runId && (!run || run.jobId !== job.id || run.status !== RunStatus.Running)) return job;
@@ -154,6 +164,7 @@ export class CompilationService implements ICompilationControl {
       await this.deps.jobRepository.cancelRuns(job.id);
       return job;
     }
+
     if (run) {
       const metadata = run.metadata!;
       if (
@@ -163,56 +174,37 @@ export class CompilationService implements ICompilationControl {
         await this.failRecovery(job, run);
         return job;
       }
-      metadata.compilationAttempts++;
-      willRetry = willRetry && metadata.compilationAttempts < env.COMPILATION_QUEUE_MAX_ATTEMPTS;
-      run = await this.deps.jobRepository.commitRun(
-        { ...run, metadata },
-        [],
-        undefined,
-        job.updatedAt
-      );
+      const attempt = buildRecoveryCompilationAttemptRun(run);
+      willRetry =
+        willRetry && attempt.metadata.compilationAttempts < env.COMPILATION_QUEUE_MAX_ATTEMPTS;
+      run = await this.deps.jobRepository.commitRun(attempt.input, [], undefined, job.updatedAt);
     }
 
-    if (
-      job.status === JobStatus.Paused ||
-      (reason !== undefined && job.status === JobStatus.Active && job.extractionPlan)
-    )
-      return job;
+    if (shouldSkipCompilation(job, reason)) return job;
 
-    if (job.userId) {
-      try {
-        await this.deps.quotaService.assertCanCompile(job.userId);
-      } catch (quotaErr) {
-        if (abortController.signal.aborted) {
-          return (await this.deps.jobRepository.findById(job.id)) ?? job;
-        }
-        if (quotaErr instanceof QuotaExceededError) {
-          logger.warn('Skipping compilation: monthly compilation quota reached', {
-            jobId: job.id,
-            userId: job.userId,
-            reason,
-          });
-          if (reason === CompilationReason.Recovery) {
-            if (!run)
-              throw new Error('Recovery compilation has no active execution run.', {
-                cause: quotaErr,
-              });
-            await this.failRecovery(job, run);
-            return job;
-          }
-          throw quotaErr;
-        }
-        throw quotaErr;
+    try {
+      await this.deps.quotaService.assertCanCompile(job.userId);
+    } catch (quotaErr) {
+      if (abortController.signal.aborted) {
+        return (await this.deps.jobRepository.findById(job.id)) ?? job;
       }
+      if (quotaErr instanceof QuotaExceededError) {
+        logger.warn('Skipping compilation: monthly compilation quota reached', {
+          jobId: job.id,
+          userId: job.userId,
+          reason,
+        });
+        if (run) {
+          await this.failRecovery(job, run);
+          return job;
+        }
+      }
+      throw quotaErr;
     }
 
     const currentJob = await this.deps.jobRepository.findById(job.id);
-    if (!currentJob) throw new NotFoundError(`Scraping job not found: ${job.id}`);
-    if (
-      abortController.signal.aborted ||
-      currentJob.status === JobStatus.Paused ||
-      (reason !== undefined && currentJob.status === JobStatus.Active && currentJob.extractionPlan)
-    ) {
+    if (!currentJob) throw new JobNotFoundError(job.id);
+    if (abortController.signal.aborted || shouldSkipCompilation(currentJob, reason)) {
       return currentJob;
     }
 
@@ -224,16 +216,11 @@ export class CompilationService implements ICompilationControl {
         provider: 'configuration-pipeline',
       });
 
-      const owner = await this.deps.userRepository.findById(job.userId);
-      const pageLanguage = owner?.pageLanguage ?? owner?.browserPageLanguage ?? undefined;
-      const storageState = await resolveSessionStorageState(
+      const context = await resolveJobExecutionContext(
+        this.deps.userRepository,
         this.deps.sessionRepository,
-        job.userId,
-        job.url,
-        {
-          jobId: job.id,
-          logAction: 'Using authenticated web session for AI compilation',
-        }
+        job,
+        'Using authenticated web session for AI compilation'
       );
       abortController.signal.throwIfAborted();
 
@@ -251,65 +238,61 @@ export class CompilationService implements ICompilationControl {
                   failureCode: failure.failureCode,
                   failureReason: failure.failureReason,
                   quality: failure.quality,
-                  issues: failure.issues?.slice(0, 8) ?? [],
+                  issues: failure.issues.slice(0, 8),
                   evidence: failure.evidence?.slice(0, 8),
                 },
                 previousStrategy: job.extractionPlan?.strategy,
               }
             : undefined,
-        storageState,
-        pageLanguage,
+        storageState: context.storageState,
+        pageLanguage: context.pageLanguage,
         captureScreenshot: job.captureScreenshotOnChange,
         signal: abortController.signal,
       });
       abortController.signal.throwIfAborted();
-      if (!isAcceptedExtractionQuality(configured.execution.report.quality))
+
+      if (!isAcceptedExtractionQuality(configured.execution.report.quality)) {
         throw new CompilerValidationError('Recovery output did not pass extraction validation.');
+      }
+
       const compiledSchema = configured.plan;
       if (
         isRecovery &&
         job.extractionPlan &&
         !sameIntent(job.extractionPlan.intent, compiledSchema.intent)
-      )
+      ) {
         throw new CompilerValidationError(
           'Recovery cannot change extraction intent. Review the monitor instructions.'
         );
+      }
+
       logger.info('Extraction semantic review completed', {
         jobId: job.id,
         status: configured.semanticReview.status,
         score: configured.semanticReview.score,
       });
-      const execution = {
-        data: configured.execution.data,
-        report: configured.execution.report,
-        scrape: snapshotToScrapeResult(
-          configured.execution.snapshot,
-          configured.execution.durationMs
-        ),
-      };
+
+      const execution = toPlanExecutionResult(configured.execution);
       httpStatus = execution.scrape.httpStatus;
+
       await assertExecutionLease();
       const latest = await this.deps.jobRepository.findById(job.id);
-      if (
-        !latest ||
-        latest.status === JobStatus.Paused ||
-        latest.updatedAt.getTime() !== job.updatedAt.getTime()
-      )
-        return latest ?? job;
+      if (isMonitorStale(latest, job)) return latest ?? job;
 
       const contractRevision = job.extractionPlan
         ? (job.contractRevision ?? randomUUID())
         : randomUUID();
       const planRevision = randomUUID();
-      const prepared = await new SuccessfulRunService(this.deps).prepare({
+      const prepared = await this.deps.successfulRunService.prepare({
         job,
         plan: compiledSchema,
         execution,
         contractRevision,
         startedAt: run?.startedAt?.getTime() ?? startTime,
         logContext: 'compilation',
+        timezone: context.timezone,
       });
-      const durationMs = prepared.run.durationMs ?? 0;
+
       const repeatableKey = await this.deps.jobScheduler.scheduleRepeatableJob(
         job.id,
         job.cronExpression
@@ -343,26 +326,20 @@ export class CompilationService implements ICompilationControl {
 
       logger.info('Job compilation and smoke-test succeeded; job is now ACTIVE', {
         jobId: job.id,
-        durationMs,
+        durationMs: prepared.run.durationMs ?? 0,
         provider: 'configuration-pipeline',
       });
 
       await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, JobStatus.Active);
-
       return updatedJob ?? job;
     } catch (error) {
-      if (
-        abortController.signal.aborted ||
-        (error instanceof Error &&
-          (error.name === 'AbortError' || error.message.includes('cancelled')))
-      ) {
+      if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
         logger.info('Job compilation cancelled by signal', {
           jobId: job.id,
           durationMs: Date.now() - startTime,
         });
         await assertExecutionLease().catch(() => {});
-        const current = await this.deps.jobRepository.findById(job.id);
-        return current ?? job;
+        return (await this.deps.jobRepository.findById(job.id)) ?? job;
       }
 
       const durationMs = Date.now() - startTime;
@@ -381,56 +358,36 @@ export class CompilationService implements ICompilationControl {
 
       await assertExecutionLease();
       const current = await this.deps.jobRepository.findById(job.id);
-      if (
-        !current ||
-        current.status === JobStatus.Paused ||
-        current.updatedAt.getTime() !== job.updatedAt.getTime()
-      )
-        return current ?? job;
+      if (isMonitorStale(current, job)) return current ?? job;
+
       let userMessage = formatUserErrorMessage(error);
-      if (!willRetry && isActionableCompilationError(error) && this.deps.diagnosticService) {
-        try {
-          const diagnosis = await this.deps.diagnosticService.diagnose({
-            jobId: job.id,
-            url: job.url,
-            userPrompt: job.userPrompt,
-            failureReason: error instanceof Error ? error.message : undefined,
+      if (!willRetry && isActionableCompilationError(error)) {
+        const diagnosis = await this.deps.diagnosticService.diagnose({
+          jobId: job.id,
+          url: job.url,
+          userPrompt: job.userPrompt,
+          failureReason: error instanceof Error ? error.message : undefined,
+        });
+        if (diagnosis) {
+          userMessage = formatStructuredUserFailure({
+            title: USER_FAILURES.configurationRejected.title,
+            description: diagnosis.issue,
+            nextStep: diagnosis.nextSteps,
           });
-          if (diagnosis) {
-            userMessage = JSON.stringify({
-              title: 'Monitor Setup Could Not Be Verified',
-              description: diagnosis.issue,
-              nextStep: diagnosis.nextSteps,
-            });
-          }
-        } catch {
-          // Keep default userMessage on diagnostic failure
         }
       }
 
-      if (!run && !willRetry)
-        await this.deps.jobRepository.createRun({
-          jobId: job.id,
-          extractedData: null,
-          extractionReport:
-            error instanceof ConfigurationFailure
-              ? {
-                  quality: ExtractionQuality.Invalid,
-                  scope: 'page',
-                  pagesVisited: 0,
-                  issues: [userMessage],
-                  sourcesUsed: {},
-                  trace: error.trace,
-                  semanticReview: error.semanticReview,
-                }
-              : undefined,
-          normalizedHash: null,
-          hasChanges: ChangeStatus.Unchanged,
-          status: RunStatus.Failed,
-          errorMessage: userMessage,
-          httpStatus,
-          durationMs,
-        });
+      if (!run && !willRetry) {
+        await this.deps.jobRepository.createRun(
+          buildFailedCompilationRun({
+            jobId: job.id,
+            error,
+            userMessage,
+            httpStatus,
+            durationMs,
+          })
+        );
+      }
 
       if (run) {
         const retryRecovery =
@@ -439,18 +396,14 @@ export class CompilationService implements ICompilationControl {
           error instanceof DomainError &&
           error.isRetryable;
         if (retryRecovery) {
-          await this.deps.jobRepository.commitRun(
-            { ...run, metadata: run.metadata },
-            [],
-            undefined,
-            job.updatedAt
-          );
           await this.deps.realtimeService.notifyJobUpdated(
             job.userId,
             job.id,
             JobStatus.Recovering
           );
-        } else await this.failRecovery(job, run);
+        } else {
+          await this.failRecovery(job, run);
+        }
       } else {
         const failureStatus = compilationFailureStatus({
           willRetry,
@@ -458,8 +411,8 @@ export class CompilationService implements ICompilationControl {
           error,
         });
 
-        let fallbackPatch: Partial<import('../repositories/jobRepository.js').UpdateJobPatch> = {};
-        if (failureStatus === JobStatus.Active && job.extractionPlan && job.planRevision) {
+        let fallbackPatch: Partial<UpdateJobPatch> = {};
+        if (failureStatus === JobStatus.Active && job.planRevision) {
           const stableVersion = await this.deps.jobRepository.findPlanVersionByRevision(
             job.id,
             job.planRevision
@@ -478,19 +431,12 @@ export class CompilationService implements ICompilationControl {
           ...fallbackPatch,
         });
         await this.deps.realtimeService.notifyJobUpdated(job.userId, job.id, failureStatus);
-        if (failureStatus === JobStatus.Active && job.extractionPlan) {
+        if (failureStatus === JobStatus.Active || failureStatus === JobStatus.Failed) {
           await this.deps.realtimeService.notifyJobCompilationFailed(
             job.userId,
             job.id,
             userMessage,
-            true
-          );
-        } else if (failureStatus === JobStatus.Failed) {
-          await this.deps.realtimeService.notifyJobCompilationFailed(
-            job.userId,
-            job.id,
-            userMessage,
-            false
+            failureStatus === JobStatus.Active
           );
         }
       }
@@ -498,15 +444,11 @@ export class CompilationService implements ICompilationControl {
       throw error;
     }
   }
+
   private async failRecovery(job: ScrapingJobEntity, run: JobRunEntity): Promise<void> {
-    const message = formatUserErrorMessage(new CompilerValidationError('Recovery failed.'));
+    const message = USER_FAILURES.requestedDataUnavailable.description;
     const completed = await this.deps.jobRepository.commitRun(
-      {
-        ...run,
-        status: RunStatus.Failed,
-        errorMessage: message,
-        durationMs: Date.now() - (run.startedAt?.getTime() ?? Date.now()),
-      },
+      buildFailedRunUpdate(run, message),
       [],
       { status: JobStatus.Failed, lastError: message },
       job.updatedAt

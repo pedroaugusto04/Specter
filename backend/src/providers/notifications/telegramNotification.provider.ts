@@ -1,6 +1,8 @@
 import { env } from '../../config/env.js';
-import { logger } from '../../utils/logger.js';
 import { formatNotificationDateTime } from '../../utils/dateFormatter.js';
+import { getErrorMessage } from '../../utils/errors.js';
+import { escapeHtml } from '../../utils/htmlEscape.js';
+import { logger } from '../../utils/logger.js';
 import type {
   AlertPayload,
   ITelegramNotificationProvider,
@@ -10,14 +12,9 @@ import type {
 
 export type { TelegramSendOptions, TelegramTestResult };
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 function formatValue(val: unknown): string {
   if (val === null || val === undefined) return '<i>null</i>';
-  if (typeof val === 'object') return escapeHtml(JSON.stringify(val));
-  return escapeHtml(String(val));
+  return escapeHtml(val);
 }
 
 export class TelegramNotificationProvider implements ITelegramNotificationProvider {
@@ -61,7 +58,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       }
     } catch (err) {
       logger.warn('Failed to resolve Telegram bot username via getMe', {
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage: getErrorMessage(err),
       });
     }
 
@@ -162,7 +159,7 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
       await this.postMessage(token, options.chatId, text);
       return { ok: true };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = getErrorMessage(err);
       logger.warn('Telegram test notification failed', {
         chatId: options.chatId,
         errorMessage,

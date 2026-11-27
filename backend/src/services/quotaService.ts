@@ -22,14 +22,11 @@ export class QuotaService {
     const activeCount = await this.deps.jobRepository.countActiveJobsByUserId(userId);
 
     if (activeCount >= limits.maxActiveMonitors) {
-      throw new QuotaExceededError(
-        `Active monitor limit reached (${activeCount}/${limits.maxActiveMonitors}). Pause or delete existing monitors to activate more.`,
-        {
-          quotaType: 'ACTIVE_MONITORS',
-          current: activeCount,
-          limit: limits.maxActiveMonitors,
-        }
-      );
+      throw new QuotaExceededError({
+        quotaType: 'ACTIVE_MONITORS',
+        current: activeCount,
+        limit: limits.maxActiveMonitors,
+      });
     }
   }
 
@@ -38,14 +35,11 @@ export class QuotaService {
     const usage = await this.deps.usageRepository.getUsage(userId);
 
     if (usage.compilationsCount >= limits.maxMonthlyCompilations) {
-      throw new QuotaExceededError(
-        `Monthly compilation limit reached (${usage.compilationsCount}/${limits.maxMonthlyCompilations}). Compilations reset at the start of next month.`,
-        {
-          quotaType: 'COMPILATIONS',
-          current: usage.compilationsCount,
-          limit: limits.maxMonthlyCompilations,
-        }
-      );
+      throw new QuotaExceededError({
+        quotaType: 'COMPILATIONS',
+        current: usage.compilationsCount,
+        limit: limits.maxMonthlyCompilations,
+      });
     }
   }
 
@@ -54,14 +48,11 @@ export class QuotaService {
     const usage = await this.deps.usageRepository.getUsage(userId);
 
     if (usage.executionsCount >= limits.maxMonthlyExecutions) {
-      throw new QuotaExceededError(
-        `Monthly scrape execution limit reached (${usage.executionsCount}/${limits.maxMonthlyExecutions}). Runs will resume next month.`,
-        {
-          quotaType: 'EXECUTIONS',
-          current: usage.executionsCount,
-          limit: limits.maxMonthlyExecutions,
-        }
-      );
+      throw new QuotaExceededError({
+        quotaType: 'EXECUTIONS',
+        current: usage.executionsCount,
+        limit: limits.maxMonthlyExecutions,
+      });
     }
   }
 

@@ -50,7 +50,6 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
       ],
       removed: [],
       summaryText: 'price: $100 -> $80',
-      summaryHtml: '<b>price</b>: $100 -> $80',
     },
     data: { price: '$80' },
     userId: 'user-123',
@@ -186,7 +185,6 @@ describe('Telegram & Webhook Notification Providers & Dispatcher', () => {
     await integrationRepo.upsert('user-123', {
       telegramEnabled: true,
       telegramChatId: 'chat-999',
-      telegramBotToken: 'bot-token-999',
       webhookEnabled: true,
       webhookUrl: 'https://webhook.example.com/alerts',
       webhookSecret: 'secret-123',

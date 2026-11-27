@@ -10,6 +10,7 @@ import { IntegrationService } from '../../src/services/integrationService.js';
 import { JobService } from '../../src/services/jobService.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import {
+  createTestJobPresenter,
   createTestQuotaService,
   createTestRealtimeService,
   InMemoryIntegrationRepository,
@@ -52,6 +53,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       sessionRepository,
       realtimeService,
       quotaService,
+      presenter: createTestJobPresenter(repository, sessionRepository),
     });
     const authService = new AuthService(userRepository, {
       jwtSecret: 'test-jwt-secret-key-with-at-least-32-bytes',
@@ -496,7 +498,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       },
     });
 
-    await repository.savePlanVersion({
+    repository.seedPlanVersion({
       jobId: createdData.id,
       versionNumber: 1,
       planRevision: 'rev-1',
@@ -508,7 +510,7 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
       createdByRunId: null,
     });
 
-    await repository.savePlanVersion({
+    repository.seedPlanVersion({
       jobId: createdData.id,
       versionNumber: 2,
       planRevision: 'rev-2',

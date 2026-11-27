@@ -10,12 +10,13 @@ import { buildChangeAlert } from '../utils/changeAlertHelper.js';
 import { presentExtractionReport } from '../utils/errorSanitizer.js';
 import { uploadScreenshotIfEligible } from '../utils/screenshotHelper.js';
 
-interface SuccessfulRunDeps {
+export interface SuccessfulRunDeps {
   jobRepository: Pick<IJobRepository, 'findLatestSuccessfulRun'>;
   storageProvider: IStorageProvider;
   alertRouter: IAlertRouter;
 }
-interface SuccessfulRunInput {
+
+export interface SuccessfulRunInput {
   job: ScrapingJobEntity;
   plan: ExtractionPlan;
   execution: PlanExecutionResult;
@@ -24,9 +25,11 @@ interface SuccessfulRunInput {
   logContext: string;
   timezone?: string;
 }
+
 /** Common preparation; callers retain lifecycle decisions and the atomic commit. */
 export class SuccessfulRunService {
   constructor(private readonly deps: SuccessfulRunDeps) {}
+
   async prepare(input: SuccessfulRunInput) {
     const { job, plan, execution, contractRevision } = input;
     const normalizedHash = computeExtractionHash(execution.data);
@@ -53,7 +56,6 @@ export class SuccessfulRunService {
             previousData: previous.extractedData,
             triggerRules: plan.intent.triggerRules,
             triggerMatchMode: plan.intent.triggerMatchMode,
-            screenshotUrl,
             timezone: input.timezone,
           })
         : null;

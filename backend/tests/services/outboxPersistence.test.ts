@@ -90,7 +90,6 @@ function delivery(jobId: string): AlertDelivery {
         removed: [],
         modified: [],
         summaryText: 'Changed',
-        summaryHtml: 'Changed',
       },
       data: { title: 'New' },
     },

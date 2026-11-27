@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { UnauthorizedError } from '../errors/domainErrors.js';
+import { AuthenticationRequiredError } from '../errors/domainErrors.js';
 import type { UserDto } from '@specter/contracts';
 import type { AuthService } from '../services/authService.js';
 import { ACCESS_COOKIE_NAME, parseCookies, REFRESH_COOKIE_NAME } from '../utils/cookies.js';
@@ -39,27 +39,10 @@ async function resolveAuthenticatedUser(
   request.user = user;
 
   if (!user && requireAuth) {
-    throw new UnauthorizedError('Please sign in to continue.');
+    throw new AuthenticationRequiredError();
   }
 
   return user;
-}
-
-export interface AuthMiddlewareOptions {
-  required?: boolean;
-}
-
-/**
- * Fastify preHandler hook for centralized authentication and authorization.
- */
-export function authenticate(
-  authService: AuthService,
-  options: AuthMiddlewareOptions = {}
-): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
-  const required = options.required ?? false;
-  return async (request: FastifyRequest, reply: FastifyReply) => {
-    await resolveAuthenticatedUser(request, reply, authService, required);
-  };
 }
 
 /**
@@ -68,7 +51,9 @@ export function authenticate(
 export function requireAuth(
   authService: AuthService
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
-  return authenticate(authService, { required: true });
+  return async (request, reply) => {
+    await resolveAuthenticatedUser(request, reply, authService, true);
+  };
 }
 
 /**
@@ -77,16 +62,17 @@ export function requireAuth(
 export function optionalAuth(
   authService: AuthService
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
-  return authenticate(authService, { required: false });
+  return async (request, reply) => {
+    await resolveAuthenticatedUser(request, reply, authService, false);
+  };
 }
 
 /**
- * Safe accessor that returns the authenticated user or throws UnauthorizedError.
- * Eliminates non-null assertions like `request.user!.id`.
+ * Safe accessor that returns the authenticated user or throws AuthenticationRequiredError.
  */
 export function requireUser(request: FastifyRequest): UserDto {
   if (!request.user) {
-    throw new UnauthorizedError('Please sign in to continue.');
+    throw new AuthenticationRequiredError();
   }
   return request.user;
 }

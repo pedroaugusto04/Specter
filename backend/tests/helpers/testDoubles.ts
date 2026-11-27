@@ -1,4 +1,11 @@
-import type { AlertDelivery } from '../../src/notifications/contracts.js';
+import type { AlertDelivery, IAlertRouter } from '../../src/notifications/contracts.js';
+import type { IConfigurationPipeline } from '../../src/extraction/configuration.js';
+import type { IStorageProvider } from '../../src/providers/storage/storage.interface.js';
+import type { IPlanExecutor } from '../../src/services/planExecutionService.js';
+import { CompilationDiagnosticService } from '../../src/services/compilationDiagnosticService.js';
+import { SuccessfulRunService } from '../../src/services/successfulRunService.js';
+import { JobPresenter } from '../../src/presentation/jobPresenter.js';
+import type { PageResult } from '../../src/utils/pagination.js';
 import { fixturePlan } from './extractionFixtures.js';
 import crypto from 'crypto';
 import type {
@@ -24,7 +31,6 @@ import type {
   IJobRepository,
   JobRunsSummary,
   PaginatedTimeseriesResult,
-  PaginatedRunsResult,
   UpdateJobPatch,
 } from '../../src/repositories/jobRepository.js';
 import type {
@@ -206,7 +212,7 @@ export class InMemoryJobRepository implements IJobRepository {
   async findRunningRun(jobId: string) {
     return this.runs.find((run) => run.jobId === jobId && run.status === 'RUNNING') ?? null;
   }
-  async savePlanVersion(version: NewJobPlanVersion): Promise<JobPlanVersionEntity> {
+  seedPlanVersion(version: NewJobPlanVersion): JobPlanVersionEntity {
     const entity: JobPlanVersionEntity = {
       ...version,
       id: crypto.randomUUID(),
@@ -214,11 +220,6 @@ export class InMemoryJobRepository implements IJobRepository {
     };
     this.planVersions.push(entity);
     return { ...entity };
-  }
-  async getLatestPlanVersionNumber(jobId: string): Promise<number> {
-    const versions = this.planVersions.filter((v) => v.jobId === jobId);
-    if (!versions.length) return 0;
-    return Math.max(...versions.map((v) => v.versionNumber));
   }
   async findPaginatedPlanVersions(jobId: string, page = 1, pageSize = 10) {
     const versions = this.planVersions
@@ -272,7 +273,9 @@ export class InMemoryJobRepository implements IJobRepository {
     });
   }
   async purgeEvidence(_cutoff: Date) {}
-  async createJob(input: CreateJobInput): Promise<ScrapingJobEntity> {
+  async createJob(
+    input: Omit<CreateJobInput, 'userId' | 'name'> & { userId?: string; name?: string }
+  ): Promise<ScrapingJobEntity> {
     const now = new Date();
     const entity: ScrapingJobEntity = {
       id: crypto.randomUUID(),
@@ -285,9 +288,13 @@ export class InMemoryJobRepository implements IJobRepository {
       webhookSecret: input.webhookSecret ?? null,
       cronExpression: input.cronExpression,
       bullmqRepeatableKey: null,
+      contractRevision: null,
+      planRevision: null,
       extractionPlan: null,
       status: 'PENDING_COMPILATION',
       lastError: null,
+      recoveryAttempts: 0,
+      recoveryWindowStartedAt: null,
       captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
       createdAt: now,
       updatedAt: now,
@@ -369,11 +376,18 @@ export class InMemoryJobRepository implements IJobRepository {
   }
   async createRun(input: CreateJobRunInput): Promise<JobRunEntity> {
     const entity: JobRunEntity = {
-      ...input,
       id: crypto.randomUUID(),
       jobId: input.jobId,
-      extractionReport: input.extractionReport,
-      contractRevision: input.contractRevision,
+      originQueueId: input.originQueueId ?? null,
+      phase: input.phase ?? null,
+      startedAt: input.startedAt ?? null,
+      completedAt: input.completedAt ?? null,
+      nextAttemptAt: input.nextAttemptAt ?? null,
+      monitorUpdatedAt: input.monitorUpdatedAt ?? null,
+      recoveredAutomatically: input.recoveredAutomatically ?? false,
+      metadata: input.metadata ?? null,
+      extractionReport: input.extractionReport ?? null,
+      contractRevision: input.contractRevision ?? null,
       extractedData: input.extractedData ?? null,
       normalizedHash: input.normalizedHash ?? null,
       hasChanges: input.hasChanges,
@@ -397,7 +411,7 @@ export class InMemoryJobRepository implements IJobRepository {
     jobId: string,
     page = 1,
     pageSize = PAGINATION_RUNS_PAGE_SIZE
-  ): Promise<PaginatedRunsResult> {
+  ): Promise<PageResult<JobRunEntity>> {
     const filtered = this.runs
       .filter((r) => r.jobId === jobId)
       .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
@@ -655,10 +669,6 @@ export class InMemoryIntegrationRepository implements IIntegrationRepository {
       id: existing?.id ?? crypto.randomUUID(),
       userId,
       telegramEnabled: input.telegramEnabled ?? existing?.telegramEnabled ?? false,
-      telegramBotToken:
-        input.telegramBotToken !== undefined
-          ? input.telegramBotToken
-          : (existing?.telegramBotToken ?? null),
       telegramChatId:
         input.telegramChatId !== undefined
           ? input.telegramChatId
@@ -847,47 +857,73 @@ export function createTestQuotaService(
   });
 }
 
+export function createTestJobPresenter(
+  jobRepository: IJobRepository = new InMemoryJobRepository(),
+  sessionRepository: ISessionRepository = new InMemorySessionRepository()
+): JobPresenter {
+  return new JobPresenter(
+    new AccessCooldownService(new NoopAccessCooldownStore(), sessionRepository),
+    jobRepository
+  );
+}
+
+export function createTestDiagnosticService(): CompilationDiagnosticService {
+  return new CompilationDiagnosticService({
+    name: 'noop-diagnostic',
+    generate: async () => null,
+  });
+}
+
 export function createTestJobService(overrides: Partial<JobServiceDeps> = {}): JobService {
   const jobRepo = overrides.jobRepository ?? new InMemoryJobRepository();
+  const sessionRepo = overrides.sessionRepository ?? new InMemorySessionRepository();
   return new JobService({
     jobRepository: jobRepo,
     jobScheduler: overrides.jobScheduler ?? new MockJobScheduler(),
     compilationControl: overrides.compilationControl ?? noopCompilationControl,
     scraperEngine: overrides.scraperEngine ?? createDummyScraperEngine(),
-    sessionRepository: overrides.sessionRepository ?? new InMemorySessionRepository(),
+    sessionRepository: sessionRepo,
     realtimeService: overrides.realtimeService ?? createTestRealtimeService(),
     quotaService: overrides.quotaService ?? createTestQuotaService(jobRepo),
-    ...overrides,
+    presenter: overrides.presenter ?? createTestJobPresenter(jobRepo, sessionRepo),
   });
 }
 
 export function createTestCompilationService(
   overrides: Partial<CompilationServiceDeps> & {
     jobRepository: IJobRepository;
-    configurationPipeline: any;
-    alertRouter: any;
-    jobScheduler: any;
-    storageProvider: any;
+    configurationPipeline: IConfigurationPipeline;
+    alertRouter: IAlertRouter;
+    jobScheduler: IJobScheduler;
+    storageProvider: IStorageProvider;
   }
 ): CompilationService {
+  const { alertRouter, storageProvider, ...rest } = overrides;
   return new CompilationService({
     userRepository: new InMemoryUserRepository(),
     sessionRepository: new InMemorySessionRepository(),
     realtimeService: createTestRealtimeService(),
     quotaService: createTestQuotaService(overrides.jobRepository),
-    ...overrides,
+    diagnosticService: createTestDiagnosticService(),
+    successfulRunService: new SuccessfulRunService({
+      jobRepository: overrides.jobRepository,
+      storageProvider,
+      alertRouter,
+    }),
+    ...rest,
   });
 }
 
 export function createTestScrapeExecutionService(
   overrides: Partial<ScrapeExecutionServiceDeps> & {
     jobRepository: IJobRepository;
-    planExecutor: any;
-    alertRouter: any;
-    jobScheduler: any;
-    storageProvider: any;
+    planExecutor: IPlanExecutor;
+    alertRouter: IAlertRouter;
+    jobScheduler: IJobScheduler;
+    storageProvider: IStorageProvider;
   }
 ): ScrapeExecutionService {
+  const { alertRouter, storageProvider, ...rest } = overrides;
   const sessionRepo = overrides.sessionRepository ?? new InMemorySessionRepository();
   return new ScrapeExecutionService({
     userRepository: new InMemoryUserRepository(),
@@ -895,7 +931,12 @@ export function createTestScrapeExecutionService(
     sessionRepository: sessionRepo,
     realtimeService: createTestRealtimeService(),
     quotaService: createTestQuotaService(overrides.jobRepository),
-    ...overrides,
+    successfulRunService: new SuccessfulRunService({
+      jobRepository: overrides.jobRepository,
+      storageProvider,
+      alertRouter,
+    }),
+    ...rest,
   });
 }
 
@@ -908,6 +949,7 @@ export function createTestNotificationDispatcher(
       name: 'mock-telegram',
       sendAlert: async () => {},
       sendTestMessage: async () => ({ ok: true }),
+      getBotUsername: async () => null,
     },
     webhookProvider: {
       name: 'mock-webhook',

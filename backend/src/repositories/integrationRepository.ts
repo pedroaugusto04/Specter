@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm';
-import { getDb, type Database } from '../db/index.js';
+import type { Database } from '../db/index.js';
 import { userIntegrations } from '../db/schema.js';
+import { PersistenceError } from '../errors/domainErrors.js';
 import { IntegrationMapper } from '../mappers/integrationMapper.js';
 import type { UserIntegrationEntity } from '../types/domain.js';
 import { encryptText } from '../utils/crypto.js';
 
 export interface UpsertIntegrationInput {
   telegramEnabled?: boolean;
-  telegramBotToken?: string | null;
   telegramChatId?: string | null;
   webhookEnabled?: boolean;
   webhookUrl?: string | null;
@@ -20,11 +20,7 @@ export interface IIntegrationRepository {
 }
 
 export class DrizzleIntegrationRepository implements IIntegrationRepository {
-  private readonly db: Database;
-
-  constructor(db?: Database) {
-    this.db = db ?? getDb();
-  }
+  constructor(private readonly db: Database) {}
 
   async findByUserId(userId: string): Promise<UserIntegrationEntity | null> {
     const [row] = await this.db
@@ -37,45 +33,42 @@ export class DrizzleIntegrationRepository implements IIntegrationRepository {
   }
 
   async upsert(userId: string, input: UpsertIntegrationInput): Promise<UserIntegrationEntity> {
-    const existing = await this.findByUserId(userId);
+    const encryptedWebhookSecret =
+      input.webhookSecret !== undefined
+        ? input.webhookSecret !== null
+          ? encryptText(input.webhookSecret)
+          : null
+        : undefined;
 
-    // Encrypt sensitive fields before persisting
-    const encryptedInput = {
-      ...input,
-      telegramBotToken:
-        input.telegramBotToken != null
-          ? encryptText(input.telegramBotToken)
-          : input.telegramBotToken,
-      webhookSecret:
-        input.webhookSecret != null ? encryptText(input.webhookSecret) : input.webhookSecret,
+    const updateSet = {
+      ...(input.telegramEnabled !== undefined ? { telegramEnabled: input.telegramEnabled } : {}),
+      ...(input.telegramChatId !== undefined ? { telegramChatId: input.telegramChatId } : {}),
+      ...(input.webhookEnabled !== undefined ? { webhookEnabled: input.webhookEnabled } : {}),
+      ...(input.webhookUrl !== undefined ? { webhookUrl: input.webhookUrl } : {}),
+      ...(encryptedWebhookSecret !== undefined ? { webhookSecret: encryptedWebhookSecret } : {}),
+      updatedAt: new Date(),
     };
 
-    if (existing) {
-      const [updated] = await this.db
-        .update(userIntegrations)
-        .set({
-          ...encryptedInput,
-          updatedAt: new Date(),
-        })
-        .where(eq(userIntegrations.userId, userId))
-        .returning();
-
-      return IntegrationMapper.rowToEntity(updated!);
-    }
-
-    const [inserted] = await this.db
+    const [row] = await this.db
       .insert(userIntegrations)
       .values({
         userId,
-        telegramEnabled: encryptedInput.telegramEnabled ?? false,
-        telegramBotToken: encryptedInput.telegramBotToken ?? null,
-        telegramChatId: encryptedInput.telegramChatId ?? null,
-        webhookEnabled: encryptedInput.webhookEnabled ?? false,
-        webhookUrl: encryptedInput.webhookUrl ?? null,
-        webhookSecret: encryptedInput.webhookSecret ?? null,
+        telegramEnabled: input.telegramEnabled ?? false,
+        telegramChatId: input.telegramChatId ?? null,
+        webhookEnabled: input.webhookEnabled ?? false,
+        webhookUrl: input.webhookUrl ?? null,
+        webhookSecret: encryptedWebhookSecret ?? null,
+      })
+      .onConflictDoUpdate({
+        target: userIntegrations.userId,
+        set: updateSet,
       })
       .returning();
 
-    return IntegrationMapper.rowToEntity(inserted!);
+    if (!row) {
+      throw new PersistenceError('upsert user integrations');
+    }
+
+    return IntegrationMapper.rowToEntity(row);
   }
 }

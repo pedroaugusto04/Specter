@@ -1,6 +1,7 @@
 import type { ServerResponse } from 'node:http';
-import { toRealtimeDto } from '../mappers/realtimeMapper.js';
 import type { FastifyInstance } from 'fastify';
+import { RealtimeUnavailableError } from '../errors/domainErrors.js';
+import { buildConnectedEvent, formatSseEvent, toRealtimeDto } from '../mappers/realtimeMapper.js';
 import { requireAuth, requireUser } from '../middlewares/authMiddleware.js';
 import type { AuthService } from '../services/authService.js';
 import type { RealtimeService } from '../services/realtimeService.js';
@@ -20,7 +21,7 @@ export function registerRealtimeRoutes(
   app.get('/api/events', { preHandler: [withAuth] }, async (request, reply) => {
     const userId = requireUser(request).id;
     const raw = reply.raw;
-    const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+    const origin = request.headers.origin;
     const allowedOrigin = origin && isAllowedCorsOrigin(origin) ? origin : null;
 
     const headers: Record<string, string> = {
@@ -48,22 +49,22 @@ export function registerRealtimeRoutes(
       unsubscribe?.();
     };
     raw.once('close', cleanup);
+
     try {
       // Wait for Redis SUBSCRIBE acknowledgement before confirming the SSE connection.
       unsubscribe = await realtimeService.subscribeUser(
         userId,
         (event) => {
-          if (!raw.writableEnded && !raw.destroyed) {
-            const message = `event: ${event.type}\ndata: ${JSON.stringify(toRealtimeDto(event))}\n\n`;
-            if (streamReady) raw.write(message);
+          if (streamReady && !raw.writableEnded && !raw.destroyed) {
+            raw.write(formatSseEvent(event.type, toRealtimeDto(event)));
           }
         },
         () => raw.destroy()
       );
-    } catch {
+    } catch (err) {
       cleanup();
       if (raw.destroyed) return;
-      return reply.code(503).send({ error: 'Realtime event stream is temporarily unavailable' });
+      throw new RealtimeUnavailableError(err);
     }
 
     if (raw.destroyed) {
@@ -74,17 +75,8 @@ export function registerRealtimeRoutes(
     reply.hijack();
     raw.writeHead(200, headers);
     streamReady = true;
+    raw.flushHeaders();
 
-    if (typeof raw.flushHeaders === 'function') {
-      raw.flushHeaders();
-    }
-
-    // Initial connection acknowledgement
-    const connectedPayload = JSON.stringify({
-      type: 'CONNECTED',
-      userId,
-      timestamp: new Date().toISOString(),
-    });
-    raw.write(`event: connected\ndata: ${connectedPayload}\n\n`);
+    raw.write(formatSseEvent('connected', buildConnectedEvent(userId)));
   });
 }

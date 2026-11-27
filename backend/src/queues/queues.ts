@@ -1,4 +1,4 @@
-import { Queue, type ConnectionOptions } from 'bullmq';
+import { Queue, type ConnectionOptions, type JobsOptions } from 'bullmq';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { CompilationReason, type IJobScheduler } from './scheduler.interface.js';
@@ -23,15 +23,43 @@ export function buildRepeatableJobId(jobId: string): string {
   return `job-cron-${jobId}`;
 }
 
+export function buildScrapeRepeatJob(
+  jobId: string,
+  cronExpression: string,
+  timezone?: string
+): {
+  name: 'scrape-job';
+  data: { jobId: string; trigger: 'cron' };
+  opts: JobsOptions;
+} {
+  return {
+    name: 'scrape-job',
+    data: { jobId, trigger: 'cron' },
+    opts: {
+      jobId: buildRepeatableJobId(jobId),
+      repeat: {
+        pattern: cronExpression,
+        ...(timezone ? { tz: timezone } : {}),
+      },
+    },
+  };
+}
+
+export interface BullMqJobSchedulerOptions {
+  connection?: ConnectionOptions;
+  resolveTimezone: (jobId: string) => Promise<string>;
+}
+
 export class BullMqJobScheduler implements IJobScheduler {
   public readonly compilationQueue: Queue;
   public readonly scrapeQueue: Queue;
   public readonly maintenanceQueue: Queue;
+  private readonly resolveTimezone: (jobId: string) => Promise<string>;
 
-  constructor(
-    connection: ConnectionOptions = getRedisConnectionOptions(),
-    private readonly resolveTimezone?: (jobId: string) => Promise<string>
-  ) {
+  constructor(options: BullMqJobSchedulerOptions) {
+    const connection = options.connection ?? getRedisConnectionOptions();
+    this.resolveTimezone = options.resolveTimezone;
+
     this.compilationQueue = new Queue(COMPILATION_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
@@ -127,22 +155,12 @@ export class BullMqJobScheduler implements IJobScheduler {
   }
 
   async scheduleRepeatableJob(jobId: string, cronExpression: string): Promise<string | null> {
-    const repeatableJobId = buildRepeatableJobId(jobId);
-    const timezone = await this.resolveTimezone?.(jobId);
+    const timezone = await this.resolveTimezone(jobId);
+    const repeatJob = buildScrapeRepeatJob(jobId, cronExpression, timezone);
 
-    const job = await this.scrapeQueue.add(
-      'scrape-job',
-      { jobId, trigger: 'cron' },
-      {
-        jobId: repeatableJobId,
-        repeat: {
-          pattern: cronExpression,
-          ...(timezone ? { tz: timezone } : {}),
-        },
-      }
-    );
+    const job = await this.scrapeQueue.add(repeatJob.name, repeatJob.data, repeatJob.opts);
 
-    const repeatJobKey = job.repeatJobKey ?? repeatableJobId;
+    const repeatJobKey = job.repeatJobKey ?? buildRepeatableJobId(jobId);
     logger.info('Scheduled repeatable scrape job', {
       jobId,
       cronExpression,
@@ -171,42 +189,30 @@ export class BullMqJobScheduler implements IJobScheduler {
     }
   }
 
-  async scheduleRunReconciliation(): Promise<void> {
+  private async scheduleMaintenanceJob(
+    name: string,
+    jobId: string,
+    repeat: NonNullable<JobsOptions['repeat']>
+  ): Promise<void> {
     const repeatable = await this.maintenanceQueue.getRepeatableJobs();
     for (const job of repeatable) {
-      if (job.id === 'reconcile-runs' || job.name === 'reconcile-runs') {
+      if (job.id === jobId || job.name === name) {
         await this.maintenanceQueue.removeRepeatableByKey(job.key);
       }
     }
-    await this.maintenanceQueue.add(
-      'reconcile-runs',
-      {},
-      {
-        jobId: 'reconcile-runs',
-        repeat: {
-          every: env.RUN_RECONCILE_INTERVAL_MS,
-        },
-      }
-    );
+    await this.maintenanceQueue.add(name, {}, { jobId, repeat });
+  }
+
+  async scheduleRunReconciliation(): Promise<void> {
+    await this.scheduleMaintenanceJob('reconcile-runs', 'reconcile-runs', {
+      every: env.RUN_RECONCILE_INTERVAL_MS,
+    });
   }
 
   async scheduleDailyRetentionPruning(): Promise<void> {
-    const repeatable = await this.maintenanceQueue.getRepeatableJobs();
-    for (const job of repeatable) {
-      if (job.id === 'daily-retention-pruning' || job.name === 'prune-unchanged-runs') {
-        await this.maintenanceQueue.removeRepeatableByKey(job.key);
-      }
-    }
-    await this.maintenanceQueue.add(
-      'prune-unchanged-runs',
-      {},
-      {
-        jobId: 'daily-retention-pruning',
-        repeat: {
-          pattern: '0 3 * * *', // Daily at 03:00 AM
-        },
-      }
-    );
+    await this.scheduleMaintenanceJob('prune-unchanged-runs', 'daily-retention-pruning', {
+      pattern: '0 3 * * *', // Daily at 03:00 AM
+    });
   }
 
   async close(): Promise<void> {

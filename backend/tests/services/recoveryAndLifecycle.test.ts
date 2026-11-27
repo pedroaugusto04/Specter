@@ -15,7 +15,6 @@ import {
 import { CompilationService } from '../../src/services/compilationService.js';
 import { ScrapeExecutionService } from '../../src/services/scrapeExecutionService.js';
 import { CompilationReason } from '../../src/queues/scheduler.interface.js';
-import { JobPresenter } from '../../src/presentation/jobPresenter.js';
 import {
   createTestCompilationService,
   createTestJobService,
@@ -286,7 +285,6 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
       jobScheduler: scheduler,
       compilationControl: compilationService,
       scraperEngine: scraper,
-      presenter: new JobPresenter(),
     });
 
     const job = await repository.createJob({
@@ -341,7 +339,6 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
       jobScheduler: scheduler,
       compilationControl: compilationService,
       scraperEngine: scraper,
-      presenter: new JobPresenter(),
     });
 
     const job = await repository.createJob({

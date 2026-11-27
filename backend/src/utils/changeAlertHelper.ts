@@ -23,7 +23,6 @@ export interface BuildChangeAlertOptions {
   previousData: ExtractedPayload | null;
   triggerRules?: TriggerRule[];
   triggerMatchMode?: TriggerMatchMode;
-  screenshotUrl?: string | null;
   timezone?: string;
 }
 
@@ -32,15 +31,12 @@ export interface BuildChangeAlertOptions {
  * Removes duplication across CompilationService and ScrapeExecutionService.
  */
 export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload | null {
-  const { job, currentData, previousData, triggerRules, triggerMatchMode, screenshotUrl } = options;
+  const { job, currentData, previousData, triggerRules, triggerMatchMode } = options;
 
   if (!previousData) return null;
 
-  const diffSummary = compareSnapshots(
-    previousData,
-    currentData,
-    job.extractionPlan?.intent.identityFields ?? []
-  );
+  const identityFields = job.extractionPlan?.intent.identityFields ?? [];
+  const diffSummary = compareSnapshots(previousData, currentData, identityFields);
   if (!diffSummary.hasChanges) return null;
 
   const triggerResult = evaluateTriggerRules(
@@ -48,7 +44,7 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
     triggerRules,
     triggerMatchMode,
     previousData,
-    job.extractionPlan?.intent.identityFields ?? []
+    identityFields
   );
 
   if (!triggerResult.triggered) return null;
@@ -58,7 +54,7 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
       ? '1 change detected'
       : `${diffSummary.totalChanges} changes detected`;
 
-  const monitorName = job.name?.trim() || job.url;
+  const monitorName = job.name.trim() || job.url;
   const subject = `[Specter] ${changeNoun}: ${monitorName}`;
 
   return {
@@ -75,7 +71,6 @@ export function buildChangeAlert(options: BuildChangeAlertOptions): AlertPayload
     diffSummary,
     data: currentData,
     triggerReasons: triggerResult.hasRules ? triggerResult.reasons : undefined,
-    screenshotUrl: screenshotUrl ?? undefined,
     timezone: options.timezone,
   };
 }

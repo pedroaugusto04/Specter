@@ -29,9 +29,6 @@ function decryptValue<T>(decrypt: (key: Buffer) => T, key?: string | Buffer): T 
 }
 function decryptParts(iv: string, tag: string, data: string, key: Buffer): string {
   if (
-    typeof iv !== 'string' ||
-    typeof tag !== 'string' ||
-    typeof data !== 'string' ||
     iv.length !== IvBytes * 2 ||
     tag.length !== TagBytes * 2 ||
     data.length % 2 ||

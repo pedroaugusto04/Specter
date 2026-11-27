@@ -44,7 +44,6 @@ describe('Specter Resend Notifications & Email Template', () => {
       ],
       summaryText:
         '• [Modified] price: "$ 499.00" → "$ 399.00"\n• [Added] shipping: "Free Worldwide Shipping"\n• [Removed] oldPromoTag: (previously "Coupon 10%")',
-      summaryHtml: '<table>...</table>',
     },
     data: {
       title: 'Headphone Bluetooth ANC Pro',
@@ -132,7 +131,6 @@ describe('Specter Resend Notifications & Email Template', () => {
           added: [],
           removed: [],
           summaryText: 'XSS test',
-          summaryHtml: '<p>XSS</p>',
         },
       };
 

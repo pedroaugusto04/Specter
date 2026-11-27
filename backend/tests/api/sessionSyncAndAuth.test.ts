@@ -47,6 +47,7 @@ describe('Companion Browser Extension — Session Synchronization & Bearer Auth'
       name: 'dummy-telegram',
       sendAlert: async () => {},
       sendTestMessage: async () => ({ ok: true }),
+      getBotUsername: async () => null,
     };
     const dummyWebhook = {
       name: 'dummy-webhook',

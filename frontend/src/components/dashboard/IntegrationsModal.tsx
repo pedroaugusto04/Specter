@@ -1,7 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { formToIntegrations } from '@/forms/integrationForm';
+import {
+  emptyIntegrationForm,
+  formToIntegrations,
+  formToWebhookTest,
+  integrationsToForm,
+  isIntegrationFormDirty,
+  type IntegrationFormValues,
+} from '@/forms/integrationForm';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useModal } from '@/components/ui/modal-dialog';
@@ -13,7 +20,7 @@ import {
   useTestWebhookMutation,
   useUpdateIntegrationsMutation,
 } from '@/hooks/useDashboardQueries';
-import { type SessionDto, type UserIntegrationsDto } from '@/lib/api';
+import type { SessionDto } from '@/lib/api';
 import { PAGINATION_DEFAULT_PAGE_SIZE } from '@specter/contracts';
 import { cn, DEFAULT_TIMEZONE } from '@/lib/utils';
 import {
@@ -32,63 +39,40 @@ import { WebSessionsTab } from './integrations/WebSessionsTab';
 export interface IntegrationsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaved?: (integrations: UserIntegrationsDto) => void;
   timeZone?: string;
 }
 
 export function IntegrationsModal({
   isOpen,
   onClose,
-  onSaved,
   timeZone = DEFAULT_TIMEZONE,
 }: IntegrationsModalProps) {
   const [activeTab, setActiveTab] = React.useState<'telegram' | 'webhook' | 'sessions'>('telegram');
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [form, setForm] = React.useState<IntegrationFormValues>(emptyIntegrationForm);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [globalError, setGlobalError] = React.useState<string | null>(null);
 
-  // Sessions state (from companion browser extension)
   const extensionUrl =
     process.env.NEXT_PUBLIC_EXTENSION_URL ||
     `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/specter-companion.zip`;
   const isExternalExtensionUrl = Boolean(
     process.env.NEXT_PUBLIC_EXTENSION_URL &&
-    /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
+      /^https?:\/\//i.test(process.env.NEXT_PUBLIC_EXTENSION_URL)
   );
-  const [sessions, setSessions] = React.useState<SessionDto[]>([]);
   const [sessionsPage, setSessionsPage] = React.useState(1);
   const [sessionsPageSize, setSessionsPageSize] = React.useState<number>(
     PAGINATION_DEFAULT_PAGE_SIZE
   );
-  const [sessionsPagination, setSessionsPagination] =
-    React.useState<import('@specter/contracts').PaginationMeta>();
-  const [isLoadingSessions, setIsLoadingSessions] = React.useState(false);
   const [deletingSessionId, setDeletingSessionId] = React.useState<string | null>(null);
-
-  // Telegram state
-  const [telegramEnabled, setTelegramEnabled] = React.useState(false);
-  const [telegramChatId, setTelegramChatId] = React.useState('');
-  const [telegramBotUsername, setTelegramBotUsername] = React.useState<string | null>(null);
-  const [isTestingTelegram, setIsTestingTelegram] = React.useState(false);
   const [telegramTestStatus, setTelegramTestStatus] = React.useState<{
     ok: boolean;
     msg: string;
   } | null>(null);
-
-  // Webhook state
-  const [webhookEnabled, setWebhookEnabled] = React.useState(false);
-  const [webhookUrl, setWebhookUrl] = React.useState('');
-  const [webhookSecret, setWebhookSecret] = React.useState('');
-  const [clearWebhookSecret, setClearWebhookSecret] = React.useState(false);
-  const [isTestingWebhook, setIsTestingWebhook] = React.useState(false);
   const [webhookTestStatus, setWebhookTestStatus] = React.useState<{
     ok: boolean;
     msg: string;
   } | null>(null);
 
-  // Initial pristine snapshot for isDirty check
-  const [initialData, setInitialData] = React.useState<UserIntegrationsDto | null>(null);
   const modal = useModal();
   const integrationsQuery = useIntegrationsQuery(isOpen);
   const sessionsQuery = useSessionsQuery(isOpen, sessionsPage, sessionsPageSize);
@@ -97,55 +81,40 @@ export function IntegrationsModal({
   const testTelegramMutation = useTestTelegramMutation();
   const testWebhookMutation = useTestWebhookMutation();
 
-  React.useEffect(() => {
-    if (!sessionsQuery.data) return;
-    setSessions(sessionsQuery.data.items);
-    setSessionsPagination(sessionsQuery.data.pagination);
-    if (sessionsPage !== sessionsQuery.data.pagination.page) {
-      setSessionsPage(sessionsQuery.data.pagination.page);
-    }
-  }, [sessionsPage, sessionsQuery.data]);
+  const initialData = integrationsQuery.data ?? null;
+  const sessions = sessionsQuery.data?.items ?? [];
+  const sessionsPagination = sessionsQuery.data?.pagination;
+  const telegramBotUsername =
+    initialData?.botUsername || process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || null;
 
-  const fetchIntegrations = React.useCallback(async () => {
-    setIsLoading(true);
+  React.useEffect(() => {
+    if (!isOpen) return;
     setGlobalError(null);
     setSaveSuccess(false);
     setTelegramTestStatus(null);
     setWebhookTestStatus(null);
+  }, [isOpen]);
 
-    try {
-      const res = await integrationsQuery.refetch();
-      const data = res.data || integrationsQuery.data!;
-      setInitialData(data);
-      setTelegramEnabled(Boolean(data.telegramEnabled));
-      setTelegramChatId(data.telegramChatId || '');
-      setTelegramBotUsername(
-        data.botUsername || process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || null
-      );
-      setWebhookEnabled(Boolean(data.webhookEnabled));
-      setWebhookUrl(data.webhookUrl || '');
-      setWebhookSecret('');
-      setClearWebhookSecret(false);
-    } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to load integration settings.');
-    } finally {
-      setIsLoading(false);
+  React.useEffect(() => {
+    if (isOpen && initialData) {
+      setForm(integrationsToForm(initialData));
     }
-  }, []);
+  }, [isOpen, initialData]);
 
-  const fetchSessions = React.useCallback(async () => {
-    setIsLoadingSessions(true);
-    try {
-      const res = await sessionsQuery.refetch();
-      const data = res.data;
-      setSessions(data?.items ?? []);
-      setSessionsPagination(data?.pagination);
-    } catch {
-      // ignore
-    } finally {
-      setIsLoadingSessions(false);
+  React.useEffect(() => {
+    if (sessionsPagination && sessionsPage !== sessionsPagination.page) {
+      setSessionsPage(sessionsPagination.page);
     }
-  }, []);
+  }, [sessionsPage, sessionsPagination]);
+
+  const queryError =
+    integrationsQuery.error instanceof Error ? integrationsQuery.error.message : null;
+  const displayError = globalError ?? queryError;
+  const isDirty = isIntegrationFormDirty(form, initialData);
+  const isLoading = integrationsQuery.isLoading && !initialData;
+  const isSaving = updateIntegrationsMutation.isPending;
+  const isTestingTelegram = testTelegramMutation.isPending;
+  const isTestingWebhook = testWebhookMutation.isPending;
 
   const handleDeleteSession = async (session: SessionDto) => {
     const sessionLabel = session.name || session.domain;
@@ -161,7 +130,6 @@ export function IntegrationsModal({
     setDeletingSessionId(session.id);
     try {
       await deleteSessionMutation.mutateAsync(session.id);
-      setSessions((prev) => prev.filter((s) => s.id !== session.id));
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Failed to revoke session.');
     } finally {
@@ -169,108 +137,54 @@ export function IntegrationsModal({
     }
   };
 
-  React.useEffect(() => {
-    if (isOpen) {
-      void fetchIntegrations();
-      void fetchSessions();
-    }
-  }, [isOpen, fetchIntegrations, fetchSessions]);
-
-  const isDirty = React.useMemo(() => {
-    if (!initialData) return false;
-    return (
-      telegramEnabled !== Boolean(initialData.telegramEnabled) ||
-      telegramChatId !== (initialData.telegramChatId || '') ||
-      webhookEnabled !== Boolean(initialData.webhookEnabled) ||
-      webhookUrl !== (initialData.webhookUrl || '') ||
-      Boolean(webhookSecret.trim()) ||
-      clearWebhookSecret
-    );
-  }, [
-    initialData,
-    telegramEnabled,
-    telegramChatId,
-    webhookEnabled,
-    webhookUrl,
-    webhookSecret,
-    clearWebhookSecret,
-  ]);
-
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setIsSaving(true);
     setGlobalError(null);
     setSaveSuccess(false);
 
     try {
-      const payload = formToIntegrations({
-        telegramEnabled,
-        telegramChatId,
-        webhookEnabled,
-        webhookUrl,
-        webhookSecret,
-        clearWebhookSecret,
-      });
-      const updated = await updateIntegrationsMutation.mutateAsync(payload);
-      setWebhookSecret('');
-      setClearWebhookSecret(false);
-      setInitialData(updated);
+      const updated = await updateIntegrationsMutation.mutateAsync(formToIntegrations(form));
+      setForm(integrationsToForm(updated));
       setSaveSuccess(true);
-      onSaved?.(updated);
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3000);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Failed to save integrations.');
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const handleTestTelegram = async () => {
-    if (!telegramChatId.trim()) {
+    if (!form.telegramChatId.trim()) {
       setTelegramTestStatus({ ok: false, msg: 'Please provide a Telegram Chat ID first.' });
       return;
     }
 
-    setIsTestingTelegram(true);
     setTelegramTestStatus(null);
     try {
-      const res = await testTelegramMutation.mutateAsync({
-        chatId: telegramChatId.trim(),
-      });
-      setTelegramTestStatus({ ok: true, msg: res?.message || 'Test message sent successfully!' });
+      const res = await testTelegramMutation.mutateAsync({ chatId: form.telegramChatId.trim() });
+      setTelegramTestStatus({ ok: true, msg: res.message });
     } catch (err) {
       setTelegramTestStatus({
         ok: false,
         msg: err instanceof Error ? err.message : 'Telegram test failed.',
       });
-    } finally {
-      setIsTestingTelegram(false);
     }
   };
 
   const handleTestWebhook = async () => {
-    if (!webhookUrl.trim()) {
+    if (!form.webhookUrl.trim()) {
       setWebhookTestStatus({ ok: false, msg: 'Please provide a Webhook URL first.' });
       return;
     }
 
-    setIsTestingWebhook(true);
     setWebhookTestStatus(null);
     try {
-      const res = await testWebhookMutation.mutateAsync({
-        webhookUrl: webhookUrl.trim(),
-        secret: clearWebhookSecret ? null : webhookSecret.trim() || undefined,
-      });
-      setWebhookTestStatus({ ok: true, msg: res?.message || 'Webhook test event delivered!' });
+      const res = await testWebhookMutation.mutateAsync(formToWebhookTest(form));
+      setWebhookTestStatus({ ok: true, msg: res.message });
     } catch (err) {
       setWebhookTestStatus({
         ok: false,
         msg: err instanceof Error ? err.message : 'Webhook delivery failed.',
       });
-    } finally {
-      setIsTestingWebhook(false);
     }
   };
 
@@ -295,7 +209,6 @@ export function IntegrationsModal({
       confirmMessage="You have modified integration settings that have not been saved. Close without saving?"
     >
       <div className="space-y-6 pt-2">
-        {/* Navigation Tabs */}
         <div className="grid grid-cols-3 gap-1.5 rounded-lg bg-muted/60 p-1 border border-border">
           <button
             type="button"
@@ -309,7 +222,7 @@ export function IntegrationsModal({
           >
             <Send className="h-4 w-4 text-sky-500" />
             <span className="truncate">Telegram</span>
-            {telegramEnabled && (
+            {form.telegramEnabled && (
               <span className="h-2 w-2 rounded-full bg-emerald-500" title="Active" />
             )}
           </button>
@@ -325,16 +238,13 @@ export function IntegrationsModal({
           >
             <Webhook className="h-4 w-4 text-violet-500" />
             <span className="truncate">Webhook</span>
-            {webhookEnabled && (
+            {form.webhookEnabled && (
               <span className="h-2 w-2 rounded-full bg-emerald-500" title="Active" />
             )}
           </button>
           <button
             type="button"
-            onClick={() => {
-              setActiveTab('sessions');
-              void fetchSessions();
-            }}
+            onClick={() => setActiveTab('sessions')}
             className={cn(
               'flex items-center justify-center gap-1.5 rounded-md py-2 text-xs sm:text-sm font-medium transition-all duration-150',
               activeTab === 'sessions'
@@ -352,10 +262,10 @@ export function IntegrationsModal({
           </button>
         </div>
 
-        {globalError && (
+        {displayError && (
           <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <div className="flex-1 font-medium">{globalError}</div>
+            <div className="flex-1 font-medium">{displayError}</div>
           </div>
         )}
 
@@ -375,10 +285,14 @@ export function IntegrationsModal({
           <form onSubmit={handleSave} className="space-y-6">
             {activeTab === 'telegram' && (
               <TelegramTab
-                telegramEnabled={telegramEnabled}
-                onTelegramEnabledChange={setTelegramEnabled}
-                telegramChatId={telegramChatId}
-                onTelegramChatIdChange={setTelegramChatId}
+                telegramEnabled={form.telegramEnabled}
+                onTelegramEnabledChange={(value) =>
+                  setForm((prev) => ({ ...prev, telegramEnabled: value }))
+                }
+                telegramChatId={form.telegramChatId}
+                onTelegramChatIdChange={(value) =>
+                  setForm((prev) => ({ ...prev, telegramChatId: value }))
+                }
                 telegramBotUsername={telegramBotUsername}
                 onTestTelegram={handleTestTelegram}
                 isTestingTelegram={isTestingTelegram}
@@ -388,14 +302,20 @@ export function IntegrationsModal({
 
             {activeTab === 'webhook' && (
               <WebhookTab
-                webhookEnabled={webhookEnabled}
-                onWebhookEnabledChange={setWebhookEnabled}
-                webhookUrl={webhookUrl}
-                onWebhookUrlChange={setWebhookUrl}
-                webhookSecret={webhookSecret}
-                onWebhookSecretChange={setWebhookSecret}
-                clearWebhookSecret={clearWebhookSecret}
-                onClearWebhookSecretChange={setClearWebhookSecret}
+                webhookEnabled={form.webhookEnabled}
+                onWebhookEnabledChange={(value) =>
+                  setForm((prev) => ({ ...prev, webhookEnabled: value }))
+                }
+                webhookUrl={form.webhookUrl}
+                onWebhookUrlChange={(value) => setForm((prev) => ({ ...prev, webhookUrl: value }))}
+                webhookSecret={form.webhookSecret}
+                onWebhookSecretChange={(value) =>
+                  setForm((prev) => ({ ...prev, webhookSecret: value }))
+                }
+                clearWebhookSecret={form.clearWebhookSecret}
+                onClearWebhookSecretChange={(value) =>
+                  setForm((prev) => ({ ...prev, clearWebhookSecret: value }))
+                }
                 hasConfiguredSecret={Boolean(initialData?.hasWebhookSecret)}
                 onTestWebhook={handleTestWebhook}
                 isTestingWebhook={isTestingWebhook}
@@ -414,9 +334,9 @@ export function IntegrationsModal({
                   setSessionsPageSize(size);
                   setSessionsPage(1);
                 }}
-                isLoadingSessions={isLoadingSessions}
+                isLoadingSessions={sessionsQuery.isFetching}
                 deletingSessionId={deletingSessionId}
-                onRefreshSessions={() => void fetchSessions()}
+                onRefreshSessions={() => void sessionsQuery.refetch()}
                 onDeleteSession={handleDeleteSession}
                 extensionUrl={extensionUrl}
                 isExternalExtensionUrl={isExternalExtensionUrl}
@@ -424,7 +344,6 @@ export function IntegrationsModal({
               />
             )}
 
-            {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
               <Button type="button" variant="outline" onClick={onClose} className="h-9 text-xs">
                 Close

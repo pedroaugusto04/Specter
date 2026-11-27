@@ -4,7 +4,11 @@ import { watch, promises as fs, type FSWatcher } from 'fs';
 import path from 'path';
 import { env } from '../../config/env.js';
 import { compilerEnvironment } from './cliEnvironment.js';
-import { CompilerTimeoutError, CompilerValidationError } from '../../errors/domainErrors.js';
+import {
+  CompilerOutputTooLargeError,
+  CompilerTimeoutError,
+  CompilerValidationError,
+} from '../../errors/domainErrors.js';
 import { logger } from '../../utils/logger.js';
 import { buildCliCompilerPrompt } from './compilerPrompt.js';
 import { defaultCliErrorClassifier, type CliErrorClassifier } from './cliErrorClassifier.js';
@@ -60,7 +64,7 @@ export class CliCompilerProvider implements IModelProvider {
       ? `${userPrompt}\nReturn only a JSON object matching this schema: ${JSON.stringify(input.outputSchema)}`
       : userPrompt;
     const startTime = Date.now();
-    const timeoutMs = Math.min(input.timeoutMs ?? this.timeoutMs, this.timeoutMs);
+    const timeoutMs = Math.min(input.timeoutMs, this.timeoutMs);
     const safeJobDirName = jobId.replace(/[^a-zA-Z0-9_-]/g, '_');
     await fs.mkdir(this.tempBaseDir, { recursive: true });
     const tempDir = await fs.mkdtemp(
@@ -172,11 +176,11 @@ export class CliCompilerProvider implements IModelProvider {
       const tryReadOutputFile = async (): Promise<unknown | null> => {
         try {
           const stat = await fs.stat(outputFile);
-          if (stat.size > env.COMPILER_MAX_OUTPUT_CHARS * 4)
-            throw new CompilerValidationError('Model output exceeds the configured size limit.');
+          if (stat.size > env.COMPILER_MAX_OUTPUT_CHARS * 4) throw new CompilerOutputTooLargeError();
           const content = await fs.readFile(outputFile, 'utf-8');
-          if (content.length > env.COMPILER_MAX_OUTPUT_CHARS)
-            throw new CompilerValidationError('Model output exceeds the configured size limit.');
+          if (content.length > env.COMPILER_MAX_OUTPUT_CHARS) {
+            throw new CompilerOutputTooLargeError();
+          }
           if (!content.trim()) return null;
           const parsed: unknown = parseCliJson(content);
           return parsed;

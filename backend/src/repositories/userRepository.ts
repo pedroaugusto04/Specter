@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
-import { getDb, type Database } from '../db/index.js';
+import type { Database } from '../db/index.js';
 import { users } from '../db/schema.js';
+import { PersistenceError } from '../errors/domainErrors.js';
 import { UserMapper } from '../mappers/userMapper.js';
 import type { UserEntity } from '../types/domain.js';
-export type { UserEntity };
 
 export interface CreateUserInput {
   email: string;
@@ -31,11 +31,7 @@ export interface IUserRepository {
 }
 
 export class DrizzleUserRepository implements IUserRepository {
-  private readonly db: Database;
-
-  constructor(db?: Database) {
-    this.db = db ?? getDb();
-  }
+  constructor(private readonly db: Database) {}
 
   async findById(id: string): Promise<UserEntity | null> {
     const [row] = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
@@ -66,7 +62,7 @@ export class DrizzleUserRepository implements IUserRepository {
       .returning();
 
     if (!row) {
-      throw new Error('Failed to create user record.');
+      throw new PersistenceError('create user record');
     }
 
     return UserMapper.rowToEntity(row);

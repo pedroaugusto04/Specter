@@ -1,4 +1,4 @@
-import type { RunProgress } from './run.js';
+import type { RunMetadata, RunPhase } from './run.js';
 import type { ExtractionPlan, ExtractionReport } from './extractionPlan.js';
 import type { ChangeStatus, JobStatus, RunStatus } from './enums.js';
 import type { ExtractedPayload } from './extractor.js';
@@ -23,7 +23,6 @@ export interface UserIntegrationEntity {
   id: string;
   userId: string;
   telegramEnabled: boolean;
-  telegramBotToken: string | null;
   telegramChatId: string | null;
   webhookEnabled: boolean;
   webhookUrl: string | null;
@@ -50,27 +49,35 @@ export interface ScrapingJobEntity {
   url: string;
   userPrompt: string;
   notificationEmail: string | null;
-  webhookUrl?: string | null;
-  webhookSecret?: string | null;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
   cronExpression: string;
   bullmqRepeatableKey: string | null;
-  contractRevision?: string | null;
-  planRevision?: string | null;
+  contractRevision: string | null;
+  planRevision: string | null;
   extractionPlan: ExtractionPlan | null;
   status: JobStatus;
   lastError: string | null;
-  recoveryAttempts?: number;
-  recoveryWindowStartedAt?: Date | null;
+  recoveryAttempts: number;
+  recoveryWindowStartedAt: Date | null;
   captureScreenshotOnChange: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface JobRunEntity extends RunProgress {
+export interface JobRunEntity {
   id: string;
   jobId: string;
-  contractRevision?: string | null;
-  extractionReport?: ExtractionReport | null;
+  originQueueId: string | null;
+  phase: RunPhase | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  nextAttemptAt: Date | null;
+  monitorUpdatedAt: Date | null;
+  recoveredAutomatically: boolean;
+  metadata: RunMetadata | null;
+  contractRevision: string | null;
+  extractionReport: ExtractionReport | null;
   extractedData: ExtractedPayload | null;
   normalizedHash: string | null;
   hasChanges: ChangeStatus;

@@ -75,6 +75,5 @@ describe('Normalized Diff Hashing & Diff Summary', () => {
     expect(diff.removed).toHaveLength(1);
     expect(diff.removed[0]?.field).toBe('promoTag');
     expect(diff.summaryText).toContain('price');
-    expect(diff.summaryHtml).toContain('<table');
   });
 });

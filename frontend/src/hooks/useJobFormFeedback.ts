@@ -1,8 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import type { JobFormValues } from '@/forms/jobForm';
+import { formToValidationData, type JobFormValues } from '@/forms/jobForm';
+import { extractFormError } from '@/lib/api';
 import { validateJobForm, type JobFormField } from '@/lib/validation';
+
+const JOB_FORM_FIELDS: readonly JobFormField[] = [
+  'name',
+  'url',
+  'userPrompt',
+  'notificationEmail',
+  'cronExpression',
+];
 
 /** Validation and field feedback shared by creation and editing. */
 export function useJobFormFeedback(
@@ -43,18 +52,23 @@ export function useJobFormFeedback(
       }));
       return false;
     }
-    const validation = validateJobForm({
-      name: values.name,
-      url: values.url,
-      userPrompt: values.userPrompt,
-      notificationEmail: values.sendEmailAlerts ? values.notificationEmail : '',
-      cronExpression: values.useCustomCron ? values.customCron : values.cronPreset,
-    });
+    const validation = validateJobForm(formToValidationData(values));
     if (!validation.isValid) {
       setFieldErrors(validation.errors);
       focusFirstInvalidField(validation.errors);
     }
     return validation.isValid;
+  };
+
+  const applyApiError = (error: unknown, fallbackMessage: string): boolean => {
+    const extracted = extractFormError(error, JOB_FORM_FIELDS, fallbackMessage);
+    const hasFieldErrors = Object.keys(extracted.fieldErrors).length > 0;
+    if (hasFieldErrors) {
+      setFieldErrors(extracted.fieldErrors);
+      focusFirstInvalidField(extracted.fieldErrors);
+    }
+    setGlobalError(extracted.globalError);
+    return hasFieldErrors;
   };
 
   return {
@@ -65,5 +79,6 @@ export function useJobFormFeedback(
     clearFieldError,
     focusFirstInvalidField,
     validateFields,
+    applyApiError,
   };
 }

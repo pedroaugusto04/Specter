@@ -1,7 +1,7 @@
-import type { IntentField } from '@specter/contracts';
+import type { FieldDefinitionDto } from '@specter/contracts';
 import { formatObservedNumber } from './numberFormatting';
 
-export type ExtractionFieldDefinitions = Record<string, Pick<IntentField, 'displayName' | 'type' | 'locale'>>;
+export type ExtractionFieldDefinitions = Record<string, FieldDefinitionDto>;
 
 export function getExtractionFieldLabels(fields: ExtractionFieldDefinitions = {}) {
   return Object.fromEntries(
@@ -14,25 +14,24 @@ export function localizeExtractedPayload(
   fields: ExtractionFieldDefinitions = {}
 ): unknown {
   const labels = getExtractionFieldLabels(fields);
-  const localizeRecord = (record: unknown) => {
-    if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
-    return Object.fromEntries(
+
+  const localizeRecord = (record: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(
       Object.entries(record).map(([key, value]) => {
-        const field = fields[key] ?? Object.values(fields).find(
-          (candidate) => candidate.displayName?.trim() === key
-        );
-        const displayLabel = field?.displayName || key;
+        const field =
+          fields[key] ??
+          Object.values(fields).find((candidate) => candidate.displayName?.trim() === key);
+        const label = labels[key] ?? key;
         if (field?.type !== 'number') {
-          return [labels[key] ?? key, localizeNested(value)];
+          return [label, localizeNested(value)];
         }
-        const formatted = formatObservedNumber(value, field?.locale, displayLabel);
-        return [labels[key] ?? key, formatted];
+        return [label, formatObservedNumber(value, field.locale, field.displayName || key)];
       })
     );
-  };
+
   const localizeNested = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(localizeNested);
-    if (value && typeof value === 'object') return localizeRecord(value);
+    if (value && typeof value === 'object') return localizeRecord(value as Record<string, unknown>);
     return value;
   };
 

@@ -1,3 +1,4 @@
+import { isCollectionPayload, type ExtractedRecord } from '@specter/contracts';
 import type { JobRunDto } from '@/lib/api';
 
 function escapeCsvField(val: unknown): string {
@@ -9,62 +10,54 @@ function escapeCsvField(val: unknown): string {
   return str;
 }
 
+function runRecords(run: JobRunDto): ExtractedRecord[] {
+  if (!run.extractedData) return [];
+  if (isCollectionPayload(run.extractedData)) return run.extractedData.items;
+  return [run.extractedData];
+}
+
 export function runsToCsv(runs: JobRunDto[]): string {
-  if (!runs || runs.length === 0) return '';
+  if (runs.length === 0) return '';
 
   const dataFieldKeys = new Set<string>();
-  for (const r of runs) {
-    if (r.extractedData && typeof r.extractedData === 'object' && !Array.isArray(r.extractedData)) {
-      if ('items' in r.extractedData && Array.isArray((r.extractedData as Record<string, unknown>).items)) {
-        const items = (r.extractedData as Record<string, unknown>).items as unknown[];
-        for (const item of items) {
-          if (typeof item === 'object' && item !== null) {
-            Object.keys(item).forEach((k) => dataFieldKeys.add(k));
-          }
-        }
-      } else {
-        Object.keys(r.extractedData).forEach((k) => dataFieldKeys.add(k));
+  for (const run of runs) {
+    for (const record of runRecords(run)) {
+      for (const key of Object.keys(record)) {
+        dataFieldKeys.add(key);
       }
     }
   }
 
-  const standardHeaders = ['Run ID', 'Executed At', 'Status', 'HTTP Status', 'Duration (ms)', 'Has Changes'];
+  const standardHeaders = [
+    'Run ID',
+    'Executed At',
+    'Status',
+    'HTTP Status',
+    'Duration (ms)',
+    'Has Changes',
+  ];
   const dataHeaders = Array.from(dataFieldKeys);
-  const allHeaders = [...standardHeaders, ...dataHeaders];
+  const rows: string[] = [[...standardHeaders, ...dataHeaders].map(escapeCsvField).join(',')];
 
-  const rows: string[] = [];
-  rows.push(allHeaders.map(escapeCsvField).join(','));
-
-  for (const r of runs) {
+  for (const run of runs) {
     const baseCols = [
-      r.id,
-      r.executedAt,
-      r.status,
-      r.httpStatus ?? '',
-      r.durationMs ?? '',
-      r.hasChanges ?? '',
+      run.id,
+      run.executedAt,
+      run.status,
+      run.httpStatus ?? '',
+      run.durationMs ?? '',
+      run.hasChanges,
     ];
+    const records = runRecords(run);
 
-    if (r.extractedData && typeof r.extractedData === 'object') {
-      if ('items' in r.extractedData && Array.isArray((r.extractedData as Record<string, unknown>).items)) {
-        const items = (r.extractedData as Record<string, unknown>).items as unknown[];
-        if (items.length === 0) {
-          const dataCols = dataHeaders.map(() => '');
-          rows.push([...baseCols, ...dataCols].map(escapeCsvField).join(','));
-        } else {
-          for (const item of items) {
-            const itemRecord = (item as Record<string, unknown>) ?? {};
-            const dataCols = dataHeaders.map((k) => itemRecord[k] ?? '');
-            rows.push([...baseCols, ...dataCols].map(escapeCsvField).join(','));
-          }
-        }
-      } else {
-        const record = r.extractedData as Record<string, unknown>;
-        const dataCols = dataHeaders.map((k) => record[k] ?? '');
-        rows.push([...baseCols, ...dataCols].map(escapeCsvField).join(','));
-      }
-    } else {
-      const dataCols = dataHeaders.map(() => '');
+    if (records.length === 0) {
+      const emptyCols = dataHeaders.map(() => '');
+      rows.push([...baseCols, ...emptyCols].map(escapeCsvField).join(','));
+      continue;
+    }
+
+    for (const record of records) {
+      const dataCols = dataHeaders.map((key) => record[key] ?? '');
       rows.push([...baseCols, ...dataCols].map(escapeCsvField).join(','));
     }
   }
@@ -74,17 +67,17 @@ export function runsToCsv(runs: JobRunDto[]): string {
 }
 
 export function runsToJson(runs: JobRunDto[]): string {
-  const formatted = runs.map((r) => ({
-    id: r.id,
-    jobId: r.jobId,
-    executedAt: r.executedAt,
-    status: r.status,
-    httpStatus: r.httpStatus,
-    durationMs: r.durationMs,
-    hasChanges: r.hasChanges,
-    errorMessage: r.errorMessage,
-    screenshotUrl: r.screenshotUrl,
-    extractedData: r.extractedData,
+  const formatted = runs.map((run) => ({
+    id: run.id,
+    jobId: run.jobId,
+    executedAt: run.executedAt,
+    status: run.status,
+    httpStatus: run.httpStatus,
+    durationMs: run.durationMs,
+    hasChanges: run.hasChanges,
+    errorMessage: run.errorMessage,
+    screenshotUrl: run.screenshotUrl,
+    extractedData: run.extractedData,
   }));
   return JSON.stringify(formatted, null, 2);
 }

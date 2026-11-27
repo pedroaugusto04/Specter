@@ -7,6 +7,7 @@ import { SessionService } from '../../src/services/sessionService.js';
 import { IntegrationService } from '../../src/services/integrationService.js';
 import type { ISessionRepository } from '../../src/repositories/sessionRepository.js';
 import {
+  createTestJobPresenter,
   createTestQuotaService,
   createTestRealtimeService,
   InMemoryJobRepository,
@@ -27,7 +28,6 @@ async function setup() {
   const auth = new AuthService(users);
   const sessions: ISessionRepository = {
     findByUserAndDomain: async () => null,
-    findById: async () => null,
     listPageByUserId: async (userId, page, pageSize) => ({
       items: [
         {
@@ -84,6 +84,7 @@ async function setup() {
       sessionRepository: sessions,
       realtimeService,
       quotaService,
+      presenter: createTestJobPresenter(jobs, sessions),
     }),
     authService: auth,
     integrationService: new IntegrationService(integrations, telegram, webhook),
@@ -109,7 +110,6 @@ describe('API credential boundaries', () => {
   it('keeps credentials and session cookies out of API responses', async () => {
     const { app, headers, userId, integrations } = await setup();
     await integrations.upsert(userId, {
-      telegramBotToken: 'private-bot-token',
       webhookSecret: 'private-signing-secret',
       webhookEnabled: true,
       webhookUrl: 'https://example.com',
