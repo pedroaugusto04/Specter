@@ -1,0 +1,34 @@
+{
+  "$schema": "https://agenticresourcediscovery.org/schemas/ard-manifest.schema.json",
+  "entries": [
+    {
+      "@context": "https://schema.org",
+      "@id": "urn:air:specterdev.online:apps:specter",
+      "identifier": "urn:air:specterdev.online:apps:specter",
+      "displayName": "Specter",
+      "type": "text/html",
+      "description": "Web change monitor that turns a URL and plain-language prompt into scheduled deterministic checks with visual diffs, self-healing selectors, and alerts.",
+      "tags": [
+        "web-monitoring",
+        "change-detection",
+        "visual-diff",
+        "web-scraping",
+        "alerts"
+      ],
+      "capabilities": [
+        "website-change-monitoring",
+        "visual-diff-comparison",
+        "scheduled-extraction",
+        "webhook-and-telegram-alerts"
+      ],
+      "representativeQueries": [
+        "Monitor a website for price or stock changes",
+        "Track visual and content updates on a web page automatically",
+        "Set up scheduled web scraping alerts with visual diffs"
+      ],
+      "version": "1.0.0",
+      "updatedAt": "2026-11-27T00:00:00Z",
+      "url": "https://specterdev.online"
+    }
+  ]
+}

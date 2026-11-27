@@ -13,7 +13,7 @@ afterEach(async () => {
   );
 });
 describe('Codex transport', () => {
-  it('uses default read-only arguments with a portable node subprocess', async () => {
+  it('uses hardened read-only stdin arguments with shell tools disabled and no prompt files on disk', async () => {
     vi.stubEnv('JWT_SECRET', 'backend-session-secret');
     vi.stubEnv('DATABASE_URL', 'postgresql://secret@db/app');
     vi.stubEnv('OPENAI_API_KEY', 'test-cli-credential');
@@ -25,10 +25,18 @@ describe('Codex transport', () => {
     await writeFile(
       executable,
       `const fs=require('node:fs');const args=process.argv.slice(2);
-      const expected=['exec','--ephemeral','--skip-git-repo-check','--sandbox','read-only'];
+      const expected=[
+        'exec','--ephemeral','--skip-git-repo-check','--ignore-user-config','--ignore-rules',
+        '--disable','shell_tool','--disable','unified_exec','--disable','apps',
+        '--disable','browser_use','--disable','computer_use','--sandbox','read-only'
+      ];
       if(!expected.every((value,index)=>args[index]===value))process.exit(11);
       const index=args.indexOf('--output-last-message');if(index<0)process.exit(12);
-      const prompt=fs.readFileSync('prompt.md','utf8');if(!prompt.includes('Find the page title'))process.exit(13);
+      if(args[args.length-1]!=='-')process.exit(18);
+      if(fs.existsSync('prompt.md')||fs.existsSync('dom.html'))process.exit(19);
+      const prompt=fs.readFileSync(0,'utf8');
+      if(!prompt.includes('Find the page title'))process.exit(13);
+      if(!prompt.includes('<h1>Example</h1>'))process.exit(20);
       const schema=${JSON.stringify(JSON.stringify({ type: 'object', properties: { version: { type: 'number' } }, required: ['version'] }))};
       if(prompt.split(schema).length!==2)process.exit(14);
       if(!prompt.includes('untrusted data'))process.exit(15);
@@ -58,7 +66,7 @@ describe('Codex transport', () => {
     expect(await readdir(path.join(root, 'work'))).toEqual([]);
   });
 
-  it('supports configured danger-full-access sandbox for container environments', async () => {
+  it('supports explicit sandbox override while keeping shell tools disabled', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'specter-codex-sandbox-'));
     directories.push(root);
     const executable = path.join(root, 'fake-codex-sandbox.cjs');
@@ -66,13 +74,14 @@ describe('Codex transport', () => {
     await writeFile(
       executable,
       `const fs=require('node:fs');const args=process.argv.slice(2);
-      const expected=['exec','--ephemeral','--skip-git-repo-check','--sandbox','danger-full-access'];
-      if(!expected.every((value,index)=>args[index]===value))process.exit(11);
+      const sandboxIdx=args.indexOf('--sandbox');
+      if(sandboxIdx<0 || args[sandboxIdx+1]!=='workspace-write')process.exit(11);
+      if(!args.includes('--ignore-user-config') || !args.includes('shell_tool'))process.exit(12);
       const index=args.indexOf('--output-last-message');
       fs.writeFileSync(args[index+1], ${JSON.stringify(JSON.stringify(output))});process.exit(0);`
     );
     const provider = new CodexCompilerProvider({
-      sandbox: 'danger-full-access',
+      sandbox: 'workspace-write',
       tempBaseDir: path.join(root, 'work'),
       spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
         spawn(process.execPath, [executable, ...args], options),

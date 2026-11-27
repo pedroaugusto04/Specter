@@ -26,3 +26,17 @@ ${taskInstructions}
 Read evidence only from ${JSON.stringify(domFilePath)}.
 Return only the final JSON result. Do not modify files. File-reading tools or commands may read only the supplied evidence file; no other commands or network access.`;
 }
+export function buildCodexStdinCompilerPrompt(
+  evidence: string,
+  taskInstructions: string
+): string {
+  return `${MODEL_SYSTEM_INSTRUCTIONS}
+Return only the final JSON result. Do not call any tools, run commands, access the network, or read or modify files.
+
+Backend task:
+${taskInstructions}
+
+<untrusted_evidence>
+${evidence}
+</untrusted_evidence>`;
+}

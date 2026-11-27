@@ -80,7 +80,7 @@ env:
   COMPILER_API_MODEL: ${{ vars.COMPILER_API_MODEL || '' }}
   AGY_MODEL: ${{ vars.AGY_MODEL || '' }}
   COMPILER_CODEX_MODEL: ${{ vars.COMPILER_CODEX_MODEL || 'gpt-6-luna' }}
-  COMPILER_CODEX_SANDBOX: ${{ vars.COMPILER_CODEX_SANDBOX || 'danger-full-access' }}
+  COMPILER_CODEX_SANDBOX: ${{ vars.COMPILER_CODEX_SANDBOX || 'read-only' }}
   COMPILER_API_BASE_URL: ${{ vars.COMPILER_API_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
   COMPILER_API_MAX_RETRIES: ${{ vars.COMPILER_API_MAX_RETRIES || '3' }}
   COMPILER_API_RETRY_BASE_DELAY_MS: ${{ vars.COMPILER_API_RETRY_BASE_DELAY_MS || '1000' }}
