@@ -1,23 +1,17 @@
 # Specter
 
-> Automated website change monitor & visual diff tracking.
+> Automated website change monitor with AI-assisted setup, deterministic scheduled checks, and visual diff tracking.
 
-Specter is an automated website monitoring tool that detects visual and content changes across any public web page on scheduled intervals and delivers instant alerts.
+Specter turns a URL and a plain-language prompt into a scheduled web monitor. AI inspects the page to build and repair extraction plans, while routine checks run deterministically with no LLM calls.
 
 ## Key Capabilities
 - **Visual Diff Tracking**: Capture page snapshots and compare them side-by-side with an interactive comparison slider.
-- **Scheduled Monitoring**: Configure automated checks on your custom schedule—from every 15 minutes to daily intervals.
-- **Instant Alerts**: Dispatch notifications to Telegram channels/bots, custom Webhook endpoints (Discord, Slack, Zapier), and email.
-- **Dynamic Modern Web Support**: Fully renders dynamic web pages and interactive content before evaluating changes.
+- **Scheduled Monitoring**: Configure automated checks on custom cron schedules with a 15-minute minimum interval.
+- **Instant Alerts**: Dispatch notifications to Telegram, custom Webhooks (Discord, Slack, Zapier), and email.
+- **Self-Healing Plans**: Detect layout changes and automatically revise broken selectors with version history and rollback.
 
-## Target Use Cases
-- Tracking competitor pricing and product availability changes.
-- Monitoring regulatory, compliance, and legal terms updates.
-- Detecting website defacement, unexpected visual changes, and layout regressions.
-- Keeping track of critical page modifications without manual inspection.
-
-## Canonical URLs
-- Website: https://specterdev.online
-- GitHub: https://github.com/pedroaugusto04/Specter
-- Privacy Policy: https://specterdev.online/privacy/
-- Terms of Service: https://specterdev.online/terms/
+## Resources
+- [Specter Website](https://specterdev.online): Product overview and hosted web application.
+- [GitHub Repository](https://github.com/pedroaugusto04/Specter): Source code, Docker quick start, and self-hosting instructions.
+- [Privacy Policy](https://specterdev.online/privacy/): Data handling and privacy terms for Specter and Specter Companion.
+- [Terms of Service](https://specterdev.online/terms/): Service terms and acceptable use policy.

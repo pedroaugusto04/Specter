@@ -85,14 +85,13 @@ services:
       MAX_RECOVERY_ATTEMPTS: ${MAX_RECOVERY_ATTEMPTS:-3}
       CODEX_CLI_PATH: /usr/local/bin/codex
       COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
-      COMPILER_CODEX_SANDBOX: ${COMPILER_CODEX_SANDBOX:-danger-full-access}
-      CODEX_HOME: /root/.codex
+      COMPILER_CODEX_SANDBOX: ${COMPILER_CODEX_SANDBOX:-read-only}
+      CODEX_HOME: /home/node/.codex
     ports:
-      - '${PORT:-3001}:3001'
+      - '${BIND_HOST:-127.0.0.1}:${PORT:-3001}:3001'
     volumes:
       - compiler_jobs:/tmp/scraper_jobs
-      - ${CODEX_HOST_DIR:-/home/ubuntu/.codex}:/root/.codex
-      - ${GEMINI_HOST_DIR:-/home/ubuntu/.gemini}:/root/.gemini
+      - ${CODEX_HOST_DIR:-/home/ubuntu/.codex}:/home/node/.codex
     depends_on:
       postgres:
         condition: service_healthy

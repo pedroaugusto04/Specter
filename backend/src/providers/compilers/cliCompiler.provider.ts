@@ -20,6 +20,7 @@ export interface CliCompilerOptions {
   model?: string;
   cliArgsBuilder?: (promptFile: string, outputFile: string) => string[];
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
+  stdinPromptBuilder?: (evidence: string, taskInstructions: string) => string;
   tempBaseDir?: string;
   timeoutMs?: number;
   errorClassifier?: CliErrorClassifier;
@@ -39,6 +40,7 @@ export class CliCompilerProvider implements IModelProvider {
     | ((command: string, args: readonly string[], options: SpawnOptions) => ChildProcess)
     | typeof spawn;
   private readonly promptBuilder: NonNullable<CliCompilerOptions['promptBuilder']>;
+  private readonly stdinPromptBuilder?: CliCompilerOptions['stdinPromptBuilder'];
 
   constructor(options: CliCompilerOptions = {}) {
     this.name = options.providerName ?? 'cli';
@@ -56,6 +58,7 @@ export class CliCompilerProvider implements IModelProvider {
     this.timeoutMs = options.timeoutMs ?? env.COMPILER_TIMEOUT_MS;
     this.spawnFn = options.spawnFn ?? spawn;
     this.promptBuilder = options.promptBuilder ?? buildCliCompilerPrompt;
+    this.stdinPromptBuilder = options.stdinPromptBuilder;
   }
 
   async generate(input: ModelInput): Promise<unknown> {
@@ -75,12 +78,18 @@ export class CliCompilerProvider implements IModelProvider {
     const domFile = path.join(tempDir, 'dom.html');
     const outputFile = path.join(tempDir, 'extractor.json');
 
-    await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
-    await fs.writeFile(
-      promptFile,
-      this.promptBuilder(domFile, outputFile, taskInstructions),
-      'utf-8'
-    );
+    const stdinPayload = this.stdinPromptBuilder
+      ? this.stdinPromptBuilder(sanitizedHtml, taskInstructions)
+      : undefined;
+
+    if (stdinPayload === undefined) {
+      await fs.writeFile(domFile, sanitizedHtml, 'utf-8');
+      await fs.writeFile(
+        promptFile,
+        this.promptBuilder(domFile, outputFile, taskInstructions),
+        'utf-8'
+      );
+    }
 
     const langfuse = getLangfuse();
     const trace = langfuse?.trace({
@@ -106,7 +115,7 @@ export class CliCompilerProvider implements IModelProvider {
       const args = this.cliArgsBuilder(promptFile, outputFile);
       const spawnOpts: SpawnOptions = {
         cwd: tempDir,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [stdinPayload !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         detached: false,
         signal: input.signal,
         env: compilerEnvironment(this.name),
@@ -114,6 +123,12 @@ export class CliCompilerProvider implements IModelProvider {
 
       let stderrBuffer = '';
       const cliProcess = this.spawnFn(this.cliCommand, args, spawnOpts);
+      if (stdinPayload !== undefined && cliProcess.stdin) {
+        cliProcess.stdin.on('error', () => {
+          // Ignore EPIPE when the subprocess exits before consuming stdin.
+        });
+        cliProcess.stdin.end(stdinPayload, 'utf-8');
+      }
       // Drain streams so a verbose CLI cannot deadlock on a full pipe.
       cliProcess.stdout?.resume();
       cliProcess.stderr?.on('data', (chunk: Buffer | string) => {

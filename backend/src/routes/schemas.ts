@@ -67,7 +67,8 @@ const userPromptSchema = z
       issue.input === undefined ? 'Extraction instructions are required' : undefined,
   })
   .trim()
-  .min(5, 'Extraction instructions must contain at least 5 characters');
+  .min(5, 'Extraction instructions must contain at least 5 characters')
+  .max(2000, 'Extraction instructions must be 2000 characters or fewer');
 
 const emailAddressSchema = z
   .string({ error: (issue) => (issue.input === undefined ? 'Email is required' : undefined) })

@@ -86,6 +86,26 @@ describe('Environment configuration', () => {
     ).toBe('api');
     expect(parseEnv(base).COMPILER_PROVIDER).toBe('agy');
   });
+  it('blocks full-access Codex sandboxes in production while allowing read-only', () => {
+    const prodBase = {
+      NODE_ENV: 'production',
+      JWT_SECRET: 'valid-production-jwt-secret',
+      ENCRYPTION_KEY: 'a'.repeat(64),
+      COMPILER_PROVIDER: 'codex',
+    };
+    expect(() =>
+      parseEnv({ ...prodBase, COMPILER_CODEX_SANDBOX: 'danger-full-access' })
+    ).toThrow('COMPILER_CODEX_SANDBOX');
+    expect(() =>
+      parseEnv({
+        ...prodBase,
+        COMPILER_CODEX_SANDBOX: 'dangerously-bypass-approvals-and-sandbox',
+      })
+    ).toThrow('COMPILER_CODEX_SANDBOX');
+    expect(
+      parseEnv({ ...prodBase, COMPILER_CODEX_SANDBOX: 'read-only' }).COMPILER_CODEX_SANDBOX
+    ).toBe('read-only');
+  });
   it('preserves custom values through the deployment environment generator', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'specter-env-'));
     try {

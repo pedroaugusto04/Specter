@@ -18,6 +18,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOST=0.0.0.0
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Install Playwright Chromium and system dependencies required for headless browser
 RUN apt-get update && \
@@ -31,7 +32,7 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # Keep the local Codex provider available inside the backend container.
-RUN npm install --global @openai/codex@0.163.0
+RUN npm install --global @openai/codex@0.172.0
 
 # Install Playwright browser binaries with system dependencies
 RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
@@ -44,6 +45,11 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/tests/fixtures/configuration-evaluation-corpus.json ./tests/fixtures/configuration-evaluation-corpus.json
 COPY backend/drizzle.config.ts ./
+
+RUN mkdir -p /tmp/scraper_jobs /home/node/.codex && \
+    chown -R node:node /app /ms-playwright /tmp/scraper_jobs /home/node/.codex
+
+USER node
 
 EXPOSE 3001
 

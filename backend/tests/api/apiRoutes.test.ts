@@ -669,4 +669,18 @@ describe('Fastify REST API Endpoints (Black-Box Behavioral Tests)', () => {
     });
     expect(conflictRunningRes.statusCode).toBe(409);
   });
+
+  it('rejects oversized userPrompt payloads above 2000 characters', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      headers: { cookie: authCookie },
+      payload: {
+        url: 'https://news.example.com/tech',
+        userPrompt: 'a'.repeat(2001),
+        cronExpression: '*/30 * * * *',
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
 });

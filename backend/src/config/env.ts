@@ -229,6 +229,17 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     );
   }
 
+  if (
+    parsed.NODE_ENV === 'production' &&
+    parsed.COMPILER_PROVIDER === 'codex' &&
+    (parsed.COMPILER_CODEX_SANDBOX === 'danger-full-access' ||
+      parsed.COMPILER_CODEX_SANDBOX === 'dangerously-bypass-approvals-and-sandbox')
+  ) {
+    throw new Error(
+      'Invalid environment configuration:\n  - COMPILER_CODEX_SANDBOX: In production, Codex must run with "read-only" (or "workspace-write") sandbox; full-access modes are forbidden.'
+    );
+  }
+
   return parsed;
 }
 
