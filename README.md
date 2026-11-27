@@ -53,17 +53,13 @@ Full version control for every extraction plan. Review prompt iterations, audit 
 <a name="how-it-works"></a>
 ## How It Works
 
-```mermaid
-flowchart LR
-    User([User Prompt & URL]) --> Compiler[Extraction Compiler\nAI-assisted plan synthesis]
-    Compiler --> Plan[(Extraction Plan\nSelectors, Schema & Validation)]
-    Plan --> Worker[Scheduled Workers\nDeterministic 0-token runs]
-    Worker --> Engine[Playwright / HTTP Engine]
-    Engine --> Diff[Diffing & Change Detection]
-    Diff --> Notify[Alerts\nEmail / Telegram / Webhook]
-    Diff -. Redesign or Broken Selectors .-> AutoHeal[Self-Healing Recovery\nBounded plan revision]
-    AutoHeal -. Updates .-> Plan
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/architecture-light.svg" />
+    <img alt="Specter Architecture" src="assets/architecture-light.svg" width="100%" />
+  </picture>
+</p>
 
 1. **Synthesize Plan**: You provide a target URL and what you want to extract. Specter fetches the live DOM and uses a model (Gemini or Codex) to compile robust CSS selectors, parsing rules, and schema assertions.
 2. **Deterministic Polling**: Scheduled background workers periodically execute the compiled plan using headless Chromium or lightweight HTTP. No AI models are called during normal execution, keeping operational costs near zero.
