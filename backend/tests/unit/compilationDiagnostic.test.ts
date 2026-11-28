@@ -113,7 +113,9 @@ describe('CompilationDiagnosticService', () => {
     });
 
     expect(result).toBeNull();
-    const evidenceArg = JSON.parse(generate.mock.calls[0][0].evidence) as {
+    const firstCall = generate.mock.calls[0];
+    expect(firstCall).toBeDefined();
+    const evidenceArg = JSON.parse(firstCall![0].evidence) as {
       userPrompt: string;
       failureContext: string;
     };
