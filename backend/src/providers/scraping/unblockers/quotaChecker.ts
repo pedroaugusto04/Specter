@@ -213,19 +213,21 @@ function buildProxyQuotaInfo(
 export async function checkAllProviderQuotas(
   fetchFn: typeof fetch = fetch
 ): Promise<ProviderQuotaInfo[]> {
-  const results: ProviderQuotaInfo[] = [];
+  const remoteChecks: Array<Promise<ProviderQuotaInfo>> = [];
 
   if (env.SCRAPERAPI_KEY) {
-    results.push(await checkScraperApiQuota(env.SCRAPERAPI_KEY, fetchFn));
+    remoteChecks.push(checkScraperApiQuota(env.SCRAPERAPI_KEY, fetchFn));
   }
 
   if (env.SCRAPINGBEE_API_KEY) {
-    results.push(await checkScrapingBeeQuota(env.SCRAPINGBEE_API_KEY, fetchFn));
+    remoteChecks.push(checkScrapingBeeQuota(env.SCRAPINGBEE_API_KEY, fetchFn));
   }
 
   if (env.CRAWLBASE_TOKEN) {
-    results.push(await checkCrawlbaseQuota(env.CRAWLBASE_TOKEN, fetchFn));
+    remoteChecks.push(checkCrawlbaseQuota(env.CRAWLBASE_TOKEN, fetchFn));
   }
+
+  const results: ProviderQuotaInfo[] = await Promise.all(remoteChecks);
 
   if (env.ZENROWS_API_KEY) {
     results.push({

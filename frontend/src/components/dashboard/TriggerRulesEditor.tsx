@@ -84,6 +84,23 @@ export function TriggerHelpCallout({ onDismiss }: { onDismiss?: () => void }) {
   );
 }
 
+const CHANGE_ONLY_OPERATORS = new Set<TriggerOperator>([
+  TriggerOperator.Decreased,
+  TriggerOperator.Increased,
+  TriggerOperator.Changes,
+]);
+
+const NUMERIC_VALUE_OPERATORS = new Set<TriggerOperator>([
+  TriggerOperator.LessThan,
+  TriggerOperator.LessThanOrEqual,
+  TriggerOperator.GreaterThan,
+  TriggerOperator.GreaterThanOrEqual,
+  TriggerOperator.PercentageDrop,
+  TriggerOperator.PercentageIncrease,
+]);
+
+const ALL_TRIGGER_OPERATORS = Object.values(TriggerOperator);
+
 export function TriggerRulesEditor({
   triggerRules,
   onChange,
@@ -208,7 +225,9 @@ export function TriggerRulesEditor({
         <div className="space-y-2">
           {triggerRules.map((rule, idx) => {
             const fieldType = fieldTypes[rule.field]?.type;
-            const allowedOperators = fieldType ? triggerOperatorsForType(fieldType) : [];
+            const allowedOperators = fieldType
+              ? triggerOperatorsForType(fieldType)
+              : ALL_TRIGGER_OPERATORS;
 
             return (
               <div
@@ -333,13 +352,7 @@ export function TriggerRulesEditor({
 
                 {/* Value input */}
                 <div className="w-full sm:w-1/3">
-                  {(
-                    [
-                      TriggerOperator.Decreased,
-                      TriggerOperator.Increased,
-                      TriggerOperator.Changes,
-                    ] as TriggerOperator[]
-                  ).includes(rule.operator) ? (
+                  {CHANGE_ONLY_OPERATORS.has(rule.operator) ? (
                     <div className="h-8 flex items-center px-2.5 rounded border border-input bg-muted/40 text-xs text-muted-foreground italic select-none">
                       Any change detected
                     </div>
@@ -354,20 +367,7 @@ export function TriggerRulesEditor({
                     </select>
                   ) : (
                     <Input
-                      type={
-                        (
-                          [
-                            TriggerOperator.LessThan,
-                            TriggerOperator.LessThanOrEqual,
-                            TriggerOperator.GreaterThan,
-                            TriggerOperator.GreaterThanOrEqual,
-                            TriggerOperator.PercentageDrop,
-                            TriggerOperator.PercentageIncrease,
-                          ] as TriggerOperator[]
-                        ).includes(rule.operator)
-                          ? 'number'
-                          : 'text'
-                      }
+                      type={NUMERIC_VALUE_OPERATORS.has(rule.operator) ? 'number' : 'text'}
                       placeholder={
                         rule.operator === TriggerOperator.PercentageDrop ||
                         rule.operator === TriggerOperator.PercentageIncrease
@@ -377,16 +377,7 @@ export function TriggerRulesEditor({
                       value={String(rule.value ?? '')}
                       className="h-8 text-xs"
                       onChange={(e) => {
-                        const isNum = (
-                          [
-                            TriggerOperator.LessThan,
-                            TriggerOperator.LessThanOrEqual,
-                            TriggerOperator.GreaterThan,
-                            TriggerOperator.GreaterThanOrEqual,
-                            TriggerOperator.PercentageDrop,
-                            TriggerOperator.PercentageIncrease,
-                          ] as TriggerOperator[]
-                        ).includes(rule.operator);
+                        const isNum = NUMERIC_VALUE_OPERATORS.has(rule.operator);
 
                         handleValueChange(
                           idx,

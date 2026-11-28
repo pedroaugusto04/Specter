@@ -147,6 +147,24 @@ export function isInternalHostname(hostname: string): boolean {
  */
 const dnsSafeCache = new Map<string, number>();
 const DNS_CACHE_TTL_MS = 5_000;
+const DNS_CACHE_MAX_ENTRIES = 1_000;
+
+function cacheSafeHostname(hostname: string, nowMs: number): void {
+  if (dnsSafeCache.size >= DNS_CACHE_MAX_ENTRIES) {
+    for (const [key, expiresAt] of dnsSafeCache) {
+      if (expiresAt <= nowMs) {
+        dnsSafeCache.delete(key);
+      }
+    }
+    if (dnsSafeCache.size >= DNS_CACHE_MAX_ENTRIES) {
+      const oldestKey = dnsSafeCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        dnsSafeCache.delete(oldestKey);
+      }
+    }
+  }
+  dnsSafeCache.set(hostname, nowMs + DNS_CACHE_TTL_MS);
+}
 
 export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<string> {
   let parsed: URL;
@@ -209,7 +227,7 @@ export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<
         );
       }
     }
-    dnsSafeCache.set(hostname, Date.now() + DNS_CACHE_TTL_MS);
+    cacheSafeHostname(hostname, Date.now());
   } catch (err) {
     if (err instanceof ValidationError) {
       throw err;

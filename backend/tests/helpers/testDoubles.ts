@@ -206,7 +206,11 @@ export class InMemoryJobRepository implements IJobRepository {
   async findRun(id: string) {
     return this.runs.find((run) => run.id === id) ?? null;
   }
-  async findRunningRuns() {
+  async findRunningRuns(jobIds?: string[]) {
+    if (jobIds !== undefined) {
+      const idSet = new Set(jobIds);
+      return this.runs.filter((run) => run.status === 'RUNNING' && idSet.has(run.jobId));
+    }
     return this.runs.filter((run) => run.status === 'RUNNING');
   }
   async findRunningRun(jobId: string) {

@@ -80,7 +80,6 @@ export interface RecordExtractionOutput {
   failures: Map<string, FieldSourceFailure[]>;
   evidence: PageExtraction['evidence'];
   hasUnhandledSourceError: boolean;
-  unhandledErrors: string[];
 }
 
 export function extractFieldFromSources(params: {
@@ -202,7 +201,6 @@ export function extractSingleContextRecord(params: {
   const record: Record<string, Scalar> = {};
   const failures = new Map<string, FieldSourceFailure[]>();
   const evidence: PageExtraction['evidence'] = [];
-  const unhandledErrors: string[] = [];
   let hasUnhandledSourceError = false;
 
   for (const [name, field] of definitions) {
@@ -241,14 +239,13 @@ export function extractSingleContextRecord(params: {
 
     if (value === null && unhandledSourceError) {
       hasUnhandledSourceError = true;
-      unhandledErrors.push(unhandledSourceError);
       if (!field.required) onFail(unhandledSourceError);
     }
 
     record[name] = value;
   }
 
-  return { record, failures, evidence, hasUnhandledSourceError, unhandledErrors };
+  return { record, failures, evidence, hasUnhandledSourceError };
 }
 
 export function validateSingleModeRecord(params: {

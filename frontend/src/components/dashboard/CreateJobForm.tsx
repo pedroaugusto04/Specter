@@ -31,8 +31,6 @@ import { CheckCircle2, HelpCircle, Loader2, Plus, ShieldCheck } from 'lucide-rea
 import * as React from 'react';
 import { PAGINATION_MAX_PAGE_SIZE } from '@specter/contracts';
 
-export const PENDING_JOB_STORAGE_KEY = 'specter_pending_job';
-
 export interface CreateJobFormProps {
   user?: UserDto | null;
   onAuthenticated?: (user: UserDto) => void;

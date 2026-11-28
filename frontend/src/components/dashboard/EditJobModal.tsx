@@ -68,14 +68,21 @@ export function EditJobModal({ job, isOpen, onClose, onUpdated, user }: EditJobM
     applyApiError,
   } = useJobFormFeedback(values, user?.email, 'edit-');
 
+  const initializedJobIdRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
-    if (job && isOpen) {
+    if (!isOpen) {
+      initializedJobIdRef.current = null;
+      return;
+    }
+    if (job && initializedJobIdRef.current !== job.id) {
+      initializedJobIdRef.current = job.id;
       resetForm(jobToForm(job, user?.email));
       setClearWebhookSecret(false);
       setFieldErrors({});
       setGlobalError(null);
     }
-  }, [job, isOpen]);
+  }, [job, isOpen, resetForm, setFieldErrors, setGlobalError, user?.email]);
 
   const willRecompile = Boolean(
     job && (url.trim() !== job.url || userPrompt.trim() !== job.userPrompt)

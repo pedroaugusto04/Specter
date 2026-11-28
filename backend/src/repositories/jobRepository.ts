@@ -102,7 +102,7 @@ function isScheduleKeyOnlyPatch(patch: UpdateJobPatch): boolean {
 export interface IJobRepository {
   beginRun(job: ScrapingJobEntity, originQueueId: string): Promise<JobRunEntity | null>;
   findRun(id: string): Promise<JobRunEntity | null>;
-  findRunningRuns(): Promise<JobRunEntity[]>;
+  findRunningRuns(jobIds?: string[]): Promise<JobRunEntity[]>;
   findRunningRun(jobId: string): Promise<JobRunEntity | null>;
   cancelRuns(jobId: string): Promise<void>;
   createJob(input: CreateJobInput): Promise<ScrapingJobEntity>;
@@ -171,7 +171,15 @@ export class DrizzleJobRepository implements IJobRepository {
     return row ? JobMapper.runRowToEntity(row) : null;
   }
 
-  async findRunningRuns(): Promise<JobRunEntity[]> {
+  async findRunningRuns(jobIds?: string[]): Promise<JobRunEntity[]> {
+    if (jobIds !== undefined) {
+      if (jobIds.length === 0) return [];
+      const rows = await this.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.status, RunStatus.Running), inArray(jobRuns.jobId, jobIds)));
+      return rows.map(JobMapper.runRowToEntity);
+    }
     const rows = await this.db.select().from(jobRuns).where(eq(jobRuns.status, RunStatus.Running));
     return rows.map(JobMapper.runRowToEntity);
   }

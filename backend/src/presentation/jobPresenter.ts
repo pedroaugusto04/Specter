@@ -25,7 +25,7 @@ export class JobPresenter {
     if (jobs.length === 1) return [await this.present(jobs[0]!)];
 
     // Single indexed query to find all running runs across monitors instead of N separate queries
-    const runningRuns = await this.repository.findRunningRuns();
+    const runningRuns = await this.repository.findRunningRuns(jobs.map((job) => job.id));
     const runningByJobId = new Map(runningRuns.map((run) => [run.jobId, run]));
 
     return Promise.all(

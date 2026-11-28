@@ -73,10 +73,6 @@ export default function DashboardPage() {
 
   const isRefreshing = isJobsLoading || isJobsFetching || isStatsFetching;
   const connectionError = userError || jobsError || statsError;
-  const runningJobIds = React.useMemo(
-    () => new Set(jobs.filter((job) => job.currentRun).map((job) => job.id)),
-    [jobs]
-  );
 
   const { toasts, addToast, removeToast } = useToast();
 
@@ -251,7 +247,6 @@ export default function DashboardPage() {
         {/* Central Monitoring Table */}
         <JobsTable
           jobs={jobs}
-          runningJobIds={runningJobIds}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing}
           onSelectJobForHistory={modals.openJobHistory}

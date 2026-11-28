@@ -115,7 +115,6 @@ function renderStatusPill(status: JobStatus, onFailedClick?: () => void, failure
 
 export function JobsTable({
   jobs,
-  runningJobIds = new Set(),
   onRefresh,
   isRefreshing = false,
   onSelectJobForHistory,
@@ -132,7 +131,6 @@ export function JobsTable({
   onStatusChange,
 }: {
   jobs: ScrapingJobDto[];
-  runningJobIds?: Set<string>;
   onRefresh: () => void;
   isRefreshing?: boolean;
   onSelectJobForHistory: (job: ScrapingJobDto) => void;
@@ -200,7 +198,6 @@ export function JobsTable({
     setActiveActions((prev) => ({ ...prev, [jobId]: action }));
     try {
       await fn();
-      onRefresh();
     } catch (err) {
       await modal.alert({
         title: 'Action Failed',
@@ -388,7 +385,7 @@ export function JobsTable({
             <tbody className="divide-y divide-border">
               {filteredJobs.map((job) => {
                 const currentAction = activeActions[job.id];
-                const isRunningExtraction = runningJobIds.has(job.id);
+                const isRunningExtraction = Boolean(job.currentRun);
                 const isRunning = currentAction === 'run';
                 const isCompilingState =
                   job.status === JobStatus.PendingCompilation ||

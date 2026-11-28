@@ -251,9 +251,11 @@ export function useLogoutMutation() {
     mutationFn: () => api.logout(),
     onSuccess: () => {
       queryClient.setQueryData(dashboardKeys.user, null);
-      void Promise.all(jobListInvalidations(queryClient));
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.integrations });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.sessions });
+      queryClient.removeQueries({ queryKey: dashboardKeys.jobs });
+      queryClient.removeQueries({ queryKey: dashboardKeys.stats });
+      queryClient.removeQueries({ queryKey: dashboardKeys.quotas });
+      queryClient.removeQueries({ queryKey: dashboardKeys.integrations });
+      queryClient.removeQueries({ queryKey: dashboardKeys.sessions });
     },
   });
 }
@@ -305,6 +307,8 @@ export function useDeleteJobMutation() {
     onSuccess: (_, jobId) => {
       void Promise.all(jobListInvalidations(queryClient, true));
       queryClient.removeQueries({ queryKey: dashboardKeys.jobRunsPrefix(jobId) });
+      queryClient.removeQueries({ queryKey: dashboardKeys.timeseriesPrefix(jobId) });
+      queryClient.removeQueries({ queryKey: dashboardKeys.jobVersionsPrefix(jobId) });
     },
   });
 }
