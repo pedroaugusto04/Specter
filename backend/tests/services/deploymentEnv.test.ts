@@ -117,6 +117,7 @@ describe('Environment configuration', () => {
           env: {
             ...process.env,
             ...tuning,
+            POSTGRES_APP_PASSWORD: 'test-app-password',
             ENCRYPTION_KEY: 'a'.repeat(64),
             COMPILER_PROVIDER: 'api',
             COMPILER_API_MODEL: 'gemini-test-model',
@@ -128,6 +129,7 @@ describe('Environment configuration', () => {
       for (const [key, value] of Object.entries(tuning))
         expect(generated).toContain(`${key}=${value}\n`);
       expect(generated).toContain(`ENCRYPTION_KEY=${'a'.repeat(64)}\n`);
+      expect(generated).toContain('POSTGRES_APP_PASSWORD=test-app-password\n');
       expect(generated).toContain('COMPILER_PROVIDER=api\n');
       expect(generated).toContain('COMPILER_API_MODEL=gemini-test-model\n');
       expect(generated).toContain('COMPILER_API_KEY=test-secret\n');
