@@ -636,5 +636,19 @@ describe('CORS – Chrome Extension Origin Restriction', () => {
         corsOrigins: 'https://app.specter.com',
       })
     ).toBe(true);
+    expect(
+      isAllowedCorsOrigin('chrome-extension://extid', {
+        nodeEnv: 'production',
+        corsOrigins: 'https://app.specter.com',
+        chromeExtensionId: '',
+      })
+    ).toBe(false);
+    expect(
+      isAllowedCorsOrigin('chrome-extension://allowedid', {
+        nodeEnv: 'production',
+        corsOrigins: 'https://app.specter.com',
+        chromeExtensionId: 'allowedid',
+      })
+    ).toBe(true);
   });
 });

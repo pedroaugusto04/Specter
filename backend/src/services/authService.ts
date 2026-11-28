@@ -335,10 +335,11 @@ export class AuthService {
     const profile = (await profileRes.json()) as {
       sub?: string;
       email?: string;
+      email_verified?: boolean;
       name?: string;
     };
 
-    if (!profile.sub || !profile.email) {
+    if (!profile.sub || !profile.email || profile.email_verified !== true) {
       throw new OAuthExchangeError('email');
     }
 

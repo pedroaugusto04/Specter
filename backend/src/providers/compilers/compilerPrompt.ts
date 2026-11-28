@@ -15,7 +15,7 @@ Read evidence only from ${JSON.stringify(domFilePath)}.
 Write the JSON result only to ${JSON.stringify(outputFilePath)}.
 Do not request interactive confirmation or modify any other file.`;
 }
-export function buildCodexCliCompilerPrompt(
+export function buildReadOnlyStdoutCompilerPrompt(
   domFilePath: string,
   _outputFilePath: string,
   taskInstructions: string
@@ -24,12 +24,13 @@ export function buildCodexCliCompilerPrompt(
 Backend task:
 ${taskInstructions}
 Read evidence only from ${JSON.stringify(domFilePath)}.
-Return only the final JSON result. Do not modify files. File-reading tools or commands may read only the supplied evidence file; no other commands or network access.`;
+Return only the final JSON object on stdout. Do not write or modify any files, run commands, or access the network.`;
 }
 export function buildCodexStdinCompilerPrompt(
   evidence: string,
   taskInstructions: string
 ): string {
+  const safeEvidence = evidence.replace(/<\/untrusted_evidence>/gi, '<\\/untrusted_evidence>');
   return `${MODEL_SYSTEM_INSTRUCTIONS}
 Return only the final JSON result. Do not call any tools, run commands, access the network, or read or modify files.
 
@@ -37,6 +38,6 @@ Backend task:
 ${taskInstructions}
 
 <untrusted_evidence>
-${evidence}
+${safeEvidence}
 </untrusted_evidence>`;
 }

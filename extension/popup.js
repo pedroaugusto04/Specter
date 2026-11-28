@@ -72,6 +72,15 @@ async function clearStoredConfig() {
   });
 }
 
+function assertSafeApiUrl(url) {
+  const parsed = new URL(url);
+  const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLocal)) {
+    throw new Error('Custom Specter server URL must use HTTPS (except localhost).');
+  }
+  return parsed.origin;
+}
+
 function hostPattern(url) {
   const parsed = new URL(url);
   if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -311,7 +320,8 @@ if (btnGoogle) {
     btnGoogle.innerHTML = '<span class="spinner"></span> <span>Opening Google Sign-In...</span>';
 
     try {
-      await requestHostAccess([apiUrl]);
+      const safeApiUrl = assertSafeApiUrl(apiUrl);
+      await requestHostAccess([safeApiUrl]);
 
       // Calculate center position for popup window
       const width = 500;
@@ -321,7 +331,7 @@ if (btnGoogle) {
 
       // Open Google OAuth flow in a separate popup window without displacing current tab
       const authWindow = await chrome.windows.create({
-        url: `${apiUrl}/api/auth/google?source=extension`,
+        url: `${safeApiUrl}/api/auth/google?source=extension`,
         type: 'popup',
         width,
         height,
@@ -416,8 +426,9 @@ btnLogin.addEventListener('click', async () => {
   btnLogin.innerHTML = '<span class="spinner"></span> <span>Signing in...</span>';
 
   try {
-    await requestHostAccess([apiUrl]);
-    const res = await fetch(`${apiUrl}/api/auth/login`, {
+    const safeApiUrl = assertSafeApiUrl(apiUrl);
+    await requestHostAccess([safeApiUrl]);
+    const res = await fetch(`${safeApiUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -480,7 +491,8 @@ btnSync.addEventListener('click', async () => {
   btnSync.innerHTML = '<span class="spinner"></span> <span>Syncing...</span>';
 
   try {
-    await requestHostAccess([currentTab.url, currentApiUrl]);
+    const safeApiUrl = assertSafeApiUrl(currentApiUrl);
+    await requestHostAccess([currentTab.url, safeApiUrl]);
     // Re-extract cookies strictly for the active tab domain
     activeCookies = await extractActiveTabCookies(currentTab);
 

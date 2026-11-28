@@ -146,7 +146,7 @@ export function isInternalHostname(hostname: string): boolean {
  * DNS pinning is still required to fully prevent DNS rebinding.
  */
 const dnsSafeCache = new Map<string, number>();
-const DNS_CACHE_TTL_MS = 60_000;
+const DNS_CACHE_TTL_MS = 5_000;
 
 export async function assertSafeUrl(rawUrl: string, fieldName = 'url'): Promise<string> {
   let parsed: URL;

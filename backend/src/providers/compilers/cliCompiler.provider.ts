@@ -18,6 +18,7 @@ export interface CliCompilerOptions {
   providerName?: string;
   cliCommand?: string;
   model?: string;
+  outputMode?: 'file' | 'stdout';
   cliArgsBuilder?: (promptFile: string, outputFile: string) => string[];
   promptBuilder?: (domFilePath: string, outputFilePath: string, userPrompt: string) => string;
   stdinPromptBuilder?: (evidence: string, taskInstructions: string) => string;
@@ -32,6 +33,7 @@ export interface CliCompilerOptions {
 export class CliCompilerProvider implements IModelProvider {
   public readonly name: string;
   private readonly cliCommand: string;
+  private readonly outputMode: 'file' | 'stdout';
   private readonly cliArgsBuilder: (promptFile: string, outputFile: string) => string[];
   private readonly tempBaseDir: string;
   private readonly timeoutMs: number;
@@ -45,6 +47,7 @@ export class CliCompilerProvider implements IModelProvider {
   constructor(options: CliCompilerOptions = {}) {
     this.name = options.providerName ?? 'cli';
     this.cliCommand = options.cliCommand ?? 'cli';
+    this.outputMode = options.outputMode ?? 'file';
     this.errorClassifier = options.errorClassifier ?? defaultCliErrorClassifier;
     this.cliArgsBuilder =
       options.cliArgsBuilder ??
@@ -122,6 +125,8 @@ export class CliCompilerProvider implements IModelProvider {
       };
 
       let stderrBuffer = '';
+      let stdoutBuffer = '';
+      let stdoutOverflow = false;
       const cliProcess = this.spawnFn(this.cliCommand, args, spawnOpts);
       if (stdinPayload !== undefined && cliProcess.stdin) {
         cliProcess.stdin.on('error', () => {
@@ -129,8 +134,18 @@ export class CliCompilerProvider implements IModelProvider {
         });
         cliProcess.stdin.end(stdinPayload, 'utf-8');
       }
-      // Drain streams so a verbose CLI cannot deadlock on a full pipe.
-      cliProcess.stdout?.resume();
+      if (this.outputMode === 'stdout') {
+        cliProcess.stdout?.on('data', (chunk: Buffer | string) => {
+          if (stdoutOverflow) return;
+          stdoutBuffer += chunk.toString();
+          if (stdoutBuffer.length > env.COMPILER_MAX_OUTPUT_CHARS) {
+            stdoutOverflow = true;
+          }
+        });
+      } else {
+        // Drain streams so a verbose CLI cannot deadlock on a full pipe.
+        cliProcess.stdout?.resume();
+      }
       cliProcess.stderr?.on('data', (chunk: Buffer | string) => {
         if (stderrBuffer.length < 8192) {
           stderrBuffer += chunk.toString();
@@ -190,7 +205,10 @@ export class CliCompilerProvider implements IModelProvider {
 
       const tryReadOutputFile = async (): Promise<unknown | null> => {
         try {
-          const stat = await fs.stat(outputFile);
+          const stat = await fs.lstat(outputFile);
+          if (stat.isSymbolicLink() || !stat.isFile()) {
+            throw new CompilerValidationError('Compiler output must be a regular file.');
+          }
           if (stat.size > env.COMPILER_MAX_OUTPUT_CHARS * 4) throw new CompilerOutputTooLargeError();
           const content = await fs.readFile(outputFile, 'utf-8');
           if (content.length > env.COMPILER_MAX_OUTPUT_CHARS) {
@@ -235,48 +253,50 @@ export class CliCompilerProvider implements IModelProvider {
         });
       }, timeoutMs);
 
-      try {
-        fileWatcher = watch(tempDir, async (_eventType, filename) => {
-          if (settled) return;
-          const changedFile = filename?.toString();
-          if (changedFile === 'extractor.json' || !changedFile) {
-            try {
-              await new Promise((r) => setTimeout(r, 100));
-              if (settled) return;
-              const parsed = await tryReadOutputFile();
-              if (parsed && !settled) {
-                settled = true;
-                try {
-                  cliProcess.kill('SIGTERM');
-                } catch {
-                  // ignore kill error
+      if (this.outputMode === 'file') {
+        try {
+          fileWatcher = watch(tempDir, async (_eventType, filename) => {
+            if (settled) return;
+            const changedFile = filename?.toString();
+            if (changedFile === 'extractor.json' || !changedFile) {
+              try {
+                await new Promise((r) => setTimeout(r, 100));
+                if (settled) return;
+                const parsed = await tryReadOutputFile();
+                if (parsed && !settled) {
+                  settled = true;
+                  try {
+                    cliProcess.kill('SIGTERM');
+                  } catch {
+                    // ignore kill error
+                  }
+                  await cleanup();
+                  logger.info('Compiler successfully generated extractor schema', {
+                    jobId,
+                    provider: this.name,
+                    durationMs: Date.now() - startTime,
+                  });
+                  resolve(parsed);
                 }
-                await cleanup();
-                logger.info('Compiler successfully generated extractor schema', {
-                  jobId,
-                  provider: this.name,
-                  durationMs: Date.now() - startTime,
-                });
-                resolve(parsed);
-              }
-            } catch (err) {
-              if (!settled && err instanceof CompilerValidationError) {
-                settled = true;
-                try {
-                  cliProcess.kill('SIGTERM');
-                } catch {
-                  // ignore
+              } catch (err) {
+                if (!settled && err instanceof CompilerValidationError) {
+                  settled = true;
+                  try {
+                    cliProcess.kill('SIGTERM');
+                  } catch {
+                    // ignore
+                  }
+                  await cleanup();
+                  reject(err);
                 }
-                await cleanup();
-                reject(err);
               }
             }
+          });
+        } catch (err) {
+          if (!settled) {
+            settled = true;
+            void cleanup().finally(() => reject(err));
           }
-        });
-      } catch (err) {
-        if (!settled) {
-          settled = true;
-          void cleanup().finally(() => reject(err));
         }
       }
 
@@ -298,20 +318,47 @@ export class CliCompilerProvider implements IModelProvider {
       cliProcess.on('close', async (code) => {
         if (settled) return;
 
-        // Check if extractor.json was written right before process exit
-        try {
-          const parsed = await tryReadOutputFile();
-          if (parsed) {
+        if (this.outputMode === 'stdout') {
+          if (stdoutOverflow) {
             settled = true;
             await cleanup();
-            resolve(parsed);
+            reject(new CompilerOutputTooLargeError());
             return;
           }
-        } catch (err) {
-          settled = true;
-          await cleanup();
-          reject(err);
-          return;
+          if (code === 0 && stdoutBuffer.trim()) {
+            try {
+              const parsed = parseCliJson(stdoutBuffer);
+              settled = true;
+              await cleanup();
+              resolve(parsed);
+              return;
+            } catch (err) {
+              settled = true;
+              await cleanup();
+              reject(
+                new CompilerValidationError(
+                  err instanceof Error ? err.message : 'Invalid extraction plan.'
+                )
+              );
+              return;
+            }
+          }
+        } else {
+          // Check if extractor.json was written right before process exit
+          try {
+            const parsed = await tryReadOutputFile();
+            if (parsed) {
+              settled = true;
+              await cleanup();
+              resolve(parsed);
+              return;
+            }
+          } catch (err) {
+            settled = true;
+            await cleanup();
+            reject(err);
+            return;
+          }
         }
 
         settled = true;

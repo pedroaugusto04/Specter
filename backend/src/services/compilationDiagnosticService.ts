@@ -4,6 +4,7 @@ import { ModelTask } from '../extraction/configurationConstants.js';
 import { logger } from '../utils/logger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getManagedPrompt } from '../providers/langfuse.js';
+import { redactText } from '../extraction/evidence.js';
 
 export interface DiagnosticInput {
   jobId: string;
@@ -18,30 +19,19 @@ export interface DiagnosticResult {
   nextSteps: string;
 }
 
-const DIAGNOSTIC_MAX_FIELD_CHARS = 500;
 const DIAGNOSTIC_MAX_INPUT_CHARS = 2000;
+const DIAGNOSTIC_MAX_FIELD_CHARS = 500;
 
-const UNSAFE_DIAGNOSTIC_PATTERNS = [
-  /```/,
-  /(?:^|\s)\/(?:root|etc|home|tmp|var|proc)\//i,
-  /\b(?:sk-[a-zA-Z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[0-9A-Za-z]{20,}|eyJ[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{15,})\b/,
-  /\b(?:JWT_SECRET|ENCRYPTION_KEY|OPENAI_API_KEY|COMPILER_API_KEY|DATABASE_URL|SUPABASE_SERVICE_ROLE_KEY|RESEND_API_KEY)\b/,
-];
-
-function containsUnsafeDiagnosticContent(value: string): boolean {
-  return UNSAFE_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(value));
-}
-
-function truncateDiagnosticInput(value: string): string {
-  const trimmed = value.trim();
-  return trimmed.length > DIAGNOSTIC_MAX_INPUT_CHARS
-    ? `${trimmed.slice(0, DIAGNOSTIC_MAX_INPUT_CHARS)}...`
-    : trimmed;
-}
+const plainTextField = z
+  .string()
+  .trim()
+  .min(5)
+  .max(DIAGNOSTIC_MAX_FIELD_CHARS)
+  .refine((value) => !value.includes('```'), 'Diagnostic output must be plain text without code blocks');
 
 const diagnosticOutputSchema = z.object({
-  issue: z.string().trim().min(5).max(DIAGNOSTIC_MAX_FIELD_CHARS),
-  nextSteps: z.string().trim().min(5).max(DIAGNOSTIC_MAX_FIELD_CHARS),
+  issue: plainTextField,
+  nextSteps: plainTextField,
 });
 
 const DIAGNOSTIC_INSTRUCTIONS = `
@@ -67,10 +57,14 @@ export class CompilationDiagnosticService {
     try {
       const timeoutMs = 12000;
       const evidence = JSON.stringify({
-        userPrompt: truncateDiagnosticInput(input.userPrompt),
-        pageUrl: truncateDiagnosticInput(input.url),
-        failureContext: truncateDiagnosticInput(
-          input.failureReason || 'Selectors could not be resolved reliably for the requested data.'
+        userPrompt: redactText(input.userPrompt.trim(), DIAGNOSTIC_MAX_INPUT_CHARS),
+        pageUrl: redactText(input.url.trim(), DIAGNOSTIC_MAX_INPUT_CHARS),
+        failureContext: redactText(
+          (
+            input.failureReason ||
+            'Selectors could not be resolved reliably for the requested data.'
+          ).trim(),
+          DIAGNOSTIC_MAX_INPUT_CHARS
         ),
       });
 
@@ -96,21 +90,14 @@ export class CompilationDiagnosticService {
 
       const parsed = diagnosticOutputSchema.safeParse(output);
       if (parsed.success) {
-        if (
-          containsUnsafeDiagnosticContent(parsed.data.issue) ||
-          containsUnsafeDiagnosticContent(parsed.data.nextSteps)
-        ) {
-          logger.warn('Diagnostic output rejected by safety filter', {
-            jobId: input.jobId,
-            durationMs: Date.now() - started,
-          });
-          return null;
-        }
         logger.info('Compilation diagnostic generated successfully', {
           jobId: input.jobId,
           durationMs: Date.now() - started,
         });
-        return parsed.data;
+        return {
+          issue: redactText(parsed.data.issue, DIAGNOSTIC_MAX_FIELD_CHARS),
+          nextSteps: redactText(parsed.data.nextSteps, DIAGNOSTIC_MAX_FIELD_CHARS),
+        };
       }
 
       logger.warn('Diagnostic output schema validation failed', {

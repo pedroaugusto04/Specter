@@ -1,9 +1,9 @@
-import { env } from '../../config/env.js';
+import { env, type CodexSandboxMode } from '../../config/env.js';
 import { CliCompilerProvider, type CliCompilerOptions } from './cliCompiler.provider.js';
 import { buildCodexStdinCompilerPrompt } from './compilerPrompt.js';
 
 export interface CodexCompilerOptions extends CliCompilerOptions {
-  sandbox?: string;
+  sandbox?: CodexSandboxMode;
 }
 
 const CODEX_DISABLED_FEATURES = [
@@ -33,9 +33,8 @@ export class CodexCompilerProvider extends CliCompilerProvider {
           '--ignore-rules',
           ...CODEX_DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
           ...(model ? ['-m', model] : []),
-          ...(sandbox === 'dangerously-bypass-approvals-and-sandbox'
-            ? ['--dangerously-bypass-approvals-and-sandbox']
-            : ['--sandbox', sandbox]),
+          '--sandbox',
+          sandbox,
           '--output-last-message',
           outputFile,
           '-',

@@ -15,11 +15,12 @@ export function isAllowedCorsOrigin(
   if (!origin) return true;
 
   // Chrome extension origin restriction:
-  // - In production with CHROME_EXTENSION_ID set, only the specific extension is allowed.
-  // - In development or when CHROME_EXTENSION_ID is unset, any chrome-extension:// origin is allowed.
+  // - In production, only the configured CHROME_EXTENSION_ID is allowed (fail-closed if unset).
+  // - In development/test, any chrome-extension:// origin is allowed.
   if (origin.startsWith('chrome-extension://')) {
-    const allowedExtId = chromeExtensionId;
-    if (!allowedExtId || nodeEnv !== 'production') return true;
+    const allowedExtId = chromeExtensionId.trim();
+    if (nodeEnv !== 'production') return true;
+    if (!allowedExtId) return false;
     return origin === `chrome-extension://${allowedExtId}`;
   }
 

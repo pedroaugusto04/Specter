@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 export const MINIMUM_CRON_INTERVAL_MINUTES = 15;
+export const CODEX_SANDBOX_MODES = ['read-only', 'workspace-write'] as const;
+export type CodexSandboxMode = (typeof CODEX_SANDBOX_MODES)[number];
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -52,15 +54,7 @@ export const envSchema = z.object({
   AGY_MODEL: z.string().trim().default(''),
   CODEX_CLI_PATH: z.string().min(1).default('codex'),
   COMPILER_CODEX_MODEL: z.string().trim().default(''),
-  COMPILER_CODEX_SANDBOX: z
-    .enum(['read-only', 'workspace-write', 'danger-full-access', 'dangerously-bypass-approvals-and-sandbox'])
-    .default(
-      (['read-only', 'workspace-write', 'danger-full-access', 'dangerously-bypass-approvals-and-sandbox'].includes(
-        process.env.CODEX_SANDBOX ?? ''
-      )
-        ? (process.env.CODEX_SANDBOX as 'read-only' | 'workspace-write' | 'danger-full-access' | 'dangerously-bypass-approvals-and-sandbox')
-        : 'read-only')
-    ),
+  COMPILER_CODEX_SANDBOX: z.enum(CODEX_SANDBOX_MODES).default('read-only'),
   COMPILER_TEMP_DIR: z.string().min(1).default('/tmp/scraper_jobs'),
   COMPILER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(900000),
   COMPILER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(1),
@@ -226,17 +220,6 @@ export function parseEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   ) {
     throw new Error(
       'Invalid environment configuration:\n  - JWT_SECRET: In production, you must set a secure, unique JWT_SECRET (the default development secret cannot be used).'
-    );
-  }
-
-  if (
-    parsed.NODE_ENV === 'production' &&
-    parsed.COMPILER_PROVIDER === 'codex' &&
-    (parsed.COMPILER_CODEX_SANDBOX === 'danger-full-access' ||
-      parsed.COMPILER_CODEX_SANDBOX === 'dangerously-bypass-approvals-and-sandbox')
-  ) {
-    throw new Error(
-      'Invalid environment configuration:\n  - COMPILER_CODEX_SANDBOX: In production, Codex must run with "read-only" (or "workspace-write") sandbox; full-access modes are forbidden.'
     );
   }
 

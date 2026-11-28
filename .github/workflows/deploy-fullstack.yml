@@ -72,8 +72,9 @@ env:
   RUN_RECONCILE_INTERVAL_MS: ${{ vars.RUN_RECONCILE_INTERVAL_MS || '60000' }}
   COMPILATION_QUEUE_MAX_ATTEMPTS: ${{ vars.COMPILATION_QUEUE_MAX_ATTEMPTS || '3' }}
   CONFIGURATION_MAX_INPUT_CHARS: ${{ vars.CONFIGURATION_MAX_INPUT_CHARS || '250000' }}
-  COMPILATION_DIAGNOSTICS_ENABLED: ${{ vars.COMPILATION_DIAGNOSTICS_ENABLED || 'true' }}
+  COMPILATION_DIAGNOSTICS_ENABLED: ${{ vars.COMPILATION_DIAGNOSTICS_ENABLED || 'false' }}
   COMPILATION_DIAGNOSTICS_MAX_CHARS: ${{ vars.COMPILATION_DIAGNOSTICS_MAX_CHARS || '30000' }}
+  CHROME_EXTENSION_ID: ${{ vars.CHROME_EXTENSION_ID || 'hgejblacdmfplnfcobnhcliljpggoioh' }}
   RECOVERY_WINDOW_MS: ${{ vars.RECOVERY_WINDOW_MS || '86400000' }}
   MAX_RECOVERY_ATTEMPTS: ${{ vars.MAX_RECOVERY_ATTEMPTS || '3' }}
   COMPILER_PROVIDER: ${{ vars.COMPILER_PROVIDER || 'codex' }}
@@ -286,6 +287,7 @@ jobs:
           AGY_MODEL: ${{ env.AGY_MODEL }}
           COMPILER_CODEX_MODEL: ${{ env.COMPILER_CODEX_MODEL }}
           COMPILER_CODEX_SANDBOX: ${{ env.COMPILER_CODEX_SANDBOX }}
+          CHROME_EXTENSION_ID: ${{ env.CHROME_EXTENSION_ID }}
           COMPILER_API_KEY: ${{ secrets.COMPILER_API_KEY }}
           COMPILER_API_BASE_URL: ${{ env.COMPILER_API_BASE_URL }}
           COMPILER_API_MAX_RETRIES: ${{ env.COMPILER_API_MAX_RETRIES }}
@@ -385,7 +387,7 @@ jobs:
             mkdir -p ~/${APP_DIR_NAME}
             cd ~/${APP_DIR_NAME} || exit 1
             chmod 600 backend.env
-            cp backend.env .env.prod
+            mv backend.env .env.prod
             echo "DOCKER_IMAGE=$BACKEND_IMAGE" >> .env.prod
 
             if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then

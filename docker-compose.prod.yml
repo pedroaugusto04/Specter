@@ -46,6 +46,12 @@ services:
     # Set DOCKER_IMAGE in the deployment environment, for example in .env.prod.
     image: ${DOCKER_IMAGE}
     container_name: specter-backend
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: ${BACKEND_MEM_LIMIT:-2g}
     stop_grace_period: 20m
     restart: unless-stopped
     env_file:
@@ -86,12 +92,17 @@ services:
       CODEX_CLI_PATH: /usr/local/bin/codex
       COMPILER_CODEX_MODEL: ${COMPILER_CODEX_MODEL:-}
       COMPILER_CODEX_SANDBOX: ${COMPILER_CODEX_SANDBOX:-read-only}
-      CODEX_HOME: /home/node/.codex
+      CHROME_EXTENSION_ID: ${CHROME_EXTENSION_ID:-}
+      CODEX_HOME: /codex
+      AGY_CLI_PATH: ${AGY_CLI_PATH:-/usr/local/bin/agy}
+      AGY_MODEL: ${AGY_MODEL:-}
     ports:
-      - '${BIND_HOST:-127.0.0.1}:${PORT:-3001}:3001'
+      - '${BIND_HOST:-0.0.0.0}:${PORT:-3001}:3001'
     volumes:
       - compiler_jobs:/tmp/scraper_jobs
-      - ${CODEX_HOST_DIR:-/home/ubuntu/.codex}:/home/node/.codex
+      - ${CODEX_HOST_DIR:-/srv/specter-codex}:/codex
+      - ${AGY_BIN_PATH:-/srv/specter-agy/bin/agy}:/usr/local/bin/agy:ro
+      - ${AGY_HOST_DIR:-/srv/specter-agy/data}:/home/node/.gemini
     depends_on:
       postgres:
         condition: service_healthy

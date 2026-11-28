@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
 import { isAllowedCorsOrigin } from './utils/corsHelper.js';
 import { centralErrorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { registerSecurityHeaders } from './middlewares/securityHeaders.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
 import { registerIntegrationRoutes } from './routes/integrationRoutes.js';
 import { registerJobRoutes } from './routes/jobRoutes.js';
@@ -29,11 +30,13 @@ export interface BuildAppOptions {
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: options.enableLogger ?? env.NODE_ENV !== 'test',
+    trustProxy: true,
   });
 
   app.decorateRequest('user', null);
   app.setErrorHandler(centralErrorHandler);
   app.setNotFoundHandler(notFoundHandler);
+  registerSecurityHeaders(app);
 
   await app.register(rateLimit, {
     global: true,

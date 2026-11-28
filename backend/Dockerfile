@@ -46,8 +46,8 @@ COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/tests/fixtures/configuration-evaluation-corpus.json ./tests/fixtures/configuration-evaluation-corpus.json
 COPY backend/drizzle.config.ts ./
 
-RUN mkdir -p /tmp/scraper_jobs /home/node/.codex && \
-    chown -R node:node /app /ms-playwright /tmp/scraper_jobs /home/node/.codex
+RUN mkdir -p /tmp/scraper_jobs && \
+    chown -R node:node /app /ms-playwright /tmp/scraper_jobs
 
 USER node
 

@@ -1,5 +1,5 @@
 import { fixturePlan } from '../helpers/extractionFixtures.js';
-import { spawn } from 'child_process';
+import { spawn, type SpawnOptions } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -68,6 +68,39 @@ describe('Subprocess Safety (Dead Man Switch), Reconciler & Retention Pruning', 
     );
     // Temp job directory must be cleaned up after completion
     expect(await fs.readdir(tempBaseDir)).toEqual([]);
+    await fs.rm(tempBaseDir, { recursive: true, force: true });
+  });
+  it('runs AGY in read-only plan mode with isolated settings and parses JSON from stdout', async () => {
+    const tempBaseDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scraper-test-agy-stdout-'));
+    const executable = path.join(tempBaseDir, 'fake-agy.cjs');
+    const expected = fixturePlan();
+    await fs.writeFile(
+      executable,
+      `const args = process.argv.slice(2);
+      if (args[0] !== '--print') process.exit(11);
+      if (!args.includes('--mode') || args[args.indexOf('--mode') + 1] !== 'plan') process.exit(12);
+      if (!args.includes('--sandbox') || !args.includes('--disable-slash-commands')) process.exit(13);
+      if (!args.includes('--settings') || args[args.indexOf('--settings') + 1] !== '{}') process.exit(14);
+      process.stdout.write(${JSON.stringify(JSON.stringify(expected))});
+      process.exit(0);`
+    );
+    const workDir = path.join(tempBaseDir, 'work');
+    const provider = new AgyCliCompilerProvider({
+      tempBaseDir: workDir,
+      timeoutMs: 10000,
+      model: 'plan-model',
+      spawnFn: (_command: string, args: readonly string[], options: SpawnOptions) =>
+        spawn(process.execPath, [executable, ...args], options),
+    });
+    const result = await provider.generate({
+      task: 'configure',
+      timeoutMs: 10000,
+      jobId: 'agy-hardened-1',
+      evidence: '<html><body><h1>Hello</h1></body></html>',
+      instructions: 'Get headline',
+    });
+    expect(result).toEqual(expected);
+    expect(await fs.readdir(workDir)).toEqual([]);
     await fs.rm(tempBaseDir, { recursive: true, force: true });
   });
   it('enforces dead-man switch timeout, kills hanging subprocess with SIGKILL, and cleans up temp files', async () => {
