@@ -2,15 +2,20 @@ import crypto from 'node:crypto';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { assertSafeUrl } from '../../utils/ssrfValidator.js';
-import type {
-  AlertPayload,
-  IWebhookNotificationProvider,
-  WebhookSendOptions,
-  WebhookTestResult,
+import {
+  type AlertPayload,
+  type IWebhookNotificationProvider,
+  type WebhookSendOptions,
+  type WebhookTestResult,
+  isFailureAlert,
 } from './notification.interface.js';
 export type { WebhookSendOptions, WebhookTestResult };
 
-const WebhookEvent = { Change: 'monitor.change_detected', Test: 'test.ping' } as const;
+const WebhookEvent = {
+  Change: 'monitor.change_detected',
+  Failure: 'monitor.failure',
+  Test: 'test.ping',
+} as const;
 type WebhookEvent = (typeof WebhookEvent)[keyof typeof WebhookEvent];
 const WebhookHeader = {
   ContentType: 'Content-Type',
@@ -31,6 +36,36 @@ const WebhookMessage = {
   Failed: 'Webhook endpoint returned an error or could not be reached. Please check the URL.',
   Test: 'Specter Webhook integration test event',
 } as const;
+
+function toWebhookBody(payload: AlertPayload): Record<string, unknown> {
+  const base = {
+    jobId: payload.jobId,
+    targetUrl: payload.targetUrl,
+    userPrompt: payload.userPrompt ?? null,
+    detectedAt: payload.detectedAt
+      ? new Date(payload.detectedAt).toISOString()
+      : new Date().toISOString(),
+  };
+
+  if (isFailureAlert(payload)) {
+    return {
+      ...base,
+      monitorName: payload.monitorName ?? null,
+      errorTitle: payload.errorTitle,
+      errorDescription: payload.errorDescription,
+      nextStep: payload.nextStep,
+      failureCode: payload.failureCode ?? null,
+      requiresSessionRenewal: payload.requiresSessionRenewal ?? false,
+    };
+  }
+
+  return {
+    ...base,
+    triggerReasons: payload.triggerReasons ?? [],
+    diffSummary: payload.diffSummary,
+    data: payload.data,
+  };
+}
 
 export class WebhookNotificationProvider implements IWebhookNotificationProvider {
   public readonly name = 'webhook';
@@ -74,22 +109,8 @@ export class WebhookNotificationProvider implements IWebhookNotificationProvider
   }
   async sendAlert(payload: AlertPayload, options: WebhookSendOptions): Promise<void> {
     const deliveryId = payload.deliveryId ?? crypto.randomUUID();
-    const httpStatus = await this.postEvent(
-      WebhookEvent.Change,
-      deliveryId,
-      {
-        jobId: payload.jobId,
-        targetUrl: payload.targetUrl,
-        userPrompt: payload.userPrompt ?? null,
-        detectedAt: payload.detectedAt
-          ? new Date(payload.detectedAt).toISOString()
-          : new Date().toISOString(),
-        triggerReasons: payload.triggerReasons ?? [],
-        diffSummary: payload.diffSummary,
-        data: payload.data,
-      },
-      options
-    );
+    const event = isFailureAlert(payload) ? WebhookEvent.Failure : WebhookEvent.Change;
+    const httpStatus = await this.postEvent(event, deliveryId, toWebhookBody(payload), options);
     logger.info('Webhook alert dispatched successfully', {
       jobId: payload.jobId,
       deliveryId,

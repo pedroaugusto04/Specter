@@ -58,6 +58,7 @@ export interface UpdateJobPatch {
   lastError?: string | null;
   recoveryAttempts?: number;
   recoveryWindowStartedAt?: Date | null;
+  lastFailureAlertAt?: Date | null;
   captureScreenshotOnChange?: boolean;
 }
 

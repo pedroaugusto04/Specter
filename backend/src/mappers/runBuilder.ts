@@ -1,10 +1,11 @@
-import { RunPhase } from '@specter/contracts';
+import { RunPhase, USER_FAILURES } from '@specter/contracts';
 import type { CreateJobRunInput } from '../repositories/jobRepository.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import type { RunMetadata } from '../types/run.js';
 import { ChangeStatus, ExtractionQuality, RunStatus } from '../types/enums.js';
 import { ConfigurationFailure } from '../extraction/configurationFailure.js';
+import { ExtractionFailureReason, FailureCode, TraceStatus } from '../extraction/constants.js';
 
 export function initialRunMetadata(): RunMetadata {
   return {
@@ -184,5 +185,43 @@ export function buildFailedCompilationRun(input: {
     errorMessage: input.userMessage,
     httpStatus: input.httpStatus,
     durationMs: input.durationMs,
+  };
+}
+
+export function buildSessionExpiredReport(
+  scope: ExtractionReport['scope'],
+  options?: { pagesVisited?: number; preflight?: boolean }
+): ExtractionReport {
+  return {
+    pagesVisited: options?.pagesVisited ?? 0,
+    quality: ExtractionQuality.Invalid,
+    failureCode: FailureCode.SessionExpired,
+    failureReason: ExtractionFailureReason.MissingRecords,
+    issues: [USER_FAILURES.sessionUnavailable.description],
+    sourcesUsed: {},
+    evidence: [],
+    trace: options?.preflight
+      ? [
+          {
+            stage: 'session-validation',
+            durationMs: 0,
+            status: TraceStatus.Failed,
+            code: 'EXPIRED',
+          },
+        ]
+      : [],
+    targetReady: false,
+    structuralFailure: false,
+    validatedSourceRecords: 0,
+    scope,
+  };
+}
+
+export function markReportSessionExpired(report: ExtractionReport): ExtractionReport {
+  const description = USER_FAILURES.sessionUnavailable.description;
+  return {
+    ...report,
+    failureCode: FailureCode.SessionExpired,
+    issues: report.issues.includes(description) ? report.issues : [description, ...report.issues],
   };
 }

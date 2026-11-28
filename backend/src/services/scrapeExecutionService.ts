@@ -3,14 +3,20 @@ import { USER_FAILURES } from '@specter/contracts';
 import type { AccessCooldownService } from '../acquisition/cooldown.js';
 import { classifyAccessFailure } from '../acquisition/failure.js';
 import { env } from '../config/env.js';
-import { DomainError, QuotaExceededError } from '../errors/domainErrors.js';
+import {
+  DomainError,
+  QuotaExceededError,
+  UpstreamHttpError,
+} from '../errors/domainErrors.js';
 import {
   buildAttemptStartRun,
   buildChargeExecutionRun,
   buildFailedRunUpdate,
   buildScheduleRetryRun,
+  buildSessionExpiredReport,
   buildStartRecoveryRun,
   cloneRunMetadata,
+  markReportSessionExpired,
 } from '../mappers/runBuilder.js';
 import { assertExecutionLease } from '../queues/executionLease.js';
 import { CompilationReason, type IJobScheduler } from '../queues/scheduler.interface.js';
@@ -19,7 +25,7 @@ import type { ISessionRepository } from '../repositories/sessionRepository.js';
 import type { IUserRepository } from '../repositories/userRepository.js';
 import { AccessFailure } from '../types/access.js';
 import type { JobRunEntity, ScrapingJobEntity } from '../types/domain.js';
-import { JobStatus, RunStatus } from '../types/enums.js';
+import { JobStatus, RunStatus, isAcceptedExtractionQuality } from '../types/enums.js';
 import type { ExtractionReport } from '../types/extractionPlan.js';
 import type { RunMetadata } from '../types/run.js';
 import { formatUserErrorMessage } from '../utils/errorSanitizer.js';
@@ -28,8 +34,24 @@ import { resolveJobExecutionContext } from './executionContext.js';
 import type { IPlanExecutor } from './planExecutionService.js';
 import type { QuotaService } from './quotaService.js';
 import type { RealtimeService } from './realtimeService.js';
+import { FailureCode } from '../extraction/constants.js';
+import type { IAlertRouter } from '../notifications/contracts.js';
+import { prepareTerminalFailureAlert } from '../utils/failureAlertHelper.js';
+import {
+  inspectStorageStateExpiry,
+  isAuthFailureStatusCode,
+} from '../utils/sessionValidator.js';
 import { RecoveryDecision, decideRecovery } from './recoveryPolicy.js';
 import type { SuccessfulRunService } from './successfulRunService.js';
+
+interface FinishRunOptions {
+  structural: boolean;
+  userMessage: string;
+  metadata?: RunMetadata;
+  extractionReport?: ExtractionReport | null;
+  failureCode?: string;
+  timezone?: string;
+}
 
 export interface ScrapeExecutionServiceDeps {
   accessCooldown: AccessCooldownService;
@@ -41,6 +63,7 @@ export interface ScrapeExecutionServiceDeps {
   sessionRepository: ISessionRepository;
   realtimeService: RealtimeService;
   quotaService: QuotaService;
+  alertRouter?: IAlertRouter;
   maxRecoveryAttempts?: number;
 }
 
@@ -65,7 +88,10 @@ export class ScrapeExecutionService {
     }
     if (run.nextAttemptAt && run.nextAttemptAt.getTime() > Date.now()) return null;
     if (!job.extractionPlan) {
-      return this.finish(job, run, true, USER_FAILURES.requestedDataUnavailable.description);
+      return this.finish(job, run, {
+        structural: true,
+        userMessage: USER_FAILURES.requestedDataUnavailable.description,
+      });
     }
 
     const existingMetadata = run.metadata!;
@@ -73,7 +99,11 @@ export class ScrapeExecutionService {
       Date.now() - run.startedAt!.getTime() > env.RUN_MAX_DURATION_MS ||
       existingMetadata.accessAttempts >= env.SCRAPE_MAX_ATTEMPTS + 1
     ) {
-      return this.finish(job, run, false, USER_FAILURES.requestTimedOut.description);
+      return this.finish(job, run, {
+        structural: false,
+        userMessage: USER_FAILURES.requestTimedOut.description,
+        failureCode: FailureCode.Timeout,
+      });
     }
 
     const started = buildAttemptStartRun(run);
@@ -84,11 +114,17 @@ export class ScrapeExecutionService {
     let report: ExtractionReport | undefined;
     let error: unknown;
     let access: Awaited<ReturnType<AccessCooldownService['forMonitor']>> | undefined;
+    let executionTimezone: string | undefined;
+    let context: Awaited<ReturnType<typeof resolveJobExecutionContext>> | undefined;
 
     try {
       access = await this.deps.accessCooldown.forMonitor(job);
       if (await access.state()) {
-        return this.finish(job, run, false, USER_FAILURES.accessBlocked.description, { metadata });
+        return this.finish(job, run, {
+          structural: false,
+          userMessage: USER_FAILURES.accessBlocked.description,
+          metadata,
+        });
       }
 
       if (!metadata.executionCharged) {
@@ -98,18 +134,48 @@ export class ScrapeExecutionService {
         await repo.commitRun(charged.input, [], undefined, job.updatedAt);
       }
 
-      const context = await resolveJobExecutionContext(
+      context = await resolveJobExecutionContext(
         this.deps.userRepository,
         this.deps.sessionRepository,
         job,
         'Executing monitor'
       );
+      executionTimezone = context.timezone;
+
+      if (context.storageState) {
+        const expiry = inspectStorageStateExpiry(context.storageState, job.url);
+        if (expiry.isExpired) {
+          logger.warn('Saved web session deterministically expired before execution', {
+            jobId: job.id,
+            reason: expiry.reason,
+            detail: expiry.detail,
+          });
+          return this.finish(job, run, {
+            structural: false,
+            userMessage: USER_FAILURES.sessionUnavailable.description,
+            metadata,
+            extractionReport: buildSessionExpiredReport(job.extractionPlan.intent.scope, {
+              preflight: true,
+            }),
+            failureCode: FailureCode.SessionExpired,
+            timezone: executionTimezone,
+          });
+        }
+      }
+
       const execution = await this.deps.planExecutor.execute(job.url, job.extractionPlan, {
         storageState: context.storageState,
         pageLanguage: context.pageLanguage,
         captureScreenshot: job.captureScreenshotOnChange,
       });
       report = execution.report;
+      if (
+        context.storageState &&
+        !isAcceptedExtractionQuality(report.quality) &&
+        isAuthFailureStatusCode(execution.scrape.httpStatus)
+      ) {
+        report = markReportSessionExpired(report);
+      }
       await assertExecutionLease();
       await access.record(false);
 
@@ -129,7 +195,7 @@ export class ScrapeExecutionService {
         const result = await repo.commitRun(
           { ...prepared.run, id: run.id },
           prepared.deliveries,
-          { lastError: null },
+          { lastError: null, lastFailureAlertAt: null },
           job.updatedAt
         );
         await this.completed(job, result);
@@ -137,6 +203,13 @@ export class ScrapeExecutionService {
       }
     } catch (caught) {
       error = caught;
+      if (
+        context?.storageState &&
+        caught instanceof UpstreamHttpError &&
+        isAuthFailureStatusCode(caught.httpStatus)
+      ) {
+        report = buildSessionExpiredReport(job.extractionPlan.intent.scope, { pagesVisited: 1 });
+      }
       await assertExecutionLease();
       logger.error('Monitor attempt failed', {
         jobId,
@@ -176,18 +249,25 @@ export class ScrapeExecutionService {
       const attempts = inWindow ? job.recoveryAttempts : 0;
       const failedMetadata = appendReason(metadata, reason);
       if (attempts >= (this.deps.maxRecoveryAttempts ?? env.MAX_RECOVERY_ATTEMPTS)) {
-        return this.finish(job, run, true, USER_FAILURES.requestedDataUnavailable.description, {
+        return this.finish(job, run, {
+          structural: true,
+          userMessage: USER_FAILURES.requestedDataUnavailable.description,
           metadata: failedMetadata,
           extractionReport: report ?? null,
+          failureCode: report?.failureCode,
+          timezone: executionTimezone,
         });
       }
       try {
         await this.deps.quotaService.assertCanCompile(job.userId);
       } catch (quotaErr) {
         if (!(quotaErr instanceof QuotaExceededError)) throw quotaErr;
-        return this.finish(job, run, false, formatUserErrorMessage(quotaErr), {
+        return this.finish(job, run, {
+          structural: false,
+          userMessage: formatUserErrorMessage(quotaErr),
           metadata: failedMetadata,
           extractionReport: report ?? null,
+          timezone: executionTimezone,
         });
       }
 
@@ -235,28 +315,49 @@ export class ScrapeExecutionService {
       return null;
     }
 
-    const userMessage = error
-      ? formatUserErrorMessage(error)
-      : USER_FAILURES.requestedDataUnavailable.description;
-    return this.finish(job, run, Boolean(report?.structuralFailure), userMessage, {
+    const isSessionExpired = report?.failureCode === FailureCode.SessionExpired;
+    const userMessage = isSessionExpired
+      ? USER_FAILURES.sessionUnavailable.description
+      : error
+        ? formatUserErrorMessage(error)
+        : USER_FAILURES.requestedDataUnavailable.description;
+    return this.finish(job, run, {
+      structural: Boolean(report?.structuralFailure),
+      userMessage,
       metadata: appendReason(metadata, reason),
       extractionReport: report ?? null,
+      failureCode: report?.failureCode,
+      timezone: executionTimezone,
     });
   }
 
   private async finish(
     job: ScrapingJobEntity,
     run: JobRunEntity,
-    structural: boolean,
-    userMessage: string,
-    overrides?: { metadata?: RunMetadata; extractionReport?: ExtractionReport | null }
+    options: FinishRunOptions
   ): Promise<JobRunEntity> {
+    const { structural, userMessage, metadata, extractionReport, timezone } = options;
+    const failureCode = options.failureCode ?? extractionReport?.failureCode;
+    const { deliveries, jobPatch } = await prepareTerminalFailureAlert({
+      alertRouter: this.deps.alertRouter,
+      job,
+      userMessage,
+      failureCode,
+      timezone,
+    });
+
+    const overrides = {
+      ...(metadata ? { metadata } : {}),
+      ...(extractionReport !== undefined ? { extractionReport } : {}),
+    };
+
     const result = await this.deps.jobRepository.commitRun(
       buildFailedRunUpdate(run, userMessage, overrides),
-      [],
+      deliveries,
       {
         status: structural ? JobStatus.Failed : JobStatus.Active,
         lastError: userMessage,
+        ...jobPatch,
       },
       job.updatedAt
     );

@@ -295,6 +295,7 @@ export class InMemoryJobRepository implements IJobRepository {
       lastError: null,
       recoveryAttempts: 0,
       recoveryWindowStartedAt: null,
+      lastFailureAlertAt: null,
       captureScreenshotOnChange: input.captureScreenshotOnChange ?? false,
       createdAt: now,
       updatedAt: now,
@@ -910,6 +911,7 @@ export function createTestCompilationService(
       storageProvider,
       alertRouter,
     }),
+    alertRouter,
     ...rest,
   });
 }
@@ -936,6 +938,7 @@ export function createTestScrapeExecutionService(
       storageProvider,
       alertRouter,
     }),
+    alertRouter,
     ...rest,
   });
 }

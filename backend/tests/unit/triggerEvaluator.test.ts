@@ -1,3 +1,4 @@
+import type { ChangeAlertPayload } from '../../src/providers/notifications/notification.interface.js';
 import { NoopStorageProvider } from '../../src/providers/storage/noopStorage.provider.js';
 import { fixtureExecutor } from '../helpers/extractionFixtures.js';
 import { fixturePlan } from '../helpers/extractionFixtures.js';
@@ -265,7 +266,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       expect(run?.hasChanges).toBe('YES');
       // Notification must be dispatched with triggerReasons
       expect(repository.pendingDeliveries.map((delivery) => delivery.payload)).toHaveLength(1);
-      const alert = repository.pendingDeliveries.map((delivery) => delivery.payload)[0]!;
+      const alert = repository.pendingDeliveries.map((delivery) => delivery.payload)[0]! as ChangeAlertPayload;
       expect(alert.jobId).toBe(job.id);
       expect(alert.triggerReasons).toBeDefined();
       expect(alert.triggerReasons?.[0]).toContain('price (3399) < 3500');
@@ -332,7 +333,7 @@ describe('Conditional Alert Triggers & Evaluator', () => {
       await scrapeService.executeScrape(job.id);
       expect(repository.pendingDeliveries.map((delivery) => delivery.payload)).toHaveLength(1);
       expect(
-        repository.pendingDeliveries.map((delivery) => delivery.payload)[0]!.triggerReasons?.[0]
+        (repository.pendingDeliveries[0]!.payload as ChangeAlertPayload).triggerReasons?.[0]
       ).toContain('dropped by');
     });
   });

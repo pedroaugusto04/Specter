@@ -3,11 +3,14 @@ import { formatNotificationDateTime } from '../../utils/dateFormatter.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { escapeHtml } from '../../utils/htmlEscape.js';
 import { logger } from '../../utils/logger.js';
-import type {
-  AlertPayload,
-  ITelegramNotificationProvider,
-  TelegramSendOptions,
-  TelegramTestResult,
+import {
+  type AlertPayload,
+  type ChangeAlertPayload,
+  type FailureAlertPayload,
+  type ITelegramNotificationProvider,
+  type TelegramSendOptions,
+  type TelegramTestResult,
+  isFailureAlert,
 } from './notification.interface.js';
 
 export type { TelegramSendOptions, TelegramTestResult };
@@ -15,6 +18,84 @@ export type { TelegramSendOptions, TelegramTestResult };
 function formatValue(val: unknown): string {
   if (val === null || val === undefined) return '<i>null</i>';
   return escapeHtml(val);
+}
+
+function formatFailureAlertMessage(payload: FailureAlertPayload): string {
+  const detectedTime = formatNotificationDateTime(payload.detectedAt, payload.timezone);
+  const lines: string[] = [
+    `⚠️ <b>[Specter] Attention Required</b>`,
+    '',
+    `🎯 <b>Monitor:</b> ${escapeHtml(payload.monitorName ?? payload.targetUrl)}`,
+    `🔗 <b>Target:</b> <a href="${escapeHtml(payload.targetUrl)}">${escapeHtml(payload.targetUrl)}</a>`,
+  ];
+
+  if (payload.userPrompt) {
+    lines.push(`<b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
+  }
+
+  lines.push(
+    '',
+    `❌ <b>Issue:</b> ${escapeHtml(payload.errorTitle)}`,
+    `📝 <b>Details:</b> ${escapeHtml(payload.errorDescription)}`,
+    `👉 <b>Action Needed:</b> ${escapeHtml(payload.nextStep)}`,
+    '',
+    `⏱ <b>Time:</b> ${detectedTime}`,
+    '',
+    '<i>Specter • Autonomous Web Monitor</i>'
+  );
+  return lines.join('\n');
+}
+
+function formatChangeAlertMessage(payload: ChangeAlertPayload): string {
+  const diff = payload.diffSummary;
+  const changeNoun =
+    diff.totalChanges === 1 ? '1 change detected' : `${diff.totalChanges} changes detected`;
+
+  const lines: string[] = [
+    `🔔 <b>[Specter] ${escapeHtml(changeNoun)}</b>`,
+    '',
+    `🔗 <b>Target:</b> <a href="${escapeHtml(payload.targetUrl)}">${escapeHtml(payload.targetUrl)}</a>`,
+  ];
+
+  if (payload.userPrompt) {
+    lines.push(`<b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
+  }
+
+  if (payload.triggerReasons && payload.triggerReasons.length > 0) {
+    lines.push('', '<b>Trigger Conditions Met:</b>');
+    for (const reason of payload.triggerReasons) {
+      lines.push(`• <code>${escapeHtml(reason)}</code>`);
+    }
+  }
+
+  const detectedTime = formatNotificationDateTime(payload.detectedAt, payload.timezone);
+  lines.push(`⏱ <b>Time:</b> ${detectedTime}`, '', '<b>Detected Changes:</b>');
+
+  const allChanges = [
+    ...diff.modified.map(
+      (c) =>
+        `• <b>${escapeHtml(c.field)}</b>: <s>${formatValue(c.previousValue)}</s> ➔ <b>${formatValue(c.currentValue)}</b>`
+    ),
+    ...diff.added.map(
+      (c) => `• <b>${escapeHtml(c.field)}</b> (added): <b>${formatValue(c.currentValue)}</b>`
+    ),
+    ...diff.removed.map(
+      (c) => `• <b>${escapeHtml(c.field)}</b> (removed): <s>${formatValue(c.previousValue)}</s>`
+    ),
+  ];
+
+  if (allChanges.length > 0) {
+    // Limit to first 15 changes to prevent Telegram message length limit (4096 chars)
+    lines.push(...allChanges.slice(0, 15));
+    if (allChanges.length > 15) {
+      lines.push(`<i>...and ${allChanges.length - 15} more changes</i>`);
+    }
+  } else {
+    lines.push('<i>Change detected in normalized content hash.</i>');
+  }
+
+  lines.push('', '<i>Specter • Autonomous Web Monitor</i>');
+  return lines.join('\n');
 }
 
 export class TelegramNotificationProvider implements ITelegramNotificationProvider {
@@ -75,60 +156,9 @@ export class TelegramNotificationProvider implements ITelegramNotificationProvid
   }
 
   formatAlertMessage(payload: AlertPayload): string {
-    const diff = payload.diffSummary;
-    const changeNoun =
-      diff.totalChanges === 1 ? '1 change detected' : `${diff.totalChanges} changes detected`;
-
-    const lines: string[] = [
-      `🔔 <b>[Specter] ${escapeHtml(changeNoun)}</b>`,
-      '',
-      `🔗 <b>Target:</b> <a href="${escapeHtml(payload.targetUrl)}">${escapeHtml(payload.targetUrl)}</a>`,
-    ];
-
-    if (payload.userPrompt) {
-      lines.push(`<b>Prompt:</b> <i>${escapeHtml(payload.userPrompt)}</i>`);
-    }
-
-    if (payload.triggerReasons && payload.triggerReasons.length > 0) {
-      lines.push('');
-      lines.push('<b>Trigger Conditions Met:</b>');
-      for (const reason of payload.triggerReasons) {
-        lines.push(`• <code>${escapeHtml(reason)}</code>`);
-      }
-    }
-
-    const detectedTime = formatNotificationDateTime(payload.detectedAt, payload.timezone);
-    lines.push(`⏱ <b>Time:</b> ${detectedTime}`);
-    lines.push('');
-    lines.push('<b>Detected Changes:</b>');
-
-    const allChanges = [
-      ...diff.modified.map(
-        (c) =>
-          `• <b>${escapeHtml(c.field)}</b>: <s>${formatValue(c.previousValue)}</s> ➔ <b>${formatValue(c.currentValue)}</b>`
-      ),
-      ...diff.added.map(
-        (c) => `• <b>${escapeHtml(c.field)}</b> (added): <b>${formatValue(c.currentValue)}</b>`
-      ),
-      ...diff.removed.map(
-        (c) => `• <b>${escapeHtml(c.field)}</b> (removed): <s>${formatValue(c.previousValue)}</s>`
-      ),
-    ];
-
-    if (allChanges.length > 0) {
-      // Limit to first 15 changes to prevent Telegram message length limit (4096 chars)
-      lines.push(...allChanges.slice(0, 15));
-      if (allChanges.length > 15) {
-        lines.push(`<i>...and ${allChanges.length - 15} more changes</i>`);
-      }
-    } else {
-      lines.push('<i>Change detected in normalized content hash.</i>');
-    }
-
-    lines.push('');
-    lines.push('<i>Specter • Autonomous Web Monitor</i>');
-
-    return lines.join('\n');
+    return isFailureAlert(payload)
+      ? formatFailureAlertMessage(payload)
+      : formatChangeAlertMessage(payload);
   }
 
   async sendAlert(payload: AlertPayload, options: TelegramSendOptions): Promise<void> {

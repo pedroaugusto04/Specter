@@ -1,28 +1,237 @@
 import { EntityChangeKind } from '@specter/contracts';
-import type { AlertPayload } from './notification.interface.js';
+import {
+  type AlertPayload,
+  type ChangeAlertPayload,
+  type FailureAlertPayload,
+  isFailureAlert,
+} from './notification.interface.js';
 import { env } from '../../config/env.js';
 import { formatEmailDateTime } from '../../utils/dateFormatter.js';
 import { escapeHtml } from '../../utils/htmlEscape.js';
 
-/**
- * Builds a responsive, enterprise-grade HTML email with Specter brand identity,
- * clean typography, change comparison tables, and full snapshot details.
- */
-export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; text: string } {
+function buildSpecterJobUrl(jobId?: string): string {
+  const baseUrl = env.FRONTEND_URL.replace(/\/$/, '');
+  return jobId ? `${baseUrl}/?jobId=${encodeURIComponent(jobId)}` : baseUrl;
+}
+
+function renderTargetMetadataCard(input: {
+  monitorName?: string;
+  targetUrl: string;
+  userPrompt?: string;
+  formattedDate: string;
+  marginBottom?: string;
+}): string {
+  const promptRow = input.userPrompt
+    ? `<tr>
+        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Instruction:</td>
+        <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${escapeHtml(input.userPrompt)}</td>
+       </tr>`
+    : '';
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:16px 20px;margin-bottom:${input.marginBottom ?? '24px'};">
+    <tr>
+      <td>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Monitored Target:</td>
+            <td style="padding:6px 0;font-size:13px;word-break:break-word;">
+              ${input.monitorName ? `${escapeHtml(input.monitorName)}<br>` : ''}
+              <a href="${escapeHtml(input.targetUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:none;">
+                ${escapeHtml(input.targetUrl)}
+              </a>
+            </td>
+          </tr>
+          ${promptRow}
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Detected At:</td>
+            <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${input.formattedDate}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function renderEmailShell(input: {
+  subject: string;
+  bodyHtml: string;
+  footerDescription: string;
+  formattedDate: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(input.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#09090b;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container Card -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;box-shadow:0 10px 15px -3px rgba(0,0,0,0.04),0 4px 6px -4px rgba(0,0,0,0.02);">
+          <!-- SPECTER BRAND HEADER -->
+          <tr>
+            <td style="background-color:#09090b;padding:24px 32px;border-bottom:1px solid #27272a;text-align:center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="cid:specter-logo" width="36" height="36" alt="Specter" style="display:block;border-radius:8px;border:0;outline:none;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;line-height:1;">SPECTER</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CONTENT -->
+          <tr>
+            <td style="padding:32px 32px 20px 32px;">
+              ${input.bodyHtml}
+            </td>
+          </tr>
+
+          <!-- SPECTER BRAND FOOTER -->
+          <tr>
+            <td style="background-color:#09090b;padding:28px 32px;border-top:1px solid #27272a;text-align:center;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <div style="font-size:13px;font-weight:700;color:#f4f4f5;margin-bottom:6px;">
+                      SPECTER
+                    </div>
+                    <div style="font-size:12px;color:#a1a1aa;line-height:1.6;margin-bottom:12px;">
+                      ${input.footerDescription}
+                    </div>
+                    <div style="font-size:11px;color:#71717a;">
+                      ${input.formattedDate}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Legal / Automated Note -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;margin-top:16px;">
+          <tr>
+            <td align="center" style="font-size:11px;color:#a1a1aa;line-height:1.5;">
+              This is an automated transactional email generated by your Specter environment. Please do not reply to this message.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildSpecterFailureEmail(payload: FailureAlertPayload): {
+  html: string;
+  text: string;
+} {
+  const formattedDate = formatEmailDateTime(payload.detectedAt, payload.timezone);
+  const specterUrl = buildSpecterJobUrl(payload.jobId);
+
+  const sessionRenewalBanner = payload.requiresSessionRenewal
+    ? `<div style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
+        <div style="font-size:12px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
+          Action Required: Reconnect Web Session
+        </div>
+        <p style="margin:0;font-size:13px;color:#7f1d1d;line-height:1.5;">
+          The session cookies for this website have expired. Open the website in your browser and use the Specter Companion extension to synchronize a fresh session.
+        </p>
+      </div>`
+    : '';
+
+  const bodyHtml = `
+    <div style="display:inline-block;background-color:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">
+      Attention Required
+    </div>
+    <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.4px;line-height:1.3;">
+      Monitor check could not be completed
+    </h1>
+    <p style="margin:0 0 24px 0;font-size:14px;color:#52525b;line-height:1.6;">
+      Specter encountered an issue while monitoring this target. Automatic recovery could not proceed. Review the details below:
+    </p>
+    ${sessionRenewalBanner}
+    ${renderTargetMetadataCard({
+      monitorName: payload.monitorName,
+      targetUrl: payload.targetUrl,
+      userPrompt: payload.userPrompt,
+      formattedDate,
+    })}
+    <div style="background-color:#ffffff;border:1px solid #e4e4e7;border-left:4px solid #ef4444;border-radius:6px;padding:16px 20px;margin-bottom:28px;">
+      <div style="font-size:15px;font-weight:700;color:#09090b;margin-bottom:6px;">
+        ${escapeHtml(payload.errorTitle)}
+      </div>
+      <div style="font-size:13px;color:#52525b;line-height:1.6;margin-bottom:12px;">
+        ${escapeHtml(payload.errorDescription)}
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#27272a;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">
+        What you can do:
+      </div>
+      <div style="font-size:13px;color:#09090b;line-height:1.5;">
+        ${escapeHtml(payload.nextStep)}
+      </div>
+    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+      <tr>
+        <td align="center" style="border-radius:6px;background-color:#09090b;">
+          <a href="${escapeHtml(specterUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">
+            Open Specter Dashboard &rarr;
+          </a>
+        </td>
+      </tr>
+    </table>`;
+
+  const html = renderEmailShell({
+    subject: payload.subject,
+    bodyHtml,
+    footerDescription:
+      'You received this operational alert because this target has reached a terminal failure state.',
+    formattedDate,
+  });
+
+  const text = [
+    `[SPECTER] ATTENTION REQUIRED: ${payload.monitorName ?? payload.targetUrl}`,
+    `============================================================`,
+    ``,
+    `Issue: ${payload.errorTitle}`,
+    `Details: ${payload.errorDescription}`,
+    `What to do: ${payload.nextStep}`,
+    ``,
+    `Monitor: ${payload.monitorName ?? payload.targetUrl}`,
+    `Target URL: ${payload.targetUrl}`,
+    payload.userPrompt ? `Instruction: ${payload.userPrompt}` : null,
+    `Date: ${formattedDate}`,
+    ``,
+    `See more on Specter: ${specterUrl}`,
+    `------------------------------------------------------------`,
+    `Specter • Automated operational notification`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return { html, text };
+}
+
+function buildSpecterChangeEmail(payload: ChangeAlertPayload): { html: string; text: string } {
   const formattedDate = formatEmailDateTime(payload.detectedAt, payload.timezone);
   const totalChanges = payload.diffSummary.totalChanges;
   const changeNoun = totalChanges === 1 ? 'change detected' : 'changes detected';
+  const specterUrl = buildSpecterJobUrl(payload.jobId);
 
   const allChanges = [
     ...payload.diffSummary.modified,
     ...payload.diffSummary.added,
     ...payload.diffSummary.removed,
   ];
-
-  const specterBaseUrl = env.FRONTEND_URL.replace(/\/$/, '');
-  const specterUrl = payload.jobId
-    ? `${specterBaseUrl}/?jobId=${encodeURIComponent(payload.jobId)}`
-    : specterBaseUrl;
 
   const diffRowsHtml = allChanges
     .map((change) => {
@@ -53,13 +262,6 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     })
     .join('');
 
-  const promptBlockHtml = payload.userPrompt
-    ? `<tr>
-        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Instruction:</td>
-        <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${escapeHtml(payload.userPrompt)}</td>
-       </tr>`
-    : '';
-
   const triggerBlockHtml =
     payload.triggerReasons && payload.triggerReasons.length > 0
       ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
@@ -76,156 +278,66 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
         </table>`
       : '';
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(payload.subject)}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#09090b;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f5;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <!-- Main Container Card -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;box-shadow:0 10px 15px -3px rgba(0,0,0,0.04),0 4px 6px -4px rgba(0,0,0,0.02);">
-          
-          <!-- SPECTER BRAND HEADER -->
-          <tr>
-            <td style="background-color:#09090b;padding:24px 32px;border-bottom:1px solid #27272a;text-align:center;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
-                <tr>
-                  <td style="vertical-align:middle;padding-right:12px;">
-                    <!-- Specter Viewfinder Logo with CID attachment reference -->
-                    <img src="cid:specter-logo" width="36" height="36" alt="Specter" style="display:block;border-radius:8px;border:0;outline:none;" />
-                  </td>
-                  <td style="vertical-align:middle;">
-                    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;line-height:1;">SPECTER</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
+  const bodyHtml = `
+    <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.4px;line-height:1.3;">
+      Change detected on monitored target
+    </h1>
+    <p style="margin:0 0 24px 0;font-size:14px;color:#52525b;line-height:1.6;">
+      Specter identified differences in the extracted attributes compared to the previous execution. Review the updated data below:
+    </p>
+    ${renderTargetMetadataCard({
+      monitorName: payload.monitorName,
+      targetUrl: payload.targetUrl,
+      userPrompt: payload.userPrompt,
+      formattedDate,
+      marginBottom: '28px',
+    })}
+    ${triggerBlockHtml}
+    <div style="margin-bottom:28px;">
+      <h2 style="margin:0 0 12px 0;font-size:15px;font-weight:700;color:#09090b;">
+        Change Summary (${totalChanges})
+      </h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;background-color:#ffffff;">
+        <thead>
+          <tr style="background-color:#fafafa;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.5px;">
+            <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Attribute</th>
+            <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Status</th>
+            <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Previous Value</th>
+            <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">New Value</th>
           </tr>
+        </thead>
+        <tbody>
+          ${diffRowsHtml}
+        </tbody>
+      </table>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 28px 0;">
+      <tr>
+        <td align="center">
+          <a href="${escapeHtml(specterUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:#09090b;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:6px;letter-spacing:-0.2px;">
+            See more on Specter &rarr;
+          </a>
+        </td>
+      </tr>
+    </table>
+    <details style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
+      <summary style="font-size:13px;font-weight:600;color:#3f3f46;cursor:pointer;user-select:none;">
+        View full extracted data snapshot (JSON)
+      </summary>
+      <div style="margin-top:12px;">
+        <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;background-color:#09090b;color:#fafafa;padding:14px;border-radius:6px;overflow-x:auto;line-height:1.5;">${escapeHtml(JSON.stringify(payload.data, null, 2))}</pre>
+      </div>
+    </details>`;
 
-          <!-- ALERT HERO & CONTEXT -->
-          <tr>
-            <td style="padding:32px 32px 20px 32px;">
-              <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.4px;line-height:1.3;">
-                Change detected on monitored target
-              </h1>
-              <p style="margin:0 0 24px 0;font-size:14px;color:#52525b;line-height:1.6;">
-                Specter identified differences in the extracted attributes compared to the previous execution. Review the updated data below:
-              </p>
+  const html = renderEmailShell({
+    subject: payload.subject,
+    bodyHtml,
+    footerDescription:
+      'You received this notification because this email was configured to receive alerts for this monitor.',
+    formattedDate,
+  });
 
-              <!-- Target Metadata Card -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:16px 20px;margin-bottom:28px;">
-                <tr>
-                  <td>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Monitored Target:</td>
-                        <td style="padding:6px 0;font-size:13px;word-break:break-word;">
-                          ${payload.monitorName ? `${escapeHtml(payload.monitorName)}<br>` : ''}
-                          <a href="${escapeHtml(payload.targetUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:none;">
-                            ${escapeHtml(payload.targetUrl)}
-                          </a>
-                        </td>
-                      </tr>
-                      ${promptBlockHtml}
-                      <tr>
-                        <td style="padding:6px 0;font-size:12px;color:#71717a;width:140px;font-weight:500;">Detected At:</td>
-                        <td style="padding:6px 0;font-size:13px;color:#09090b;font-weight:500;">${formattedDate}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- TRIGGER REASONS (IF PRESENT) -->
-              ${triggerBlockHtml}
-
-              <!-- ATTRIBUTES DIFF TABLE -->
-              <div style="margin-bottom:28px;">
-                <h2 style="margin:0 0 12px 0;font-size:15px;font-weight:700;color:#09090b;">
-                  Change Summary (${totalChanges})
-                </h2>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;background-color:#ffffff;">
-                  <thead>
-                    <tr style="background-color:#fafafa;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.5px;">
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Attribute</th>
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Status</th>
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">Previous Value</th>
-                      <th style="padding:10px 14px;border-bottom:1px solid #e4e4e7;">New Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${diffRowsHtml}
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- ACTION LINK: REDIRECT TO SPECTER -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 28px 0;">
-                <tr>
-                  <td align="center">
-                    <a href="${escapeHtml(specterUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:#09090b;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:6px;letter-spacing:-0.2px;">
-                      See more on Specter &rarr;
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- FULL SNAPSHOT (JSON ACCORDION) -->
-              <details style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
-                <summary style="font-size:13px;font-weight:600;color:#3f3f46;cursor:pointer;user-select:none;">
-                  View full extracted data snapshot (JSON)
-                </summary>
-                <div style="margin-top:12px;">
-                  <pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;background-color:#09090b;color:#fafafa;padding:14px;border-radius:6px;overflow-x:auto;line-height:1.5;">${escapeHtml(JSON.stringify(payload.data, null, 2))}</pre>
-                </div>
-              </details>
-            </td>
-          </tr>
-
-          <!-- SPECTER BRAND FOOTER -->
-          <tr>
-            <td style="background-color:#09090b;padding:28px 32px;border-top:1px solid #27272a;text-align:center;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td align="center">
-                    <div style="font-size:13px;font-weight:700;color:#f4f4f5;margin-bottom:6px;">
-                      SPECTER
-                    </div>
-                    <div style="font-size:12px;color:#a1a1aa;line-height:1.6;margin-bottom:12px;">
-                      You received this notification because this email was configured to receive alerts for this monitor.
-                    </div>
-                    <div style="font-size:11px;color:#71717a;">
-                      ${formattedDate}
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-        </table>
-
-        <!-- Legal / Automated Note -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;margin-top:16px;">
-          <tr>
-            <td align="center" style="font-size:11px;color:#a1a1aa;line-height:1.5;">
-              This is an automated transactional email generated by your Specter environment. Please do not reply to this message.
-            </td>
-          </tr>
-        </table>
-
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-  const textLines = [
+  const text = [
     `[SPECTER] ${totalChanges} ${changeNoun.toUpperCase()} ON MONITORED TARGET`,
     `============================================================`,
     ``,
@@ -250,5 +362,15 @@ export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; t
     .filter(Boolean)
     .join('\n');
 
-  return { html, text: textLines };
+  return { html, text };
+}
+
+/**
+ * Builds a responsive, enterprise-grade HTML email with Specter brand identity,
+ * routing between change summary emails and terminal failure operational alerts.
+ */
+export function buildSpecterAlertEmail(payload: AlertPayload): { html: string; text: string } {
+  return isFailureAlert(payload)
+    ? buildSpecterFailureEmail(payload)
+    : buildSpecterChangeEmail(payload);
 }

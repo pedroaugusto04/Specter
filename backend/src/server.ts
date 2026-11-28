@@ -148,6 +148,7 @@ async function bootstrap(): Promise<void> {
     realtimeService,
     quotaService,
     diagnosticService: new CompilationDiagnosticService(compilerProvider),
+    alertRouter: notificationDispatcher,
   });
 
   const scrapeExecutionService = new ScrapeExecutionService({
@@ -160,6 +161,7 @@ async function bootstrap(): Promise<void> {
     sessionRepository,
     realtimeService,
     quotaService,
+    alertRouter: notificationDispatcher,
   });
 
   const retentionService = new RetentionService(jobRepository);

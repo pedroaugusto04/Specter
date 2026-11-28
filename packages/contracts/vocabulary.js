@@ -71,6 +71,7 @@ export const FailureCode = Object.freeze(
     Source: 'SOURCE',
     Navigation: 'NAVIGATION',
     Timeout: 'TIMEOUT',
+    SessionExpired: 'SESSION_EXPIRED',
   })
 );
 

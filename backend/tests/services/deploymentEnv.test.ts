@@ -110,12 +110,15 @@ describe('Environment configuration', () => {
     const directory = await mkdtemp(join(tmpdir(), 'specter-env-'));
     try {
       const file = join(directory, 'backend.env');
+      const cleanEnv = { ...process.env };
+      delete cleanEnv.DATABASE_URL;
+      delete cleanEnv.MIGRATION_DATABASE_URL;
       await promisify(execFile)(
         'bash',
         [resolve('../scripts/deploy/generate-backend-env.sh'), file],
         {
           env: {
-            ...process.env,
+            ...cleanEnv,
             ...tuning,
             POSTGRES_APP_PASSWORD: 'app-password-for-test-only',
             ENCRYPTION_KEY: 'a'.repeat(64),

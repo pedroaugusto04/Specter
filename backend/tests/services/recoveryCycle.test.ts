@@ -242,7 +242,8 @@ describe('One persisted result per execution cycle', () => {
       'intent'
     );
     expect(repo.runs[0]?.status).toBe('FAILED');
-    expect(repo.pendingDeliveries).toHaveLength(0);
+    expect(repo.pendingDeliveries).toHaveLength(1);
+    expect(repo.pendingDeliveries[0]?.payload.kind).toBe('failure');
     expect((await repo.findById(jobId))?.extractionPlan?.intent.fields.title).toBeDefined();
   });
   it('accepts a validated empty collection without recovery', async () => {

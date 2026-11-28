@@ -62,6 +62,7 @@ export const JobMapper = {
       lastError: row.lastError,
       recoveryAttempts: row.recoveryAttempts,
       recoveryWindowStartedAt: row.recoveryWindowStartedAt,
+      lastFailureAlertAt: row.lastFailureAlertAt,
       captureScreenshotOnChange: row.captureScreenshotOnChange,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

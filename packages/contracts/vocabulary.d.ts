@@ -65,6 +65,7 @@ export const FailureCode: Readonly<{
   readonly Source: 'SOURCE';
   readonly Navigation: 'NAVIGATION';
   readonly Timeout: 'TIMEOUT';
+  readonly SessionExpired: 'SESSION_EXPIRED';
 }>;
 export const ExtractionFailureReason: Readonly<{
   readonly RequiredField: 'REQUIRED_FIELD';

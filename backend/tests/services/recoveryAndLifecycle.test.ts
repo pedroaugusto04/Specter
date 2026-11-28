@@ -1,3 +1,4 @@
+import type { ChangeAlertPayload } from '../../src/providers/notifications/notification.interface.js';
 import { ExtractionQuality, FailureCode } from '../../src/extraction/constants.js';
 import { InMemoryRealtimeEventBus } from '../../src/providers/realtime/inMemoryRealtime.provider.js';
 import { RealtimeService } from '../../src/services/realtimeService.js';
@@ -219,7 +220,7 @@ describe('Monitor compilation, recovery, and lifecycle', () => {
       'alerts@example.com'
     );
     expect(
-      repository.pendingDeliveries.map((delivery) => delivery.payload)[0]?.diffSummary.modified[0]
+      (repository.pendingDeliveries[0]?.payload as ChangeAlertPayload)?.diffSummary.modified[0]
         ?.field
     ).toBe('price');
   });

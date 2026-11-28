@@ -91,6 +91,7 @@ export const scrapingJobs = pgTable(
 
     recoveryAttempts: integer('recovery_attempts').default(0).notNull(),
     recoveryWindowStartedAt: timestamp('recovery_window_started_at', { withTimezone: true }),
+    lastFailureAlertAt: timestamp('last_failure_alert_at', { withTimezone: true }),
 
     // Visual Diff Screenshot Option (Defaults to false)
     captureScreenshotOnChange: boolean('capture_screenshot_on_change').default(false).notNull(),

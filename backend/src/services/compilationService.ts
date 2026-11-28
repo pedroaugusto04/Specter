@@ -41,6 +41,10 @@ import type { QuotaService } from './quotaService.js';
 import type { RealtimeService } from './realtimeService.js';
 import type { SuccessfulRunService } from './successfulRunService.js';
 
+import type { IAlertRouter } from '../notifications/contracts.js';
+import { prepareTerminalFailureAlert } from '../utils/failureAlertHelper.js';
+import { FailureCode } from '../extraction/constants.js';
+
 function compilationFailureStatus(input: {
   willRetry: boolean;
   hasExistingPlan: boolean;
@@ -99,6 +103,7 @@ export interface CompilationServiceDeps {
   realtimeService: RealtimeService;
   quotaService: QuotaService;
   diagnosticService: CompilationDiagnosticService;
+  alertRouter?: IAlertRouter;
 }
 
 export class CompilationService implements ICompilationControl {
@@ -311,6 +316,7 @@ export class CompilationService implements ICompilationControl {
           contractRevision,
           status: JobStatus.Active,
           lastError: null,
+          lastFailureAlertAt: null,
           bullmqRepeatableKey: repeatableKey,
         },
         job.updatedAt
@@ -447,10 +453,18 @@ export class CompilationService implements ICompilationControl {
 
   private async failRecovery(job: ScrapingJobEntity, run: JobRunEntity): Promise<void> {
     const message = USER_FAILURES.requestedDataUnavailable.description;
+    const { deliveries, jobPatch } = await prepareTerminalFailureAlert({
+      alertRouter: this.deps.alertRouter,
+      job,
+      userMessage: message,
+      failureCode: run.extractionReport?.failureCode ?? FailureCode.Readiness,
+      logContext: 'Failed to prepare terminal recovery failure alert',
+    });
+
     const completed = await this.deps.jobRepository.commitRun(
       buildFailedRunUpdate(run, message),
-      [],
-      { status: JobStatus.Failed, lastError: message },
+      deliveries,
+      { status: JobStatus.Failed, lastError: message, ...jobPatch },
       job.updatedAt
     );
     await this.deps.jobScheduler.removeRepeatableJob(job.id, job.bullmqRepeatableKey);

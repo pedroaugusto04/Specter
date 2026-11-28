@@ -1,7 +1,8 @@
 import type { DiffSummary } from '../../types/domain.js';
 import type { ExtractedPayload } from '../../types/extractor.js';
 
-export interface AlertPayload {
+export interface BaseAlertPayload {
+  kind?: 'change' | 'failure';
   deliveryId?: string;
   to?: string;
   subject: string;
@@ -10,13 +11,32 @@ export interface AlertPayload {
   monitorName?: string;
   userPrompt?: string;
   detectedAt?: Date;
-  diffSummary: DiffSummary;
-  data: ExtractedPayload;
   userId?: string;
   timezone?: string;
   webhookUrl?: string | null;
   webhookSecret?: string | null;
   triggerReasons?: string[];
+}
+
+export interface ChangeAlertPayload extends BaseAlertPayload {
+  kind?: 'change';
+  diffSummary: DiffSummary;
+  data: ExtractedPayload;
+}
+
+export interface FailureAlertPayload extends BaseAlertPayload {
+  kind: 'failure';
+  errorTitle: string;
+  errorDescription: string;
+  nextStep: string;
+  failureCode?: string;
+  requiresSessionRenewal?: boolean;
+}
+
+export type AlertPayload = ChangeAlertPayload | FailureAlertPayload;
+
+export function isFailureAlert(payload: AlertPayload): payload is FailureAlertPayload {
+  return payload.kind === 'failure';
 }
 
 export interface INotificationProvider {

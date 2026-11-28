@@ -27,6 +27,7 @@ export function decideRecovery(input: {
       ? classifyReportFailure(report)
       : undefined;
   if (access === AccessFailure.Blocked) return RecoveryDecision.Fail;
+  if (report?.failureCode === FailureCode.SessionExpired) return RecoveryDecision.Fail;
   if (access === AccessFailure.Timeout || access === AccessFailure.Transient)
     return metadata.accessAttempts < maxAccessAttempts
       ? RecoveryDecision.Retry

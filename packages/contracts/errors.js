@@ -57,8 +57,9 @@ export const USER_FAILURES = Object.freeze({
   },
   sessionUnavailable: {
     title: 'Website Session Needs Attention',
-    description: 'We could not use the saved website session.',
-    nextStep: 'Reconnect your website session, then try again.',
+    description: 'The authenticated web session for this website has expired or redirected to login.',
+    nextStep:
+      'Open the website in your browser and reconnect your session using the Specter Companion extension.',
   },
   unsupported: {
     title: 'Page Cannot Be Monitored Yet',

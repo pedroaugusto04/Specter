@@ -1,0 +1,1 @@
+ALTER TABLE "scraping_jobs" ADD COLUMN "last_failure_alert_at" timestamp with time zone;
