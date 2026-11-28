@@ -1,5 +1,8 @@
 import { Redis } from 'ioredis';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import * as schema from './db/schema.js';
 import { reconcileRuns } from './queues/runReconciler.js';
 import { ScheduleCoordinator } from './queues/scheduleCoordinator.js';
 import { ExecutionLease } from './queues/executionLease.js';
@@ -51,6 +54,24 @@ import { JobStatus } from './types/enums.js';
 import { WorkerManager } from './workers/workers.js';
 
 async function bootstrap(): Promise<void> {
+  const migrationClient = postgres(env.MIGRATION_DATABASE_URL ?? env.DATABASE_URL, {
+    max: 1,
+    connect_timeout: 10,
+  });
+  try {
+    await migrate(drizzle(migrationClient, { schema }), {
+      migrationsFolder: 'drizzle/migrations',
+    });
+    logger.info('Database migrations applied successfully.');
+  } catch (err) {
+    logger.error('Database migration failed', {
+      errorMessage: getErrorMessage(err),
+    });
+    throw err;
+  } finally {
+    await migrationClient.end({ timeout: 5 });
+  }
+
   const db = getDb();
   const accessRedis = new Redis(env.REDIS_URL);
   const leaseStore = new RedisLeaseStore(accessRedis);
@@ -161,17 +182,6 @@ async function bootstrap(): Promise<void> {
     webhookProvider
   );
   const sessionService = new SessionService(sessionRepository);
-
-  // Run migrations automatically on startup
-  try {
-    await migrate(db, { migrationsFolder: 'drizzle/migrations' });
-    logger.info('Database migrations applied successfully.');
-  } catch (err) {
-    logger.error('Database migration failed', {
-      errorMessage: getErrorMessage(err),
-    });
-    throw err;
-  }
 
   // Reconcile PostgreSQL active jobs with BullMQ repeatable schedules on startup
   try {

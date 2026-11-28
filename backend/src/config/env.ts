@@ -21,6 +21,7 @@ export const envSchema = z.object({
     .string()
     .url('DATABASE_URL must be a valid connection URL')
     .default('postgresql://postgres:postgres@localhost:5432/specter'),
+  MIGRATION_DATABASE_URL: z.string().url().optional(),
   REDIS_URL: z
     .string()
     .url('REDIS_URL must be a valid Redis URL')
