@@ -117,6 +117,7 @@ describe('Environment configuration', () => {
           env: {
             ...process.env,
             ...tuning,
+            POSTGRES_APP_PASSWORD: 'app-password-for-test-only',
             ENCRYPTION_KEY: 'a'.repeat(64),
             COMPILER_PROVIDER: 'api',
             COMPILER_API_MODEL: 'gemini-test-model',
@@ -131,6 +132,13 @@ describe('Environment configuration', () => {
       expect(generated).toContain('COMPILER_PROVIDER=api\n');
       expect(generated).toContain('COMPILER_API_MODEL=gemini-test-model\n');
       expect(generated).toContain('COMPILER_API_KEY=test-secret\n');
+      expect(generated).toContain('POSTGRES_APP_PASSWORD=app-password-for-test-only\n');
+      expect(generated).toContain(
+        'DATABASE_URL=postgresql://specter_app:app-password-for-test-only@postgres:5432/specter\n'
+      );
+      expect(generated).toContain(
+        'MIGRATION_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/specter\n'
+      );
       const workflow = await readFile('../.github/workflows/deploy-fullstack.yml', 'utf8');
       expect(workflow).toContain('secrets.ENCRYPTION_KEY');
       for (const example of ['../.env.example', '.env.example']) {
